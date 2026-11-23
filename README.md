@@ -63,3 +63,9 @@ npm run typecheck
 In Supabase > Authentication > URL Configuration, set **Site URL** to the Vercel production address and add
 `https://<that address>/**` under **Redirect URLs**, so invite and password-reset emails open the app instead of localhost.
 
+
+## Before launch
+
+- [ ] **Turn second-person sign-off back on.** It is off during pre-launch so one owner can load the historical imports.
+  Run in the Supabase SQL editor: `update public.organizations set require_second_signoff = true;`
+  After that, the person who uploads an import can never publish it.

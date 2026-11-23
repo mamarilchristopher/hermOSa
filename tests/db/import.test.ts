@@ -184,3 +184,31 @@ describe("discarding a staged batch", () => {
     expect((await db.rpc(owner, "aal2", "cancel_staged_batch", [rows[0].id, "Should not work"])).error).toBe("NOT_STAGED");
   });
 });
+
+describe("pre-launch switch for the second sign-off", () => {
+  it("with the switch off, an MFA owner can publish their own upload; finance still cannot; it is audited", async () => {
+    await db.sql("UPDATE public.organizations SET require_second_signoff = false");
+    try {
+      const csv = "source_id,posting_date,amount_php\nDEMO-SW1,2025-07-01,10.00\n";
+      const s = await db.stage(owner, "aal2", "MARIKINA", csv, 1, 1000);
+      const p = await db.rpc(owner, "aal2", "publish_historical_batch", [s.id, 1, 1000]);
+      expect(p.ok).toBe(true);
+      expect(await db.auditCount("IMPORT_PUBLISHED", "next_value->>'self_approved' = 'true'")).toBe(1);
+      const csv2 = "source_id,posting_date,amount_php\nDEMO-SW2,2025-07-02,10.00\n";
+      const s2 = await db.stage(finance, "aal2", "MARIKINA", csv2, 1, 1000);
+      expect((await db.rpc(finance, "aal2", "publish_historical_batch", [s2.id, 1, 1000])).error).toBe("SELF_APPROVAL_DENIED");
+      // reconciliation still applies
+      const csv3 = "source_id,posting_date,amount_php\nDEMO-SW3,2025-07-03,10.00\n";
+      const s3 = await db.stage(owner, "aal2", "MARIKINA", csv3, 1, 999);
+      expect((await db.rpc(owner, "aal2", "publish_historical_batch", [s3.id, 1, 999])).error).toBe("RECONCILIATION_FAILED");
+    } finally {
+      await db.sql("UPDATE public.organizations SET require_second_signoff = true");
+    }
+  });
+
+  it("with the switch on (default), the owner cannot publish their own upload", async () => {
+    const csv = "source_id,posting_date,amount_php\nDEMO-SW4,2025-07-04,10.00\n";
+    const s = await db.stage(owner, "aal2", "MARIKINA", csv, 1, 1000);
+    expect((await db.rpc(owner, "aal2", "publish_historical_batch", [s.id, 1, 1000])).error).toBe("SELF_APPROVAL_DENIED");
+  });
+});
