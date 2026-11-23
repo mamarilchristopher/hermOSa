@@ -50,10 +50,16 @@ npm run typecheck
    select id, 'OWNER' from public.app_users where email = 'owner@example.com';
    ```
    After that, roles are managed in the app at `/admin/users`.
-5. Create a Vercel project from this repo with `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (from Supabase > Project Settings > API). Never add the service role key to Vercel.
+5. Create a Vercel project from this repo (production builds from `main`) with `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (from Supabase > Project Settings > API). Never add the service role key to Vercel.
 
 ## Data rules
 
 - Test with DEMO or sanitized files only. Do not put real patient or employee records in chats, issues or test fixtures.
 - Dashboards show "No validated data" until a branch's import is signed off; nothing is estimated or made up.
 - Official receipts and BIR invoicing stay in the clinic's current registered process (excluded from scope).
+
+## After the first Vercel deploy
+
+In Supabase > Authentication > URL Configuration, set **Site URL** to the Vercel production address and add
+`https://<that address>/**` under **Redirect URLs**, so invite and password-reset emails open the app instead of localhost.
+
