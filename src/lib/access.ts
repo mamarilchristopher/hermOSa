@@ -9,6 +9,7 @@ export type Access = {
   display_name: string;
   mfa: boolean;
   needs_mfa: boolean;
+  join_status?: "PENDING" | "APPROVED" | "REJECTED";
   grants: { role: Role; branch_id: string | null }[];
 };
 export type Branch = { id: string; code: string; name: string; kind: "CLINIC" | "HQ" };
@@ -18,18 +19,22 @@ export type Branch = { id: string; code: string; name: string; kind: "CLINIC" | 
  * and to /mfa when a privileged role needs a second factor. The database enforces the same
  * rules again; hiding a button here is never the security boundary.
  */
-export async function requireAccess(opts: { allowWithoutMfa?: boolean } = {}) {
+export async function requireAccess(opts: { allowWithoutMfa?: boolean; allowPending?: boolean } = {}) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  const { data, error } = await supabase.rpc("my_access");
+  // Both reads go out together: each trip to the database counts on every page load.
+  const [{ data, error }, { data: branches }] = await Promise.all([
+    supabase.rpc("my_access"),
+    supabase.from("branches").select("id, code, name, kind").order("name"),
+  ]);
   if (error) throw new Error("Could not load access");
   const access = data as Access | null;
   if (!access) redirect("/login?error=no_account");
+  if (access.join_status === "PENDING" && !opts.allowPending) redirect("/pending");
   if (access.needs_mfa && !access.mfa && !opts.allowWithoutMfa) redirect("/mfa");
-  const { data: branches } = await supabase.from("branches").select("id, code, name, kind").order("name");
   return { supabase, access, branches: sortBranches((branches ?? []) as Branch[]) };
 }
 
@@ -79,5 +84,9 @@ export const ERROR_TEXT: Record<string, string> = {
   UNKNOWN_SERVICE: "That service isn't available. Refresh the page.",
   NAME_REQUIRED: "Type a name.",
   BAD_REQUEST: "Something was missing. Try again.",
+  LEVEL_REQUIRED: "Choose a staff level first.",
+  BRANCH_REQUIRED: "Choose their home branch.",
+  UNKNOWN_USER: "That person isn't in the list any more. Refresh the page.",
+  SELF_ESCALATION_DENIED: "You can't change your own access.",
 };
 export const errorText = (code: string | undefined) => (code && ERROR_TEXT[code]) || "Something went wrong.";
