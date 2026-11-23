@@ -91,3 +91,11 @@ it("sortBranches uses the owner's order", async () => {
   const list = ["MARIKINA", "STA_MARIA", "QC_MAIN", "FAIRVIEW"].map((code) => ({ code, name: code }));
   expect(sortBranches(list).map((b) => b.code)).toEqual(["QC_MAIN", "FAIRVIEW", "STA_MARIA", "MARIKINA"]);
 });
+
+it("commission preview: 5%, lead 60 / assist 40, rounding gives the remainder to the assistant", async () => {
+  const { previewCommission } = await import("../../src/lib/commission");
+  expect(previewCommission(1_000_000, "LEAD")).toEqual({ total: 50000, lead: 30000, assist: 20000, solo: 0 });
+  expect(previewCommission(333_300, "ASSIST")).toEqual({ total: 16665, lead: 9999, assist: 6666, solo: 0 });
+  expect(previewCommission(600_000, "SOLO").solo).toBe(30000);
+  expect(previewCommission(600_000, "NONCOMMI").total).toBe(0);
+});

@@ -1,4 +1,6 @@
+import Link from "next/link";
 import type { Access } from "@/lib/access";
+import { createClient } from "@/lib/supabase/server";
 import { can } from "@/lib/access";
 import { IconLogout, IconShield } from "./Icons";
 import { NavLinks, type NavItem } from "./NavLinks";
@@ -9,11 +11,23 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 /** App navigation: a sidebar on wide screens, a top bar plus bottom tabs on phones. */
-export function TopBar({ access }: { access: Access }) {
+export async function TopBar({ access }: { access: Access }) {
+  const supabase = await createClient();
+  const approver = access.grants.some((g) => g.role === "OWNER" || g.role === "MANAGER");
+  const [{ data: overdueData }, { data: me }] = await Promise.all([
+    approver ? supabase.rpc("overdue_commission_days") : Promise.resolve({ data: [] }),
+    supabase.from("employees").select("id").eq("app_user_id", access.user_id).maybeSingle(),
+  ]);
+  const overdue = (Array.isArray(overdueData) ? overdueData : []) as { code: string; name: string; date: string; pending: number }[];
+  const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
+  const people = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "HR", "AUDITOR"].includes(g.role));
   const importer = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
   const filler = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER"].includes(g.role));
   const items: NavItem[] = [
     { href: "/", label: "Sales dashboard", short: "Sales", icon: "chart" },
+    ...(logger ? [{ href: "/services", label: "Service log", short: "Services", icon: "clipboard", badge: overdue.length || undefined } as NavItem] : []),
+    ...(people ? [{ href: "/people", label: "Employees", short: "Staff", icon: "people" } as NavItem] : []),
+    ...(me && !people ? [{ href: `/people/${me.id}`, label: "My commissions", short: "Mine", icon: "coins" } as NavItem] : []),
     ...(filler ? [{ href: "/sales/missing", label: "Missing days", short: "Missing", icon: "calendar" } as NavItem] : []),
     ...(importer ? [{ href: "/imports", label: "Imports", short: "Imports", icon: "upload" } as NavItem] : []),
     ...(can(access, ["OWNER"], null) ? [{ href: "/admin/users", label: "Users and roles", short: "Users", icon: "users" } as NavItem] : []),
@@ -49,6 +63,17 @@ export function TopBar({ access }: { access: Access }) {
         </form>
       </header>
       <NavLinks items={items} variant="tabs" />
+      {overdue.length > 0 && (
+        <div className="alert-strip" role="status">
+          <strong>Commission sign-off overdue:</strong>
+          {overdue.slice(0, 6).map((o) => (
+            <Link key={`${o.code}-${o.date}`} href={`/services?date=${o.date}&branch=${o.code}`}>
+              {o.name.replace(/ \(.*\)$/, "")}, {o.date.slice(5).replace("-", "/")} ({o.pending})
+            </Link>
+          ))}
+          {overdue.length > 6 && <span>+{overdue.length - 6} more days</span>}
+        </div>
+      )}
     </>
   );
 }

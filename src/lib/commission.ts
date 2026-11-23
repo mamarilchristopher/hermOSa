@@ -1,0 +1,17 @@
+// Commission maths shared by the entry form preview. The database computes the stored amounts the same way.
+export const RATE_BP = 500; // 5% of the amount paid
+export const LEAD_SHARE_BP = 6000; // lead 60%, assistant 40%
+export type CommissionType = "LEAD" | "ASSIST" | "SOLO" | "NONCOMMI";
+
+const roundBp = (cents: number, bp: number) => Math.floor((cents * bp + 5000) / 10000);
+
+export function previewCommission(paidCents: number, type: CommissionType) {
+  if (type === "NONCOMMI" || !(paidCents > 0)) return { total: 0, lead: 0, assist: 0, solo: 0 };
+  const total = roundBp(paidCents, RATE_BP);
+  if (type === "SOLO") return { total, lead: 0, assist: 0, solo: total };
+  const lead = roundBp(total, LEAD_SHARE_BP);
+  return { total, lead, assist: total - lead, solo: 0 };
+}
+
+export const ROLE_TEXT: Record<string, string> = { SOLO: "solo", LEAD: "lead", ASSIST: "assist" };
+export const TYPE_TEXT: Record<string, string> = { LEAD: "Lead + assist", SOLO: "Solo", NONCOMMI: "No commission" };

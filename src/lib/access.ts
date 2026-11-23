@@ -72,5 +72,12 @@ export const ERROR_TEXT: Record<string, string> = {
   INVALID_AMOUNT: "Enter an amount above zero.",
   INVALID_DATE: "Only past days can be filled in.",
   NOT_FOUND: "Not found. Refresh the page.",
+  ASSISTANT_REQUIRED: "Choose who assisted (or who led, for Assist).",
+  SAME_PERSON: "The lead and the assistant must be different people.",
+  EMPLOYEE_REQUIRED: "Choose who did the service.",
+  UNKNOWN_EMPLOYEE: "That employee isn't active. Refresh the page.",
+  UNKNOWN_SERVICE: "That service isn't available. Refresh the page.",
+  NAME_REQUIRED: "Type a name.",
+  BAD_REQUEST: "Something was missing. Try again.",
 };
 export const errorText = (code: string | undefined) => (code && ERROR_TEXT[code]) || "Something went wrong.";
