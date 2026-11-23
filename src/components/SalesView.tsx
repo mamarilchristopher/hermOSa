@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { MonthBars, Spark, WeekdayBars } from "./SalesCharts";
 import { centsToPhp } from "@/lib/csv";
-import { change, type Insights, type Scope } from "@/lib/insights";
+import { addDays, change, WEEKDAYS, weekday, type DayRow, type Insights, type Scope, type ZeroMark } from "@/lib/insights";
 
 function Delta({ cur, base, label }: { cur: number; base: number | null; label: string }) {
   const c = change(cur, base);
@@ -17,7 +17,7 @@ function Delta({ cur, base, label }: { cur: number; base: number | null; label: 
 function MissingLink({ s, branch, q }: { s: Scope; branch?: string; q: string }) {
   if (s.missing.length === 0) return <span className="missing-link none">✓ No missing days</span>;
   return (
-    <Link className="missing-link" href={`/sales/missing?${q}${branch ? `&branch=${branch}` : ""}`}>
+    <Link className="missing-link" href={`/sales/missing?${q}${branch && !q.includes("branch=") ? `&branch=${branch}` : ""}`}>
       ⚠ {s.missing.length} day{s.missing.length > 1 ? "s" : ""} with no recorded sales
     </Link>
   );
@@ -34,7 +34,7 @@ export function SalesView({ ins, whole, q }: { ins: Insights; whole: boolean; q:
             <div className="value">{centsToPhp(c.total)}</div>
             <div className="note"><Delta cur={c.total} base={c.prev} label={ins.prevLabel} /></div>
             {!ins.prevLabel.includes("last year") && <div className="note"><Delta cur={c.total} base={c.lastYear} label="same period last year" /></div>}
-            <div className="note" style={{ marginTop: 6 }}><MissingLink s={c} q={q} />{whole && c.missing.length > 0 ? <span className="muted"> (all branches)</span> : null}</div>
+            <div className="note" style={{ marginTop: 6 }}><MissingLink s={c} q={q} branch={whole ? undefined : ins.branches[0]?.branch.code} />{whole && c.missing.length > 0 ? <span className="muted"> (all branches)</span> : null}</div>
             {c.pendingMarks > 0 && (
               <div className="note"><Link href={`/sales/missing?${q}`}>{c.pendingMarks} Closed / No sales day{c.pendingMarks > 1 ? "s" : ""} waiting for a second person</Link></div>
             )}
@@ -73,12 +73,12 @@ export function SalesView({ ins, whole, q }: { ins: Insights; whole: boolean; q:
 
         {whole && (
           <>
-            <h2>By branch</h2>
+            <h2>By Branch:</h2>
             <div className="grid branches">
               {ins.branches.map((b) => (
                 <div className="card branch-card" key={b.branch.id}>
                   <div className="top">
-                    <h3>{b.branch.name}</h3>
+                    <h3><Link className="card-link" href={`/?${q}&branch=${b.branch.code}`}>{b.branch.name} ›</Link></h3>
                     <Spark months={b.months} label={b.branch.name} />
                   </div>
                   {!b.branch.first_date ? (
@@ -103,5 +103,48 @@ export function SalesView({ ins, whole, q }: { ins: Insights; whole: boolean; q:
           </>
         )}
       </>
+  );
+}
+
+/** Day-by-day list for one branch in the period, newest first. */
+export function BranchDays({ ins, days, marks }: { ins: Insights; days: DayRow[]; marks: ZeroMark[] }) {
+  const b = ins.branches[0];
+  if (!b?.branch.first_date || ins.compareEnd < ins.period.start) return null;
+  const sales = new Map(days.filter((d) => d[0] === b.branch.id).map((d) => [d[1], Number(d[2])]));
+  const mark = new Map(marks.filter((m) => m[0] === b.branch.id).map((m) => [m[1], m]));
+  const rows: string[] = [];
+  for (let d = ins.compareEnd; d >= ins.period.start && rows.length < 400; d = addDays(d, -1)) {
+    if (d < b.branch.first_date) break;
+    rows.push(d);
+  }
+  const avg = b.avgPerDay;
+  return (
+    <>
+      <h2>Day by Day</h2>
+      <div className="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Day</th><th className="num">Sales</th><th className="num">vs average day</th></tr></thead>
+          <tbody>
+            {rows.map((d) => {
+              const c = sales.get(d);
+              const m = mark.get(d);
+              const diff = c !== undefined && avg ? (c - avg) / avg : null;
+              return (
+                <tr key={d}>
+                  <td>{d}</td>
+                  <td>{WEEKDAYS[weekday(d)]}</td>
+                  <td className="num">
+                    {c !== undefined ? centsToPhp(c)
+                      : m ? <span className="muted">{m[2] === "CLOSED" ? "Closed" : "No sales"}{m[3] === "PENDING" ? " (needs 2nd person)" : ""}</span>
+                      : <Link href={`/sales/missing?p=custom&start=${d}&end=${d}&branch=${b.branch.code}`}>Missing, fill in</Link>}
+                  </td>
+                  <td className="num">{diff === null ? "" : <span className={`delta ${diff >= 0 ? "up" : "down"}`}>{diff >= 0 ? "+" : ""}{(diff * 100).toFixed(0)}%</span>}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }

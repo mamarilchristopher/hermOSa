@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAccess, errorText } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
-import { SalesView } from "@/components/SalesView";
+import { BranchDays, SalesView } from "@/components/SalesView";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { computeInsights, fetchStart, resolvePeriod, sortBranches, type BranchInfo, type DayRow, type ZeroMark } from "@/lib/insights";
 
@@ -16,25 +16,30 @@ const PRESETS = [
   ["12m", "Last 12 months"],
 ] as const;
 
-export default async function Dashboard({ searchParams }: { searchParams: Promise<{ p?: string; start?: string; end?: string }> }) {
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ p?: string; start?: string; end?: string; branch?: string }> }) {
   const { supabase, access } = await requireAccess();
   const sp = await searchParams;
   const today = manilaToday();
   const period = resolvePeriod(sp.p, isIsoDate(sp.start) ? sp.start : undefined, isIsoDate(sp.end) ? sp.end : undefined, today);
   const { data } = await supabase.rpc("historical_sales_daily", { p_start: fetchStart(period), p_end: period.end });
   const daily = (data ?? { ok: false, error: "UNKNOWN" }) as Daily;
-  if (daily.ok) daily.branches = sortBranches(daily.branches);
+  const allBranches = daily.ok ? sortBranches(daily.branches) : [];
+  // Drill-down: ?branch=CODE shows one branch on its own.
+  const focus = daily.ok ? allBranches.find((b) => b.code === sp.branch) : undefined;
+  if (daily.ok) daily.branches = focus ? [focus] : allBranches;
+  const bq = focus ? `&branch=${focus.code}` : "";
   const { count: pending } = await supabase.from("import_batches").select("id", { count: "exact", head: true }).eq("state", "STAGED");
 
-  const q = `p=${period.key}&start=${period.start}&end=${period.end}`;
+  const q = `p=${period.key}&start=${period.start}&end=${period.end}${bq}`;
   const header = (
     <>
       <div className="periods card">
         {PRESETS.map(([k, label]) => (
-          <Link key={k} href={`/?p=${k}`} className={period.key === k ? "on" : ""}>{label}</Link>
+          <Link key={k} href={`/?p=${k}${bq}`} className={period.key === k ? "on" : ""}>{label}</Link>
         ))}
         <form>
           <input type="hidden" name="p" value="custom" />
+          {focus && <input type="hidden" name="branch" value={focus.code} />}
           <input type="date" name="start" defaultValue={period.start} aria-label="From" />
           <span className="muted">to</span>
           <input type="date" name="end" defaultValue={period.end} max={today} aria-label="To" />
@@ -63,14 +68,23 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
   const ins = computeInsights({ period, today, branches: daily.branches, days: daily.days, closed: daily.closed });
   const anyData = daily.branches.some((b) => b.first_date);
-  const whole = daily.consolidated || daily.branches.length > 1;
+  const whole = !focus && (daily.consolidated || daily.branches.length > 1);
   const throughText = ins.compareEnd < period.start ? "no complete days yet" : `${period.start} to ${ins.compareEnd}`;
 
   return (
     <>
       <TopBar access={access} />
       <main>
-        <h1>{whole ? "Sales: all branches" : `Sales: ${daily.branches[0].name}`}</h1>
+        {focus && allBranches.length > 1 && (
+          <p className="small" style={{ margin: "0 0 6px" }}>
+            <Link href={`/?p=${period.key}&start=${period.start}&end=${period.end}`}>← Sales: All Branches</Link>
+            {" · "}
+            {allBranches.filter((b) => b.id !== focus.id).map((b, i) => (
+              <span key={b.id}>{i > 0 && " · "}<Link href={`/?p=${period.key}&start=${period.start}&end=${period.end}&branch=${b.code}`}>{b.name}</Link></span>
+            ))}
+          </p>
+        )}
+        <h1>{whole ? "Sales: All Branches" : `Sales: ${daily.branches[0].name}`}</h1>
         <p className="muted small">
           {period.label} · {throughText} (Manila, today not counted until it's recorded) · published imports only
         </p>
@@ -83,6 +97,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         {!anyData && <div className="notice info">No validated data yet. Sales show here once an import is published.</div>}
 
         {anyData && <SalesView ins={ins} whole={whole} q={q} />}
+        {anyData && !whole && <BranchDays ins={ins} days={daily.days} marks={daily.closed} />}
       </main>
     </>
   );
