@@ -164,3 +164,23 @@ describe("reversal and re-import", () => {
     expect(r.rows.find((x: any) => x.branch_code === "QC_MAIN").has_validated_data).toBe(true);
   });
 });
+
+describe("discarding a staged batch", () => {
+  it("a batch with wrong expected totals can be discarded and the same file staged again", async () => {
+    const csv = "source_id,posting_date,amount_php\nDEMO-X1,2025-06-01,10.00\nDEMO-X2,2025-06-02,5.50\n";
+    const wrong = await db.stage(fairviewManager, "aal1", "FAIRVIEW", csv, 2, 1600);
+    expect((await db.stage(fairviewManager, "aal1", "FAIRVIEW", csv, 2, 1550)).duplicate).toBe(true);
+    expect((await db.rpc(cashier, "aal1", "cancel_staged_batch", [wrong.id, "Typed the total wrong"])).error).toBe("FORBIDDEN");
+    expect((await db.rpc(fairviewManager, "aal1", "cancel_staged_batch", [wrong.id, "short"])).error).toBe("REASON_REQUIRED");
+    expect((await db.rpc(fairviewManager, "aal1", "cancel_staged_batch", [wrong.id, "Typed the total wrong"])).ok).toBe(true);
+    const fixed = await db.stage(fairviewManager, "aal1", "FAIRVIEW", csv, 2, 1550);
+    expect(fixed).toMatchObject({ ok: true, duplicate: false });
+    expect((await db.rpc(owner, "aal2", "publish_historical_batch", [fixed.id, 2, 1550])).ok).toBe(true);
+    expect(await db.auditCount("IMPORT_DISCARDED")).toBe(1);
+  });
+
+  it("published batches cannot be discarded, only reversed", async () => {
+    const { rows } = await db.sql("SELECT id FROM public.import_batches WHERE state = 'PUBLISHED' LIMIT 1");
+    expect((await db.rpc(owner, "aal2", "cancel_staged_batch", [rows[0].id, "Should not work"])).error).toBe("NOT_STAGED");
+  });
+});

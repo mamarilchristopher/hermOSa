@@ -1,6 +1,6 @@
 "use client";
 import { useActionState } from "react";
-import { publishImport, reverseImport, stageImport, type FormState } from "./actions";
+import { discardImport, publishImport, reverseImport, stageImport, type FormState } from "./actions";
 
 function Notice({ state }: { state: FormState }) {
   if (state?.error) return <div className="notice error">{state.error}</div>;
@@ -58,6 +58,18 @@ export function ReverseForm({ batch }: { batch: string }) {
       <input type="hidden" name="batch" value={batch} />
       <label>Reason<textarea name="reason" minLength={8} maxLength={500} required rows={2} /></label>
       <button type="submit" className="danger" disabled={pending}>{pending ? "Reversing…" : "Reverse this batch"}</button>
+    </form>
+  );
+}
+
+export function DiscardForm({ batch }: { batch: string }) {
+  const [state, action, pending] = useActionState(discardImport, undefined);
+  return (
+    <form action={action} className="stack">
+      <Notice state={state} />
+      <input type="hidden" name="batch" value={batch} />
+      <label>Reason<input name="reason" minLength={8} maxLength={500} required placeholder="e.g. Typed the total wrong" /></label>
+      <button type="submit" className="secondary" disabled={pending}>{pending ? "Discarding…" : "Discard this upload"}</button>
     </form>
   );
 }

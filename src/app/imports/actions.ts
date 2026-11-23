@@ -82,3 +82,15 @@ export async function reverseImport(_prev: FormState, fd: FormData): Promise<For
   revalidatePath(`/imports/${parsed.data.batch}`);
   return { ok: "Reversed. The original rows and audit trail are kept." };
 }
+
+export async function discardImport(_prev: FormState, fd: FormData): Promise<FormState> {
+  const parsed = Reverse.safeParse({ batch: fd.get("batch"), reason: fd.get("reason") });
+  if (!parsed.success) return { error: errorText("REASON_REQUIRED") };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("cancel_staged_batch", { p_batch: parsed.data.batch, p_reason: parsed.data.reason });
+  if (error) return { error: "Could not discard. Try again." };
+  if (!data.ok) return { error: errorText(data.error) };
+  revalidatePath(`/imports/${parsed.data.batch}`);
+  revalidatePath("/imports");
+  return { ok: "Discarded. You can upload the corrected file or totals now." };
+}

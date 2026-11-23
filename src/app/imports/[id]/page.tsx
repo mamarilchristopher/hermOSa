@@ -4,7 +4,7 @@ import { requireAccess, can } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { centsToPhp } from "@/lib/csv";
 import { formatManila } from "@/lib/dates";
-import { PublishForm, ReverseForm } from "../Forms";
+import { DiscardForm, PublishForm, ReverseForm } from "../Forms";
 
 export default async function BatchPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ duplicate?: string }> }) {
   const { id } = await params;
@@ -47,7 +47,10 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
           <div className="card"><h2 style={{ marginTop: 0 }}>Sign off</h2><PublishForm batch={b.id} /></div>
         )}
         {b.state === "STAGED" && isUploader && <div className="notice info">Someone else with Owner or Finance access has to sign this off.</div>}
-        {b.state === "STAGED" && !countsMatch && <div className="notice error">This batch can't be published. Fix the file or the expected totals and upload again.</div>}
+        {b.state === "STAGED" && !countsMatch && <div className="notice error">This batch can't be published. Discard it below, then upload the corrected file or totals.</div>}
+        {b.state === "STAGED" && can(access, ["OWNER", "FINANCE", "MANAGER"], b.branch_id) && (
+          <div className="card"><h2 style={{ marginTop: 0 }}>Discard</h2><p className="small muted">Use this if the file or the expected totals were wrong. Nothing was published, and the record is kept.</p><DiscardForm batch={b.id} /></div>
+        )}
         {b.state === "PUBLISHED" && canApprove && (
           <div className="card"><h2 style={{ marginTop: 0 }}>Reverse</h2><p className="small muted">Removes this batch from all totals. The rows and audit trail are kept.</p><ReverseForm batch={b.id} /></div>
         )}
