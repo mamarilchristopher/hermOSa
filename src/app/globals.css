@@ -315,3 +315,30 @@ label .muted { font-weight: 500; }
   .log-table td:nth-child(4), .log-table td:nth-child(5) { grid-column: 1 / -1; }
   .log-table td[colspan] { grid-column: 1 / -1; }
 }
+
+/* Staff invites and join requests */
+.nav-badge.inline { display: inline-grid; margin-left: 8px; vertical-align: middle; }
+.join-request { display: grid; gap: 12px; padding: 16px 0; border-top: 1px solid var(--line); }
+.join-request:first-of-type { border-top: 0; padding-top: 4px; }
+.join-who { display: grid; gap: 2px; }
+.approve-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 12px; align-items: end; }
+.approve-form label { display: grid; gap: 4px; font-size: 0.82rem; font-weight: 600; }
+.approve-form .notice { grid-column: 1 / -1; margin: 0; }
+.invite-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px dashed var(--line); }
+.invite-row:first-of-type { border-top: 0; }
+.copy-link { display: flex; gap: 8px; flex: 1 1 320px; min-width: 0; }
+.copy-link input { flex: 1; min-width: 0; font-family: ui-monospace, monospace; font-size: 0.82rem; }
+.inline-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-top: 12px; }
+.inline-form label { display: grid; gap: 4px; font-size: 0.82rem; font-weight: 600; }
+
+/* Staff home */
+.reveal { all: unset; cursor: pointer; display: block; width: 100%; }
+.reveal .value.hidden { letter-spacing: 0.2em; color: var(--muted); }
+.reveal .hint { font-size: 0.78rem; color: var(--gold); font-weight: 700; }
+.reveal:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; border-radius: 8px; }
+.plain-list { list-style: none; padding: 0; margin: 0 0 12px; }
+.plain-list li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px dashed var(--line); font-size: 0.9rem; }
+.plain-list li:first-child { border-top: 0; }
+.plain-list li > span:first-child { flex: 1 1 auto; }
+.approve-form select, .approve-form input { width: 100%; min-width: 0; box-sizing: border-box; }
+.approve-form { grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); }

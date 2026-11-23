@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireAccess, errorText } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { BranchDays, SalesView } from "@/components/SalesView";
@@ -18,6 +19,8 @@ const PRESETS = [
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ p?: string; start?: string; end?: string; branch?: string }> }) {
   const { supabase, access } = await requireAccess();
+  // Sales figures are for management; everyone else starts on their own Home page.
+  if (!access.grants.some((g) => ["OWNER", "FINANCE", "AUDITOR", "MANAGER"].includes(g.role))) redirect("/me");
   const sp = await searchParams;
   const today = manilaToday();
   const period = resolvePeriod(sp.p, isIsoDate(sp.start) ? sp.start : undefined, isIsoDate(sp.end) ? sp.end : undefined, today);

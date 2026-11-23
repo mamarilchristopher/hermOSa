@@ -14,20 +14,18 @@ const ROLE_LABEL: Record<string, string> = {
 export async function TopBar({ access }: { access: Access }) {
   const supabase = await createClient();
   const approver = access.grants.some((g) => g.role === "OWNER" || g.role === "MANAGER");
-  const [{ data: overdueData }, { data: me }] = await Promise.all([
-    approver ? supabase.rpc("overdue_commission_days") : Promise.resolve({ data: [] }),
-    supabase.from("employees").select("id").eq("app_user_id", access.user_id).maybeSingle(),
-  ]);
+  const { data: overdueData } = approver ? await supabase.rpc("overdue_commission_days") : { data: [] };
   const overdue = (Array.isArray(overdueData) ? overdueData : []) as { code: string; name: string; date: string; pending: number }[];
   const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
   const people = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "HR", "AUDITOR"].includes(g.role));
   const importer = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
   const filler = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER"].includes(g.role));
+  const management = access.grants.some((g) => ["OWNER", "FINANCE", "AUDITOR", "MANAGER"].includes(g.role));
   const items: NavItem[] = [
-    { href: "/", label: "Sales dashboard", short: "Sales", icon: "chart" },
+    { href: "/me", label: "Home", short: "Home", icon: "home" },
+    ...(management ? [{ href: "/", label: "Sales dashboard", short: "Sales", icon: "chart" } as NavItem] : []),
     ...(logger ? [{ href: "/services", label: "Service log", short: "Services", icon: "clipboard", badge: overdue.length || undefined } as NavItem] : []),
     ...(people ? [{ href: "/people", label: "Employees", short: "Staff", icon: "people" } as NavItem] : []),
-    ...(me && !people ? [{ href: `/people/${me.id}`, label: "My commissions", short: "Mine", icon: "coins" } as NavItem] : []),
     ...(filler ? [{ href: "/sales/missing", label: "Missing days", short: "Missing", icon: "calendar" } as NavItem] : []),
     ...(importer ? [{ href: "/imports", label: "Imports", short: "Imports", icon: "upload" } as NavItem] : []),
     ...(can(access, ["OWNER"], null) ? [{ href: "/admin/users", label: "Users and roles", short: "Users", icon: "users" } as NavItem] : []),

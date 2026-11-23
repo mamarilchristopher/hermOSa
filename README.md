@@ -66,6 +66,7 @@ In Supabase > Authentication > URL Configuration, set **Site URL** to the Vercel
 
 ## Before launch
 
+- [ ] **Turn off old invite links.** Users and roles > Invite link > Turn off any link you no longer need. A link works until it expires or is turned off.
 - [ ] **Turn second-person sign-off back on.** It is off during pre-launch so one owner can load imports and mark Closed / No sales days alone.
   Run in the Supabase SQL editor: `update public.organizations set require_second_signoff = true;`
   After that, the person who uploads an import can never publish it, Closed / No sales days need a second person to confirm, and the pre-launch **Quick upload**

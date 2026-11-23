@@ -8,6 +8,7 @@ import { manilaToday } from "@/lib/dates";
 import { addMonths, monthEnd, monthLabel } from "@/lib/insights";
 import { ROLE_TEXT } from "@/lib/commission";
 import { EmployeeForm } from "../EmployeeForm";
+import { Reveal } from "@/components/Reveal";
 
 type Line = { id: string; role: string; amount_cents: number; service_logs: { id: string; service_date: string; state: string; amount_paid_cents: number; branch_id: string; services: { name: string } | null } };
 
@@ -33,6 +34,8 @@ export default async function Employee({ params, searchParams }: { params: Promi
   const isOwner = can(access, ["OWNER"], null);
   const { data: users } = isOwner ? await supabase.from("app_users").select("id, display_name").eq("active", true).order("display_name") : { data: null };
   const isMe = e.app_user_id === access.user_id;
+  // Commission is confidential: only the person and management may open this page.
+  if (!isMe && !can(access, ["OWNER", "FINANCE", "HR", "AUDITOR", "MANAGER"], e.branch_id)) notFound();
   const prev = addMonths(start, -1).slice(0, 7), next = addMonths(start, 1).slice(0, 7);
 
   return (
@@ -52,8 +55,17 @@ export default async function Employee({ params, searchParams }: { params: Promi
         </div>
 
         <div className="grid">
-          <div className="card stat hero"><div className="label">Approved commission, {monthLabel(ym)}</div><div className="value">{centsToPhp(approved)}</div><div className="note">This is what goes to payroll</div></div>
-          <div className="card stat"><div className="label">Waiting sign-off</div><div className="value">{centsToPhp(pending)}</div><div className="note">Counts once a manager approves</div></div>
+          {isMe ? (
+            <>
+              <div className="card stat hero"><Reveal label={`Approved commission, ${monthLabel(ym)}`} note="This is what goes to payroll">{centsToPhp(approved)}</Reveal></div>
+              <div className="card stat"><Reveal label="Waiting sign-off" note="Counts once a manager approves">{centsToPhp(pending)}</Reveal></div>
+            </>
+          ) : (
+            <>
+              <div className="card stat hero"><div className="label">Approved commission, {monthLabel(ym)}</div><div className="value">{centsToPhp(approved)}</div><div className="note">This is what goes to payroll</div></div>
+              <div className="card stat"><div className="label">Waiting sign-off</div><div className="value">{centsToPhp(pending)}</div><div className="note">Counts once a manager approves</div></div>
+            </>
+          )}
           <div className="card stat"><div className="label">By type (approved)</div>
             <dl className="kv" style={{ borderTop: 0, paddingTop: 0, marginTop: 6 }}>
               <dt>Lead</dt><dd>{centsToPhp(byRole("LEAD"))}</dd>
