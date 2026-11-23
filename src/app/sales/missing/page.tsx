@@ -24,6 +24,8 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
 
   const here = `/sales/missing?p=${period.key}&start=${period.start}&end=${period.end}${sp.branch ? `&branch=${sp.branch}` : ""}`;
   const msg = /^(marked|confirmed)-(\d+)-(\d+)$/.exec(sp.msg ?? "");
+  const { data: required } = await supabase.rpc("second_signoff_required");
+  const preLaunch = required === false;
   let canMark = false;
   const confirmable: string[] = [];
   let body;
@@ -34,9 +36,10 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
     body = ins.branches.map((b) => {
       const editable = can(access, ["OWNER", "FINANCE", "MANAGER"], b.branch.id);
       const approver = can(access, ["OWNER", "FINANCE"], b.branch.id);
+      const selfOk = preLaunch && can(access, ["OWNER"], b.branch.id);
       const marks = new Map(daily.closed.filter((m) => m[0] === b.branch.id && m[3] === "PENDING").map((m) => [m[1], m]));
       if (editable) canMark = true;
-      if (approver) for (const m of marks.values()) if (!m[6]) confirmable.push(m[4]);
+      if (approver) for (const m of marks.values()) if (!m[6] || selfOk) confirmable.push(m[4]);
       const runs = dateRuns(b.missing);
       const listed = [...b.missing].sort().reverse().slice(0, MAX_LISTED);
       return (
@@ -72,7 +75,7 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
                           <td>{d}</td>
                           <td>{WEEKDAYS[weekday(d)]}</td>
                           {m ? (
-                            <td><DecideForm mark={m[4]} label={m[2] === "CLOSED" ? "Closed" : "No sales"} by={m[6] ? "you" : m[5]} canDecide={approver && !m[6]} /></td>
+                            <td><DecideForm mark={m[4]} label={m[2] === "CLOSED" ? "Closed" : "No sales"} by={m[6] ? "you" : m[5]} canDecide={approver && (!m[6] || selfOk)} /></td>
                           ) : (
                             editable && <td><FillForm branch={b.branch.id} date={d} /></td>
                           )}
@@ -99,12 +102,16 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
         <p className="muted small">
           {period.label} · {sp.branch ? <Link href={`/sales/missing?p=${period.key}&start=${period.start}&end=${period.end}`}>show all branches</Link> : "all branches"}.
           Enter the day&apos;s sales if you have them, or mark the day Closed or No sales. Nothing is guessed.
-          Closed and No sales need a second person (Owner or Finance) to confirm before the day stops counting as missing.
+          {preLaunch
+            ? "Pre-launch mode: an owner's Closed / No sales marks count right away. This turns back to two-person confirmation before launch."
+            : "Closed and No sales need a second person (Owner or Finance) to confirm before the day stops counting as missing."}
           Sales entered by managers wait for an owner&apos;s sign-off on the Imports page.
         </p>
         {msg && (
           <div className="notice ok">
-            {msg[1] === "marked" ? `${msg[2]} day${msg[2] === "1" ? "" : "s"} marked. A second person (Owner or Finance) now has to confirm them.` : `${msg[2]} day${msg[2] === "1" ? "" : "s"} confirmed.`}
+            {msg[1] === "marked"
+              ? `${msg[2]} day${msg[2] === "1" ? "" : "s"} marked.${preLaunch && can(access, ["OWNER"], null) ? "" : " A second person (Owner or Finance) now has to confirm them."}`
+              : `${msg[2]} day${msg[2] === "1" ? "" : "s"} confirmed.`}
             {msg[3] !== "0" && ` ${msg[3]} could not be saved (already recorded, or not allowed).`}
           </div>
         )}
@@ -112,7 +119,7 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
           <form action={bulkConfirm} className="card bulk-bar">
             <input type="hidden" name="back" value={here} />
             {confirmable.map((id) => <input key={id} type="hidden" name="marks" value={id} />)}
-            <span><strong>{confirmable.length}</strong> Closed / No sales day{confirmable.length > 1 ? "s" : ""} marked by someone else {confirmable.length > 1 ? "are" : "is"} waiting for you.</span>
+            <span><strong>{confirmable.length}</strong> Closed / No sales day{confirmable.length > 1 ? "s" : ""} {preLaunch ? "" : "marked by someone else "}{confirmable.length > 1 ? "are" : "is"} waiting for confirmation.</span>
             <button type="submit">Confirm all {confirmable.length}</button>
           </form>
         )}

@@ -36,6 +36,7 @@ export async function fillDay(_prev: FillState, fd: FormData): Promise<FillState
   if (!data.ok) return { error: errorText(data.error) };
   revalidatePath("/sales/missing");
   revalidatePath("/");
+  if (data.state === "CONFIRMED") return { ok: `Marked ${p.data.mode === "CLOSED" ? "closed" : "no sales"}` };
   if (data.state === "PENDING") return { ok: `Marked ${p.data.mode === "CLOSED" ? "closed" : "no sales"}, waiting for a second person to confirm` };
   if (data.state === "STAGED") return { ok: "Saved, waiting for sign-off" };
   return { ok: "Saved" };

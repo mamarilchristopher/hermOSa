@@ -60,18 +60,13 @@ describe("fill_missing_day", () => {
     expect(r.closed[0].slice(0, 4)).toEqual([db.branches.FAIRVIEW, "2025-03-02", "CLOSED", "CONFIRMED"]);
   });
 
-  it("an owner can't confirm their own No sales mark, even with import sign-off off; a rejected day can be marked again", async () => {
-    await db.sql("UPDATE public.organizations SET require_second_signoff = false");
-    try {
-      const m = await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-10", "NO_SALES", null, null]);
-      expect(m.state).toBe("PENDING");
-      expect((await db.rpc(owner, "aal2", "decide_zero_day", [m.id, true, null])).error).toBe("SELF_APPROVAL_DENIED");
-      expect((await db.rpc(finance, "aal2", "decide_zero_day", [m.id, false, null])).state).toBe("REJECTED");
-      const again = await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-10", "CLOSED", null, null]);
-      expect(again.state).toBe("PENDING");
-    } finally {
-      await db.sql("UPDATE public.organizations SET require_second_signoff = true");
-    }
+  it("with the switch on, an owner can't confirm their own No sales mark; a rejected day can be marked again", async () => {
+    const m = await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-10", "NO_SALES", null, null]);
+    expect(m.state).toBe("PENDING");
+    expect((await db.rpc(owner, "aal2", "decide_zero_day", [m.id, true, null])).error).toBe("SELF_APPROVAL_DENIED");
+    expect((await db.rpc(finance, "aal2", "decide_zero_day", [m.id, false, null])).state).toBe("REJECTED");
+    const again = await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-10", "CLOSED", null, null]);
+    expect(again.state).toBe("PENDING");
   });
 
   it("nobody can confirm a mark by writing the table directly", async () => {
@@ -110,5 +105,32 @@ describe("fill_missing_day", () => {
   it("rejects today, future days and bad amounts", async () => {
     expect((await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2999-01-01", "AMOUNT", 100, null])).error).toBe("INVALID_DATE");
     expect((await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-08", "AMOUNT", 0, null])).error).toBe("INVALID_AMOUNT");
+  });
+});
+
+describe("pre-launch switch also covers zero days", () => {
+  it("switch off: an MFA owner's No sales mark is confirmed at once and audited as self-confirmed; managers still wait", async () => {
+    await db.sql("UPDATE public.organizations SET require_second_signoff = false");
+    try {
+      const before = await db.auditCount("ZERO_DAY_MARKED", "next_value->>'self_confirmed' = 'true'");
+      const m = await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-20", "NO_SALES", null, null]);
+      expect(m.state).toBe("CONFIRMED");
+      expect(await db.auditCount("ZERO_DAY_MARKED", "next_value->>'self_confirmed' = 'true'")).toBe(before + 1);
+      const mg = await db.rpc(fvManager, "aal1", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-21", "NO_SALES", null, null]);
+      expect(mg.state).toBe("PENDING");
+      // owner can now confirm their own older pending mark
+      await db.sql("UPDATE public.organizations SET require_second_signoff = true");
+      const p = await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-22", "CLOSED", null, null]);
+      expect(p.state).toBe("PENDING");
+      await db.sql("UPDATE public.organizations SET require_second_signoff = false");
+      expect((await db.rpc(owner, "aal2", "decide_zero_day", [p.id, true, null])).state).toBe("CONFIRMED");
+      // finance can't self-confirm even with the switch off
+      const f = await db.rpc(finance, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-23", "CLOSED", null, null]);
+      expect(f.state).toBe("PENDING");
+      expect((await db.rpc(finance, "aal2", "decide_zero_day", [f.id, true, null])).error).toBe("SELF_APPROVAL_DENIED");
+      expect(await db.rpc(owner, "aal2", "second_signoff_required", [])).toBe(false);
+    } finally {
+      await db.sql("UPDATE public.organizations SET require_second_signoff = true");
+    }
   });
 });
