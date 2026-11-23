@@ -85,3 +85,9 @@ it("dateRuns groups consecutive days", () => {
     { from: "2024-02-01", to: "2024-02-01", days: 1 },
   ]);
 });
+
+it("sortBranches uses the owner's order", async () => {
+  const { sortBranches } = await import("../../src/lib/insights");
+  const list = ["MARIKINA", "STA_MARIA", "QC_MAIN", "FAIRVIEW"].map((code) => ({ code, name: code }));
+  expect(sortBranches(list).map((b) => b.code)).toEqual(["QC_MAIN", "FAIRVIEW", "STA_MARIA", "MARIKINA"]);
+});

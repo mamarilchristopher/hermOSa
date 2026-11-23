@@ -10,6 +10,13 @@ export type Period = { key: PeriodKey; start: string; end: string; label: string
 export type PeriodKey = "month" | "lastmonth" | "ytd" | "12m" | "custom";
 
 const DAY = 86_400_000;
+
+/** Owner's branch order (2026-11-23): Main, Fairview, Sta. Maria (SMB), Marikina. Unknown codes go last by name. */
+export const BRANCH_ORDER = ["QC_MAIN", "FAIRVIEW", "STA_MARIA", "MARIKINA", "HQ"];
+export function sortBranches<T extends { code: string; name: string }>(list: T[]): T[] {
+  const rank = (c: string) => (BRANCH_ORDER.includes(c) ? BRANCH_ORDER.indexOf(c) : BRANCH_ORDER.length);
+  return [...list].sort((a, b) => rank(a.code) - rank(b.code) || a.name.localeCompare(b.name));
+}
 const toMs = (d: string) => Date.parse(`${d}T00:00:00Z`);
 const fromMs = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 export const addDays = (d: string, n: number) => fromMs(toMs(d) + n * DAY);

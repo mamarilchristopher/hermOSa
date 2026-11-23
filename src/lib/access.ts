@@ -1,6 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { createClient } from "./supabase/server";
+import { sortBranches } from "./insights";
 
 export type Role = "OWNER" | "FINANCE" | "MANAGER" | "CASHIER" | "HR" | "MARKETING" | "CLINICIAN" | "INVENTORY" | "AUDITOR";
 export type Access = {
@@ -29,7 +30,7 @@ export async function requireAccess(opts: { allowWithoutMfa?: boolean } = {}) {
   if (!access) redirect("/login?error=no_account");
   if (access.needs_mfa && !access.mfa && !opts.allowWithoutMfa) redirect("/mfa");
   const { data: branches } = await supabase.from("branches").select("id, code, name, kind").order("name");
-  return { supabase, access, branches: (branches ?? []) as Branch[] };
+  return { supabase, access, branches: sortBranches((branches ?? []) as Branch[]) };
 }
 
 const effective = (a: Access, role: Role) =>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireAccess, can, errorText } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { isIsoDate, manilaToday } from "@/lib/dates";
-import { computeInsights, dateRuns, resolvePeriod, WEEKDAYS, weekday, type BranchInfo, type DayRow, type ZeroMark } from "@/lib/insights";
+import { computeInsights, dateRuns, resolvePeriod, sortBranches, WEEKDAYS, weekday, type BranchInfo, type DayRow, type ZeroMark } from "@/lib/insights";
 import { DecideForm, FillForm } from "./FillForm";
 
 type Daily =
@@ -18,6 +18,7 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
   const period = resolvePeriod(sp.p, isIsoDate(sp.start) ? sp.start : undefined, isIsoDate(sp.end) ? sp.end : undefined, today);
   const { data } = await supabase.rpc("historical_sales_daily", { p_start: period.start, p_end: period.end });
   const daily = (data ?? { ok: false, error: "UNKNOWN" }) as Daily;
+  if (daily.ok) daily.branches = sortBranches(daily.branches);
   const back = `/?p=${period.key}&start=${period.start}&end=${period.end}`;
 
   let body;

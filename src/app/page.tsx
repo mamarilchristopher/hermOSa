@@ -3,7 +3,7 @@ import { requireAccess, errorText } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { SalesView } from "@/components/SalesView";
 import { isIsoDate, manilaToday } from "@/lib/dates";
-import { computeInsights, fetchStart, resolvePeriod, type BranchInfo, type DayRow, type ZeroMark } from "@/lib/insights";
+import { computeInsights, fetchStart, resolvePeriod, sortBranches, type BranchInfo, type DayRow, type ZeroMark } from "@/lib/insights";
 
 type Daily =
   | { ok: true; consolidated: boolean; branches: BranchInfo[]; days: DayRow[]; closed: ZeroMark[] }
@@ -23,6 +23,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const period = resolvePeriod(sp.p, isIsoDate(sp.start) ? sp.start : undefined, isIsoDate(sp.end) ? sp.end : undefined, today);
   const { data } = await supabase.rpc("historical_sales_daily", { p_start: fetchStart(period), p_end: period.end });
   const daily = (data ?? { ok: false, error: "UNKNOWN" }) as Daily;
+  if (daily.ok) daily.branches = sortBranches(daily.branches);
   const { count: pending } = await supabase.from("import_batches").select("id", { count: "exact", head: true }).eq("state", "STAGED");
 
   const q = `p=${period.key}&start=${period.start}&end=${period.end}`;
