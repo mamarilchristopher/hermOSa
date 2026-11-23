@@ -1,0 +1,26 @@
+resource_action,Owner/System Admin,Finance,Branch Manager,Cashier,HR/Payroll,Marketing,Clinician/Therapist,Inventory/Purchasing,Auditor,Notes
+view_consolidated_dashboard,allow,allow,deny,deny,deny,allow_aggregate_only,deny,deny,allow_readonly,Marketing restricted to nonsensitive aggregate metrics
+view_branch_sales,all_branches,all_branches,assigned_branches,assigned_branches,deny,assigned_attributed_only,deny,deny,all_branches_readonly,Queries scoped server-side
+post_sale,deny,deny,approve_only,assigned_branches,deny,deny,deny,deny,deny,Owner may approve but no daily cashier posting by default
+refund_void,approve,approve,request,request,deny,deny,deny,deny,view_only,Two-person review above configurable thresholds
+cash_close,view,review,approve_branch,prepare,deny,deny,deny,deny,read_only,No cashier self approval
+view_patient_demographics,all_minimum_needed,deny,assigned_branches,assigned_branches_minimal,deny,assigned_leads_only,assigned_treatment_patients,deny,metadata_only,Need to know; owner not automatic unrestricted clinical access
+view_clinical_notes,deny,deny,deny,deny,deny,deny,assigned_treatment_patients,deny,deny,Owner clinical access requires separate permitted clinician role
+view_clinical_photos,deny,deny,deny,deny,deny,deny,assigned_with_consent,deny,deny,Purpose-specific consent and download log
+manage_patient_consent,deny,deny,review,record_minimal,deny,marketing_optout_only,clinical_consent_only,deny,audit_metadata_only,No staff may override declined consent
+edit_appointments,view,deny,assigned_branches,assigned_branches,deny,lead_status_only,assigned_sessions,deny,read_only,Prevent unauthorized export
+view_ads_and_leads,all,aggregates_only,assigned_branches,deny,deny,all_marketing,deny,deny,read_only,Marketing may not view clinical charts
+edit_ad_spend,approve,view,deny,deny,deny,write,deny,deny,read_only,Campaign branch allocation approved
+view_supplier_bills,all,all,assigned_branches,deny,deny,deny,deny,assigned_purchasing,read_only,Payment account fields tightly restricted
+stock_receive_transfer,view,view,approve_branch,deny,deny,deny,session_consumption_only,assigned_branches,read_only,No unrestricted stock adjustment
+stock_write_off,approve,approve,request,deny,deny,deny,request,request,read_only,Two-person signoff
+post_expenses,view,approve,request,request_petty_cash_only,deny,deny,deny,request_purchase_only,read_only,Accounting checks journal posting
+view_payroll,all_admin_with_mfa,summary_only,headcount_cost_aggregate_only,deny,all_employee_level,deny,own_payslip_only,deny,approved_readonly_restricted,Payroll PII not in branch reports
+approve_payroll,second_approver,finance_final_review,deny,deny,prepare_no_self_approval,deny,deny,deny,read_only,Segregation of duties required
+edit_payroll_rules,approve,read_only,deny,deny,propose,deny,deny,deny,read_only,Effective-dated published versions
+import_historical_data,approve_publish,prepare_and_stage,stage_branch_only,deny,deny,stage_ads_only,deny,stage_stock_only,read_only,Reconciliation before approval
+approve_import_reconciliation,final_approve,prepare_review,sign_branch_counts,deny,deny,deny,deny,sign_stock_counts,read_only,Different approver from uploader
+manage_roles_and_users,all_with_mfa,deny,request_branch_user,deny,request_staff_user,deny,deny,deny,view_audit_only,No self permission escalation
+view_audit_logs,all,finance_domain_only,branch_domain_only,deny,hr_domain_only,marketing_domain_only,clinical_domain_only,inventory_domain_only,all_readonly,Logs must not leak clinical/payroll content
+close_financial_period,approve,prepare_review,deny,deny,deny,deny,deny,deny,read_only,Locked period correction via separate authorized adjustment
+export_any_report,authorized_scope,authorized_scope,assigned_branches,assigned_register,authorized_hr_scope,authorized_marketing_scope,authorized_clinical_scope,authorized_stock_scope,approved_readonly,Exports always subject to same access controls
