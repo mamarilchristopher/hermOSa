@@ -1,78 +1,87 @@
-import { requireAccess, can, branchesFor, errorText } from "@/lib/access";
+import Link from "next/link";
+import { requireAccess, errorText } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
-import { centsToPhp } from "@/lib/csv";
+import { SalesView } from "@/components/SalesView";
 import { isIsoDate, manilaToday } from "@/lib/dates";
+import { computeInsights, fetchStart, resolvePeriod, type BranchInfo, type DayRow } from "@/lib/insights";
 
-type Row = {
-  branch_id: string; branch_code: string; branch_name: string; sales_count: number;
-  gross_cents: number; pending_batches: number; has_validated_data: boolean;
-};
-type Totals = { ok: true; rows: Row[]; total_gross_cents: number; any_validated_data: boolean; basis: string } | { ok: false; error: string };
+type Daily =
+  | { ok: true; consolidated: boolean; branches: BranchInfo[]; days: DayRow[]; closed: [string, string][] }
+  | { ok: false; error: string };
 
-export default async function Dashboard({ searchParams }: { searchParams: Promise<{ start?: string; end?: string }> }) {
-  const { supabase, access, branches } = await requireAccess();
+const PRESETS = [
+  ["month", "This month"],
+  ["lastmonth", "Last month"],
+  ["ytd", "Year to date"],
+  ["12m", "Last 12 months"],
+] as const;
+
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ p?: string; start?: string; end?: string }> }) {
+  const { supabase, access } = await requireAccess();
   const sp = await searchParams;
-  const end = isIsoDate(sp.end) ? sp.end : manilaToday();
-  const start = isIsoDate(sp.start) ? sp.start : `${Number(end.slice(0, 4)) - 3}-01-01`;
+  const today = manilaToday();
+  const period = resolvePeriod(sp.p, isIsoDate(sp.start) ? sp.start : undefined, isIsoDate(sp.end) ? sp.end : undefined, today);
+  const { data } = await supabase.rpc("historical_sales_daily", { p_start: fetchStart(period), p_end: period.end });
+  const daily = (data ?? { ok: false, error: "UNKNOWN" }) as Daily;
+  const { count: pending } = await supabase.from("import_batches").select("id", { count: "exact", head: true }).eq("state", "STAGED");
 
-  const consolidated = can(access, ["OWNER", "FINANCE", "AUDITOR"], null);
-  const results: Totals[] = [];
-  if (consolidated) {
-    const { data } = await supabase.rpc("historical_sales_totals", { p_branch: null, p_start: start, p_end: end });
-    results.push(data as Totals);
-  } else {
-    for (const b of branchesFor(access, branches, ["MANAGER", "CASHIER"])) {
-      const { data } = await supabase.rpc("historical_sales_totals", { p_branch: b.id, p_start: start, p_end: end });
-      results.push(data as Totals);
-    }
+  const q = `p=${period.key}&start=${period.start}&end=${period.end}`;
+  const header = (
+    <>
+      <div className="periods card">
+        {PRESETS.map(([k, label]) => (
+          <Link key={k} href={`/?p=${k}`} className={period.key === k ? "on" : ""}>{label}</Link>
+        ))}
+        <form>
+          <input type="hidden" name="p" value="custom" />
+          <input type="date" name="start" defaultValue={period.start} aria-label="From" />
+          <span className="muted">to</span>
+          <input type="date" name="end" defaultValue={period.end} max={today} aria-label="To" />
+          <button type="submit" className="secondary">Show</button>
+        </form>
+      </div>
+    </>
+  );
+
+  if (!daily.ok) {
+    return (
+      <>
+        <TopBar access={access} />
+        <main><h1>Sales</h1>{header}<div className="notice error">{errorText(daily.error)}</div></main>
+      </>
+    );
   }
-  const failed = results.find((r) => !r.ok) as { error: string } | undefined;
-  const rows = results.flatMap((r) => (r.ok ? r.rows : []));
-  const anyData = rows.some((r) => r.has_validated_data);
-  const pending = rows.reduce((s, r) => s + Number(r.pending_batches), 0);
+  if (daily.branches.length === 0) {
+    return (
+      <>
+        <TopBar access={access} />
+        <main><h1>Sales</h1><div className="notice info">You don't have sales access to any branch yet.</div></main>
+      </>
+    );
+  }
+
+  const ins = computeInsights({ period, today, branches: daily.branches, days: daily.days, closed: daily.closed });
+  const anyData = daily.branches.some((b) => b.first_date);
+  const whole = daily.consolidated || daily.branches.length > 1;
+  const throughText = ins.compareEnd < period.start ? "no complete days yet" : `${period.start} to ${ins.compareEnd}`;
 
   return (
     <>
       <TopBar access={access} />
       <main>
-        <h1>{consolidated ? "Company dashboard" : "Branch dashboard"}</h1>
+        <h1>{whole ? "Sales: all branches" : `Sales: ${daily.branches[0].name}`}</h1>
         <p className="muted small">
-          Historical sales · basis: posting date · {start} to {end} (Manila) · validated imports only, reversed batches excluded
+          {period.label} · {throughText} (Manila, today not counted until it's recorded) · published imports only
         </p>
-        <form className="card" style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
-          <label>From<input type="date" name="start" defaultValue={start} /></label>
-          <label>To<input type="date" name="end" defaultValue={end} /></label>
-          <button type="submit" className="secondary">Apply</button>
-        </form>
-        {failed && <div className="notice error">{errorText(failed.error)}</div>}
-        {rows.length === 0 && !failed && <div className="notice info">You don't have sales access to any branch yet.</div>}
-        {pending > 0 && (
-          <div className="notice info">{pending} imported batch{pending > 1 ? "es are" : " is"} waiting for sign-off and not counted below.</div>
+        {header}
+        {(pending ?? 0) > 0 && (
+          <div className="notice info">
+            {pending} upload{pending! > 1 ? "s are" : " is"} waiting for sign-off and not counted. <Link href="/imports">Review</Link>
+          </div>
         )}
-        {rows.length > 0 && (
-          <>
-            {consolidated && (
-              <div className="grid">
-                <div className="card stat">
-                  <div className="label">All branches</div>
-                  <div className="value">{anyData ? centsToPhp(rows.reduce((s, r) => s + Number(r.gross_cents), 0)) : "No validated data"}</div>
-                  <div className="note">Sum of the branches below</div>
-                </div>
-              </div>
-            )}
-            <div className="grid">
-              {rows.map((r) => (
-                <div className="card stat" key={r.branch_id}>
-                  <div className="label">{r.branch_name}</div>
-                  <div className="value">{r.has_validated_data ? centsToPhp(Number(r.gross_cents)) : "No validated data"}</div>
-                  <div className="note">
-                    {r.has_validated_data ? `${r.sales_count} sales in range` : "Nothing imported and signed off yet"}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+        {!anyData && <div className="notice info">No validated data yet. Sales show here once an import is published.</div>}
+
+        {anyData && <SalesView ins={ins} whole={whole} q={q} />}
       </main>
     </>
   );

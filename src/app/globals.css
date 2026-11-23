@@ -76,3 +76,39 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .center { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
 .auth-card { width: 100%; max-width: 400px; }
 .auth-card img { width: 220px; height: auto; display: block; margin: 0 auto 16px; }
+
+/* Sales dashboard */
+:root { --chart-fill: #735240; --chart-fill-soft: #e2d3c1; }
+.periods { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.periods a { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; text-decoration: none; font-weight: 600; font-size: 0.88rem; background: #fff; }
+.periods a.on { background: var(--brown); color: #fff; border-color: var(--brown); }
+.periods form { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.periods form input { padding: 5px 8px; font-size: 0.88rem; }
+.periods form button { padding: 5px 12px; font-size: 0.88rem; }
+.hero .value { font-size: 2rem; }
+.delta { font-weight: 700; font-variant-numeric: tabular-nums; }
+.delta.up { color: var(--good); }
+.delta.down { color: var(--bad); }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; font-size: 0.88rem; margin-top: 8px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.chart { margin: 0; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .axis, svg .axis { font-size: 11px; fill: var(--muted); }
+.chart .bar:hover rect:last-of-type { opacity: 0.8; }
+.hbars { display: grid; gap: 6px; }
+.hbar { display: grid; grid-template-columns: 36px 1fr 64px; gap: 8px; align-items: center; font-size: 0.85rem; }
+.hbar-track { height: 10px; background: var(--cream); border-radius: 999px; overflow: hidden; }
+.hbar-fill { display: block; height: 100%; background: var(--chart-fill); border-radius: 999px; }
+.hbar-value { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.two { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+@media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+.branch-card h3 { margin: 0; font-size: 1rem; color: var(--brown-dark); }
+.branch-card .top { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
+.missing-link { font-size: 0.85rem; font-weight: 600; }
+.missing-link.none { color: var(--good); text-decoration: none; }
+.fill-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.fill-row input { width: 130px; padding: 5px 8px; }
+.fill-row button { padding: 5px 10px; font-size: 0.85rem; }
+.grid.branches { grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+.chart .axis { font-size: 13px; }
