@@ -1,9 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconCalendar, IconChart, IconClipboard, IconCoins, IconHome, IconPeople, IconUpload, IconUsers } from "./Icons";
+import { IconCalendar, IconChart, IconClipboard, IconCoins, IconHome, IconIdCard, IconPeople, IconUpload, IconUsers } from "./Icons";
 
-const ICONS = { chart: IconChart, calendar: IconCalendar, upload: IconUpload, users: IconUsers, clipboard: IconClipboard, people: IconPeople, coins: IconCoins, home: IconHome };
+const ICONS = { chart: IconChart, calendar: IconCalendar, upload: IconUpload, users: IconUsers, clipboard: IconClipboard, people: IconPeople, coins: IconCoins, home: IconHome, idcard: IconIdCard };
 export type NavItem = { href: string; label: string; short: string; icon: keyof typeof ICONS; badge?: number };
 
 export function NavLinks({ items, variant }: { items: NavItem[]; variant: "side" | "tabs" }) {
@@ -17,7 +17,7 @@ export function NavLinks({ items, variant }: { items: NavItem[]; variant: "side"
           <Link key={it.href} href={it.href} className={active ? "active" : undefined} aria-current={active ? "page" : undefined}>
             <Icon />
             <span>{variant === "side" ? it.label : it.short}</span>
-            {it.badge ? <span className="nav-badge" aria-label={`${it.badge} overdue`}>{it.badge}</span> : null}
+            {it.badge ? <span className="nav-badge" aria-label={`${it.badge} waiting`}>{it.badge}</span> : null}
           </Link>
         );
       })}

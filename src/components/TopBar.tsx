@@ -14,7 +14,11 @@ const ROLE_LABEL: Record<string, string> = {
 export async function TopBar({ access }: { access: Access }) {
   const supabase = await createClient();
   const approver = access.grants.some((g) => g.role === "OWNER" || g.role === "MANAGER");
-  const { data: overdueData } = approver ? await supabase.rpc("overdue_commission_days") : { data: [] };
+  const owner = can(access, ["OWNER"], null);
+  const [{ data: overdueData }, { count: detailsWaiting }] = await Promise.all([
+    approver ? supabase.rpc("overdue_commission_days") : Promise.resolve({ data: [] }),
+    owner ? supabase.from("employee_detail_submissions").select("id", { count: "exact", head: true }).eq("state", "PENDING") : Promise.resolve({ count: 0 }),
+  ]);
   const overdue = (Array.isArray(overdueData) ? overdueData : []) as { code: string; name: string; date: string; pending: number }[];
   const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
   const people = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "HR", "AUDITOR"].includes(g.role));
@@ -28,7 +32,8 @@ export async function TopBar({ access }: { access: Access }) {
     ...(people ? [{ href: "/people", label: "Employees", short: "Staff", icon: "people" } as NavItem] : []),
     ...(filler ? [{ href: "/sales/missing", label: "Missing days", short: "Missing", icon: "calendar" } as NavItem] : []),
     ...(importer ? [{ href: "/imports", label: "Imports", short: "Imports", icon: "upload" } as NavItem] : []),
-    ...(can(access, ["OWNER"], null) ? [{ href: "/admin/users", label: "Users and roles", short: "Users", icon: "users" } as NavItem] : []),
+    ...(owner ? [{ href: "/admin/details", label: "Staff details", short: "Details", icon: "idcard", badge: detailsWaiting || undefined } as NavItem] : []),
+    ...(owner ? [{ href: "/admin/users", label: "Users and roles", short: "Users", icon: "users" } as NavItem] : []),
   ];
   const initials = access.display_name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "?";
   const role = [...new Set(access.grants.map((g) => ROLE_LABEL[g.role] ?? g.role))].join(", ") || "No role yet";

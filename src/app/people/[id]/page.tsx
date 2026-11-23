@@ -9,6 +9,8 @@ import { addMonths, monthEnd, monthLabel } from "@/lib/insights";
 import { ROLE_TEXT } from "@/lib/commission";
 import { EmployeeForm } from "../EmployeeForm";
 import { Reveal } from "@/components/Reveal";
+import { DetailsView } from "@/components/DetailsView";
+import type { Details } from "@/lib/employeeDetails";
 
 type Line = { id: string; role: string; amount_cents: number; service_logs: { id: string; service_date: string; state: string; amount_paid_cents: number; branch_id: string; services: { name: string } | null } };
 
@@ -34,6 +36,8 @@ export default async function Employee({ params, searchParams }: { params: Promi
   const isOwner = can(access, ["OWNER"], null);
   const { data: users } = isOwner ? await supabase.from("app_users").select("id, display_name").eq("active", true).order("display_name") : { data: null };
   const isMe = e.app_user_id === access.user_id;
+  // Approved personal details (IDs, bank): owners only. RLS enforces the same.
+  const { data: det } = isOwner ? await supabase.from("employee_details").select("data, approved_at").eq("employee_id", e.id).maybeSingle() : { data: null };
   // Commission is confidential: only the person and management may open this page.
   if (!isMe && !can(access, ["OWNER", "FINANCE", "HR", "AUDITOR", "MANAGER"], e.branch_id)) notFound();
   const prev = addMonths(start, -1).slice(0, 7), next = addMonths(start, 1).slice(0, 7);
@@ -94,6 +98,13 @@ export default async function Employee({ params, searchParams }: { params: Promi
           </table>
         </div>
 
+        {isOwner && (
+          <details className="card">
+            <summary><strong>Personal, government and payroll details</strong> <span className="small muted">
+              {det ? `approved ${String(det.approved_at).slice(0, 10)} · owners only` : "not sent or not approved yet"}</span></summary>
+            {det ? <DetailsView data={det.data as Details} /> : <p className="small muted">They fill these in from their Home page. Review them under Staff details.</p>}
+          </details>
+        )}
         {canEdit && !isMe && (
           <div className="card">
             <h2>Edit details</h2>

@@ -19,10 +19,13 @@ export default async function Me() {
   const { supabase, access, branches } = await requireAccess();
   const today = manilaToday();
   const start = monthStart(today), ym = today.slice(0, 7);
-  const [{ data: emp }, { data: user }] = await Promise.all([
+  const [{ data: emp }, { data: user }, { data: subs }] = await Promise.all([
     supabase.from("employees").select("id, full_name, branch_id, position, commission_eligible, active").eq("app_user_id", access.user_id).maybeSingle(),
     supabase.from("app_users").select("email, joined_at").eq("id", access.user_id).maybeSingle(),
+    supabase.from("employee_detail_submissions").select("state, note").eq("user_id", access.user_id).neq("state", "SUPERSEDED")
+      .order("submitted_at", { ascending: false }).limit(1),
   ]);
+  const detailState = subs?.[0]?.state as string | undefined;
   const { data } = emp?.commission_eligible
     ? await supabase.from("commission_lines").select("role, amount_cents, service_logs!inner(service_date, state, services(name))")
         .eq("employee_id", emp.id).gte("service_logs.service_date", start).lte("service_logs.service_date", monthEnd(start))
@@ -44,6 +47,12 @@ export default async function Me() {
         <h1>Hi, {first}</h1>
         <p className="muted small">{emp?.position ?? "Staff"}{emp && ` · ${branchName[emp.branch_id]}`}</p>
 
+        {detailState !== "APPROVED" && detailState !== "PENDING" && (
+          <div className={`notice ${detailState === "RETURNED" ? "error" : "info"}`}>
+            {detailState === "RETURNED" ? "The owner sent your employee details back to fix. " : "Please fill in your employee details for payroll and government reports. "}
+            <Link href="/me/details">{detailState === "RETURNED" ? "Fix my details" : "Fill them in"}</Link>
+          </div>
+        )}
         {emp?.commission_eligible && (
           <>
             <div className="grid">
@@ -84,7 +93,10 @@ export default async function Me() {
             <dt>Login email</dt><dd>{user?.email ?? ""}</dd>
             {user?.joined_at && <><dt>Joined the app</dt><dd>{user.joined_at.slice(0, 10)}</dd></>}
           </dl>
-          <p className="small muted" style={{ marginBottom: 0 }}>Something wrong here? Tell your manager or the owner. Payroll details come later.</p>
+          <p className="small muted" style={{ marginBottom: 0 }}>
+            <Link href="/me/details">My employee details</Link>{detailState === "PENDING" ? " (waiting for approval)" : detailState === "APPROVED" ? " (approved)" : ""}.
+            Something else wrong? Tell your manager or the owner.
+          </p>
         </div>
 
         {logger && (
