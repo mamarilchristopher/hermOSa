@@ -34,9 +34,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const header = (
     <>
       <div className="periods card">
-        {PRESETS.map(([k, label]) => (
-          <Link key={k} href={`/?p=${k}${bq}`} className={period.key === k ? "on" : ""}>{label}</Link>
-        ))}
+        <div className="segmented" role="tablist" aria-label="Period">
+          {PRESETS.map(([k, label]) => (
+            <Link key={k} href={`/?p=${k}${bq}`} className={period.key === k ? "on" : ""} aria-current={period.key === k ? "page" : undefined}>{label}</Link>
+          ))}
+        </div>
         <form>
           <input type="hidden" name="p" value="custom" />
           {focus && <input type="hidden" name="branch" value={focus.code} />}
@@ -76,13 +78,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       <TopBar access={access} />
       <main>
         {focus && allBranches.length > 1 && (
-          <p className="small" style={{ margin: "0 0 6px" }}>
-            <Link href={`/?p=${period.key}&start=${period.start}&end=${period.end}`}>← Sales: All Branches</Link>
-            {" · "}
-            {allBranches.filter((b) => b.id !== focus.id).map((b, i) => (
-              <span key={b.id}>{i > 0 && " · "}<Link href={`/?p=${period.key}&start=${period.start}&end=${period.end}&branch=${b.code}`}>{b.name}</Link></span>
+          <nav className="crumbs" aria-label="Branches">
+            <Link className="back" href={`/?p=${period.key}&start=${period.start}&end=${period.end}`}>← All Branches</Link>
+            {allBranches.filter((b) => b.id !== focus.id).map((b) => (
+              <Link key={b.id} href={`/?p=${period.key}&start=${period.start}&end=${period.end}&branch=${b.code}`}>{b.name}</Link>
             ))}
-          </p>
+          </nav>
         )}
         <h1>{whole ? "Sales: All Branches" : `Sales: ${daily.branches[0].name}`}</h1>
         <p className="muted small">

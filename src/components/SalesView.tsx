@@ -18,7 +18,7 @@ function MissingLink({ s, branch, q }: { s: Scope; branch?: string; q: string })
   if (s.missing.length === 0) return <span className="missing-link none">✓ No missing days</span>;
   return (
     <Link className="missing-link" href={`/sales/missing?${q}${branch && !q.includes("branch=") ? `&branch=${branch}` : ""}`}>
-      ⚠ {s.missing.length} day{s.missing.length > 1 ? "s" : ""} with no recorded sales
+      {s.missing.length} day{s.missing.length > 1 ? "s" : ""} with no recorded sales
     </Link>
   );
 }
@@ -78,7 +78,7 @@ export function SalesView({ ins, whole, q }: { ins: Insights; whole: boolean; q:
               {ins.branches.map((b) => (
                 <div className="card branch-card" key={b.branch.id}>
                   <div className="top">
-                    <h3><Link className="card-link" href={`/?${q}&branch=${b.branch.code}`}>{b.branch.name} ›</Link></h3>
+                    <h3><Link className="card-link" href={`/?${q}&branch=${b.branch.code}`}>{b.branch.name}<span className="go" aria-hidden>→</span></Link></h3>
                     <Spark months={b.months} label={b.branch.name} />
                   </div>
                   {!b.branch.first_date ? (
