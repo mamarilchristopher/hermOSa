@@ -1,6 +1,7 @@
 "use client";
 import { useActionState } from "react";
-import { discardImport, publishImport, reverseImport, stageImport, type FormState } from "./actions";
+import Link from "next/link";
+import { discardImport, publishImport, quickImport, reverseImport, stageImport, type FormState } from "./actions";
 
 function Notice({ state }: { state: FormState }) {
   if (state?.error) return <div className="notice error">{state.error}</div>;
@@ -70,6 +71,29 @@ export function DiscardForm({ batch }: { batch: string }) {
       <input type="hidden" name="batch" value={batch} />
       <label>Reason<input name="reason" minLength={8} maxLength={500} required placeholder="e.g. Typed the total wrong" /></label>
       <button type="submit" className="secondary" disabled={pending}>{pending ? "Discarding…" : "Discard this upload"}</button>
+    </form>
+  );
+}
+
+export function QuickUploadForm() {
+  const [state, action, pending] = useActionState(quickImport, undefined);
+  return (
+    <form action={action} className="stack">
+      {state?.error && <div className="notice error">{state.error}</div>}
+      {state?.results && (
+        <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
+          {state.results.map((r, i) => (
+            <li key={i} style={{ color: r.ok ? "var(--good)" : "var(--bad)" }}>
+              <strong>{r.file}</strong>: {r.text} {r.id && <Link href={`/imports/${r.id}`}>View</Link>}
+            </li>
+          ))}
+        </ul>
+      )}
+      <label>
+        CSV files (you can pick several)
+        <input type="file" name="files" accept=".csv,text/csv" multiple required />
+      </label>
+      <button type="submit" disabled={pending}>{pending ? "Loading…" : "Upload and publish"}</button>
     </form>
   );
 }

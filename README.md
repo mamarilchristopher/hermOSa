@@ -68,4 +68,5 @@ In Supabase > Authentication > URL Configuration, set **Site URL** to the Vercel
 
 - [ ] **Turn second-person sign-off back on.** It is off during pre-launch so one owner can load the historical imports.
   Run in the Supabase SQL editor: `update public.organizations set require_second_signoff = true;`
-  After that, the person who uploads an import can never publish it.
+  After that, the person who uploads an import can never publish it, and the pre-launch **Quick upload**
+  (several CSVs at once, branch read from the file name, no typed totals or reconciliation) disappears from `/imports`.
