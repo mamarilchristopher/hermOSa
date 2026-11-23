@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { phpToCents } from "@/lib/csv";
@@ -52,4 +53,40 @@ export async function decideDay(_prev: FillState, fd: FormData): Promise<FillSta
   revalidatePath("/sales/missing");
   revalidatePath("/");
   return { ok: data.state === "CONFIRMED" ? "Confirmed" : "Rejected, the day is open again" };
+}
+
+const Bulk = z.object({ kind: z.enum(["CLOSED", "NO_SALES"]), days: z.array(z.string().regex(/^[0-9a-f-]{36}\|\d{4}-\d{2}-\d{2}$/)).min(1).max(400) });
+
+/** Mark several ticked days at once. Each still needs a second person to confirm. */
+export async function bulkMark(fd: FormData) {
+  const p = Bulk.safeParse({ kind: fd.get("kind"), days: fd.getAll("days") });
+  const back = String(fd.get("back") ?? "/sales/missing");
+  const safeBack = back.startsWith("/sales/missing") ? back : "/sales/missing";
+  if (!p.success) redirect(`${safeBack}${safeBack.includes("?") ? "&" : "?"}msg=none`);
+  const supabase = await createClient();
+  let ok = 0, failed = 0;
+  for (const item of p.data.days) {
+    const [branch, date] = item.split("|");
+    const { data } = await supabase.rpc("fill_missing_day", { p_branch: branch, p_date: date, p_kind: p.data.kind, p_amount_cents: null, p_note: null });
+    if (data?.ok) ok++; else failed++;
+  }
+  revalidatePath("/sales/missing");
+  revalidatePath("/");
+  redirect(`${safeBack}${safeBack.includes("?") ? "&" : "?"}msg=marked-${ok}-${failed}`);
+}
+
+/** Second person confirms several pending marks at once (never their own; the database checks). */
+export async function bulkConfirm(fd: FormData) {
+  const ids = fd.getAll("marks").map(String).filter((x) => z.uuid().safeParse(x).success).slice(0, 400);
+  const back = String(fd.get("back") ?? "/sales/missing");
+  const safeBack = back.startsWith("/sales/missing") ? back : "/sales/missing";
+  const supabase = await createClient();
+  let ok = 0, failed = 0;
+  for (const id of ids) {
+    const { data } = await supabase.rpc("decide_zero_day", { p_mark: id, p_confirm: true, p_note: null });
+    if (data?.ok) ok++; else failed++;
+  }
+  revalidatePath("/sales/missing");
+  revalidatePath("/");
+  redirect(`${safeBack}${safeBack.includes("?") ? "&" : "?"}msg=confirmed-${ok}-${failed}`);
 }

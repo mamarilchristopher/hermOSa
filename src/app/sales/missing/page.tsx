@@ -4,6 +4,7 @@ import { TopBar } from "@/components/TopBar";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { computeInsights, dateRuns, resolvePeriod, sortBranches, WEEKDAYS, weekday, type BranchInfo, type DayRow, type ZeroMark } from "@/lib/insights";
 import { DecideForm, FillForm } from "./FillForm";
+import { bulkConfirm, bulkMark } from "./actions";
 
 type Daily =
   | { ok: true; branches: BranchInfo[]; days: DayRow[]; closed: ZeroMark[] }
@@ -11,7 +12,7 @@ type Daily =
 
 const MAX_LISTED = 200;
 
-export default async function MissingDays({ searchParams }: { searchParams: Promise<{ p?: string; start?: string; end?: string; branch?: string }> }) {
+export default async function MissingDays({ searchParams }: { searchParams: Promise<{ p?: string; start?: string; end?: string; branch?: string; msg?: string }> }) {
   const { supabase, access } = await requireAccess();
   const sp = await searchParams;
   const today = manilaToday();
@@ -21,6 +22,10 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
   if (daily.ok) daily.branches = sortBranches(daily.branches);
   const back = `/?p=${period.key}&start=${period.start}&end=${period.end}`;
 
+  const here = `/sales/missing?p=${period.key}&start=${period.start}&end=${period.end}${sp.branch ? `&branch=${sp.branch}` : ""}`;
+  const msg = /^(marked|confirmed)-(\d+)-(\d+)$/.exec(sp.msg ?? "");
+  let canMark = false;
+  const confirmable: string[] = [];
   let body;
   if (!daily.ok) body = <div className="notice error">{errorText(daily.error)}</div>;
   else {
@@ -30,6 +35,8 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
       const editable = can(access, ["OWNER", "FINANCE", "MANAGER"], b.branch.id);
       const approver = can(access, ["OWNER", "FINANCE"], b.branch.id);
       const marks = new Map(daily.closed.filter((m) => m[0] === b.branch.id && m[3] === "PENDING").map((m) => [m[1], m]));
+      if (editable) canMark = true;
+      if (approver) for (const m of marks.values()) if (!m[6]) confirmable.push(m[4]);
       const runs = dateRuns(b.missing);
       const listed = [...b.missing].sort().reverse().slice(0, MAX_LISTED);
       return (
@@ -53,12 +60,15 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
               )}
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Date</th><th>Day</th>{(editable || marks.size > 0) && <th>Fill in</th>}</tr></thead>
+                  <thead><tr>{editable && <th style={{ width: 36 }}><span className="sr-only">Select</span></th>}<th>Date</th><th>Day</th>{(editable || marks.size > 0) && <th>Fill in</th>}</tr></thead>
                   <tbody>
                     {listed.map((d) => {
                       const m = marks.get(d);
                       return (
                         <tr key={d}>
+                          {editable && (
+                            <td>{!m && <input type="checkbox" className="tick" name="days" value={`${b.branch.id}|${d}`} form="bulk-mark" aria-label={`Select ${d}`} />}</td>
+                          )}
                           <td>{d}</td>
                           <td>{WEEKDAYS[weekday(d)]}</td>
                           {m ? (
@@ -92,6 +102,30 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
           Closed and No sales need a second person (Owner or Finance) to confirm before the day stops counting as missing.
           Sales entered by managers wait for an owner&apos;s sign-off on the Imports page.
         </p>
+        {msg && (
+          <div className="notice ok">
+            {msg[1] === "marked" ? `${msg[2]} day${msg[2] === "1" ? "" : "s"} marked. A second person (Owner or Finance) now has to confirm them.` : `${msg[2]} day${msg[2] === "1" ? "" : "s"} confirmed.`}
+            {msg[3] !== "0" && ` ${msg[3]} could not be saved (already recorded, or not allowed).`}
+          </div>
+        )}
+        {confirmable.length > 0 && (
+          <form action={bulkConfirm} className="card bulk-bar">
+            <input type="hidden" name="back" value={here} />
+            {confirmable.map((id) => <input key={id} type="hidden" name="marks" value={id} />)}
+            <span><strong>{confirmable.length}</strong> Closed / No sales day{confirmable.length > 1 ? "s" : ""} marked by someone else {confirmable.length > 1 ? "are" : "is"} waiting for you.</span>
+            <button type="submit">Confirm all {confirmable.length}</button>
+          </form>
+        )}
+        {canMark && (
+          <form id="bulk-mark" action={bulkMark} className="card bulk-bar">
+            <input type="hidden" name="back" value={here} />
+            <span>Tick the days below, then mark them all at once:</span>
+            <span className="fill-row">
+              <button type="submit" name="kind" value="NO_SALES" className="secondary">Mark ticked as No sales</button>
+              <button type="submit" name="kind" value="CLOSED" className="secondary">Mark ticked as Closed</button>
+            </span>
+          </form>
+        )}
         {body}
       </main>
     </>
