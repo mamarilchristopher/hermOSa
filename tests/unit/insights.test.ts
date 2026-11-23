@@ -42,7 +42,7 @@ describe("computeInsights", () => {
     today: "2026-11-23",
     branches,
     days,
-    closed: [[A, "2026-11-03"]],
+    closed: [[A, "2026-11-03", "CLOSED", "CONFIRMED", "m1", "Owner", false], [A, "2026-11-04", "NO_SALES", "PENDING", "m2", "Owner", false]],
   });
 
   it("totals stop at yesterday and compare like for like", () => {
@@ -54,11 +54,13 @@ describe("computeInsights", () => {
     expect(ins.company.best).toEqual({ date: "2026-11-02", cents: 3000 });
   });
 
-  it("missing days skip closed days and days before a branch's first record", () => {
+  it("missing days skip confirmed closed days and days before a branch's first record", () => {
     const qc = ins.branches.find((b) => b.branch.id === A)!;
     const fv = ins.branches.find((b) => b.branch.id === B)!;
     expect(qc.missing).toHaveLength(22 - 2 - 1); // Nov 1-22, minus 2 sales days, minus 1 closed
     expect(qc.closedDays).toBe(1);
+    expect(qc.pendingMarks).toBe(1); // a single-person mark still counts as missing
+    expect(qc.missing).toContain("2026-11-04");
     expect(fv.missing).toHaveLength(12); // Nov 10-22 minus the one sales day
     expect(ins.company.missing).toHaveLength(19 + 12);
     expect(fv.share).toBeCloseTo(700 / 5700);

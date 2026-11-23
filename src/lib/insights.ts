@@ -3,6 +3,8 @@
 // Nothing here estimates or fills gaps: a day with no recorded sales is reported as missing, never guessed.
 
 export type DayRow = [branchId: string, date: string, cents: number];
+/** A Closed / No sales mark. Only CONFIRMED marks (two people) stop a day counting as missing. */
+export type ZeroMark = [branchId: string, date: string, status: "CLOSED" | "NO_SALES", state: "PENDING" | "CONFIRMED", id: string, markedBy: string, mine: boolean];
 export type BranchInfo = { id: string; code: string; name: string; first_date: string | null };
 export type Period = { key: PeriodKey; start: string; end: string; label: string };
 export type PeriodKey = "month" | "lastmonth" | "ytd" | "12m" | "custom";
@@ -72,7 +74,8 @@ export type Scope = {
   best: { date: string; cents: number } | null;
   months: { ym: string; cents: number; partial: boolean }[]; // last 13 months up to the period end
   missing: string[]; // dates with no recorded sales and not marked closed
-  closedDays: number;
+  closedDays: number; // confirmed Closed / No sales days
+  pendingMarks: number; // marked Closed / No sales, waiting for a second person
 };
 
 export type Insights = {
@@ -97,7 +100,7 @@ export function computeInsights(input: {
   today: string;
   branches: BranchInfo[];
   days: DayRow[];
-  closed: [string, string][];
+  closed: ZeroMark[];
 }): Insights {
   const { period, today, branches } = input;
   // Today is still open: comparisons and missing days stop at yesterday.
@@ -110,9 +113,11 @@ export function computeInsights(input: {
   for (const b of branches) byBranch.set(b.id, new Map());
   for (const [b, d, c] of input.days) byBranch.get(b)?.set(d, (byBranch.get(b)!.get(d) ?? 0) + Number(c));
   const closedBy = new Map<string, Set<string>>();
-  for (const [b, d] of input.closed) {
-    if (!closedBy.has(b)) closedBy.set(b, new Set());
-    closedBy.get(b)!.add(d);
+  const pendingBy = new Map<string, Set<string>>();
+  for (const [b, d, , state] of input.closed) {
+    const m = state === "CONFIRMED" ? closedBy : pendingBy;
+    if (!m.has(b)) m.set(b, new Set());
+    m.get(b)!.add(d);
   }
 
   const sumRange = (ids: string[], s: string, e: string) => {
@@ -151,7 +156,7 @@ export function computeInsights(input: {
       partial: ym === end.slice(0, 7) && end < monthEnd(end),
     }));
     const missing: string[] = [];
-    let closedDays = 0;
+    let closedDays = 0, pendingMarks = 0;
     for (const id of ids) {
       const b = branches.find((x) => x.id === id);
       if (!b?.first_date) continue; // a branch with no data yet has nothing "missing"
@@ -160,8 +165,12 @@ export function computeInsights(input: {
       const closed = closedBy.get(id) ?? new Set();
       for (let d = from; d <= compareEnd; d = addDays(d, 1)) {
         if (days.has(d)) continue;
-        if (closed.has(d)) closedDays++;
-        else missing.push(ids.length > 1 ? `${b.code}:${d}` : d);
+        if (closed.has(d)) {
+          closedDays++;
+          continue;
+        }
+        if (pendingBy.get(id)?.has(d)) pendingMarks++; // still missing until a second person confirms
+        missing.push(ids.length > 1 ? `${b.code}:${d}` : d);
       }
     }
     return {
@@ -176,6 +185,7 @@ export function computeInsights(input: {
       months,
       missing,
       closedDays,
+      pendingMarks,
     };
   };
 

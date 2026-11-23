@@ -66,5 +66,10 @@ export const ERROR_TEXT: Record<string, string> = {
   UNCLOSED_CSV_QUOTE: "The file isn't a valid CSV (a quote is never closed).",
   UNKNOWN_BRANCH: "Unknown branch.",
   NOT_AUTHENTICATED: "Please sign in again.",
+  DAY_ALREADY_RECORDED: "That day already has sales or a mark.",
+  NOT_PENDING: "Someone already decided this one.",
+  INVALID_AMOUNT: "Enter an amount above zero.",
+  INVALID_DATE: "Only past days can be filled in.",
+  NOT_FOUND: "Not found. Refresh the page.",
 };
 export const errorText = (code: string | undefined) => (code && ERROR_TEXT[code]) || "Something went wrong.";

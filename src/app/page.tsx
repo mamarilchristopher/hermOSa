@@ -3,10 +3,10 @@ import { requireAccess, errorText } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { SalesView } from "@/components/SalesView";
 import { isIsoDate, manilaToday } from "@/lib/dates";
-import { computeInsights, fetchStart, resolvePeriod, type BranchInfo, type DayRow } from "@/lib/insights";
+import { computeInsights, fetchStart, resolvePeriod, type BranchInfo, type DayRow, type ZeroMark } from "@/lib/insights";
 
 type Daily =
-  | { ok: true; consolidated: boolean; branches: BranchInfo[]; days: DayRow[]; closed: [string, string][] }
+  | { ok: true; consolidated: boolean; branches: BranchInfo[]; days: DayRow[]; closed: ZeroMark[] }
   | { ok: false; error: string };
 
 const PRESETS = [

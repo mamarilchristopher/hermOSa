@@ -43,23 +43,48 @@ describe("historical_sales_daily", () => {
 });
 
 describe("fill_missing_day", () => {
-  it("marks a day closed once, audited, and it shows in the daily data", async () => {
-    const res = await db.rpc(fvManager, "aal1", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-02", null, true, "Holiday"]);
-    expect(res).toEqual({ ok: true, state: "CLOSED" });
-    expect(await db.auditCount("SALES_DAY_MARKED_CLOSED")).toBe(1);
-    const again = await db.rpc(fvManager, "aal1", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-02", 500, false, null]);
+  it("a Closed mark waits for a second person; the marker can't confirm it; another owner can", async () => {
+    const res = await db.rpc(fvManager, "aal1", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-02", "CLOSED", null, "Holiday"]);
+    expect(res).toMatchObject({ ok: true, state: "PENDING" });
+    expect(await db.auditCount("ZERO_DAY_MARKED")).toBe(1);
+    expect((await db.rpc(fvManager, "aal2", "decide_zero_day", [res.id, true, null])).error).toBe("FORBIDDEN");
+    const pend = await db.rpc(owner, "aal2", "historical_sales_daily", ["2025-03-01", "2025-03-31"]);
+    expect(pend.closed[0].slice(0, 4)).toEqual([db.branches.FAIRVIEW, "2025-03-02", "CLOSED", "PENDING"]);
+    expect((await db.rpc(owner, "aal1", "decide_zero_day", [res.id, true, null])).error).toBe("MFA_REQUIRED");
+    expect((await db.rpc(owner, "aal2", "decide_zero_day", [res.id, true, null])).state).toBe("CONFIRMED");
+    expect((await db.rpc(finance, "aal2", "decide_zero_day", [res.id, false, null])).error).toBe("NOT_PENDING");
+    expect(await db.auditCount("ZERO_DAY_CONFIRMED")).toBe(1);
+    const again = await db.rpc(fvManager, "aal1", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-02", "AMOUNT", 500, null]);
     expect(again.error).toBe("DAY_ALREADY_RECORDED");
     const r = await db.rpc(owner, "aal2", "historical_sales_daily", ["2025-03-01", "2025-03-31"]);
-    expect(r.closed).toEqual([[db.branches.FAIRVIEW, "2025-03-02"]]);
+    expect(r.closed[0].slice(0, 4)).toEqual([db.branches.FAIRVIEW, "2025-03-02", "CLOSED", "CONFIRMED"]);
+  });
+
+  it("an owner can't confirm their own No sales mark, even with import sign-off off; a rejected day can be marked again", async () => {
+    await db.sql("UPDATE public.organizations SET require_second_signoff = false");
+    try {
+      const m = await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-10", "NO_SALES", null, null]);
+      expect(m.state).toBe("PENDING");
+      expect((await db.rpc(owner, "aal2", "decide_zero_day", [m.id, true, null])).error).toBe("SELF_APPROVAL_DENIED");
+      expect((await db.rpc(finance, "aal2", "decide_zero_day", [m.id, false, null])).state).toBe("REJECTED");
+      const again = await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-10", "CLOSED", null, null]);
+      expect(again.state).toBe("PENDING");
+    } finally {
+      await db.sql("UPDATE public.organizations SET require_second_signoff = true");
+    }
+  });
+
+  it("nobody can confirm a mark by writing the table directly", async () => {
+    await expect(db.as(owner, "aal2", "UPDATE public.sales_day_status SET state = 'CONFIRMED'")).rejects.toThrow(/permission denied/);
   });
 
   it("a manager cannot fill another branch's day", async () => {
-    const res = await db.rpc(mkManager, "aal1", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-04", 500, false, null]);
+    const res = await db.rpc(mkManager, "aal1", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-04", "AMOUNT", 500, null]);
     expect(res.error).toBe("FORBIDDEN");
   });
 
   it("a manager's amount waits for sign-off; it doesn't count yet", async () => {
-    const res = await db.rpc(fvManager, "aal1", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-04", 12345, false, null]);
+    const res = await db.rpc(fvManager, "aal1", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-04", "AMOUNT", 12345, null]);
     expect(res).toMatchObject({ ok: true, state: "STAGED" });
     const r = await db.rpc(owner, "aal2", "historical_sales_daily", ["2025-03-04", "2025-03-04"]);
     expect(r.days).toEqual([]);
@@ -68,22 +93,22 @@ describe("fill_missing_day", () => {
   it("with sign-off off, an MFA owner's amount publishes at once; with it on, it waits", async () => {
     await db.sql("UPDATE public.organizations SET require_second_signoff = false");
     try {
-      const res = await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-05", 250075, false, null]);
+      const res = await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-05", "AMOUNT", 250075, null]);
       expect(res).toMatchObject({ ok: true, state: "PUBLISHED" });
       const r = await db.rpc(owner, "aal2", "historical_sales_daily", ["2025-03-05", "2025-03-05"]);
       expect(r.days).toEqual([[db.branches.FAIRVIEW, "2025-03-05", 250075]]);
       // finance can't self-publish even with the switch off
-      const f = await db.rpc(finance, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-06", 100, false, null]);
+      const f = await db.rpc(finance, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-06", "AMOUNT", 100, null]);
       expect(f.state).toBe("STAGED");
     } finally {
       await db.sql("UPDATE public.organizations SET require_second_signoff = true");
     }
-    const res = await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-07", 100, false, null]);
+    const res = await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-07", "AMOUNT", 100, null]);
     expect(res.state).toBe("STAGED");
   });
 
   it("rejects today, future days and bad amounts", async () => {
-    expect((await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2999-01-01", 100, false, null])).error).toBe("INVALID_DATE");
-    expect((await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-08", 0, false, null])).error).toBe("INVALID_AMOUNT");
+    expect((await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2999-01-01", "AMOUNT", 100, null])).error).toBe("INVALID_DATE");
+    expect((await db.rpc(owner, "aal2", "fill_missing_day", [db.branches.FAIRVIEW, "2025-03-08", "AMOUNT", 0, null])).error).toBe("INVALID_AMOUNT");
   });
 });

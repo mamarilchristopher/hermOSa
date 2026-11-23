@@ -35,11 +35,14 @@ export function SalesView({ ins, whole, q }: { ins: Insights; whole: boolean; q:
             <div className="note"><Delta cur={c.total} base={c.prev} label={ins.prevLabel} /></div>
             {!ins.prevLabel.includes("last year") && <div className="note"><Delta cur={c.total} base={c.lastYear} label="same period last year" /></div>}
             <div className="note" style={{ marginTop: 6 }}><MissingLink s={c} q={q} />{whole && c.missing.length > 0 ? <span className="muted"> (all branches)</span> : null}</div>
+            {c.pendingMarks > 0 && (
+              <div className="note"><Link href={`/sales/missing?${q}`}>{c.pendingMarks} Closed / No sales day{c.pendingMarks > 1 ? "s" : ""} waiting for a second person</Link></div>
+            )}
           </div>
           <div className="card stat">
             <div className="label">Average per sales day</div>
             <div className="value">{c.avgPerDay === null ? "–" : centsToPhp(c.avgPerDay)}</div>
-            <div className="note">{c.salesDays} days with recorded sales{c.closedDays ? `, ${c.closedDays} marked closed` : ""}</div>
+            <div className="note">{c.salesDays} days with recorded sales{c.closedDays ? `, ${c.closedDays} closed or no sales` : ""}</div>
             {c.best && <div className="note">Best day: {c.best.date} ({centsToPhp(c.best.cents)})</div>}
           </div>
           <div className="card stat">

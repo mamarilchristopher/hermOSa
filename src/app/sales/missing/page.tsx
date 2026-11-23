@@ -2,11 +2,11 @@ import Link from "next/link";
 import { requireAccess, can, errorText } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { isIsoDate, manilaToday } from "@/lib/dates";
-import { computeInsights, dateRuns, resolvePeriod, WEEKDAYS, weekday, type BranchInfo, type DayRow } from "@/lib/insights";
-import { FillForm } from "./FillForm";
+import { computeInsights, dateRuns, resolvePeriod, WEEKDAYS, weekday, type BranchInfo, type DayRow, type ZeroMark } from "@/lib/insights";
+import { DecideForm, FillForm } from "./FillForm";
 
 type Daily =
-  | { ok: true; branches: BranchInfo[]; days: DayRow[]; closed: [string, string][] }
+  | { ok: true; branches: BranchInfo[]; days: DayRow[]; closed: ZeroMark[] }
   | { ok: false; error: string };
 
 const MAX_LISTED = 200;
@@ -27,6 +27,8 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
     const ins = computeInsights({ period, today, branches, days: daily.days, closed: daily.closed });
     body = ins.branches.map((b) => {
       const editable = can(access, ["OWNER", "FINANCE", "MANAGER"], b.branch.id);
+      const approver = can(access, ["OWNER", "FINANCE"], b.branch.id);
+      const marks = new Map(daily.closed.filter((m) => m[0] === b.branch.id && m[3] === "PENDING").map((m) => [m[1], m]));
       const runs = dateRuns(b.missing);
       const listed = [...b.missing].sort().reverse().slice(0, MAX_LISTED);
       return (
@@ -40,7 +42,8 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
             <>
               <p className="small">
                 <strong>{b.missing.length}</strong> day{b.missing.length > 1 ? "s" : ""} with no recorded sales
-                {b.closedDays ? `, ${b.closedDays} marked closed` : ""}. Counted from {b.branch.first_date > period.start ? `the branch's first recorded day (${b.branch.first_date})` : period.start} to {ins.compareEnd}.
+                {b.closedDays ? `, ${b.closedDays} confirmed closed or no sales` : ""}
+                {b.pendingMarks ? `, ${b.pendingMarks} waiting for a second person` : ""}. Counted from {b.branch.first_date > period.start ? `the branch's first recorded day (${b.branch.first_date})` : period.start} to {ins.compareEnd}.
               </p>
               {runs.some((r) => r.days > 1) && (
                 <p className="small muted">
@@ -49,15 +52,22 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
               )}
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Date</th><th>Day</th>{editable && <th>Fill in</th>}</tr></thead>
+                  <thead><tr><th>Date</th><th>Day</th>{(editable || marks.size > 0) && <th>Fill in</th>}</tr></thead>
                   <tbody>
-                    {listed.map((d) => (
-                      <tr key={d}>
-                        <td>{d}</td>
-                        <td>{WEEKDAYS[weekday(d)]}</td>
-                        {editable && <td><FillForm branch={b.branch.id} date={d} /></td>}
-                      </tr>
-                    ))}
+                    {listed.map((d) => {
+                      const m = marks.get(d);
+                      return (
+                        <tr key={d}>
+                          <td>{d}</td>
+                          <td>{WEEKDAYS[weekday(d)]}</td>
+                          {m ? (
+                            <td><DecideForm mark={m[4]} label={m[2] === "CLOSED" ? "Closed" : "No sales"} by={m[6] ? "you" : m[5]} canDecide={approver && !m[6]} /></td>
+                          ) : (
+                            editable && <td><FillForm branch={b.branch.id} date={d} /></td>
+                          )}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -77,8 +87,9 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
         <h1>Days with no recorded sales</h1>
         <p className="muted small">
           {period.label} · {sp.branch ? <Link href={`/sales/missing?p=${period.key}&start=${period.start}&end=${period.end}`}>show all branches</Link> : "all branches"}.
-          Enter the day&apos;s sales if you have them, or mark the day closed (holiday, renovation). Nothing is guessed.
-          Entries by managers wait for an owner&apos;s sign-off on the Imports page.
+          Enter the day&apos;s sales if you have them, or mark the day Closed or No sales. Nothing is guessed.
+          Closed and No sales need a second person (Owner or Finance) to confirm before the day stops counting as missing.
+          Sales entered by managers wait for an owner&apos;s sign-off on the Imports page.
         </p>
         {body}
       </main>
