@@ -27,9 +27,10 @@ function Msg({ s }: { s: ActionState }) {
   return null;
 }
 
-export function EntryForm({ branch, date, services, employees }: { branch: string; date: string; services: Opt[]; employees: Opt[] }) {
+export function EntryForm({ branch, date, services, employees, noCommission = false }: { branch: string; date: string; services: Opt[]; employees: Opt[]; noCommission?: boolean }) {
   const [state, action, pending] = useActionState(logService, undefined);
-  const [type, setType] = useState<CommissionType>("LEAD");
+  const startType: CommissionType = noCommission ? "NONCOMMI" : "LEAD";
+  const [type, setType] = useState<CommissionType>(startType);
   const [kind, setKind] = useState<Kind>("PAID");
   const paid = kind === "PAID";
   const [amount, setAmount] = useState("");
@@ -44,7 +45,7 @@ export function EntryForm({ branch, date, services, employees }: { branch: strin
     if (state?.ok) {
       form.current?.reset();
       setAmount("");
-      setType("LEAD");
+      setType(startType);
       setKind("PAID");
       setWho("");
       setService(""); setPartner(""); setReceipt(""); setNote("");
@@ -100,7 +101,7 @@ export function EntryForm({ branch, date, services, employees }: { branch: strin
           <input name="receipt" maxLength={40} value={receipt} onChange={(e) => setReceipt(e.target.value)} />
         </label>
       </div>
-      {paid && <div className="field">
+      {paid && !noCommission && <div className="field">
         <span className="field-label">Commission type</span>
         <div className="segmented choice" role="radiogroup" aria-label="Commission type">
           {TYPES.map((t) => (
@@ -126,7 +127,7 @@ export function EntryForm({ branch, date, services, employees }: { branch: strin
       </div>
       <div className="entry-foot">
         <div className="preview">
-          {p.total > 0 ? (
+          {noCommission ? null : p.total > 0 ? (
             <>
               <span>Commission {centsToPhp(p.total)}</span>
               {type === "SOLO" && <span className="muted">all to the performer</span>}

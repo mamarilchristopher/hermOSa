@@ -42,6 +42,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const name = Object.fromEntries((emps ?? []).map((e) => [e.id, e.full_name]));
   const mine = new Set((emps ?? []).filter((e) => e.app_user_id === access.user_id).map((e) => e.id));
   const employees = (emps ?? []).map((e) => ({ id: e.id, name: e.full_name, eligible: e.commission_eligible, here: e.branch_id === branch.id }));
+  // Staff who aren't on commission never see commission choices (management still does, to log for others).
+  const myEmp = (emps ?? []).find((e) => e.app_user_id === access.user_id);
+  const noCommission = !!myEmp && !myEmp.commission_eligible && !access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
 
   const paid = list.filter((l) => l.state !== "REJECTED").reduce((s, l) => s + Number(l.amount_paid_cents), 0);
   const commission = lines.filter((x) => list.find((l) => l.id === x.service_log_id)?.state !== "REJECTED").reduce((s, x) => s + Number(x.amount_cents), 0);
@@ -85,7 +88,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 {(services ?? []).length === 0 ? "Add your services below first." : null}
               </div>
             ) : (
-              <EntryForm branch={branch.id} date={date} services={(services ?? []).map((s) => ({ id: s.id, name: s.name }))} employees={employees} />
+              <EntryForm branch={branch.id} date={date} services={(services ?? []).map((s) => ({ id: s.id, name: s.name }))} employees={employees} noCommission={noCommission} />
             )}
             {isManager && <div style={{ marginTop: 12 }}><AddServiceForm /></div>}
           </div>
