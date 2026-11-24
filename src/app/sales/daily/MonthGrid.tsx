@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { centsToPhp } from "@/lib/csv";
 import { readMoney } from "@/lib/tracker";
 import { saveGrid } from "./actions";
+import { ShareDay } from "./ShareDay";
 
 export type GridBranch = { id: string; name: string; can_enter: boolean };
 /** [recorded cents | null, mark | null, waiting sign-off, service log cents | null, correction pending] */
@@ -127,6 +128,8 @@ export function MonthGrid({ dates, branches, cells, today, changed = [] }: {
       <div className="grid-tools">
         <label className="check-inline"><input type="checkbox" checked={editing} onChange={(e) => setEditing(e.target.checked)} /> Change recorded days</label>
         {msg && <span className={msg.ok ? "saved-tick" : "field-error"}>{msg.text}</span>}
+        <ShareDay dates={dates} branches={branches} today={today}
+          cellOf={(b, d) => { const c = cells[key(b, d)]; return c ? { cents: c[0], mark: c[1], staged: c[2] } : undefined; }} />
       </div>
       <div className="table-wrap">
         <table className="tracker">

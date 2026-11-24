@@ -439,3 +439,5 @@ table.tracker tfoot tr.avg-row th, table.tracker tfoot tr.avg-row td { font-weig
 .plain-list.notices li { align-items: flex-start; }
 .plain-list.notices li.unread strong::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--gold); vertical-align: middle; }
 .plain-list.notices li.read { opacity: 0.7; }
+.share-day { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+.share-day select { width: auto; min-height: 32px; padding: 4px 8px; font-size: 0.85rem; }
