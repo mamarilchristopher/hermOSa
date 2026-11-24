@@ -5,7 +5,7 @@ import { SECTIONS, visible, type Details, type Field } from "@/lib/employeeDetai
 export type DetailsState = { ok?: string; error?: string; errors?: Record<string, string>; values?: Details; n?: number } | undefined;
 type Action = (prev: DetailsState, fd: FormData) => Promise<DetailsState>;
 
-const WATCH = new Set(["permanent_same", "prev_employer_this_year", "payout_method"]);
+const WATCH = new Set(["prev_employer_this_year", "payout_method"]);
 
 function Input({ f, value, error }: { f: Field; value: string; error?: string }) {
   const id = `f-${f.key}`;

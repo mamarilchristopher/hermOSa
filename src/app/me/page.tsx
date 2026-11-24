@@ -14,6 +14,7 @@ import { branchShort, timeLabel } from "@/lib/schedule";
 import { noticeHref } from "@/lib/noticeLink";
 import { computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
 import { addDays, sortBranches } from "@/lib/insights";
+import { missingRequired, type Details } from "@/lib/employeeDetails";
 
 type Signoffs = { to_sign: { count: number; oldest: string | null }; mine: { count: number; oldest: string | null } };
 type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: string }[]; days?: StatusDay[];
@@ -83,13 +84,16 @@ export default async function Me() {
   const [{ data: emp }, { data: user }, { data: subs }, { data: noticeData }] = await Promise.all([
     supabase.from("employees").select("id, full_name, branch_id, position, commission_eligible, active").eq("app_user_id", access.user_id).maybeSingle(),
     supabase.from("app_users").select("email, joined_at").eq("id", access.user_id).maybeSingle(),
-    supabase.from("employee_detail_submissions").select("state, note").eq("user_id", access.user_id).neq("state", "SUPERSEDED")
+    supabase.from("employee_detail_submissions").select("state, note, data").eq("user_id", access.user_id).neq("state", "SUPERSEDED")
       .order("submitted_at", { ascending: false }).limit(1),
     supabase.from("notifications").select("id, title, body, link, created_at, read_at").order("created_at", { ascending: false }).limit(15),
   ]);
   const notices = (noticeData ?? []) as Notice[];
   const unread = notices.filter((n) => !n.read_at).length;
   const detailState = subs?.[0]?.state as string | undefined;
+  // Sent before new required fields were added: ask only for what's missing.
+  const missing = detailState === "APPROVED" || detailState === "PENDING" ? missingRequired((subs?.[0]?.data ?? {}) as Details) : [];
+  const missingTodo: Todo | null = missing.length ? { text: `Your employee details need ${missing.length <= 3 ? missing.map((f) => f.label.replace(/\s*\(.*\)/, "")).join(", ") : `${missing.length} more items`}. Please add them`, href: "/me/details" } : null;
   const { data } = emp?.commission_eligible
     ? await supabase.from("commission_lines").select("role, amount_cents, service_logs!inner(service_date, state, services(name))")
         .eq("employee_id", emp.id).gte("service_logs.service_date", start).lte("service_logs.service_date", monthEnd(start))
@@ -114,6 +118,7 @@ export default async function Me() {
     for (const r of waiting) (home?.todos ?? staffTodos)?.unshift({ text: `Incident report no. ${r.ir_no} (tardiness) needs your explanation`, href: `/incidents/${r.id}`, urgent: true });
   }
   if (timeTodo) (home?.todos ?? staffTodos)?.unshift(timeTodo);
+  if (missingTodo && !isOwner) (home?.todos ?? staffTodos)?.push(missingTodo);
   if (home && !isOwner && detailState !== "APPROVED" && detailState !== "PENDING") {
     home.todos.push({ text: detailState === "RETURNED" ? "The owner sent your employee details back. Please fix them" : "Fill in your employee details (needed for payroll and government reports)", href: "/me/details" });
   }

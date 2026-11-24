@@ -53,7 +53,7 @@ export default async function TimePage() {
       <TopBar access={access} />
       <main>
         <h1>Time clock</h1>
-        <p className="muted small">Time in when you arrive and time out when you leave. This replaces the photo of the clinic clock in the group chat.</p>
+        <p className="muted small">Time in when you arrive and time out when you leave by taking a photo of the clinic clock. No more posting it in the group chat.</p>
 
         {me ? (
           <TimeClock userId={access.user_id} isIn={isIn} branches={short} defaultBranch={defaultBranch} status={status} />

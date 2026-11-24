@@ -7,7 +7,7 @@ import { parseCoords } from "@/lib/schedule";
 
 type B = { id: string; name: string };
 
-/** Shrinks the selfie to about 480 px wide JPEG (well under the 1 MB limit) before upload. */
+/** Shrinks the clock photo to about 480 px wide JPEG (well under the 1 MB limit) before upload. */
 async function shrink(file: File): Promise<Blob> {
   const url = URL.createObjectURL(file);
   try {
@@ -76,11 +76,11 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
           {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
       )}
-      <input ref={file} type="file" accept="image/*" capture="user" hidden onChange={(e) => onPhoto(e.target.files?.[0])} />
+      <input ref={file} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onPhoto(e.target.files?.[0])} />
       <button className={`clock-btn ${isIn ? "out" : ""}`} disabled={!!busy || !branch} onClick={() => file.current?.click()}>
         {busy ?? (isIn ? "Time out" : "Time in")}
       </button>
-      <p className="small muted" style={{ margin: 0 }}>Takes a quick selfie. The time comes from the server, not your phone.</p>
+      <p className="small muted" style={{ margin: 0 }}>Take a photo of the clinic clock. Your location and the server time are saved with it, not your phone's time.</p>
       {res?.error && <div className="notice error">{res.error}</div>}
       {res?.ok && <div className="notice ok">{res.ok}{res.far != null && res.far > 300 && ` Your phone looked about ${res.far >= 1000 ? `${(res.far / 1000).toFixed(1)} km` : `${res.far} m`} away from the branch, so a manager may check.`}</div>}
     </div>
