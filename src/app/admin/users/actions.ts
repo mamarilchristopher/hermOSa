@@ -39,7 +39,7 @@ export async function setActive(fd: FormData) {
   revalidatePath("/admin/users");
 }
 
-const LEVELS = ["OWNER", "GM", "SENIOR_CMA", "CMA", "MANAGER", "CASHIER", "FINANCE", "HR"] as const;
+const LEVELS = ["OWNER", "GM", "SENIOR_CMA", "CMA", "TRAINEE", "MANAGER", "CASHIER", "FINANCE", "HR"] as const;
 const Approve = z.object({
   user: z.uuid(),
   level: z.enum(LEVELS),

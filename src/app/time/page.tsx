@@ -106,7 +106,7 @@ export default async function TimePage() {
             {myBranches.length > 0 && (
               <div className="card">
                 <h2>Branch locations</h2>
-                <p className="small muted">Stand inside the clinic and save its location once. Time-ins far from the branch get flagged here.</p>
+                <p className="small muted">Save each clinic&apos;s location once. Time-ins more than 300 m away get flagged on On Duty.</p>
                 <BranchLocation branches={myBranches} />
               </div>
             )}

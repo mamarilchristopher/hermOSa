@@ -4,6 +4,8 @@ import { TopBar } from "@/components/TopBar";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { addDays, weekday } from "@/lib/insights";
 import { DOW, LEAVE_TEXT, mondayOf, shortDate, timeLabel, weekDates, weekLabel, branchShort } from "@/lib/schedule";
+import { normalizeRules, checkWeek } from "@/lib/scheduleAuto";
+import { RulesForm } from "./Forms";
 import { BranchWeek, WeekGrid, WeekButtons, PatternForm, RequestForm, DecideForm, CancelForm } from "./Forms";
 
 export type Person = { id: string; name: string; position: string | null; branch_id: string | null; can_edit: boolean;
@@ -21,7 +23,10 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const today = manilaToday();
   const monday = mondayOf(isIsoDate(sp.week) ? sp.week : today);
   const dates = weekDates(monday);
-  const { data, error } = await supabase.rpc("week_schedule", { p_monday: monday });
+  const [{ data, error }, { data: rulesRaw }] = await Promise.all([
+    supabase.rpc("week_schedule", { p_monday: monday }),
+    supabase.rpc("schedule_rules"), // errors (before update-0025) mean the default rules
+  ]);
   const clinics = branches.filter((b) => b.kind === "CLINIC").map((b) => ({ id: b.id, name: branchShort(b.name) }));
 
   if (error) {
@@ -30,6 +35,10 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   }
   const w = data as Week;
   const scheduler = w.people.some((p) => p.can_edit);
+  const rules = normalizeRules(rulesRaw, clinics.map((b) => b.id));
+  const editable = w.people.filter((p) => p.can_edit);
+  const warnings = scheduler ? checkWeek({ dates, people: editable.map((p) => ({ id: p.id, name: p.name.split(" ")[0] })), branches: clinics,
+    shifts: w.shifts.filter((s) => editable.some((p) => p.id === s.employee_id)), rules, dayLabel: dayName }) : [];
   const drafts = w.shifts.filter((s) => s.state === "DRAFT").length;
   const published = w.shifts.filter((s) => s.state === "PUBLISHED").length;
   const myDays = w.me ? w.shifts.filter((s) => s.employee_id === w.me && s.state === "PUBLISHED").sort((a, b) => a.date.localeCompare(b.date)) : [];
@@ -59,17 +68,6 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
         <p className="muted small">{scheduler
           ? "Fill the week from everyone's usual schedule, adjust any day, then publish. Staff see the week once it's published."
           : "Your week and your branch's. Ask here to swap a day or move your day off; a manager approves it."}</p>
-
-        <div className="card week-nav">
-          <Link className="button secondary small" href={link(addDays(monday, -7))} aria-label="Previous week">‹</Link>
-          <div className="week-title">
-            <strong>{weekLabel(monday)}</strong>
-            <span className="small muted">{monday === thisMonday ? "This week" : monday === addDays(thisMonday, 7) ? "Next week" : monday < thisMonday ? "Past week" : "Upcoming"}
-              {scheduler && (drafts > 0 ? <> · <span className="pill STAGED">{drafts} day{drafts === 1 ? "" : "s"} not published</span></> : published > 0 ? <> · <span className="pill PUBLISHED">Published</span></> : " · Not planned yet")}</span>
-          </div>
-          <Link className="button secondary small" href={link(addDays(monday, 7))} aria-label="Next week">›</Link>
-          {monday !== thisMonday && <Link className="small" href="/schedule">This week</Link>}
-        </div>
 
         {decide.length > 0 && (
           <div className="card">
@@ -104,20 +102,37 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
           </div>
         )}
 
-        {scheduler && <WeekButtons monday={monday} drafts={drafts} empty={w.shifts.length === 0} />}
-
-        {w.people.length > 0 && (w.shifts.length > 0 || scheduler) ? (
-          <>
-            <div className="segmented view-toggle" aria-label="View">
-              <Link className={!byPerson ? "on" : ""} href={link(monday, "")}>By branch</Link>
-              <Link className={byPerson ? "on" : ""} href={link(monday, "person")}>By person</Link>
+        <section className="card sched-card">
+          <div className="sched-head">
+            <div className="sched-nav">
+              <Link className="nav-arrow" href={link(addDays(monday, -7))} aria-label="Previous week">‹</Link>
+              <div className="week-title">
+                <strong>{weekLabel(monday)}</strong>
+                <span className="small muted">{monday === thisMonday ? "This week" : monday === addDays(thisMonday, 7) ? "Next week" : monday < thisMonday ? "Past week" : "Upcoming"}
+                  {monday !== thisMonday && <> · <Link href={link(thisMonday)}>Go to this week</Link></>}</span>
+              </div>
+              <Link className="nav-arrow" href={link(addDays(monday, 7))} aria-label="Next week">›</Link>
             </div>
-            {byPerson ? <WeekGrid dates={dates} today={today} people={w.people} shifts={w.shifts} branches={clinics} me={w.me} />
-              : <BranchWeek dates={dates} today={today} people={w.people} shifts={w.shifts} branches={clinics} me={w.me} />}
-          </>
-        ) : (
-          <div className="card"><p className="muted" style={{ margin: 0 }}>The schedule for this week isn&apos;t published yet.</p></div>
-        )}
+            <div className="sched-tools">
+              {scheduler && (drafts > 0 ? <span className="pill STAGED">{drafts} day{drafts === 1 ? "" : "s"} not published</span> : published > 0 ? <span className="pill PUBLISHED">Published</span> : <span className="pill">Not planned yet</span>)}
+              <div className="segmented view-toggle" aria-label="View">
+                <Link className={!byPerson ? "on" : ""} href={link(monday, "")}>By branch</Link>
+                <Link className={byPerson ? "on" : ""} href={link(monday, "person")}>By person</Link>
+              </div>
+            </div>
+          </div>
+          {w.people.length > 0 && (w.shifts.length > 0 || scheduler) ? (
+            byPerson ? <WeekGrid dates={dates} today={today} people={w.people} shifts={w.shifts} branches={clinics} me={w.me} />
+              : <BranchWeek dates={dates} today={today} people={w.people} shifts={w.shifts} branches={clinics} me={w.me} />
+          ) : <p className="muted" style={{ margin: "8px 0 0" }}>The schedule for this week isn&apos;t published yet.</p>}
+          {scheduler && warnings.length > 0 && (
+            <div className="notice warn sched-warn">
+              <strong>Check before publishing</strong>
+              <ul>{warnings.slice(0, 8).map((x) => <li key={x}>{x}</li>)}{warnings.length > 8 && <li>and {warnings.length - 8} more</li>}</ul>
+            </div>
+          )}
+          {scheduler && <WeekButtons monday={monday} drafts={drafts} empty={w.shifts.length === 0} />}
+        </section>
 
         {w.me && (workDays.length > 0 || offDays.length > 0) && (
           <div className="card">
@@ -138,6 +153,13 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
               ))}
             </ul>
           </div>
+        )}
+
+        {scheduler && (
+          <details className="card patterns">
+            <summary><h2>Rules for Suggest a week</h2><span className="small muted">Fewest people per branch each day, and days off per person</span></summary>
+            <RulesForm rules={rules} branches={clinics} />
+          </details>
         )}
 
         {scheduler && (

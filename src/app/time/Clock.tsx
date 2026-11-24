@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { clockPunch, setBranchLocation, type PunchState } from "./actions";
+import { parseCoords } from "@/lib/schedule";
 
 type B = { id: string; name: string };
 
@@ -100,14 +101,30 @@ export function BranchLocation({ branches }: { branches: (B & { set: boolean })[
     setRes(r); setBusy(false);
     if (r?.ok) router.refresh();
   }
+  const [pasted, setPasted] = useState("");
+  async function savePasted() {
+    const c = parseCoords(pasted);
+    if (!c) { setRes({ error: pasted.includes("goo.gl") ? "Short links can't be read. Open the link, then copy the numbers (see the steps below)." : "Paste the coordinates, like 14.6507, 121.0494." }); return; }
+    setBusy(true); setRes(undefined);
+    const r = await setBranchLocation({ branch, lat: c.lat, lng: c.lng });
+    setRes(r); setBusy(false);
+    if (r?.ok) { setPasted(""); router.refresh(); }
+  }
   return (
-    <div className="row-buttons">
-      <select value={branch} onChange={(e) => setBranch(e.target.value)} aria-label="Branch">
-        {branches.map((b) => <option key={b.id} value={b.id}>{b.name}{b.set ? " (saved)" : " (not set)"}</option>)}
-      </select>
-      <button className="secondary small" disabled={busy} onClick={save}>{busy ? "Reading location…" : "Use this phone's location"}</button>
-      {res?.error && <span className="field-error">{res.error}</span>}
-      {res?.ok && <span className="small ok-text">{res.ok}</span>}
+    <div className="field-grid">
+      <label className="field half">Branch
+        <select value={branch} onChange={(e) => setBranch(e.target.value)}>
+          {branches.map((b) => <option key={b.id} value={b.id}>{b.name}{b.set ? " (saved)" : " (not set)"}</option>)}
+        </select></label>
+      <label className="field half">Coordinates or Google Maps link
+        <input value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder="14.6507, 121.0494" /></label>
+      <div className="field row-buttons">
+        <button className="small" disabled={busy || !pasted.trim()} onClick={savePasted}>Save location</button>
+        <button className="secondary small" disabled={busy} onClick={save}>{busy ? "Saving…" : "Or use this phone's location"}</button>
+        {res?.error && <span className="field-error">{res.error}</span>}
+        {res?.ok && <span className="small ok-text">{res.ok}</span>}
+      </div>
+      <p className="field small muted" style={{ margin: 0 }}>To get the numbers: in Google Maps, press and hold (phone) or right-click (PC) on the clinic&apos;s building. The coordinates show at the top of the menu or in the search bar. Copy them and paste here.</p>
     </div>
   );
 }

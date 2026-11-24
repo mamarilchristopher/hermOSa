@@ -7,6 +7,7 @@ export const LEVEL_TEXT: Record<string, string> = {
   GM: "General Manager (all branches, signs off commissions)",
   SENIOR_CMA: "Senior CMA (own branch, on commission)",
   CMA: "CMA (own branch, on commission)",
+  TRAINEE: "Trainee (own branch, no commission by default)",
   MANAGER: "Branch manager (one branch)",
   CASHIER: "Front desk / cashier (one branch)",
 };

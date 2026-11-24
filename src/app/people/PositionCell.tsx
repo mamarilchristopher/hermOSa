@@ -2,7 +2,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { setPosition } from "./actions";
 
-const SUGGESTED = ["Owner", "General Manager", "Senior CMA", "CMA"];
+const SUGGESTED = ["Owner", "General Manager", "Senior CMA", "CMA", "Trainee"];
 
 /** Inline position editor: the Confirm button only appears once the text changes. */
 export function PositionCell({ employeeId, position }: { employeeId: string; position: string | null }) {

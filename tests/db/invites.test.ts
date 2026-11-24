@@ -87,6 +87,14 @@ describe("join requests", () => {
     expect(rows[0]).toMatchObject({ position: "Senior CMA", commission_eligible: true });
   });
 
+  it("a Trainee is a clinician at one branch, not on commission by default", async () => {
+    const t = await signUp("trainee@demo.invalid", { full_name: "DEMO Trainee", invite_code: code });
+    expect((await db.rpc(owner, "aal2", "approve_join_request", [t.appUserId, "TRAINEE", db.branches.FAIRVIEW, null, null])).ok).toBe(true);
+    expect((await db.rpc(t, "aal1", "my_access", [])).grants).toEqual([{ role: "CLINICIAN", branch_id: db.branches.FAIRVIEW }]);
+    const { rows } = await db.sql("SELECT position, commission_eligible FROM public.employees WHERE app_user_id = $1", [t.appUserId]);
+    expect(rows[0]).toMatchObject({ position: "Trainee", commission_eligible: false });
+  });
+
   it("a rejected request loses the login and can never be given a role", async () => {
     nope = await signUp("nope@demo.invalid", { full_name: "DEMO Stranger", invite_code: code });
     expect((await db.rpc(owner, "aal2", "reject_join_request", [nope.appUserId])).ok).toBe(true);

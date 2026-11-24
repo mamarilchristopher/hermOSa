@@ -30,3 +30,18 @@ export function shortNames(people: { id: string; name: string }[]): Record<strin
   }));
 }
 export const LEAVE_TEXT: Record<string, string> = { VL: "VL", SL: "SL", ABSENT: "Absent" };
+
+/** Coordinates from a Google Maps link or a "lat, lng" pair. Short links (maps.app.goo.gl) can't be read. */
+export function parseCoords(text: string): { lat: number; lng: number } | null {
+  const t = decodeURIComponent(text.trim());
+  const pats = [/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/, /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/, /[?&](?:q|query|ll|destination)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+    /^\(?\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)?$/];
+  for (const p of pats) {
+    const m = t.match(p);
+    if (m) {
+      const lat = Number(m[1]), lng = Number(m[2]);
+      if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng };
+    }
+  }
+  return null;
+}

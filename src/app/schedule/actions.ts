@@ -2,7 +2,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { errorText } from "@/lib/access";
+import { errorText, requireAccess } from "@/lib/access";
+import { addDays } from "@/lib/insights";
+import { normalizeRules, suggestWeek as suggest, type Fixed } from "@/lib/scheduleAuto";
+import { branchShort } from "@/lib/schedule";
 
 export type ActionState = { error?: string; ok?: string; at?: number } | undefined;
 
@@ -12,7 +15,7 @@ const time = z.string().regex(/^\d{2}:\d{2}$/);
 async function call(fn: string, args: Record<string, unknown>, okText: string): Promise<ActionState> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc(fn, args);
-  if (error) return { error: error.code === "PGRST202" ? `The owner needs to run update-${["save_day", "copy_last_week"].includes(fn) ? "0024" : "0022"} in Supabase first.` : "Could not save. Try again." };
+  if (error) return { error: error.code === "PGRST202" ? `The owner needs to run update-${["save_day", "copy_last_week"].includes(fn) ? "0024" : fn.includes("schedule_rules") ? "0025" : "0022"} in Supabase first.` : "Could not save. Try again." };
   if (!data?.ok) return { error: errorText(data?.error ?? "UNKNOWN") };
   revalidatePath("/schedule");
   revalidatePath("/me");
@@ -87,4 +90,52 @@ export async function cancelRequest(_p: ActionState, fd: FormData): Promise<Acti
   const id = z.uuid().safeParse(fd.get("id"));
   if (!id.success) return { error: "Try again." };
   return call("cancel_schedule_request", { p_id: id.data }, "Cancelled");
+}
+
+type WkPerson = { id: string; branch_id: string | null; can_edit: boolean; pattern: { branch_id: string; days_off: number[]; start: string; end: string } | null };
+type WkShift = { employee_id: string; date: string; off: boolean; branch_id: string | null; state: string; leave?: string | null };
+
+/** Suggest a week: plans every unpublished day from the rules; published and leave days are kept. */
+export async function suggestWeekAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const m = date.safeParse(fd.get("monday"));
+  if (!m.success) return { error: "Try again." };
+  const { supabase, branches } = await requireAccess();
+  const clinics = branches.filter((b) => b.kind === "CLINIC");
+  const [{ data: wk, error }, { data: prev }, { data: rulesRaw, error: rErr }] = await Promise.all([
+    supabase.rpc("week_schedule", { p_monday: m.data }),
+    supabase.rpc("week_schedule", { p_monday: addDays(m.data, -7) }),
+    supabase.rpc("schedule_rules"),
+  ]);
+  if (error || rErr) return { error: rErr?.code === "PGRST202" ? "The owner needs to run update-0025 in Supabase first." : "Could not load the week. Try again." };
+  const w = wk as { people: WkPerson[]; shifts: WkShift[] };
+  const people = w.people.filter((p) => p.can_edit).map((p) => ({ id: p.id, home: p.pattern?.branch_id ?? p.branch_id,
+    daysOff: p.pattern?.days_off, start: p.pattern?.start, end: p.pattern?.end }));
+  if (!people.length) return { error: "No staff to schedule." };
+  const dayIdx = (d: string, monday: string) => Math.round((Date.parse(d) - Date.parse(monday)) / 86400000);
+  const asFixed = (list: WkShift[], monday: string): Fixed[] => list.map((s) => ({ employee: s.employee_id, day: dayIdx(s.date, monday),
+    status: s.leave ?? (s.off ? "OFF" : s.branch_id ?? "OFF") }));
+  const keep = w.shifts.filter((s) => s.state === "PUBLISHED" || s.leave);
+  const seed = Number(fd.get("seed")) || Number(m.data.replace(/-/g, ""));
+  const rules = normalizeRules(rulesRaw, clinics.map((b) => b.id));
+  const { days, short } = suggest({ people, branches: clinics.map((b) => b.id), rules, fixed: asFixed(keep, m.data), seed,
+    lastWeek: asFixed(((prev as { shifts: WkShift[] } | null)?.shifts ?? []), addDays(m.data, -7)) });
+  for (let i = 0; i < 7; i++) {
+    if (!days[i].length) continue;
+    const { data, error: e } = await supabase.rpc("save_day", { p_date: addDays(m.data, i), p_rows: days[i] });
+    if (e || !data?.ok) return { error: e ? "Could not save the suggestion. Try again." : errorText(data?.error) };
+  }
+  revalidatePath("/schedule");
+  const name = (id: string) => branchShort(clinics.find((b) => b.id === id)?.name ?? "");
+  const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  return { ok: short.length
+    ? `Suggested, but not enough people for: ${short.slice(0, 4).map((x) => `${DOW[x.day]} ${name(x.branch)}`).join(", ")}${short.length > 4 ? ", and more" : ""}. Adjust, then publish.`
+    : "Suggested a week. Check it, change any day, then Publish.", at: Date.now() };
+}
+
+export async function saveRules(_p: ActionState, fd: FormData): Promise<ActionState> {
+  let raw: unknown;
+  try { raw = JSON.parse(String(fd.get("rules") ?? "{}")); } catch { return { error: "Try again." }; }
+  const { branches } = await requireAccess();
+  const rules = normalizeRules(raw, branches.filter((b) => b.kind === "CLINIC").map((b) => b.id));
+  return call("save_schedule_rules", { p_rules: rules }, "Rules saved.");
 }

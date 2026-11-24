@@ -1,5 +1,7 @@
 "use client";
 import { useActionState, useEffect, useRef, useState } from "react";
+import { saveRules, suggestWeekAction } from "./actions";
+import type { Rules } from "@/lib/scheduleAuto";
 import { cancelRequest, copyLastWeek, decideRequest, generateWeek, publishWeek, requestChange, saveDay, saveShift, savePattern, type ActionState } from "./actions";
 import { DOW, LEAVE_TEXT, shortDate, shortNames, timeLabel } from "@/lib/schedule";
 import type { Person, Shift } from "./page";
@@ -23,19 +25,27 @@ export function WeekButtons({ monday, drafts, empty }: { monday: string; drafts:
   const [g, gen, genBusy] = useActionState(generateWeek, undefined);
   const [p, pub, pubBusy] = useActionState(publishWeek, undefined);
   const [c, copy, copyBusy] = useActionState(copyLastWeek, undefined);
-  const last = [g, p, c].filter((x) => x?.at).sort((a, b) => b!.at! - a!.at!)[0];
+  const [sg, sug, sugBusy] = useActionState(suggestWeekAction, undefined);
+  const last = [g, p, c, sg].filter((x) => x?.at).sort((a, b) => b!.at! - a!.at!)[0];
   return (
-    <div className="week-actions">
-      <form action={copy}><input type="hidden" name="monday" value={monday} />
-        <button className={empty ? "" : "secondary"} disabled={copyBusy}>{copyBusy ? "Copying…" : empty ? "Copy last week" : "Copy last week into empty days"}</button></form>
-      <form action={gen}><input type="hidden" name="monday" value={monday} />
-        <button className="secondary" disabled={genBusy}>{genBusy ? "Filling…" : "Fill from usual schedules"}</button></form>
-      {drafts > 0 && (
-        <form action={pub} onSubmit={(e) => { if (!confirm("Publish this week? Staff will see it and get a notice.")) e.preventDefault(); }}>
-          <input type="hidden" name="monday" value={monday} />
-          <button disabled={pubBusy}>{pubBusy ? "Publishing…" : `Publish week (${drafts} day${drafts === 1 ? "" : "s"})`}</button></form>
-      )}
+    <div className="sched-foot">
       <Msg s={last} />
+      <div className="sched-actions">
+        <form action={sug} onSubmit={(e) => { if (drafts > 0 && !confirm("Suggest a new plan? Unpublished days will be replaced. Published days and leave are kept.")) e.preventDefault(); }}>
+          <input type="hidden" name="monday" value={monday} />
+          <input type="hidden" name="seed" value={sg?.at ?? ""} />
+          <button className="suggest" disabled={sugBusy}>{sugBusy ? "Planning…" : sg?.ok ? "Suggest again" : "Suggest a week"}</button></form>
+        <span className="small muted">{empty ? "or start from:" : "or fill empty days from:"}</span>
+        <form action={copy}><input type="hidden" name="monday" value={monday} />
+          <button className="secondary small" disabled={copyBusy}>{copyBusy ? "Copying…" : "Copy last week"}</button></form>
+        <form action={gen}><input type="hidden" name="monday" value={monday} />
+          <button className="secondary small" disabled={genBusy}>{genBusy ? "Filling…" : "Use usual schedules"}</button></form>
+        {drafts > 0 && (
+          <form action={pub} className="publish" onSubmit={(e) => { if (!confirm("Publish this week? Staff will see it and get a notice.")) e.preventDefault(); }}>
+            <input type="hidden" name="monday" value={monday} />
+            <button disabled={pubBusy}>{pubBusy ? "Publishing…" : `Publish week`}</button></form>
+        )}
+      </div>
     </div>
   );
 }
@@ -262,47 +272,60 @@ export function BranchWeek({ dates, today, people, shifts, branches, me }: { dat
   const short = shortNames(people);
   const canEdit = people.some((p) => p.can_edit);
   const on = (d: string) => shifts.filter((s) => s.date === d);
-  const Names = ({ list, leave }: { list: Shift[]; leave?: boolean }) => (
-    <div className="names">
-      {list.sort((a, b) => (short[a.employee_id] ?? "").localeCompare(short[b.employee_id] ?? "")).map((s) => {
-        const odd = !leave && !s.off && s.start && (s.start !== "10:00" || s.end !== "19:00");
+  const byName = (a: Shift, b: Shift) => (short[a.employee_id] ?? "").localeCompare(short[b.employee_id] ?? "");
+  const Names = ({ list, leave }: { list: Shift[]; leave?: boolean }) => list.length === 0 ? <span className="none">–</span> : (
+    <ul className="names">
+      {list.sort(byName).map((s) => {
+        const odd = !s.off && s.start && (s.start !== "10:00" || s.end !== "19:00");
         return (
-          <span key={s.employee_id} className={`name-chip ${s.state === "DRAFT" ? "draft" : ""} ${s.employee_id === me ? "me" : ""}`} title={s.note ?? undefined}>
-            {leave && s.leave && s.leave !== "VL" ? `${LEAVE_TEXT[s.leave]}: ` : ""}{short[s.employee_id] ?? "?"}{odd ? ` ${timeLabel(s.start)}–${timeLabel(s.end)}` : ""}
-          </span>
+          <li key={s.employee_id} className={`${s.state === "DRAFT" ? "draft" : ""} ${s.employee_id === me ? "me" : ""}`} title={s.note ?? undefined}>
+            {short[s.employee_id] ?? "?"}
+            {leave && s.leave && <span className="leave-tag">{LEAVE_TEXT[s.leave]}</span>}
+            {odd && <span className="hrs">{timeLabel(s.start)}–{timeLabel(s.end)}</span>}
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
   return (
     <>
-      <div className="table-wrap branch-week">
-        <table>
-          <thead><tr><th>Day</th>{branches.map((b) => <th key={b.id}>{b.name}</th>)}<th>Off</th><th>Leave</th></tr></thead>
+      <div className="sheet-wrap">
+        <table className="sheet">
+          <colgroup><col className="c-day" />{branches.map((b) => <col key={b.id} />)}<col className="c-off" /><col className="c-off" /></colgroup>
+          <thead><tr><th>Day</th>{branches.map((b, i) => <th key={b.id} className={`b${i % 4}`}>{b.name}</th>)}<th className="muted-col">Off</th><th className="muted-col">Leave</th></tr></thead>
           <tbody>
             {dates.map((d) => {
               const day = on(d);
-              const row = (
-                <>
-                  {branches.map((b) => <td key={b.id}><Names list={day.filter((s) => !s.off && s.branch_id === b.id)} /></td>)}
-                  <td className="off-col"><Names list={day.filter((s) => s.off && !s.leave)} /></td>
-                  <td className="leave-col"><Names list={day.filter((s) => s.off && s.leave)} leave /></td>
-                </>
-              );
               return (
-                <tr key={d} className={d === today ? "today" : ""}>
-                  <th scope="row">
-                    {canEdit ? <button type="button" className="day-btn" onClick={() => setEdit(d)}>{DOW[wd(d)]} {Number(d.slice(8))}<span className="small">Edit</span></button>
-                      : <>{DOW[wd(d)]} {Number(d.slice(8))}</>}
-                  </th>
-                  {row}
+                <tr key={d} className={`${d === today ? "today" : ""} ${canEdit ? "editable" : ""}`} onClick={canEdit ? () => setEdit(d) : undefined}
+                  tabIndex={canEdit ? 0 : undefined} onKeyDown={canEdit ? (e) => { if (e.key === "Enter") setEdit(d); } : undefined}>
+                  <th scope="row"><span className="dow">{DOW[wd(d)]}</span><span className="dnum">{shortDate(d)}</span>{canEdit && <span className="edit-hint">Edit</span>}</th>
+                  {branches.map((b) => <td key={b.id}><Names list={day.filter((s) => !s.off && s.branch_id === b.id)} /></td>)}
+                  <td className="muted-col"><Names list={day.filter((s) => s.off && !s.leave)} /></td>
+                  <td className="muted-col leave"><Names list={day.filter((s) => s.off && s.leave)} leave /></td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-      <p className="small muted legend"><span className="key draft" /> not published yet · hours show only when not 10 AM–7 PM{canEdit && " · tap a day to change it"}</p>
+      <div className="sheet-days">
+        {dates.map((d) => {
+          const day = on(d);
+          const cols = [...branches.map((b, i) => ({ k: b.id, label: b.name, cls: `b${i % 4}`, list: day.filter((s) => !s.off && s.branch_id === b.id), leave: false })),
+            { k: "off", label: "Off", cls: "muted-col", list: day.filter((s) => s.off && !s.leave), leave: false },
+            { k: "leave", label: "Leave", cls: "muted-col", list: day.filter((s) => s.off && s.leave), leave: true }].filter((c) => c.list.length);
+          return (
+            <div key={d} className={`sheet-day ${d === today ? "today" : ""}`}>
+              <div className="sheet-day-head"><strong>{DOW[wd(d)]}, {shortDate(d)}</strong>{canEdit && <button type="button" className="secondary small" onClick={() => setEdit(d)}>Edit</button>}</div>
+              {cols.length === 0 ? <p className="small muted" style={{ margin: 0 }}>Nothing planned.</p> : (
+                <dl>{cols.map((c) => <div key={c.k} className={c.cls}><dt>{c.label}</dt><dd><Names list={c.list} leave={c.leave} /></dd></div>)}</dl>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p className="small muted legend">{canEdit && <>Tap a day to change it. </>}<span className="key draft" /> = not published yet. Hours show only when not 10 AM–7 PM.</p>
       {edit && <DayEditor key={edit} date={edit} people={people.filter((p) => p.can_edit)} shifts={on(edit)} branches={branches} short={short} onClose={() => setEdit(null)} />}
     </>
   );
@@ -351,5 +374,40 @@ function DayEditor({ date, people, shifts, branches, short, onClose }: { date: s
         </div>
       </form>
     </dialog>
+  );
+}
+
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+export function RulesForm({ rules, branches }: { rules: Rules; branches: B[] }) {
+  const [state, action, pending] = useActionState(saveRules, undefined);
+  const [r, setR] = useState(rules);
+  const setMin = (b: string, d: number, v: number) => setR((x) => ({ ...x, min: { ...x.min, [b]: x.min[b].map((n, i) => (i === d ? v : n)) } }));
+  return (
+    <form action={action} className="rules-form">
+      <input type="hidden" name="rules" value={JSON.stringify(r)} />
+      <div className="table-wrap">
+        <table className="rules-table">
+          <thead><tr><th>Fewest people</th>{DAYS.map((d) => <th key={d}>{d}</th>)}</tr></thead>
+          <tbody>
+            {branches.map((b) => (
+              <tr key={b.id}><th scope="row">{b.name}</th>
+                {DAYS.map((d, i) => <td key={d}><input type="number" min={0} max={9} value={r.min[b.id]?.[i] ?? 1} aria-label={`${b.name} ${d}`}
+                  onChange={(e) => setMin(b.id, i, Math.max(0, Math.min(9, Number(e.target.value) || 0)))} /></td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="row-buttons" style={{ marginTop: 10 }}>
+        <label className="small">Days off per person each week
+          <select value={r.days_off} onChange={(e) => setR({ ...r, days_off: Number(e.target.value) })} style={{ marginLeft: 8 }}>
+            {[0, 1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select></label>
+        <button className="secondary small" disabled={pending}>{pending ? "Saving…" : "Save rules"}</button>
+        {state?.error && <span className="field-error">{state.error}</span>}
+        {state?.ok && <span className="small ok-text">{state.ok}</span>}
+      </div>
+      <p className="small muted" style={{ marginBottom: 0 }}>Suggest a week also uses each person&apos;s usual branch and usual day off (below), keeps published days and approved leave, and spreads days off so no branch runs short.</p>
+    </form>
   );
 }
