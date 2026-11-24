@@ -10,7 +10,7 @@ const ADMIN_URL = process.env.TEST_DATABASE_URL ?? "postgres://postgres@localhos
 const root = join(__dirname, "..", "..");
 
 export type Aal = "aal1" | "aal2";
-export type Person = { appUserId: string; authSubject: string; name: string };
+export type Person = { appUserId: string; authSubject: string; name: string; sessionId?: string };
 
 export class TestDb {
   branches: Record<string, string> = {};
@@ -76,7 +76,7 @@ export class TestDb {
     try {
       await client.query("BEGIN");
       await client.query("SET LOCAL ROLE authenticated");
-      const claims = who ? { sub: who.authSubject, role: "authenticated", aal } : { role: "authenticated" };
+      const claims = who ? { sub: who.authSubject, role: "authenticated", aal, session_id: who.sessionId ?? who.authSubject } : { role: "authenticated" };
       await client.query("SELECT set_config('request.jwt.claims', $1, true)", [JSON.stringify(claims)]);
       const res = await client.query<T>(text, params);
       await client.query("COMMIT");

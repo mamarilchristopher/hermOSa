@@ -8,18 +8,21 @@ import { ApproveForm, CopyLink, NewInviteForm } from "./JoinForms";
 import Link from "next/link";
 import { byRankThenName, staffRank } from "@/lib/staffOrder";
 import { PositionCell } from "../../people/PositionCell";
+import { PinCell } from "./PinCell";
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<{ sort?: string }> }) {
   const sortByName = (await searchParams).sort === "name";
   const { supabase, access, branches } = await requireAccess();
   if (!can(access, ["OWNER"], null)) redirect("/");
-  const [{ data: all }, { data: grants }, { data: invites }, { data: emps }] = await Promise.all([
+  const [{ data: all }, { data: grants }, { data: invites }, { data: emps }, { data: pinData }] = await Promise.all([
     supabase.from("app_users").select("id, display_name, email, active, join_status, requested_branch_id, joined_at").order("display_name"),
     supabase.from("role_grants").select("id, user_id, role_code, branch_id").is("revoked_at", null),
     supabase.from("staff_invites").select("id, code, expires_at, use_count").is("revoked_at", null)
       .gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }),
     supabase.from("employees").select("id, app_user_id, position"),
+    supabase.rpc("staff_pin_list"),
   ]);
+  const pins = new Set(Array.isArray(pinData) ? (pinData as string[]) : []);
   const positionOf = new Map((emps ?? []).map((e) => [e.app_user_id, e.position as string | null]));
   const employeeOf = new Map((emps ?? []).map((e) => [e.app_user_id, e.id as string]));
   const grantsOf = (id: string) => (grants ?? []).filter((g) => g.user_id === id);
@@ -86,7 +89,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Name</th><th>Position</th><th>Email</th><th>Roles</th><th></th></tr></thead>
+            <thead><tr><th>Name</th><th>Position</th><th>Email</th><th>Roles</th><th>Sign-in PIN</th><th></th></tr></thead>
             <tbody>
               {users.map((u) => (
                 <tr key={u.id}>
@@ -102,6 +105,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                       </form>
                     ))}
                   </td>
+                  <td>{u.id !== access.user_id && u.active && <PinCell userId={u.id} hasPin={pins.has(u.id)} />}</td>
                   <td>
                     {u.id !== access.user_id && (
                       <form action={setActive}>

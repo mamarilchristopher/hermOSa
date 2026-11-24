@@ -99,3 +99,20 @@ export async function revokeInvite(fd: FormData) {
   await supabase.rpc("revoke_staff_invite", { p_invite: p.data });
   revalidatePath("/admin/users");
 }
+
+export type PinCellState = { ok?: string; error?: string; n?: number; has?: boolean } | undefined;
+
+/** Owner sets (4 digits) or removes (empty + remove) someone's sign-in PIN. */
+export async function setStaffPin(prev: PinCellState, fd: FormData): Promise<PinCellState> {
+  const n = (prev?.n ?? 0) + 1;
+  const user = String(fd.get("user") ?? "");
+  const remove = fd.get("remove") === "1";
+  const pin = String(fd.get("pin") ?? "").trim();
+  if (!remove && !/^\d{4}$/.test(pin)) return { ...prev, error: "Enter 4 digits.", n };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_staff_pin", { p_user: user, p_pin: remove ? null : pin });
+  if (error) return { ...prev, error: "Could not save. Run update-0018 in Supabase first.", n };
+  if (!data.ok) return { ...prev, error: errorText(data.error), n };
+  revalidatePath("/admin/users");
+  return { ok: remove ? "PIN removed" : "PIN set", has: !remove, n };
+}
