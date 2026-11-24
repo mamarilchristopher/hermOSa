@@ -7,6 +7,7 @@ import { manilaToday } from "@/lib/dates";
 import { addDays, addMonths, monthEnd, monthLabel, sortBranches } from "@/lib/insights";
 import { DecideForm } from "./Forms";
 import { MonthGrid, type GridCell } from "./MonthGrid";
+import { highlightKeys } from "@/lib/noticeLink";
 
 type Status = {
   ok: boolean; error?: string; second_signoff: boolean;
@@ -16,7 +17,7 @@ type Status = {
 };
 
 /** Daily sales tracker: the month as a sheet (a row per day, a column per branch), typed in place. */
-export default async function DailySales({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
+export default async function DailySales({ searchParams }: { searchParams: Promise<{ month?: string; hl?: string }> }) {
   const { supabase, access } = await requireAccess();
   if (!access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role))) redirect("/me");
   const today = manilaToday();
@@ -73,7 +74,7 @@ export default async function DailySales({ searchParams }: { searchParams: Promi
         {st.ok && (
           <>
             {gaps > 0 && <p className="small">{gaps} branch-day{gaps === 1 ? "" : "s"} this month with nothing entered (highlighted). Use the ▾ in a cell to mark it Zero sales or Closed.</p>}
-            <MonthGrid dates={dates} branches={branches.map((b) => ({ id: b.id, name: b.name, can_enter: b.can_enter }))} cells={cells} today={today} changed={changed} />
+            <MonthGrid dates={dates} branches={branches.map((b) => ({ id: b.id, name: b.name, can_enter: b.can_enter }))} cells={cells} today={today} changed={changed} highlight={highlightKeys(sp.hl, branches, ym)} />
             <p className="small muted">▾ in an empty cell: Zero sales, Closed or Enter sales (typing 0 also means zero sales). • the total differs from that day&apos;s service log (hover to see it). ✎ a change is waiting for sign-off. ↺ changed before. Every save notifies the other management members, and changing a saved day needs a second person to confirm.
               {st.second_signoff ? " Entries wait for a second person on Imports before they count." : " While second sign-off is off, entries by owners and the general manager count right away."}</p>
 

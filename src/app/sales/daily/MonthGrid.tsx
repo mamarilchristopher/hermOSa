@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { centsToPhp } from "@/lib/csv";
 import { readMoney } from "@/lib/tracker";
@@ -24,12 +24,19 @@ const typedMark = (v: string): Mark | null => {
 };
 
 /** The Sales Source Tracker, inside the OS: one row per day, one column per branch, type and save. */
-export function MonthGrid({ dates, branches, cells, today, changed = [] }: {
+export function MonthGrid({ dates, branches, cells, today, changed = [], highlight = [] }: {
   dates: string[]; branches: GridBranch[]; cells: Record<string, GridCell>; today: string;
+  /** "branch|date" cells to highlight and scroll to (opened from a notice). */
+  highlight?: string[];
   /** "branch|date" keys already changed once: a further change needs two people. */
   changed?: string[];
 }) {
   const changedSet = useMemo(() => new Set(changed), [changed]);
+  const hl = useMemo(() => new Set(highlight), [highlight]);
+  useEffect(() => {
+    if (!highlight.length) return;
+    document.querySelector(`[data-cell="${highlight[0]}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [highlight]);
   const [confirming, setConfirming] = useState(false);
   const router = useRouter();
   const [typed, setTyped] = useState<Record<string, string>>({});
@@ -148,7 +155,7 @@ export function MonthGrid({ dates, branches, cells, today, changed = [] }: {
                   const canType = b.can_enter && !mark && !staged && !fixing && (rec === null || editing);
                   if (canType && rec === null && marks[k]) {
                     return (
-                      <td key={k} className="num cell-input">
+                      <td key={k} data-cell={k} className={`num cell-input ${hl.has(k) ? "hl" : ""}`}>
                         <span className="cell-mark draft">{MARK_LABEL[marks[k]]}
                           <button type="button" className="cell-undo" aria-label={`Undo ${MARK_LABEL[marks[k]]} for ${b.name} ${d}`}
                             onClick={() => setMarks((m) => { const n = { ...m }; delete n[k]; return n; })}>×</button>
@@ -158,7 +165,7 @@ export function MonthGrid({ dates, branches, cells, today, changed = [] }: {
                   }
                   if (canType) {
                     return (
-                      <td key={k} className={`num cell-input ${parsed.bad.has(k) ? "bad" : ""} ${rec !== null ? "editing" : ""}`}>
+                      <td key={k} data-cell={k} className={`num cell-input ${parsed.bad.has(k) ? "bad" : ""} ${rec !== null ? "editing" : ""} ${hl.has(k) ? "hl" : ""}`}>
                         <span className="cell-entry">
                           <input inputMode="decimal" aria-label={`${b.name} ${d}`} placeholder={rec !== null ? php(rec) : ""}
                             value={typed[k] ?? ""} onChange={(e) => setTyped((t) => ({ ...t, [k]: e.target.value }))}
@@ -193,7 +200,7 @@ export function MonthGrid({ dates, branches, cells, today, changed = [] }: {
                     );
                   }
                   return (
-                    <td key={k} className={`num ${rec === null && !mark && !staged && d < today ? "gap" : ""}`}
+                    <td key={k} data-cell={k} className={`num ${rec === null && !mark && !staged && d < today ? "gap" : ""} ${hl.has(k) ? "hl" : ""}`}
                       title={flag ? `Service log: ${php(service!)}` : fixing ? "Correction waiting for sign-off" : undefined}>
                       {rec !== null ? php(rec) : mark ? <span className="cell-mark">{mark === "CLOSED" ? "Closed" : "Zero sales"}</span> : staged ? "Waiting" : "–"}
                       {flag && <span className="flag" aria-label="differs from the service log"> •</span>}

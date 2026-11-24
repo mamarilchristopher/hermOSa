@@ -9,6 +9,7 @@ import { ROLE_TEXT } from "@/lib/commission";
 import { markNoticesRead } from "./actions";
 import { ManagerHome, TodoCard, type Todo } from "./ManagerHome";
 import { ViewAsPicker } from "./ViewAsPicker";
+import { noticeHref } from "@/lib/noticeLink";
 import { computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
 import { addDays, sortBranches } from "@/lib/insights";
 
@@ -141,7 +142,7 @@ export default async function Me() {
                     <strong>{n.title}</strong> <span className="small muted">· {when(n.created_at)}</span><br />
                     <span className="small">{n.body}</span>
                   </span>
-                  {n.link && <Link className="small" href={n.link}>Open</Link>}
+                  {n.link && <Link className="small" href={noticeHref(n.link, n.body, branches) ?? n.link}>Open</Link>}
                 </li>
               ))}
             </ul>
