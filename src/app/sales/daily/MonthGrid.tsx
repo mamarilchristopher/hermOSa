@@ -23,9 +23,13 @@ const typedMark = (v: string): Mark | null => {
 };
 
 /** The Sales Source Tracker, inside the OS: one row per day, one column per branch, type and save. */
-export function MonthGrid({ dates, branches, cells, today }: {
+export function MonthGrid({ dates, branches, cells, today, changed = [] }: {
   dates: string[]; branches: GridBranch[]; cells: Record<string, GridCell>; today: string;
+  /** "branch|date" keys already changed once: a further change needs two people. */
+  changed?: string[];
 }) {
+  const changedSet = useMemo(() => new Set(changed), [changed]);
+  const [confirming, setConfirming] = useState(false);
   const router = useRouter();
   const [typed, setTyped] = useState<Record<string, string>>({});
   const [marks, setMarks] = useState<Record<string, Mark>>({});
@@ -73,9 +77,31 @@ export function MonthGrid({ dates, branches, cells, today }: {
     return { d, vals, day, running, draft: vals.some((v) => v.draft) };
   });
   const colTotals = branches.map((b) => dates.reduce((s, d) => s + valueOf(b.id, d).cents, 0));
+  // Daily average: days with sales plus Zero sales days (as ₱0). Closed days and empty days are left out.
+  const counts = (b: string, d: string) => {
+    const k = key(b, d);
+    if (valueOf(b, d).cents > 0) return true;
+    const m = marks[k] ?? cells[k]?.[1] ?? (typed[k] ? typedMark(typed[k]) : null);
+    return m === "NO_SALES";
+  };
+  const colDays = branches.map((b) => dates.filter((d) => counts(b.id, d)).length);
+  const allDays = dates.filter((d) => branches.some((b) => counts(b.id, d))).length;
+  const grand = colTotals.reduce((s, x) => s + x, 0);
+  const avg = (total: number, n: number) => (n ? php(Math.round(total / n / 100) * 100) : "–");
   const pending = parsed.entries.length + parsed.fixes.length + parsed.zero.length;
 
+  function trySave() {
+    if (parsed.bad.size) { setMsg({ ok: false, text: "Some cells aren't amounts. They're outlined in red." }); return; }
+    if (parsed.fixes.length > 0) {
+      if (reason.trim().length < 8) { setMsg({ ok: false, text: "Write why you're changing recorded days (at least 8 characters)." }); return; }
+      setConfirming(true);
+      return;
+    }
+    save();
+  }
+
   async function save() {
+    setConfirming(false);
     if (parsed.bad.size) { setMsg({ ok: false, text: "Some cells aren't amounts. They're outlined in red." }); return; }
     setBusy(true); setMsg(null);
     const r = await saveGrid({ entries: parsed.entries, fixes: parsed.fixes, marks: parsed.zero, reason });
@@ -134,7 +160,7 @@ export function MonthGrid({ dates, branches, cells, today }: {
                               const tm = rec === null ? typedMark(e.target.value) : null;
                               if (tm) { setMarks((m) => ({ ...m, [k]: tm })); setTyped((t) => { const n = { ...t }; delete n[k]; return n; }); }
                             }}
-                            onKeyDown={(e) => { if (e.key === "Enter" && pending) { e.preventDefault(); save(); } }} />
+                            onKeyDown={(e) => { if (e.key === "Enter" && pending) { e.preventDefault(); trySave(); } }} />
                           {rec === null && (
                             <select className="cell-kind" aria-label={`${b.name} ${d}: zero sales, closed or enter sales`} value=""
                               onChange={(e) => {
@@ -159,6 +185,7 @@ export function MonthGrid({ dates, branches, cells, today }: {
                       {rec !== null ? php(rec) : mark ? <span className="cell-mark">{mark === "CLOSED" ? "Closed" : "Zero sales"}</span> : staged ? "Waiting" : "–"}
                       {flag && <span className="flag" aria-label="differs from the service log"> •</span>}
                       {fixing && <span className="flag"> ✎</span>}
+                      {changedSet.has(k) && !fixing && <span className="changed-mark" title="Changed before. Another change needs a second person to confirm."> ↺</span>}
                     </td>
                   );
                 })}
@@ -168,7 +195,10 @@ export function MonthGrid({ dates, branches, cells, today }: {
             ))}
           </tbody>
           <tfoot>
-            <tr><th scope="row">Month total</th>{colTotals.map((t, i) => <td key={branches[i].id} className="num">{php(t)}</td>)}<td className="num" /><td className="num strong">{php(colTotals.reduce((s, x) => s + x, 0))}</td></tr>
+            <tr><th scope="row">Month total</th>{colTotals.map((t, i) => <td key={branches[i].id} className="num">{php(t)}</td>)}<td className="num" /><td className="num strong">{php(grand)}</td></tr>
+            <tr className="avg-row"><th scope="row" title="Days with sales plus Zero sales days (as ₱0). Closed days and empty days are left out.">Daily average</th>
+              {colTotals.map((t, i) => <td key={branches[i].id} className="num" title={`${colDays[i]} day${colDays[i] === 1 ? "" : "s"} counted`}>{avg(t, colDays[i])}</td>)}
+              <td className="num" title={`${allDays} day${allDays === 1 ? "" : "s"} counted`}>{avg(grand, allDays)}</td><td className="num" /></tr>
           </tfoot>
         </table>
       </div>
@@ -178,11 +208,34 @@ export function MonthGrid({ dates, branches, cells, today }: {
           <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500}
             placeholder={`Why change ${parsed.fixes.length} recorded day${parsed.fixes.length === 1 ? "" : "s"}? (required)`} />
         )}
-        <button type="button" onClick={save} disabled={busy || pending === 0}>
+        <button type="button" onClick={trySave} disabled={busy || pending === 0}>
           {busy ? "Saving…" : pending ? `Save ${pending} day${pending === 1 ? "" : "s"}` : "Type totals to save"}
         </button>
         {pending > 0 && <button type="button" className="secondary" onClick={() => { setTyped({}); setMarks({}); setMsg(null); }} disabled={busy}>Clear</button>}
       </div>
+      {confirming && (
+        <div className="modal-back" role="presentation" onClick={() => setConfirming(false)}>
+          <div className="modal card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" onClick={(e) => e.stopPropagation()}>
+            <h2 id="confirm-title">Are you sure?</h2>
+            <p>This change will notify all other management members, and changing {parsed.fixes.length === 1 ? "this day" : "these days"} again will need confirmation from two people.</p>
+            <ul className="plain-list small">
+              {parsed.fixes.map((f) => {
+                const name = branches.find((b) => b.id === f.branch)?.name ?? "";
+                const old = cells[key(f.branch, f.date)]?.[0] ?? 0;
+                return (
+                  <li key={key(f.branch, f.date)}><span><strong>{name}</strong>, {label(f.date)}: {php(old)} → <strong>{php(f.cents)}</strong>
+                    {changedSet.has(key(f.branch, f.date)) && <span className="muted"> · changed before, so this waits for a second person</span>}</span></li>
+                );
+              })}
+            </ul>
+            <p className="small muted">Reason: {reason.trim()}</p>
+            <div className="row-buttons">
+              <button type="button" onClick={save} autoFocus>Yes, change {parsed.fixes.length === 1 ? "it" : "them"}</button>
+              <button type="button" className="secondary" onClick={() => setConfirming(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
       {msg?.failed && msg.failed.length > 0 && <div className="notice error"><ul className="plain">{msg.failed.map((f, i) => <li key={i}>{f}</li>)}</ul></div>}
     </div>
   );

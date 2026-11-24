@@ -15,9 +15,10 @@ export async function TopBar({ access }: { access: Access }) {
   const supabase = await createClient();
   const approver = access.grants.some((g) => g.role === "OWNER" || g.role === "MANAGER");
   const owner = can(access, ["OWNER"], null);
-  const [{ data: overdueData }, { count: detailsWaiting }] = await Promise.all([
+  const [{ data: overdueData }, { count: detailsWaiting }, { count: unreadNotices }] = await Promise.all([
     approver ? supabase.rpc("overdue_commission_days") : Promise.resolve({ data: [] }),
     owner ? supabase.from("employee_detail_submissions").select("id", { count: "exact", head: true }).eq("state", "PENDING") : Promise.resolve({ count: 0 }),
+    supabase.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null),
   ]);
   const overdue = (Array.isArray(overdueData) ? overdueData : []) as { code: string; name: string; date: string; pending: number }[];
   const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
@@ -26,7 +27,7 @@ export async function TopBar({ access }: { access: Access }) {
   const filler = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER"].includes(g.role));
   const management = access.grants.some((g) => ["OWNER", "FINANCE", "AUDITOR", "MANAGER"].includes(g.role));
   const items: NavItem[] = [
-    { href: "/me", label: "Home", short: "Home", icon: "home" },
+    { href: "/me", label: "Home", short: "Home", icon: "home", badge: unreadNotices || undefined },
     ...(management ? [{ href: "/", label: "Sales dashboard", short: "Sales", icon: "chart" } as NavItem] : []),
     ...(filler ? [{ href: "/sales/daily", label: "Daily Sales", short: "Daily", icon: "pen" } as NavItem] : []),
     ...(logger ? [{ href: "/services", label: "Service log", short: "Services", icon: "clipboard", badge: overdue.length || undefined } as NavItem] : []),

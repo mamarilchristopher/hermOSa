@@ -6,6 +6,10 @@ import { centsToPhp } from "@/lib/csv";
 import { manilaToday } from "@/lib/dates";
 import { monthEnd, monthLabel, monthStart } from "@/lib/insights";
 import { ROLE_TEXT } from "@/lib/commission";
+import { markNoticesRead } from "./actions";
+
+type Notice = { id: string; title: string; body: string | null; link: string | null; created_at: string; read_at: string | null };
+const when = (iso: string) => new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 const ROLE_LABEL: Record<string, string> = {
   OWNER: "Owner", FINANCE: "Finance", MANAGER: "Manager", CASHIER: "Front desk", HR: "HR",
@@ -19,12 +23,15 @@ export default async function Me() {
   const { supabase, access, branches } = await requireAccess();
   const today = manilaToday();
   const start = monthStart(today), ym = today.slice(0, 7);
-  const [{ data: emp }, { data: user }, { data: subs }] = await Promise.all([
+  const [{ data: emp }, { data: user }, { data: subs }, { data: noticeData }] = await Promise.all([
     supabase.from("employees").select("id, full_name, branch_id, position, commission_eligible, active").eq("app_user_id", access.user_id).maybeSingle(),
     supabase.from("app_users").select("email, joined_at").eq("id", access.user_id).maybeSingle(),
     supabase.from("employee_detail_submissions").select("state, note").eq("user_id", access.user_id).neq("state", "SUPERSEDED")
       .order("submitted_at", { ascending: false }).limit(1),
+    supabase.from("notifications").select("id, title, body, link, created_at, read_at").order("created_at", { ascending: false }).limit(15),
   ]);
+  const notices = (noticeData ?? []) as Notice[];
+  const unread = notices.filter((n) => !n.read_at).length;
   const detailState = subs?.[0]?.state as string | undefined;
   const { data } = emp?.commission_eligible
     ? await supabase.from("commission_lines").select("role, amount_cents, service_logs!inner(service_date, state, services(name))")
@@ -53,6 +60,26 @@ export default async function Me() {
             <Link href="/me/details">{detailState === "RETURNED" ? "Fix my details" : "Fill them in"}</Link>
           </div>
         )}
+        {notices.length > 0 && (
+          <div className="card">
+            <div className="card-head">
+              <h2>Notices{unread > 0 && <span className="nav-badge inline">{unread}</span>}</h2>
+              {unread > 0 && <form action={markNoticesRead}><button type="submit" className="secondary small">Mark all read</button></form>}
+            </div>
+            <ul className="plain-list notices">
+              {notices.map((n) => (
+                <li key={n.id} className={n.read_at ? "read" : "unread"}>
+                  <span>
+                    <strong>{n.title}</strong> <span className="small muted">· {when(n.created_at)}</span><br />
+                    <span className="small">{n.body}</span>
+                  </span>
+                  {n.link && <Link className="small" href={n.link}>Open</Link>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {emp?.commission_eligible && (
           <>
             <div className="grid">

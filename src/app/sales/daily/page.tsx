@@ -25,7 +25,15 @@ export default async function DailySales({ searchParams }: { searchParams: Promi
   const ym = /^\d{4}-\d{2}$/.test(sp.month ?? "") && sp.month! <= thisMonth ? sp.month! : thisMonth;
   const start = `${ym}-01`;
   const end = ym === thisMonth ? today : monthEnd(start);
-  const { data } = await supabase.rpc("daily_sales_status", { p_start: start, p_end: end });
+  const [{ data }, { data: changedData }, { data: twoData }] = await Promise.all([
+    supabase.rpc("daily_sales_status", { p_start: start, p_end: end }),
+    supabase.rpc("changed_sales_days", { p_start: start, p_end: end }),
+    supabase.from("sales_corrections").select("id").eq("state", "PENDING").eq("needs_two", true),
+  ]);
+  // Before update-0015 these two come back as errors; the page still works without them.
+  const changed = (Array.isArray(changedData) ? changedData as [string, string][] : []).map(([b, d]) => `${b}|${d}`);
+  const needsTwo = new Set((twoData ?? []).map((x: { id: string }) => x.id));
+  const gm = access.grants.some((g) => g.role === "MANAGER" && g.branch_id === null);
   const st = (data ?? { ok: false }) as Status;
   const branches = st.ok ? sortBranches(st.branches) : [];
   const dates: string[] = [];
@@ -65,8 +73,8 @@ export default async function DailySales({ searchParams }: { searchParams: Promi
         {st.ok && (
           <>
             {gaps > 0 && <p className="small">{gaps} branch-day{gaps === 1 ? "" : "s"} this month with nothing entered (highlighted). Use the ▾ in a cell to mark it Zero sales or Closed.</p>}
-            <MonthGrid dates={dates} branches={branches.map((b) => ({ id: b.id, name: b.name, can_enter: b.can_enter }))} cells={cells} today={today} />
-            <p className="small muted">▾ in an empty cell: Zero sales, Closed or Enter sales (typing 0 also means zero sales). • the total differs from that day&apos;s service log (hover to see it). ✎ a correction is waiting for sign-off.
+            <MonthGrid dates={dates} branches={branches.map((b) => ({ id: b.id, name: b.name, can_enter: b.can_enter }))} cells={cells} today={today} changed={changed} />
+            <p className="small muted">▾ in an empty cell: Zero sales, Closed or Enter sales (typing 0 also means zero sales). • the total differs from that day&apos;s service log (hover to see it). ✎ a change is waiting for sign-off. ↺ changed before: another change needs a second person to confirm. Every change notifies the other management members.
               {st.second_signoff ? " Entries wait for a second person on Imports before they count." : " While second sign-off is off, entries by owners and the general manager count right away."}</p>
 
             {st.corrections.length > 0 && (
@@ -79,7 +87,8 @@ export default async function DailySales({ searchParams }: { searchParams: Promi
                       <li key={x.id}>
                         <span><strong>{b?.name}</strong>, {x.date}: {centsToPhp(x.old_cents)} → <strong>{centsToPhp(x.new_cents)}</strong>
                           <span className="small muted"> · {x.reason} · asked by {x.requested_by}</span></span>
-                        {b?.can_approve && <DecideForm id={x.id} mine={x.mine} />}
+                        {needsTwo.has(x.id) && <span className="tag">needs a second person</span>}
+                        {(b?.can_approve || (gm && needsTwo.has(x.id))) && <DecideForm id={x.id} mine={x.mine} />}
                       </li>
                     );
                   })}
