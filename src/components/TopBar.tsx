@@ -5,6 +5,7 @@ import { can } from "@/lib/access";
 import { IconLogout, IconShield } from "./Icons";
 import { NavLinks, type NavItem } from "./NavLinks";
 import { OnlineNow } from "./OnlineNow";
+import { ViewAsButton } from "./ViewAsButton";
 
 const ROLE_LABEL: Record<string, string> = {
   OWNER: "Owner", FINANCE: "Finance", MANAGER: "Manager", CASHIER: "Cashier", HR: "HR",
@@ -16,11 +17,14 @@ export async function TopBar({ access }: { access: Access }) {
   const supabase = await createClient();
   const approver = access.grants.some((g) => g.role === "OWNER" || g.role === "MANAGER");
   const owner = can(access, ["OWNER"], null);
-  const [{ data: overdueData }, { count: detailsWaiting }, { count: unreadNotices }] = await Promise.all([
+  const viewAs = access.grants.some((g) => (g.role === "OWNER" || g.role === "MANAGER") && g.branch_id === null);
+  const [{ data: overdueData }, { count: detailsWaiting }, { count: unreadNotices }, { data: viewPeople }] = await Promise.all([
     approver ? supabase.rpc("overdue_commission_days") : Promise.resolve({ data: [] }),
     owner ? supabase.from("employee_detail_submissions").select("id", { count: "exact", head: true }).eq("state", "PENDING") : Promise.resolve({ count: 0 }),
     supabase.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null),
+    viewAs ? supabase.rpc("view_as_people") : Promise.resolve({ data: null }),
   ]);
+  const viewList = Array.isArray(viewPeople) ? (viewPeople as { id: string; name: string; position: string | null }[]) : [];
   const overdue = (Array.isArray(overdueData) ? overdueData : []) as { code: string; name: string; date: string; pending: number }[];
   const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
   const people = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "HR", "AUDITOR"].includes(g.role));
@@ -69,7 +73,12 @@ export async function TopBar({ access }: { access: Access }) {
         </form>
       </header>
       <NavLinks items={items} variant="tabs" />
-      <OnlineNow show={access.grants.some((g) => g.role === "OWNER" || g.role === "MANAGER")} />
+      {approver || viewList.length ? (
+        <div className="online-strip">
+          <OnlineNow show={approver} />
+          {viewList.length > 0 && <ViewAsButton people={viewList} />}
+        </div>
+      ) : <OnlineNow show={false} />}
       {overdue.length > 0 && (
         <div className="alert-strip" role="status">
           <strong>Commission sign-off overdue:</strong>

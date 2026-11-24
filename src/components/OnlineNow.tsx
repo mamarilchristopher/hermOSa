@@ -32,10 +32,10 @@ export function OnlineNow({ show }: { show: boolean }) {
 
   if (!show || people === null) return null;
   return (
-    <div className="online-strip" role="status" aria-live="polite">
+    <span className="online-now" role="status" aria-live="polite">
       <span className={`online-dot ${people.length ? "on" : ""}`} aria-hidden />
       <strong>Online now:</strong>
       {people.length === 0 ? <span className="muted">none</span> : people.map((p) => <span key={p.name} className="online-name">{p.name}</span>)}
-    </div>
+    </span>
   );
 }
