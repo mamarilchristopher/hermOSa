@@ -15,7 +15,12 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, them
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={sans.variable} data-theme="ivory">
-      <body>{children}</body>
+      <body>
+        {children}
+        <footer className="build-note" title="The code version this page is running">
+          Version {process.env.NEXT_PUBLIC_BUILD_SHA} · updated {process.env.NEXT_PUBLIC_BUILD_TIME} · {process.env.NEXT_PUBLIC_BUILD_HOST}
+        </footer>
+      </body>
     </html>
   );
 }
