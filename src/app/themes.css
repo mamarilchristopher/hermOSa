@@ -1,0 +1,20 @@
+/* Hermosa OS theme: Ivory Soft (chosen by the owner 2026-11-24). Keeps the official logo, the gold accent and
+   light page backgrounds. Applied with <html data-theme="ivory">; the other three options are in project files. */
+
+/* 1. Ivory Soft: today's warm look, airier. Rounder corners, softer shadows, pill navigation, bigger numbers. */
+[data-theme="ivory"] {
+  --pearl: #faf7f2; --radius: 22px; --radius-sm: 14px;
+  --shadow: 0 1px 1px rgba(47, 36, 29, 0.03), 0 12px 32px -18px rgba(115, 82, 64, 0.22);
+}
+[data-theme="ivory"] .sidebar { background: #f6eedf; border-right-color: transparent; }
+[data-theme="ivory"] .brand { border-bottom-color: #eadcc2; }
+[data-theme="ivory"] .me { border-top-color: #eadcc2; }
+[data-theme="ivory"] .online-strip { background: transparent; border-bottom: 0; }
+[data-theme="ivory"] .side-nav a { border-radius: 999px; }
+[data-theme="ivory"] .side-nav a.active { background: #fff; box-shadow: 0 6px 16px -10px rgba(115, 82, 64, 0.45); }
+[data-theme="ivory"] .side-nav a:hover { background: rgba(255, 255, 255, 0.6); }
+[data-theme="ivory"] .side-nav a.active::before { display: none; }
+[data-theme="ivory"] .card { border-color: transparent; padding: 24px; }
+[data-theme="ivory"] button, [data-theme="ivory"] .button { border-radius: 999px; }
+[data-theme="ivory"] .glance-branch:not(.missing), [data-theme="ivory"] .glance-stats .stat { border: 0; background: #faf4ea; border-radius: 16px; }
+[data-theme="ivory"] th { background: transparent; }
