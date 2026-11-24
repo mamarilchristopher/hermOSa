@@ -21,12 +21,10 @@ function Cell({ c }: { c: DayCell }) {
   }
 }
 
-/** Home for owners, finance and managers: what needs doing, yesterday per branch, and how the month is going. */
-export function ManagerHome({ g, todos }: { g: Glance; todos: Todo[] }) {
-  const ym = g.today.slice(0, 7);
+/** What needs doing, each with an Open button to the page where it's done. Red dot = urgent. */
+export function TodoCard({ todos }: { todos: Todo[] }) {
   return (
-    <>
-      <div className="card todo">
+    <div className="card todo">
         <h2>To do{todos.length > 0 && <span className="nav-badge inline">{todos.length}</span>}</h2>
         {todos.length === 0 ? <p className="muted" style={{ margin: 0 }}>All caught up. Nothing is waiting on you.</p> : (
           <ul className="plain-list todo-list">
@@ -38,6 +36,15 @@ export function ManagerHome({ g, todos }: { g: Glance; todos: Todo[] }) {
           </ul>
         )}
       </div>
+  );
+}
+
+/** Home for owners, finance and managers: what needs doing, yesterday per branch, and how the month is going. */
+export function ManagerHome({ g, todos }: { g: Glance; todos: Todo[] }) {
+  const ym = g.today.slice(0, 7);
+  return (
+    <>
+      <TodoCard todos={todos} />
 
       {g.through && (
         <div className="card">

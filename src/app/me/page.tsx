@@ -7,9 +7,9 @@ import { manilaToday } from "@/lib/dates";
 import { monthEnd, monthLabel, monthStart } from "@/lib/insights";
 import { ROLE_TEXT } from "@/lib/commission";
 import { markNoticesRead } from "./actions";
-import { ManagerHome, type Todo } from "./ManagerHome";
+import { ManagerHome, TodoCard, type Todo } from "./ManagerHome";
 import { computeGlance, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
-import { sortBranches } from "@/lib/insights";
+import { addDays, sortBranches } from "@/lib/insights";
 
 type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: string }[]; days?: StatusDay[];
   corrections?: { id: string; mine: boolean }[] };
@@ -82,8 +82,34 @@ export default async function Me() {
   const isOwner = access.grants.some((g) => g.role === "OWNER");
   const first = (emp?.full_name || access.display_name).trim().split(/\s+/)[0];
   const management = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
-  const home = management ? await managementHome(supabase, today, isOwner) : null;
   const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
+  const home = management ? await managementHome(supabase, today, isOwner) : null;
+  const staffTodos = management ? null : await staffHome();
+  if (home && !isOwner && detailState !== "APPROVED" && detailState !== "PENDING") {
+    home.todos.push({ text: detailState === "RETURNED" ? "The owner sent your employee details back. Please fix them" : "Fill in your employee details (needed for payroll and government reports)", href: "/me/details" });
+  }
+
+  /** Staff Home to-dos: unfinished employee details, service entries sent back, commission waiting for sign-off. */
+  async function staffHome(): Promise<Todo[]> {
+    const since = addDays(today, -30);
+    const who = emp ? `created_by.eq.${access.user_id},performer_id.eq.${emp.id},assistant_id.eq.${emp.id}` : `created_by.eq.${access.user_id}`;
+    const [{ data: sentBack }, { count: loggedToday }] = await Promise.all([
+      supabase.from("service_logs").select("id, service_date").eq("state", "REJECTED").gte("service_date", since).or(who).order("service_date", { ascending: false }),
+      logger ? supabase.from("service_logs").select("id", { count: "exact", head: true }).eq("service_date", today).eq("created_by", access.user_id) : Promise.resolve({ count: 1 }),
+    ]);
+    const todos: Todo[] = [];
+    if (detailState === "RETURNED") todos.push({ text: "The owner sent your employee details back. Please fix them", href: "/me/details", urgent: true });
+    else if (detailState !== "APPROVED" && detailState !== "PENDING") todos.push({ text: "Fill in your employee details (needed for payroll and government reports)", href: "/me/details", urgent: true });
+    const back = sentBack ?? [];
+    if (back.length) todos.push({ text: `${back.length} service log ${back.length === 1 ? "entry was" : "entries were"} sent back by your manager. Check the reason and log ${back.length === 1 ? "it" : "them"} again`, href: `/services?date=${back[0].service_date}`, urgent: true });
+    const unsigned = lines.filter((l) => l.service_logs.state === "PENDING");
+    if (unsigned.length) {
+      const oldest = unsigned.map((l) => l.service_logs.service_date).sort()[0];
+      todos.push({ text: `${unsigned.length} commission ${unsigned.length === 1 ? "entry is" : "entries are"} not signed yet (oldest ${dayLabel(oldest)}). Remind your manager if it's been more than a day`, href: `/services?date=${oldest}` });
+    }
+    if (logger && !loggedToday) todos.push({ text: "Nothing logged today yet. Log each service right after it's done", href: "/services" });
+    return todos;
+  }
 
   return (
     <>
@@ -92,12 +118,7 @@ export default async function Me() {
         <h1>Hi, {first}</h1>
         <p className="muted small">{emp?.position ?? (isOwner ? "Owner" : "Staff")}{emp && ` · ${branchName[emp.branch_id]}`} · {dayLabel(today)}</p>
 
-        {!isOwner && detailState !== "APPROVED" && detailState !== "PENDING" && (
-          <div className={`notice ${detailState === "RETURNED" ? "error" : "info"}`}>
-            {detailState === "RETURNED" ? "The owner sent your employee details back to fix. " : "Please fill in your employee details for payroll and government reports. "}
-            <Link href="/me/details">{detailState === "RETURNED" ? "Fix my details" : "Fill them in"}</Link>
-          </div>
-        )}
+        {staffTodos && <TodoCard todos={staffTodos} />}
         {home && <ManagerHome g={home.g} todos={home.todos} />}
         {notices.length > 0 && (
           <div className="card">
