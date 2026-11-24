@@ -29,3 +29,21 @@ export async function saveEmployee(_prev: EmpState, fd: FormData): Promise<EmpSt
   revalidatePath("/people");
   return { ok: p.data.id ? "Saved." : `Added ${p.data.name}.` };
 }
+
+/** Change only the position title. Every other field is kept exactly as it is. */
+export async function setPosition(_prev: EmpState, fd: FormData): Promise<EmpState> {
+  const p = z.object({ id: z.uuid(), position: z.string().trim().max(80) }).safeParse({ id: fd.get("id"), position: fd.get("position") });
+  if (!p.success) return { error: "Positions can be up to 80 characters." };
+  const supabase = await createClient();
+  const { data: e } = await supabase.from("employees").select("id, branch_id, full_name, commission_eligible, app_user_id, active").eq("id", p.data.id).maybeSingle();
+  if (!e) return { error: errorText("NOT_FOUND") };
+  const { data, error } = await supabase.rpc("save_employee", {
+    p_id: e.id, p_branch: e.branch_id, p_name: e.full_name, p_position: p.data.position || null,
+    p_commission: e.commission_eligible, p_app_user: e.app_user_id, p_active: e.active,
+  });
+  if (error) return { error: "Could not save. Try again." };
+  if (!data.ok) return { error: errorText(data.error) };
+  revalidatePath("/people");
+  revalidatePath("/admin/users");
+  return { ok: "Saved" };
+}

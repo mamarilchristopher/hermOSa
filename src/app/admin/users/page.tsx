@@ -7,6 +7,7 @@ import { rejectJoin, revokeInvite, revokeRole, setActive } from "./actions";
 import { ApproveForm, CopyLink, NewInviteForm } from "./JoinForms";
 import Link from "next/link";
 import { byRankThenName, staffRank } from "@/lib/staffOrder";
+import { PositionCell } from "../../people/PositionCell";
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<{ sort?: string }> }) {
   const sortByName = (await searchParams).sort === "name";
@@ -17,9 +18,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
     supabase.from("role_grants").select("id, user_id, role_code, branch_id").is("revoked_at", null),
     supabase.from("staff_invites").select("id, code, expires_at, use_count").is("revoked_at", null)
       .gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }),
-    supabase.from("employees").select("app_user_id, position"),
+    supabase.from("employees").select("id, app_user_id, position"),
   ]);
   const positionOf = new Map((emps ?? []).map((e) => [e.app_user_id, e.position as string | null]));
+  const employeeOf = new Map((emps ?? []).map((e) => [e.app_user_id, e.id as string]));
   const grantsOf = (id: string) => (grants ?? []).filter((g) => g.user_id === id);
   const listed = (all ?? []).filter((u) => u.join_status !== "PENDING" && u.join_status !== "REJECTED");
   const users = sortByName ? listed : byRankThenName(listed, (u) => staffRank(grantsOf(u.id), positionOf.get(u.id)) + (u.active ? 0 : 10), (u) => u.display_name);
@@ -89,7 +91,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
               {users.map((u) => (
                 <tr key={u.id}>
                   <td>{u.display_name}{!u.active && <span className="pill REVERSED" style={{ marginLeft: 6 }}>Inactive</span>}</td>
-                  <td>{positionOf.get(u.id) ?? <span className="muted">–</span>}</td>
+                  <td>{employeeOf.get(u.id) ? <PositionCell employeeId={employeeOf.get(u.id)!} position={positionOf.get(u.id) ?? null} /> : <span className="muted small">No employee record</span>}</td>
                   <td className="small">{u.email}</td>
                   <td>
                     {(grants ?? []).filter((g) => g.user_id === u.id).map((g) => (

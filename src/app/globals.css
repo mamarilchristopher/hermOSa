@@ -369,3 +369,6 @@ details.card > summary::after { content: " ▾"; color: var(--gold); }
 .details-view section h3 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 18px 0 4px; }
 .list-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin: 20px 0 10px; }
 .list-head h2 { margin: 0; }
+.position-cell { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 170px; }
+.position-cell input[name="position"] { width: 150px; min-height: 34px; padding: 5px 10px; font-size: 0.88rem; }
+.saved-tick { color: var(--good); font-weight: 700; }

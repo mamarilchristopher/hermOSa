@@ -6,6 +6,7 @@ import { centsToPhp } from "@/lib/csv";
 import { manilaToday } from "@/lib/dates";
 import { monthStart } from "@/lib/insights";
 import { EmployeeForm } from "./EmployeeForm";
+import { PositionCell } from "./PositionCell";
 import { byRankThenName, staffRank } from "@/lib/staffOrder";
 
 export default async function People() {
@@ -51,7 +52,7 @@ export default async function People() {
                     return (
                       <tr key={e.id} className={e.active ? undefined : "rejected"}>
                         <td><Link href={`/people/${e.id}`}><strong>{e.full_name}</strong></Link>{!e.active && <span className="pill REVERSED" style={{ marginLeft: 6 }}>Inactive</span>}</td>
-                        <td>{e.position ?? <span className="muted">–</span>}</td>
+                        <td>{manage.some((m) => m.id === e.branch_id) ? <PositionCell employeeId={e.id} position={e.position} /> : e.position ?? <span className="muted">–</span>}</td>
                         <td>{e.commission_eligible ? <span className="tag LEAD">Commission-based</span> : <span className="tag NONCOMMI">No commission</span>}</td>
                         <td className="num">{t ? centsToPhp(t.approved) : "–"}</td>
                         <td className="num muted">{t?.pending ? centsToPhp(t.pending) : "–"}</td>
