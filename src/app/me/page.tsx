@@ -8,6 +8,7 @@ import { monthEnd, monthLabel, monthStart } from "@/lib/insights";
 import { ROLE_TEXT } from "@/lib/commission";
 import { markNoticesRead } from "./actions";
 import { ManagerHome, TodoCard, type Todo } from "./ManagerHome";
+import { ViewAsPicker } from "./ViewAsPicker";
 import { computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
 import { addDays, sortBranches } from "@/lib/insights";
 
@@ -89,6 +90,8 @@ export default async function Me() {
   const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
   const home = management ? await managementHome(supabase, today, isOwner) : null;
   const staffTodos = management ? null : await staffHome();
+  const canViewAs = access.grants.some((g) => (g.role === "OWNER" || g.role === "MANAGER") && g.branch_id === null);
+  const { data: viewPeople } = canViewAs ? await supabase.rpc("view_as_people") : { data: null };
   if (home && !isOwner && detailState !== "APPROVED" && detailState !== "PENDING") {
     home.todos.push({ text: detailState === "RETURNED" ? "The owner sent your employee details back. Please fix them" : "Fill in your employee details (needed for payroll and government reports)", href: "/me/details" });
   }
@@ -124,6 +127,7 @@ export default async function Me() {
 
         {staffTodos && <TodoCard todos={staffTodos} />}
         {home && <ManagerHome g={home.g} todos={home.todos} />}
+        {canViewAs && Array.isArray(viewPeople) && <ViewAsPicker people={viewPeople} />}
         {notices.length > 0 && (
           <div className="card">
             <div className="card-head">
