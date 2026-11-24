@@ -117,3 +117,6 @@ const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MO = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 /** "Mon, Nov 23" */
 export const dayLabel = (d: string) => `${WD[weekday(d)]}, ${MO[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}`;
+
+/** Payroll cutoffs are twice a month: the 1st to the 15th, and the 16th to the month's end. Returns the current cutoff's last day. */
+export const cutoffEnd = (today: string) => (Number(today.slice(8, 10)) <= 15 ? `${today.slice(0, 7)}-15` : monthEnd(today));

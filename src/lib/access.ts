@@ -58,6 +58,7 @@ export function branchesFor(a: Access, branches: Branch[], roles: Role[]) {
 
 export const ERROR_TEXT: Record<string, string> = {
   FORBIDDEN: "You don't have access to that.",
+  DUPLICATE_RECEIPT: "That waiver / OR number is already in the log for this branch. Check the entries below.",
   PIN_WRONG: "That PIN isn't right.",
   PIN_LOCKED: "Too many wrong tries. Wait 15 minutes, or ask the owner to reset your PIN.",
   PIN_FORMAT: "The PIN must be 4 digits.",

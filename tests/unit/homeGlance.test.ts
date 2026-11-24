@@ -49,3 +49,13 @@ describe("computeGlance", () => {
 
   it("labels days", () => expect(dayLabel("2026-11-23")).toBe("Mon, Nov 23"));
 });
+
+import { cutoffEnd } from "../../src/lib/homeGlance";
+describe("cutoffEnd", () => {
+  it("splits the month at the 15th", () => {
+    expect(cutoffEnd("2026-11-03")).toBe("2026-11-15");
+    expect(cutoffEnd("2026-11-15")).toBe("2026-11-15");
+    expect(cutoffEnd("2026-11-16")).toBe("2026-11-30");
+    expect(cutoffEnd("2026-02-20")).toBe("2026-02-28");
+  });
+});

@@ -5,13 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { phpToCents } from "@/lib/csv";
 import { errorText } from "@/lib/access";
 
-export type ActionState = { error?: string; ok?: string; at?: number } | undefined;
+export type ActionState = { error?: string; ok?: string; at?: number; duplicate?: string } | undefined;
 
 const Log = z.object({
   branch: z.uuid(),
   date: z.iso.date(),
   service: z.uuid(),
-  amount: z.string().trim().min(1).max(20),
+  amount: z.string().trim().max(20).optional(),
+  kind: z.enum(["PAID", "BACKJOB", "CHECKUP", "NO_CHARGE"]),
   type: z.enum(["LEAD", "ASSIST", "SOLO", "NONCOMMI"]),
   employee: z.uuid(),
   partner: z.union([z.uuid(), z.literal("")]).optional(),
@@ -20,23 +21,33 @@ const Log = z.object({
 });
 
 export async function logService(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "type", "employee", "partner", "receipt", "note"].map((k) => [k, fd.get(k) ?? undefined])));
+  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "receipt", "note"].map((k) => [k, fd.get(k) ?? undefined])));
   if (!p.success) return { error: "Fill in the service, amount paid and who did it." };
-  let cents: number;
-  try {
-    cents = phpToCents(p.data.amount.replace(/[,₱\s]/g, ""));
-  } catch {
-    return { error: "Enter the amount paid, e.g. 2500 or 2500.50" };
+  const paid = p.data.kind === "PAID";
+  let cents = 0;
+  if (paid) {
+    try {
+      cents = phpToCents((p.data.amount ?? "").replace(/[,₱\s]/g, ""));
+    } catch {
+      return { error: "Enter the amount paid, e.g. 2500 or 2500.50" };
+    }
+    if (cents <= 0) return { error: "Enter the amount paid. If the client didn't pay, choose Backjob, Check-up or No charge." };
   }
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("log_service", {
-    p_branch: p.data.branch, p_date: p.data.date, p_service: p.data.service, p_amount_cents: cents, p_type: p.data.type,
-    p_employee: p.data.employee, p_partner: p.data.partner || null, p_receipt: p.data.receipt || null, p_note: p.data.note || null,
+  const { data, error } = await supabase.rpc("log_visit", {
+    p_branch: p.data.branch, p_date: p.data.date, p_service: p.data.service, p_amount_cents: cents, p_type: paid ? p.data.type : "NONCOMMI",
+    p_employee: p.data.employee, p_partner: paid ? p.data.partner || null : null, p_receipt: p.data.receipt || null, p_note: p.data.note || null,
+    p_kind: p.data.kind, p_confirm: fd.get("confirm") === "1",
   });
-  if (error) return { error: "Could not save. Try again." };
+  if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0020 in Supabase first." : "Could not save. Try again." };
+  if (!data.ok && data.error === "POSSIBLE_DUPLICATE") {
+    const at = new Date(data.existing.at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
+    return { duplicate: `${data.existing.by} already logged this service for the same staff and amount today at ${at}. Is this a different client?`, at: Date.now() };
+  }
   if (!data.ok) return { error: errorText(data.error) };
   revalidatePath("/services");
-  return { ok: "Saved. Waiting for manager sign-off.", at: Date.now() };
+  revalidatePath("/me");
+  return { ok: paid ? "Saved. Waiting for manager sign-off." : "Saved. Unpaid visit logged (no commission).", at: Date.now() };
 }
 
 export async function decideLog(_prev: ActionState, fd: FormData): Promise<ActionState> {

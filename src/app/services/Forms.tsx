@@ -13,6 +13,14 @@ const TYPES: { v: CommissionType; label: string; hint: string }[] = [
   { v: "NONCOMMI", label: "No commission", hint: "Not commission-based" },
 ];
 
+const KINDS = [
+  { v: "PAID", label: "Paid" },
+  { v: "BACKJOB", label: "Backjob" },
+  { v: "CHECKUP", label: "Check-up" },
+  { v: "NO_CHARGE", label: "No charge" },
+] as const;
+type Kind = (typeof KINDS)[number]["v"];
+
 function Msg({ s }: { s: ActionState }) {
   if (s?.error) return <div className="notice error">{s.error}</div>;
   if (s?.ok) return <div className="notice ok">{s.ok}</div>;
@@ -22,15 +30,24 @@ function Msg({ s }: { s: ActionState }) {
 export function EntryForm({ branch, date, services, employees }: { branch: string; date: string; services: Opt[]; employees: Opt[] }) {
   const [state, action, pending] = useActionState(logService, undefined);
   const [type, setType] = useState<CommissionType>("LEAD");
+  const [kind, setKind] = useState<Kind>("PAID");
+  const paid = kind === "PAID";
   const [amount, setAmount] = useState("");
   const [who, setWho] = useState("");
+  // Controlled so the fields survive a "log it anyway?" round trip (React resets uncontrolled fields after an action).
+  const [service, setService] = useState("");
+  const [partner, setPartner] = useState("");
+  const [receipt, setReceipt] = useState("");
+  const [note, setNote] = useState("");
   const form = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (state?.ok) {
       form.current?.reset();
       setAmount("");
       setType("LEAD");
+      setKind("PAID");
       setWho("");
+      setService(""); setPartner(""); setReceipt(""); setNote("");
     }
   }, [state]);
   const person = employees.find((e) => e.id === who);
@@ -38,8 +55,8 @@ export function EntryForm({ branch, date, services, employees }: { branch: strin
     if (person && person.eligible === false) setType("NONCOMMI");
   }, [person]);
   const cents = Math.round(Number(amount.replace(/[,₱\s]/g, "")) * 100) || 0;
-  const p = previewCommission(cents, type);
-  const needsPartner = type === "LEAD" || type === "ASSIST";
+  const p = previewCommission(paid ? cents : 0, paid ? type : "NONCOMMI");
+  const needsPartner = paid && (type === "LEAD" || type === "ASSIST");
   const people = (
     <>
       <option value="">Choose…</option>
@@ -57,21 +74,33 @@ export function EntryForm({ branch, date, services, employees }: { branch: strin
       <input type="hidden" name="branch" value={branch} />
       <input type="hidden" name="date" value={date} />
       <input type="hidden" name="type" value={type} />
+      <input type="hidden" name="kind" value={kind} />
+      <div className="field">
+        <span className="field-label">Did the client pay?</span>
+        <div className="segmented choice" role="radiogroup" aria-label="Did the client pay?">
+          {KINDS.map((k) => (
+            <button type="button" key={k.v} role="radio" aria-checked={kind === k.v} className={kind === k.v ? "on" : ""} onClick={() => setKind(k.v)}>{k.label}</button>
+          ))}
+        </div>
+        {!paid && <span className="small muted">Logged at ₱0 with no commission, so you can see every client handled.</span>}
+      </div>
       <div className="entry-grid">
         <label className="span2">Service
-          <select name="service" required defaultValue="">
+          <select name="service" required value={service} onChange={(e) => setService(e.target.value)}>
             <option value="" disabled>Choose a service…</option>
             {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </label>
-        <label>Amount paid (₱)
-          <input name="amount" inputMode="decimal" placeholder="e.g. 2500" required value={amount} onChange={(e) => setAmount(e.target.value)} />
-        </label>
-        <label><span>Receipt / OR no. <span className="muted">(optional)</span></span>
-          <input name="receipt" maxLength={40} />
+        {paid && (
+          <label>Amount paid (₱)
+            <input name="amount" inputMode="decimal" placeholder="e.g. 2500" required value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </label>
+        )}
+        <label className={paid ? "" : "span2"}><span>Waiver / OR no. <span className="muted">(stops double logging)</span></span>
+          <input name="receipt" maxLength={40} value={receipt} onChange={(e) => setReceipt(e.target.value)} />
         </label>
       </div>
-      <div className="field">
+      {paid && <div className="field">
         <span className="field-label">Commission type</span>
         <div className="segmented choice" role="radiogroup" aria-label="Commission type">
           {TYPES.map((t) => (
@@ -81,18 +110,18 @@ export function EntryForm({ branch, date, services, employees }: { branch: strin
           ))}
         </div>
         <span className="small muted">{TYPES.find((t) => t.v === type)?.hint}</span>
-      </div>
+      </div>}
       <div className="entry-grid">
-        <label className={needsPartner ? "" : "span2"}>{type === "ASSIST" ? "Assisted by (you)" : type === "LEAD" ? "Lead (done by)" : "Done by"}
+        <label className={needsPartner ? "" : "span2"}>{!paid ? "Handled by" : type === "ASSIST" ? "Assisted by (you)" : type === "LEAD" ? "Lead (done by)" : "Done by"}
           <select name="employee" required value={who} onChange={(e) => setWho(e.target.value)}>{people}</select>
         </label>
         {needsPartner && (
           <label>{type === "ASSIST" ? "Lead (who led it)" : "Assisted by"}
-            <select name="partner" required defaultValue="">{people}</select>
+            <select name="partner" required value={partner} onChange={(e) => setPartner(e.target.value)}>{people}</select>
           </label>
         )}
         <label className="span2"><span>Note <span className="muted">(optional, no client names)</span></span>
-          <input name="note" maxLength={300} />
+          <input name="note" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
       </div>
       <div className="entry-foot">
@@ -104,11 +133,17 @@ export function EntryForm({ branch, date, services, employees }: { branch: strin
               {needsPartner && <span className="muted">lead {centsToPhp(p.lead)} · assist {centsToPhp(p.assist)}</span>}
             </>
           ) : (
-            <span className="muted">{type === "NONCOMMI" ? "No commission for this service" : "Enter the amount paid to see the commission"}</span>
+            <span className="muted">{!paid ? "Unpaid visit: no commission" : type === "NONCOMMI" ? "No commission for this service" : "Enter the amount paid to see the commission"}</span>
           )}
         </div>
         <button type="submit" disabled={pending}>{pending ? "Saving…" : "Add to today's log"}</button>
       </div>
+      {state?.duplicate && (
+        <div className="notice warn dup-check">
+          <span><strong>Already logged?</strong> {state.duplicate}</span>
+          <button type="submit" name="confirm" value="1" className="small" disabled={pending}>Yes, different client. Log it</button>
+        </div>
+      )}
     </form>
   );
 }

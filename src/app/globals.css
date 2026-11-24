@@ -474,3 +474,5 @@ details.my-details[open] > summary { margin-bottom: 10px; }
 .todo-list li { flex-wrap: nowrap; }
 .todo-list li > a { flex-shrink: 0; }
 .glance-branch .delta, .stat .delta { white-space: nowrap; }
+.notice.warn { background: var(--warn-bg); color: var(--warn); border-color: #f1dfb0; }
+.dup-check { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-top: 12px; }

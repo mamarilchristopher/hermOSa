@@ -8,18 +8,19 @@ import { monthEnd, monthLabel, monthStart } from "@/lib/insights";
 import { ROLE_TEXT } from "@/lib/commission";
 import { markNoticesRead } from "./actions";
 import { ManagerHome, TodoCard, type Todo } from "./ManagerHome";
-import { computeGlance, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
+import { computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
 import { addDays, sortBranches } from "@/lib/insights";
 
+type Signoffs = { to_sign: { count: number; oldest: string | null }; mine: { count: number; oldest: string | null } };
 type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: string }[]; days?: StatusDay[];
   corrections?: { id: string; mine: boolean }[] };
 
 /** Everything the management Home needs, in one round of queries. Missing pieces (older database) just drop out. */
 async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>>["supabase"], today: string, owner: boolean) {
-  const [{ data: st }, { data: overdueData }, { count: logsWaiting }, { count: uploads }, { count: details }, { count: joins }] = await Promise.all([
+  const [{ data: st }, { data: overdueData }, { data: signData }, { count: uploads }, { count: details }, { count: joins }] = await Promise.all([
     supabase.rpc("daily_sales_status", { p_start: glanceFetchStart(today), p_end: today }),
     supabase.rpc("overdue_commission_days"),
-    supabase.from("service_logs").select("id", { count: "exact", head: true }).eq("state", "PENDING"),
+    supabase.rpc("pending_signoffs"),
     supabase.from("import_batches").select("id", { count: "exact", head: true }).eq("state", "STAGED"),
     owner ? supabase.from("employee_detail_submissions").select("id", { count: "exact", head: true }).eq("state", "PENDING") : Promise.resolve({ count: 0 }),
     owner ? supabase.from("app_users").select("id", { count: "exact", head: true }).eq("join_status", "PENDING") : Promise.resolve({ count: 0 }),
@@ -36,7 +37,10 @@ async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>
   if (changes) todos.push({ text: `${plural(changes, "sales change needs", "sales changes need")} a second person to confirm`, href: "/sales/daily", urgent: true });
   const overdue = (Array.isArray(overdueData) ? overdueData : []) as { name: string; date: string; pending: number }[];
   if (overdue.length) todos.push({ text: `Commission sign-off overdue: ${overdue.slice(0, 4).map((o) => `${o.name.replace(/ \(.*\)$/, "")} ${dayLabel(o.date).slice(5)}`).join(", ")}${overdue.length > 4 ? ", and more" : ""}`, href: "/services", urgent: true });
-  else if (logsWaiting) todos.push({ text: `${plural(logsWaiting, "service log entry is", "service log entries are")} waiting for sign-off`, href: "/services" });
+  const toSign = (signData as Signoffs | null)?.to_sign;
+  if (toSign?.count) todos.push({
+    text: `Sign off ${plural(toSign.count, "commission entry", "commission entries")} (oldest ${dayLabel(toSign.oldest!)}). Anything unsigned by ${dayLabel(cutoffEnd(today))} isn't paid in this cutoff`,
+    href: `/services?date=${toSign.oldest}`, urgent: !overdue.length });
   if (uploads) todos.push({ text: `${plural(uploads, "upload is", "uploads are")} waiting for sign-off`, href: "/imports" });
   if (details) todos.push({ text: `${plural(details, "staff member sent", "staff members sent")} employee details to review`, href: "/admin/details" });
   if (joins) todos.push({ text: `${plural(joins, "person is", "people are")} asking to join the app`, href: "/admin/users" });
@@ -93,19 +97,19 @@ export default async function Me() {
   async function staffHome(): Promise<Todo[]> {
     const since = addDays(today, -30);
     const who = emp ? `created_by.eq.${access.user_id},performer_id.eq.${emp.id},assistant_id.eq.${emp.id}` : `created_by.eq.${access.user_id}`;
-    const [{ data: sentBack }, { count: loggedToday }] = await Promise.all([
+    const [{ data: sentBack }, { count: loggedToday }, { data: signData }] = await Promise.all([
       supabase.from("service_logs").select("id, service_date").eq("state", "REJECTED").gte("service_date", since).or(who).order("service_date", { ascending: false }),
       logger ? supabase.from("service_logs").select("id", { count: "exact", head: true }).eq("service_date", today).eq("created_by", access.user_id) : Promise.resolve({ count: 1 }),
+      supabase.rpc("pending_signoffs"),
     ]);
     const todos: Todo[] = [];
     if (detailState === "RETURNED") todos.push({ text: "The owner sent your employee details back. Please fix them", href: "/me/details", urgent: true });
     else if (detailState !== "APPROVED" && detailState !== "PENDING") todos.push({ text: "Fill in your employee details (needed for payroll and government reports)", href: "/me/details", urgent: true });
     const back = sentBack ?? [];
     if (back.length) todos.push({ text: `${back.length} service log ${back.length === 1 ? "entry was" : "entries were"} sent back by your manager. Check the reason and log ${back.length === 1 ? "it" : "them"} again`, href: `/services?date=${back[0].service_date}`, urgent: true });
-    const unsigned = lines.filter((l) => l.service_logs.state === "PENDING");
-    if (unsigned.length) {
-      const oldest = unsigned.map((l) => l.service_logs.service_date).sort()[0];
-      todos.push({ text: `${unsigned.length} commission ${unsigned.length === 1 ? "entry is" : "entries are"} not signed yet (oldest ${dayLabel(oldest)}). Remind your manager if it's been more than a day`, href: `/services?date=${oldest}` });
+    const mine = (signData as Signoffs | null)?.mine;
+    if (mine?.count) {
+      todos.push({ text: `${mine.count} of your commission ${mine.count === 1 ? "entry is" : "entries are"} not signed yet (oldest ${dayLabel(mine.oldest!)}). Unsigned entries won't be included in this cutoff (closes ${dayLabel(cutoffEnd(today))}), so remind your manager`, href: `/services?date=${mine.oldest}`, urgent: true });
     }
     if (logger && !loggedToday) todos.push({ text: "Nothing logged today yet. Log each service right after it's done", href: "/services" });
     return todos;
