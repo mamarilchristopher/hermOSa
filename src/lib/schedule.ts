@@ -17,3 +17,16 @@ export function timeLabel(t: string | null | undefined): string {
 }
 /** Short branch tag for grid cells: "QC Main" -> "QC Main", "Sta. Maria Bulacan" -> "Sta. Maria". */
 export const branchShort = (name: string) => name.replace(/\s*\(.*\)$/, "").replace(/ Bulacan$/, "").replace(/^Quezon City /, "QC ");
+
+/** Short names for the by-branch grid, like the owner's sheet: first name, plus a last initial when two share it. */
+export function shortNames(people: { id: string; name: string }[]): Record<string, string> {
+  const first = (n: string) => n.trim().split(/\s+/)[0] ?? n;
+  const count = new Map<string, number>();
+  for (const p of people) count.set(first(p.name).toLowerCase(), (count.get(first(p.name).toLowerCase()) ?? 0) + 1);
+  return Object.fromEntries(people.map((p) => {
+    const parts = p.name.trim().split(/\s+/);
+    const f = parts[0] ?? p.name;
+    return [p.id, (count.get(f.toLowerCase()) ?? 0) > 1 && parts.length > 1 ? `${f} ${parts[parts.length - 1][0]}.` : f];
+  }));
+}
+export const LEAVE_TEXT: Record<string, string> = { VL: "VL", SL: "SL", ABSENT: "Absent" };

@@ -3,19 +3,19 @@ import { requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { addDays, weekday } from "@/lib/insights";
-import { DOW, mondayOf, shortDate, timeLabel, weekDates, weekLabel, branchShort } from "@/lib/schedule";
-import { WeekGrid, WeekButtons, PatternForm, RequestForm, DecideForm, CancelForm } from "./Forms";
+import { DOW, LEAVE_TEXT, mondayOf, shortDate, timeLabel, weekDates, weekLabel, branchShort } from "@/lib/schedule";
+import { BranchWeek, WeekGrid, WeekButtons, PatternForm, RequestForm, DecideForm, CancelForm } from "./Forms";
 
 export type Person = { id: string; name: string; position: string | null; branch_id: string | null; can_edit: boolean;
   pattern: { branch_id: string; days_off: number[]; start: string; end: string } | null };
-export type Shift = { employee_id: string; date: string; off: boolean; branch_id: string | null; start: string | null; end: string | null; state: "DRAFT" | "PUBLISHED"; note: string | null };
+export type Shift = { employee_id: string; date: string; off: boolean; branch_id: string | null; start: string | null; end: string | null; state: "DRAFT" | "PUBLISHED"; note: string | null; leave: "VL" | "SL" | "ABSENT" | null };
 type Req = { id: string; kind: "SWAP" | "DAY_OFF"; employee_id: string; name: string; date: string; other_employee_id: string | null; other_name: string | null;
   other_date: string | null; reason: string | null; mine: boolean; can_decide: boolean };
 type Week = { me: string | null; people: Person[]; shifts: Shift[]; requests: Req[] };
 
 const dayName = (d: string) => `${DOW[weekday(d)]}, ${shortDate(d)}`;
 
-export default async function SchedulePage({ searchParams }: { searchParams: Promise<{ week?: string }> }) {
+export default async function SchedulePage({ searchParams }: { searchParams: Promise<{ week?: string; view?: string }> }) {
   const { supabase, access, branches } = await requireAccess();
   const sp = await searchParams;
   const today = manilaToday();
@@ -34,7 +34,8 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const published = w.shifts.filter((s) => s.state === "PUBLISHED").length;
   const myDays = w.me ? w.shifts.filter((s) => s.employee_id === w.me && s.state === "PUBLISHED").sort((a, b) => a.date.localeCompare(b.date)) : [];
   const bname = (id: string | null) => clinics.find((b) => b.id === id)?.name ?? "";
-  const link = (m: string) => `/schedule?week=${m}`;
+  const byPerson = sp.view === "person";
+  const link = (m: string, v = byPerson ? "person" : "") => `/schedule?week=${m}${v ? `&view=${v}` : ""}`;
   const thisMonday = mondayOf(today);
 
   // Request form options: my working days (to swap), my days off (to work instead), and who works each day.
@@ -93,7 +94,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
                 return (
                   <div key={d} className={`my-day ${s?.off ? "off" : ""} ${d === today ? "today" : ""}`}>
                     <span className="small muted">{DOW[weekday(d)]} {Number(d.slice(8))}</span>
-                    <strong>{!s ? "–" : s.off ? "Day off" : bname(s.branch_id)}</strong>
+                    <strong>{!s ? "–" : s.leave ? LEAVE_TEXT[s.leave] : s.off ? "Day off" : bname(s.branch_id)}</strong>
                     {s && !s.off && <span className="small">{timeLabel(s.start)} – {timeLabel(s.end)}</span>}
                     {s?.note && <span className="small muted">{s.note}</span>}
                   </div>
@@ -106,7 +107,14 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
         {scheduler && <WeekButtons monday={monday} drafts={drafts} empty={w.shifts.length === 0} />}
 
         {w.people.length > 0 && (w.shifts.length > 0 || scheduler) ? (
-          <WeekGrid dates={dates} today={today} people={w.people} shifts={w.shifts} branches={clinics} me={w.me} />
+          <>
+            <div className="segmented view-toggle" aria-label="View">
+              <Link className={!byPerson ? "on" : ""} href={link(monday, "")}>By branch</Link>
+              <Link className={byPerson ? "on" : ""} href={link(monday, "person")}>By person</Link>
+            </div>
+            {byPerson ? <WeekGrid dates={dates} today={today} people={w.people} shifts={w.shifts} branches={clinics} me={w.me} />
+              : <BranchWeek dates={dates} today={today} people={w.people} shifts={w.shifts} branches={clinics} me={w.me} />}
+          </>
         ) : (
           <div className="card"><p className="muted" style={{ margin: 0 }}>The schedule for this week isn&apos;t published yet.</p></div>
         )}

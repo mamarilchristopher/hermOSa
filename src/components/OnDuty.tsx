@@ -1,7 +1,7 @@
 import { timeLabel } from "@/lib/schedule";
 
 export type DutyRow = {
-  employee_id: string; name: string; position: string | null; branch_id: string | null; off: boolean;
+  employee_id: string; name: string; position: string | null; branch_id: string | null; off: boolean; leave?: string | null;
   start: string | null; end: string | null; note: string | null;
   time_in: string | null; time_out: string | null; in_photo: string | null; in_distance_m: number | null; late_min: number | null;
 };
@@ -47,7 +47,8 @@ export function OnDutyList({ rows, branches, photos, nowHm, compact }: {
           </div>
         );
       })}
-      {off.length > 0 && <p className="small muted" style={{ margin: 0 }}>Day off: {off.map((r) => r.name).join(", ")}</p>}
+      {off.some((r) => !r.leave) && <p className="small muted" style={{ margin: 0 }}>Day off: {off.filter((r) => !r.leave).map((r) => r.name).join(", ")}</p>}
+      {off.some((r) => r.leave) && <p className="small" style={{ margin: "4px 0 0" }}><span className="late">On leave:</span> {off.filter((r) => r.leave).map((r) => `${r.name} (${r.leave === "ABSENT" ? "Absent" : r.leave})`).join(", ")}</p>}
     </>
   );
 }

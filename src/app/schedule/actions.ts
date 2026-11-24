@@ -12,7 +12,7 @@ const time = z.string().regex(/^\d{2}:\d{2}$/);
 async function call(fn: string, args: Record<string, unknown>, okText: string): Promise<ActionState> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc(fn, args);
-  if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0022 in Supabase first." : "Could not save. Try again." };
+  if (error) return { error: error.code === "PGRST202" ? `The owner needs to run update-${["save_day", "copy_last_week"].includes(fn) ? "0024" : "0022"} in Supabase first.` : "Could not save. Try again." };
   if (!data?.ok) return { error: errorText(data?.error ?? "UNKNOWN") };
   revalidatePath("/schedule");
   revalidatePath("/me");
@@ -29,6 +29,23 @@ export async function publishWeek(_p: ActionState, fd: FormData): Promise<Action
   const m = date.safeParse(fd.get("monday"));
   if (!m.success) return { error: "Try again." };
   return call("publish_week", { p_monday: m.data }, "Published. Staff can see the week and got a notice.");
+}
+
+export async function copyLastWeek(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const m = date.safeParse(fd.get("monday"));
+  if (!m.success) return { error: "Try again." };
+  return call("copy_last_week", { p_monday: m.data }, "Copied last week as a draft. Adjust any day, then publish.");
+}
+
+const DayRow = z.object({ employee: z.uuid(), status: z.union([z.uuid(), z.enum(["OFF", "VL", "SL", "ABSENT"])]), start: time.optional(), end: time.optional() });
+export async function saveDay(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const d = date.safeParse(fd.get("date"));
+  let rows: unknown;
+  try { rows = JSON.parse(String(fd.get("rows") ?? "[]")); } catch { return { error: "Try again." }; }
+  const p = z.array(DayRow).max(100).safeParse(rows);
+  if (!d.success || !p.success) return { error: "Pick a branch, Off or leave for each person." };
+  if (p.data.some((r) => !["OFF", "VL", "SL", "ABSENT"].includes(r.status) && (!r.start || !r.end || r.end <= r.start))) return { error: "Check the hours." };
+  return call("save_day", { p_date: d.data, p_rows: p.data }, "Saved.");
 }
 
 const Shift = z.object({ employee: z.uuid(), date, off: z.enum(["0", "1"]), branch: z.union([z.uuid(), z.literal("")]), start: z.union([time, z.literal("")]), end: z.union([time, z.literal("")]), note: z.string().max(200).optional() });

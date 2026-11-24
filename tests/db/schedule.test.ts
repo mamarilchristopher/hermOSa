@@ -84,6 +84,22 @@ describe("weekly schedule", () => {
     expect(pub.shifts.length).toBe(14);
     expect(pub.people.map((p: { name: string }) => p.name).sort()).toEqual(["DEMO Ana", "DEMO Bea"]);
   });
+
+  it("by branch: save a whole day (branches, off, leave) and copy last week", async () => {
+    const d = addDays(monday, 14);
+    const r = await db.rpc(gm, "aal1", "save_day", [d, JSON.stringify([{ employee: anaE, status: MK, start: "10:00", end: "19:00" }, { employee: beaE, status: "VL" }])]);
+    expect(r).toMatchObject({ ok: true, saved: 2 });
+    expect(await shift(anaE, d)).toMatchObject({ is_off: false, branch_id: MK });
+    expect((await db.sql("SELECT is_off, leave_type FROM public.shifts WHERE employee_id = $1 AND work_date = $2", [beaE, d])).rows[0]).toEqual({ is_off: true, leave_type: "VL" });
+    expect((await db.rpc(gm, "aal1", "save_day", [d, JSON.stringify([{ employee: anaE, status: MK, start: "10:00", end: "19:00" }])])).saved).toBe(0);
+    expect((await db.rpc(mkManager, "aal1", "save_day", [d, JSON.stringify([{ employee: anaE, status: "OFF" }])])).ok).toBe(false);
+    expect((await db.rpc(gm, "aal1", "save_day", [d, JSON.stringify([{ employee: anaE, status: "nonsense" }])])).ok).toBe(false);
+    const c = await db.rpc(gm, "aal1", "copy_last_week", [addDays(monday, 21)]);
+    expect(c.created).toBe(2);
+    expect((await db.sql("SELECT is_off, leave_type FROM public.shifts WHERE employee_id = $1 AND work_date = $2", [beaE, addDays(d, 7)])).rows[0]).toEqual({ is_off: true, leave_type: null });
+    const w = await db.rpc(gm, "aal1", "week_schedule", [addDays(monday, 14)]);
+    expect(w.shifts.find((x: { employee_id: string; date: string }) => x.employee_id === beaE && x.date === d).leave).toBe("VL");
+  });
 });
 
 describe("time clock and On Duty", () => {

@@ -17,3 +17,11 @@ describe("schedule helpers", () => {
     expect(branchShort("Sta. Maria Bulacan")).toBe("Sta. Maria");
   });
 });
+
+import { shortNames } from "../../src/lib/schedule";
+describe("short names", () => {
+  it("uses first names and adds a last initial only when two share one", () => {
+    expect(shortNames([{ id: "a", name: "Ana Cruz" }, { id: "b", name: "Bea Reyes" }, { id: "c", name: "Ana Lopez" }]))
+      .toEqual({ a: "Ana C.", b: "Bea", c: "Ana L." });
+  });
+});

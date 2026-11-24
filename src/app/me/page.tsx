@@ -9,6 +9,7 @@ import { ROLE_TEXT } from "@/lib/commission";
 import { markNoticesRead } from "./actions";
 import { ManagerHome, TodoCard, type Todo } from "./ManagerHome";
 import type { DutyRow } from "@/components/OnDuty";
+import type { Ir } from "@/lib/incidents";
 import { branchShort, timeLabel } from "@/lib/schedule";
 import { noticeHref } from "@/lib/noticeLink";
 import { computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
@@ -20,7 +21,7 @@ type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: s
 
 /** Everything the management Home needs, in one round of queries. Missing pieces (older database) just drop out. */
 async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>>["supabase"], today: string, owner: boolean, userId: string) {
-  const [{ data: st }, { data: overdueData }, { data: signData }, { count: uploads }, { count: details }, { count: joins }, { data: dutyData }, { count: schedReqs }] = await Promise.all([
+  const [{ data: st }, { data: overdueData }, { data: signData }, { count: uploads }, { count: details }, { count: joins }, { data: dutyData }, { count: schedReqs }, { data: irData }] = await Promise.all([
     supabase.rpc("daily_sales_status", { p_start: glanceFetchStart(today), p_end: today }),
     supabase.rpc("overdue_commission_days"),
     supabase.rpc("pending_signoffs"),
@@ -29,6 +30,7 @@ async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>
     owner ? supabase.from("app_users").select("id", { count: "exact", head: true }).eq("join_status", "PENDING") : Promise.resolve({ count: 0 }),
     supabase.rpc("on_duty", { p_date: today }), // errors (before update-0022) mean no On Duty card
     supabase.from("schedule_requests").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("requested_by", userId),
+    supabase.rpc("incident_list"), // errors (before update-0023) mean no IR to-dos
   ]);
   const s = (st ?? { ok: false }) as DailyStatus;
   if (!s.ok) return null;
@@ -50,6 +52,10 @@ async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>
   if (details) todos.push({ text: `${plural(details, "staff member sent", "staff members sent")} employee details to review`, href: "/admin/details" });
   if (joins) todos.push({ text: `${plural(joins, "person is", "people are")} asking to join the app`, href: "/admin/users" });
   if (schedReqs) todos.push({ text: `${plural(schedReqs, "schedule change is", "schedule changes are")} waiting for approval (swaps or day-off moves)`, href: "/schedule" });
+  const irs = ((irData as { reports?: Ir[] } | null)?.reports ?? []).filter((r) => r.can_manage);
+  const irDraft = irs.filter((r) => r.state === "DRAFT").length, irExplained = irs.filter((r) => r.state === "EXPLAINED").length;
+  if (irDraft) todos.push({ text: `${plural(irDraft, "tardiness IR is", "tardiness IRs are")} ready to review and issue`, href: "/incidents", urgent: true });
+  if (irExplained) todos.push({ text: `${plural(irExplained, "IR has", "IRs have")} an explanation. Close with the action taken`, href: "/incidents" });
   const duty = Array.isArray(dutyData) ? (dutyData as DutyRow[]) : null;
   if (duty) {
     const hm = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" });
@@ -102,6 +108,11 @@ export default async function Me() {
   const home = management ? await managementHome(supabase, today, isOwner, access.user_id) : null;
   const staffTodos = management ? null : await staffHome();
   const timeTodo = await timeInTodo();
+  if (emp) {
+    const { data: myIr } = await supabase.rpc("incident_list");
+    const waiting = ((myIr as { reports?: Ir[] } | null)?.reports ?? []).filter((r) => r.mine && r.state === "ISSUED");
+    for (const r of waiting) (home?.todos ?? staffTodos)?.unshift({ text: `Incident report no. ${r.ir_no} (tardiness) needs your explanation`, href: `/incidents/${r.id}`, urgent: true });
+  }
   if (timeTodo) (home?.todos ?? staffTodos)?.unshift(timeTodo);
   if (home && !isOwner && detailState !== "APPROVED" && detailState !== "PENDING") {
     home.todos.push({ text: detailState === "RETURNED" ? "The owner sent your employee details back. Please fix them" : "Fill in your employee details (needed for payroll and government reports)", href: "/me/details" });
