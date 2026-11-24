@@ -71,3 +71,9 @@ In Supabase > Authentication > URL Configuration, set **Site URL** to the Vercel
   Run in the Supabase SQL editor: `update public.organizations set require_second_signoff = true;`
   After that, the person who uploads an import can never publish it, Closed / No sales days need a second person to confirm, and the pre-launch **Quick upload**
   (several CSVs at once, branch read from the file name, no typed totals or reconciliation) disappears from `/imports`.
+
+## Hosting on Cloudflare
+
+The app also builds for Cloudflare Workers (OpenNext). Workers Builds runs `npm run cf:build`, then
+`npx opennextjs-cloudflare deploy`. It needs the build variables `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` and `NODE_VERSION=22`. Test locally with `npm run cf:preview`.
