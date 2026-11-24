@@ -20,12 +20,22 @@ async function shrink(file: File): Promise<Blob> {
   } finally { URL.revokeObjectURL(url); }
 }
 
-/** The phone's location, or nothing if it's off or slow. Never blocks the punch. */
+/** Gives up after `ms` so a stuck step shows an error instead of spinning forever. */
+function within<T>(p: Promise<T>, ms: number, fallback: () => T): Promise<T> {
+  return new Promise((ok, bad) => {
+    const t = setTimeout(() => ok(fallback()), ms);
+    p.then((v) => { clearTimeout(t); ok(v); }, (e) => { clearTimeout(t); bad(e); });
+  });
+}
+
+/** The phone's location, or nothing if it's off or slow. Never blocks the punch.
+ *  The browser's own timeout doesn't count time spent on the permission pop-up, so we cap it ourselves. */
 function locate(): Promise<GeolocationPosition | null> {
-  return new Promise((ok) => {
+  const ask = new Promise<GeolocationPosition | null>((ok) => {
     if (!navigator.geolocation) return ok(null);
     navigator.geolocation.getCurrentPosition(ok, () => ok(null), { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
   });
+  return within(ask, 15000, () => null);
 }
 
 function Now() {
@@ -42,22 +52,25 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
   const [branch, setBranch] = useState(defaultBranch);
   const [busy, setBusy] = useState<string | null>(null);
   const [res, setRes] = useState<PunchState>();
+  const [noLoc, setNoLoc] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const kind = isIn ? "OUT" : "IN";
 
   async function onPhoto(f: File | undefined) {
     if (!f) return;
-    setRes(undefined);
+    setRes(undefined); setNoLoc(false);
     try {
-      setBusy("Saving your photo…");
+      setBusy("Getting your location…");
       const [blob, pos] = await Promise.all([shrink(f), locate()]);
+      setBusy("Saving your photo…");
       const path = `${userId}/${crypto.randomUUID()}.jpg`;
-      const { error } = await createClient().storage.from("timeclock").upload(path, blob, { contentType: "image/jpeg" });
+      const up = createClient().storage.from("timeclock").upload(path, blob, { contentType: "image/jpeg" });
+      const { error } = await within(up, 30000, () => ({ data: null, error: new Error("timeout") }) as unknown as Awaited<typeof up>);
       if (error) { setRes({ error: "Could not upload the photo. Check your internet and try again." }); return; }
       setBusy(kind === "IN" ? "Timing in…" : "Timing out…");
       const r = await clockPunch({ kind, branch, photo: path, lat: pos?.coords.latitude, lng: pos?.coords.longitude,
         acc: pos ? Math.round(pos.coords.accuracy) : undefined });
-      setRes(r);
+      setRes(r); setNoLoc(!pos);
       if (r?.ok) router.refresh();
     } catch {
       setRes({ error: "Something went wrong. Try again." });
@@ -81,7 +94,9 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
         {busy ?? (isIn ? "Time out" : "Time in")}
       </button>
       <p className="small muted" style={{ margin: 0 }}>Take a photo at the clinic, like the clinic clock. Your location and the server time are saved with it, not your phone's time.</p>
+      {busy === "Getting your location…" && <div className="notice info">If your phone asks, tap Allow for location. This takes up to 15 seconds.</div>}
       {res?.error && <div className="notice error">{res.error}</div>}
+      {res?.ok && noLoc && <div className="notice warn">Saved without your location. Turn on location for this browser so next time shows you&apos;re at the clinic.</div>}
       {res?.ok && <div className="notice ok">{res.ok}{res.far != null && res.far > 300 && ` Your phone looked about ${res.far >= 1000 ? `${(res.far / 1000).toFixed(1)} km` : `${res.far} m`} away from the branch, so a manager may check.`}</div>}
     </div>
   );
