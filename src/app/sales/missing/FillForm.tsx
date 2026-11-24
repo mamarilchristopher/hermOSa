@@ -12,7 +12,7 @@ export function FillForm({ branch, date }: { branch: string; date: string }) {
       <input name="amount" inputMode="decimal" placeholder="Sales ₱" aria-label={`Sales on ${date}`} />
       <button type="submit" name="mode" value="amount" disabled={pending}>Save</button>
       <button type="submit" name="mode" value="CLOSED" className="secondary" disabled={pending} formNoValidate>Closed</button>
-      <button type="submit" name="mode" value="NO_SALES" className="secondary" disabled={pending} formNoValidate>No sales</button>
+      <button type="submit" name="mode" value="NO_SALES" className="secondary" disabled={pending} formNoValidate>Zero sales</button>
       {state?.error && <span className="small" style={{ color: "var(--bad)" }}>{state.error}</span>}
     </form>
   );

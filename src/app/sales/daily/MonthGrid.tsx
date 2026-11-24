@@ -12,6 +12,15 @@ export type GridCell = [number | null, string | null, boolean, number | null, bo
 const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const label = (d: string) => `${WD[new Date(`${d}T00:00:00Z`).getUTCDay()]} ${Number(d.slice(8))}`;
 const php = (c: number) => centsToPhp(c).replace(/\.00$/, "");
+type Mark = "CLOSED" | "NO_SALES";
+const MARK_LABEL: Record<Mark, string> = { NO_SALES: "Zero sales", CLOSED: "Closed" };
+/** Typing 0 means zero sales and "closed" (or just "c") means closed, as shortcuts for the menu. */
+const typedMark = (v: string): Mark | null => {
+  const t = v.trim().toLowerCase().replace(/[₱,\s]/g, "");
+  if (/^0+(\.0+)?$/.test(t) || t === "zero" || t === "nosales") return "NO_SALES";
+  if (t === "c" || t === "closed") return "CLOSED";
+  return null;
+};
 
 /** The Sales Source Tracker, inside the OS: one row per day, one column per branch, type and save. */
 export function MonthGrid({ dates, branches, cells, today }: {
@@ -19,6 +28,7 @@ export function MonthGrid({ dates, branches, cells, today }: {
 }) {
   const router = useRouter();
   const [typed, setTyped] = useState<Record<string, string>>({});
+  const [marks, setMarks] = useState<Record<string, Mark>>({});
   const [editing, setEditing] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -28,18 +38,25 @@ export function MonthGrid({ dates, branches, cells, today }: {
   const parsed = useMemo(() => {
     const entries: { branch: string; date: string; cents: number }[] = [];
     const fixes: { branch: string; date: string; cents: number }[] = [];
+    const zero: { branch: string; date: string; status: Mark }[] = [];
     const bad = new Set<string>();
-    for (const [k, v] of Object.entries(typed)) {
-      if (!v.trim()) continue;
+    for (const [k, m] of Object.entries(marks)) {
       const [branch, date] = k.split("|");
+      zero.push({ branch, date, status: m });
+    }
+    for (const [k, v] of Object.entries(typed)) {
+      if (!v.trim() || marks[k]) continue;
+      const [branch, date] = k.split("|");
+      const tm = typedMark(v);
+      if (tm && (cells[k]?.[0] ?? null) === null) { zero.push({ branch, date, status: tm }); continue; }
       const c = readMoney(v);
       if (c === null || Number.isNaN(c) || c <= 0) { bad.add(k); continue; }
       const cur = cells[k]?.[0] ?? null;
       if (cur === null) entries.push({ branch, date, cents: c });
       else if (cur !== c) fixes.push({ branch, date, cents: c });
     }
-    return { entries, fixes, bad };
-  }, [typed, cells]);
+    return { entries, fixes, zero, bad };
+  }, [typed, marks, cells]);
 
   // Running totals use what is recorded plus what is typed but not saved yet (shown in italics).
   const valueOf = (b: string, d: string) => {
@@ -56,16 +73,17 @@ export function MonthGrid({ dates, branches, cells, today }: {
     return { d, vals, day, running, draft: vals.some((v) => v.draft) };
   });
   const colTotals = branches.map((b) => dates.reduce((s, d) => s + valueOf(b.id, d).cents, 0));
-  const pending = parsed.entries.length + parsed.fixes.length;
+  const pending = parsed.entries.length + parsed.fixes.length + parsed.zero.length;
 
   async function save() {
     if (parsed.bad.size) { setMsg({ ok: false, text: "Some cells aren't amounts. They're outlined in red." }); return; }
     setBusy(true); setMsg(null);
-    const r = await saveGrid({ entries: parsed.entries, fixes: parsed.fixes, reason });
+    const r = await saveGrid({ entries: parsed.entries, fixes: parsed.fixes, marks: parsed.zero, reason });
     setBusy(false);
     const names = Object.fromEntries(branches.map((b) => [b.id, b.name]));
     const failedKeys = new Set(r.failed.map((f) => key(f.branch, f.date)));
     setTyped((t) => Object.fromEntries(Object.entries(t).filter(([k]) => failedKeys.has(k))));
+    setMarks((m) => Object.fromEntries(Object.entries(m).filter(([k]) => failedKeys.has(k))) as Record<string, Mark>);
     if (r.failed.length === 0) { setReason(""); setEditing(false); }
     setMsg({
       ok: r.ok,
@@ -96,19 +114,49 @@ export function MonthGrid({ dates, branches, cells, today }: {
                   const rec = c?.[0] ?? null, mark = c?.[1] ?? null, staged = c?.[2] ?? false, service = c?.[3] ?? null, fixing = c?.[4] ?? false;
                   const flag = rec !== null && service !== null && rec !== service;
                   const canType = b.can_enter && !mark && !staged && !fixing && (rec === null || editing);
+                  if (canType && rec === null && marks[k]) {
+                    return (
+                      <td key={k} className="num cell-input">
+                        <span className="cell-mark draft">{MARK_LABEL[marks[k]]}
+                          <button type="button" className="cell-undo" aria-label={`Undo ${MARK_LABEL[marks[k]]} for ${b.name} ${d}`}
+                            onClick={() => setMarks((m) => { const n = { ...m }; delete n[k]; return n; })}>×</button>
+                        </span>
+                      </td>
+                    );
+                  }
                   if (canType) {
                     return (
                       <td key={k} className={`num cell-input ${parsed.bad.has(k) ? "bad" : ""} ${rec !== null ? "editing" : ""}`}>
-                        <input inputMode="decimal" aria-label={`${b.name} ${d}`} placeholder={rec !== null ? php(rec) : ""}
-                          value={typed[k] ?? ""} onChange={(e) => setTyped((t) => ({ ...t, [k]: e.target.value }))}
-                          onKeyDown={(e) => { if (e.key === "Enter" && pending) { e.preventDefault(); save(); } }} />
+                        <span className="cell-entry">
+                          <input inputMode="decimal" aria-label={`${b.name} ${d}`} placeholder={rec !== null ? php(rec) : ""}
+                            value={typed[k] ?? ""} onChange={(e) => setTyped((t) => ({ ...t, [k]: e.target.value }))}
+                            onBlur={(e) => {
+                              const tm = rec === null ? typedMark(e.target.value) : null;
+                              if (tm) { setMarks((m) => ({ ...m, [k]: tm })); setTyped((t) => { const n = { ...t }; delete n[k]; return n; }); }
+                            }}
+                            onKeyDown={(e) => { if (e.key === "Enter" && pending) { e.preventDefault(); save(); } }} />
+                          {rec === null && (
+                            <select className="cell-kind" aria-label={`${b.name} ${d}: zero sales, closed or enter sales`} value=""
+                              onChange={(e) => {
+                                const v = e.target.value as Mark | "AMOUNT";
+                                if (v === "AMOUNT") { (e.target.previousElementSibling as HTMLInputElement | null)?.focus(); return; }
+                                setMarks((m) => ({ ...m, [k]: v }));
+                                setTyped((t) => { const n = { ...t }; delete n[k]; return n; });
+                              }}>
+                              <option value="" disabled hidden>▾</option>
+                              <option value="NO_SALES">Zero sales</option>
+                              <option value="CLOSED">Closed</option>
+                              <option value="AMOUNT">Enter sales</option>
+                            </select>
+                          )}
+                        </span>
                       </td>
                     );
                   }
                   return (
                     <td key={k} className={`num ${rec === null && !mark && !staged && d < today ? "gap" : ""}`}
                       title={flag ? `Service log: ${php(service!)}` : fixing ? "Correction waiting for sign-off" : undefined}>
-                      {rec !== null ? php(rec) : mark ? (mark === "CLOSED" ? "Closed" : "No sales") : staged ? "Waiting" : "–"}
+                      {rec !== null ? php(rec) : mark ? <span className="cell-mark">{mark === "CLOSED" ? "Closed" : "Zero sales"}</span> : staged ? "Waiting" : "–"}
                       {flag && <span className="flag" aria-label="differs from the service log"> •</span>}
                       {fixing && <span className="flag"> ✎</span>}
                     </td>
@@ -133,7 +181,7 @@ export function MonthGrid({ dates, branches, cells, today }: {
         <button type="button" onClick={save} disabled={busy || pending === 0}>
           {busy ? "Saving…" : pending ? `Save ${pending} day${pending === 1 ? "" : "s"}` : "Type totals to save"}
         </button>
-        {pending > 0 && <button type="button" className="secondary" onClick={() => { setTyped({}); setMsg(null); }} disabled={busy}>Clear</button>}
+        {pending > 0 && <button type="button" className="secondary" onClick={() => { setTyped({}); setMarks({}); setMsg(null); }} disabled={busy}>Clear</button>}
       </div>
       {msg?.failed && msg.failed.length > 0 && <div className="notice error"><ul className="plain">{msg.failed.map((f, i) => <li key={i}>{f}</li>)}</ul></div>}
     </div>

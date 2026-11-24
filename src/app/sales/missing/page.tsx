@@ -75,7 +75,7 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
                           <td>{d}</td>
                           <td>{WEEKDAYS[weekday(d)]}</td>
                           {m ? (
-                            <td><DecideForm mark={m[4]} label={m[2] === "CLOSED" ? "Closed" : "No sales"} by={m[6] ? "you" : m[5]} canDecide={approver && (!m[6] || selfOk)} /></td>
+                            <td><DecideForm mark={m[4]} label={m[2] === "CLOSED" ? "Closed" : "Zero sales"} by={m[6] ? "you" : m[5]} canDecide={approver && (!m[6] || selfOk)} /></td>
                           ) : (
                             editable && <td><FillForm branch={b.branch.id} date={d} /></td>
                           )}
@@ -101,10 +101,10 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
         <h1>Days with no recorded sales</h1>
         <p className="muted small">
           {period.label} · {sp.branch ? <Link href={`/sales/missing?p=${period.key}&start=${period.start}&end=${period.end}`}>show all branches</Link> : "all branches"}.
-          Enter the day&apos;s sales if you have them, or mark the day Closed or No sales. Nothing is guessed.
+          Enter the day&apos;s sales if you have them, or mark the day Closed or Zero sales. Nothing is guessed.
           {preLaunch
-            ? "Pre-launch mode: an owner's Closed / No sales marks count right away. This turns back to two-person confirmation before launch."
-            : "Closed and No sales need a second person (Owner or Finance) to confirm before the day stops counting as missing."}
+            ? "Pre-launch mode: an owner's Closed / Zero sales marks count right away. This turns back to two-person confirmation before launch."
+            : "Closed and Zero sales need a second person (Owner or Finance) to confirm before the day stops counting as missing."}
           Sales entered by managers wait for an owner&apos;s sign-off on the Imports page.
         </p>
         {msg && (
@@ -119,7 +119,7 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
           <form action={bulkConfirm} className="card bulk-bar">
             <input type="hidden" name="back" value={here} />
             {confirmable.map((id) => <input key={id} type="hidden" name="marks" value={id} />)}
-            <span><strong>{confirmable.length}</strong> Closed / No sales day{confirmable.length > 1 ? "s" : ""} {preLaunch ? "" : "marked by someone else "}{confirmable.length > 1 ? "are" : "is"} waiting for confirmation.</span>
+            <span><strong>{confirmable.length}</strong> Closed / Zero sales day{confirmable.length > 1 ? "s" : ""} {preLaunch ? "" : "marked by someone else "}{confirmable.length > 1 ? "are" : "is"} waiting for confirmation.</span>
             <button type="submit">Confirm all {confirmable.length}</button>
           </form>
         )}
@@ -128,7 +128,7 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
             <input type="hidden" name="back" value={here} />
             <span>Tick the days below, then mark them all at once:</span>
             <span className="fill-row">
-              <button type="submit" name="kind" value="NO_SALES" className="secondary">Mark ticked as No sales</button>
+              <button type="submit" name="kind" value="NO_SALES" className="secondary">Mark ticked as Zero sales</button>
               <button type="submit" name="kind" value="CLOSED" className="secondary">Mark ticked as Closed</button>
             </span>
           </form>

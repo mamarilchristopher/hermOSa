@@ -64,9 +64,9 @@ export default async function DailySales({ searchParams }: { searchParams: Promi
         {!st.ok && <div className="notice error">Daily sales isn&apos;t set up yet. The owner needs to run update-0013 in Supabase.</div>}
         {st.ok && (
           <>
-            {gaps > 0 && <p className="small">{gaps} branch-day{gaps === 1 ? "" : "s"} this month with nothing entered (highlighted). Closed days go on <Link href="/sales/missing">Missing days</Link>.</p>}
+            {gaps > 0 && <p className="small">{gaps} branch-day{gaps === 1 ? "" : "s"} this month with nothing entered (highlighted). Use the ▾ in a cell to mark it Zero sales or Closed.</p>}
             <MonthGrid dates={dates} branches={branches.map((b) => ({ id: b.id, name: b.name, can_enter: b.can_enter }))} cells={cells} today={today} />
-            <p className="small muted">• the total differs from that day&apos;s service log (hover to see it). ✎ a correction is waiting for sign-off.
+            <p className="small muted">▾ in an empty cell: Zero sales, Closed or Enter sales (typing 0 also means zero sales). • the total differs from that day&apos;s service log (hover to see it). ✎ a correction is waiting for sign-off.
               {st.second_signoff ? " Entries wait for a second person on Imports before they count." : " While second sign-off is off, entries by owners and the general manager count right away."}</p>
 
             {st.corrections.length > 0 && (

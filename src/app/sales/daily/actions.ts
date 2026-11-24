@@ -117,6 +117,7 @@ export async function correctFromUpload(input: unknown) {
 const Grid = z.object({
   entries: z.array(z.object({ branch: z.uuid(), date: z.iso.date(), cents: z.number().int().positive() })).max(400),
   fixes: z.array(z.object({ branch: z.uuid(), date: z.iso.date(), cents: z.number().int().positive() })).max(100),
+  marks: z.array(z.object({ branch: z.uuid(), date: z.iso.date(), status: z.enum(["CLOSED", "NO_SALES"]) })).max(400).default([]),
   reason: z.string().trim().max(500),
 });
 export type GridResult = { ok: boolean; saved: number; waiting: number; failed: { branch: string; date: string; error: string }[] };
@@ -143,6 +144,21 @@ export async function saveGrid(input: unknown): Promise<GridResult> {
       continue;
     }
     if (data.state === "PUBLISHED") out.saved += rows.length; else out.waiting += rows.length;
+  }
+  const marksByBranch = new Map<string, { date: string; status: string }[]>();
+  for (const m of p.data.marks) marksByBranch.set(m.branch, [...(marksByBranch.get(m.branch) ?? []), { date: m.date, status: m.status }]);
+  for (const [branch, days] of marksByBranch) {
+    const { data, error } = await supabase.rpc("mark_sales_days", { p_branch: branch, p_days: days });
+    if (error || !data?.ok) {
+      const problems = (data?.problems ?? []) as { date: string; error: string }[];
+      const missing = error && /mark_sales_days/.test(error.message);
+      for (const r of days) {
+        const pr = problems.find((x) => x.date === r.date);
+        out.failed.push({ branch, date: r.date, error: missing ? "Zero sales and Closed need update-0014 in Supabase first." : pr ? say(pr.error === "DAY_ALREADY_RECORDED" ? "ROWS_REJECTED" : pr.error) : error?.message ?? say(data?.error ?? "UNKNOWN") });
+      }
+      continue;
+    }
+    if (data.state === "CONFIRMED") out.saved += days.length; else out.waiting += days.length;
   }
   for (const f of p.data.fixes) {
     const { data, error } = await supabase.rpc("request_sales_correction", { p_branch: f.branch, p_date: f.date, p_cents: f.cents, p_reason: p.data.reason });

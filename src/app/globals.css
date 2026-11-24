@@ -411,6 +411,13 @@ table.tracker td.strong { font-weight: 800; }
 table.tracker td.draft { font-style: italic; color: var(--brown); }
 table.tracker td.cell-input { padding: 3px 6px; }
 table.tracker td.cell-input input { width: 100%; min-width: 92px; min-height: 34px; padding: 4px 8px; text-align: right; font-size: 0.92rem; font-variant-numeric: tabular-nums; border-color: var(--gold-line); background: #fffdf8; }
+table.tracker .cell-entry { display: flex; align-items: stretch; gap: 2px; }
+table.tracker td.cell-input .cell-entry input { flex: 1 1 auto; width: auto; min-width: 0; max-width: 150px; }
+table.tracker select.cell-kind { flex: none; width: 28px; min-height: 34px; padding: 0; text-align: center; text-align-last: center; appearance: none; -webkit-appearance: none; border: 1px solid var(--gold-line); border-radius: 8px; background: var(--surface); color: var(--brown); font-weight: 800; cursor: pointer; }
+table.tracker select.cell-kind:hover, table.tracker select.cell-kind:focus { background: var(--gold-soft); }
+table.tracker .cell-mark { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; background: var(--pearl); border: 1px solid var(--line); color: var(--ink-2); font-size: 0.8rem; font-weight: 700; white-space: nowrap; }
+table.tracker .cell-mark.draft { background: var(--gold-soft); border-color: var(--gold-line); color: var(--brown-dark); font-style: italic; }
+table.tracker .cell-undo { padding: 0 2px; min-height: 0; border: 0; background: none; color: var(--muted); font-size: 1rem; line-height: 1; cursor: pointer; box-shadow: none; }
 table.tracker td.cell-input.editing input { background: var(--surface); border-style: dashed; }
 table.tracker td.cell-input.bad input { border-color: var(--bad); background: var(--bad-bg); }
 table.tracker tfoot th, table.tracker tfoot td { font-weight: 800; border-top: 2px solid var(--line-strong); }
