@@ -72,3 +72,18 @@ describe("sales change notices", () => {
     expect(r).toEqual([[db.branches.FAIRVIEW, D]]);
   });
 });
+
+describe("changing a recorded day to zero sales", () => {
+  it("reverses the sales, marks the day Zero sales, and notifies", async () => {
+    const day = "2026-11-06";
+    await db.sql("UPDATE public.organizations SET require_second_signoff = false");
+    await db.rpc(owner, "aal2", "record_daily_sales", [db.branches.FAIRVIEW, JSON.stringify([{ date: day, cents: 90000 }]), null]);
+    const r = await db.rpc(owner, "aal2", "request_sales_correction", [db.branches.FAIRVIEW, day, 0, "Branch was actually closed"]);
+    expect(r.state).toBe("APPLIED");
+    expect(await total(day)).toBeNull();
+    const m = (await db.sql("SELECT status, state FROM public.sales_day_status WHERE branch_id = $1 AND business_date = $2", [db.branches.FAIRVIEW, day])).rows[0];
+    expect(m).toEqual({ status: "NO_SALES", state: "CONFIRMED" });
+    expect((await notes(gm)).at(-1).body).toContain("→ ₱0.00");
+    expect((await db.rpc(owner, "aal2", "request_sales_correction", [db.branches.FAIRVIEW, day, -5, "Negative is never ok"])).error).toBe("INVALID_AMOUNT");
+  });
+});

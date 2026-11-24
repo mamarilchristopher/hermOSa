@@ -116,7 +116,7 @@ export async function correctFromUpload(input: unknown) {
 
 const Grid = z.object({
   entries: z.array(z.object({ branch: z.uuid(), date: z.iso.date(), cents: z.number().int().positive() })).max(400),
-  fixes: z.array(z.object({ branch: z.uuid(), date: z.iso.date(), cents: z.number().int().positive() })).max(100),
+  fixes: z.array(z.object({ branch: z.uuid(), date: z.iso.date(), cents: z.number().int().nonnegative() })).max(100),
   marks: z.array(z.object({ branch: z.uuid(), date: z.iso.date(), status: z.enum(["CLOSED", "NO_SALES"]) })).max(400).default([]),
   reason: z.string().trim().max(500),
 });

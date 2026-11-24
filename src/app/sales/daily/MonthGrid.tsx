@@ -52,7 +52,10 @@ export function MonthGrid({ dates, branches, cells, today, changed = [] }: {
       if (!v.trim() || marks[k]) continue;
       const [branch, date] = k.split("|");
       const tm = typedMark(v);
-      if (tm && (cells[k]?.[0] ?? null) === null) { zero.push({ branch, date, status: tm }); continue; }
+      const rec0 = cells[k]?.[0] ?? null;
+      if (tm && rec0 === null) { zero.push({ branch, date, status: tm }); continue; }
+      // A recorded day changed to zero sales is a change like any other (₱0).
+      if (tm === "NO_SALES" && rec0 !== null) { fixes.push({ branch, date, cents: 0 }); continue; }
       const c = readMoney(v);
       if (c === null || Number.isNaN(c) || c <= 0) { bad.add(k); continue; }
       const cur = cells[k]?.[0] ?? null;
@@ -65,6 +68,7 @@ export function MonthGrid({ dates, branches, cells, today, changed = [] }: {
   // Running totals use what is recorded plus what is typed but not saved yet (shown in italics).
   const valueOf = (b: string, d: string) => {
     const t = typed[key(b, d)];
+    if (t?.trim() && typedMark(t)) return { cents: 0, draft: true };
     const c = t?.trim() ? readMoney(t) : null;
     if (c !== null && !Number.isNaN(c) && c > 0) return { cents: c, draft: true };
     return { cents: cells[key(b, d)]?.[0] ?? 0, draft: false };
@@ -92,11 +96,11 @@ export function MonthGrid({ dates, branches, cells, today, changed = [] }: {
 
   function trySave() {
     if (parsed.bad.size) { setMsg({ ok: false, text: "Some cells aren't amounts. They're outlined in red." }); return; }
-    if (parsed.fixes.length > 0) {
-      if (reason.trim().length < 8) { setMsg({ ok: false, text: "Write why you're changing recorded days (at least 8 characters)." }); return; }
-      setConfirming(true);
-      return;
+    if (parsed.fixes.length > 0 && reason.trim().length < 8) {
+      setMsg({ ok: false, text: "Write why you're changing recorded days (at least 8 characters)." }); return;
     }
+    // Ask first whenever a day is changed or marked Zero sales / Closed. New amounts in empty days save straight away.
+    if (parsed.fixes.length > 0 || parsed.zero.length > 0) { setMsg(null); setConfirming(true); return; }
     save();
   }
 
@@ -161,6 +165,13 @@ export function MonthGrid({ dates, branches, cells, today, changed = [] }: {
                               if (tm) { setMarks((m) => ({ ...m, [k]: tm })); setTyped((t) => { const n = { ...t }; delete n[k]; return n; }); }
                             }}
                             onKeyDown={(e) => { if (e.key === "Enter" && pending) { e.preventDefault(); trySave(); } }} />
+                          {rec !== null && (
+                            <select className="cell-kind" aria-label={`${b.name} ${d}: change to zero sales`} value=""
+                              onChange={(e) => { if (e.target.value === "NO_SALES") setTyped((t) => ({ ...t, [k]: "0" })); }}>
+                              <option value="" disabled hidden>▾</option>
+                              <option value="NO_SALES">Change to Zero sales</option>
+                            </select>
+                          )}
                           {rec === null && (
                             <select className="cell-kind" aria-label={`${b.name} ${d}: zero sales, closed or enter sales`} value=""
                               onChange={(e) => {
@@ -212,25 +223,31 @@ export function MonthGrid({ dates, branches, cells, today, changed = [] }: {
           {busy ? "Saving…" : pending ? `Save ${pending} day${pending === 1 ? "" : "s"}` : "Type totals to save"}
         </button>
         {pending > 0 && <button type="button" className="secondary" onClick={() => { setTyped({}); setMarks({}); setMsg(null); }} disabled={busy}>Clear</button>}
+        {msg && <span className={msg.ok ? "saved-tick" : "field-error"} role="status">{msg.text}</span>}
       </div>
       {confirming && (
         <div className="modal-back" role="presentation" onClick={() => setConfirming(false)}>
           <div className="modal card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" onClick={(e) => e.stopPropagation()}>
             <h2 id="confirm-title">Are you sure?</h2>
-            <p>This change will notify all other management members, and changing {parsed.fixes.length === 1 ? "this day" : "these days"} again will need confirmation from two people.</p>
+            {parsed.fixes.length > 0
+              ? <p>This change will notify all other management members, and changing {parsed.fixes.length === 1 ? "this day" : "these days"} again will need confirmation from two people.</p>
+              : <p>{parsed.zero.length === 1 ? "This day" : "These days"} will count as filled. A day with Zero sales counts as ₱0 in the daily average; Closed days are left out.</p>}
             <ul className="plain-list small">
+              {parsed.zero.map((z) => (
+                <li key={key(z.branch, z.date)}><span><strong>{branches.find((b) => b.id === z.branch)?.name ?? ""}</strong>, {label(z.date)}: <strong>{MARK_LABEL[z.status]}</strong></span></li>
+              ))}
               {parsed.fixes.map((f) => {
                 const name = branches.find((b) => b.id === f.branch)?.name ?? "";
                 const old = cells[key(f.branch, f.date)]?.[0] ?? 0;
                 return (
-                  <li key={key(f.branch, f.date)}><span><strong>{name}</strong>, {label(f.date)}: {php(old)} → <strong>{php(f.cents)}</strong>
+                  <li key={key(f.branch, f.date)}><span><strong>{name}</strong>, {label(f.date)}: {php(old)} → <strong>{f.cents === 0 ? "Zero sales (₱0)" : php(f.cents)}</strong>
                     {changedSet.has(key(f.branch, f.date)) && <span className="muted"> · changed before, so this waits for a second person</span>}</span></li>
                 );
               })}
             </ul>
-            <p className="small muted">Reason: {reason.trim()}</p>
+            {parsed.fixes.length > 0 && <p className="small muted">Reason: {reason.trim()}</p>}
             <div className="row-buttons">
-              <button type="button" onClick={save} autoFocus>Yes, change {parsed.fixes.length === 1 ? "it" : "them"}</button>
+              <button type="button" onClick={save} autoFocus>Yes, save {pending === 1 ? "it" : `all ${pending}`}</button>
               <button type="button" className="secondary" onClick={() => setConfirming(false)}>Cancel</button>
             </div>
           </div>
