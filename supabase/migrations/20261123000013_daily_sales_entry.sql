@@ -8,7 +8,7 @@
 -- A day that already has a total is never overwritten by an upload. Changing it is a correction: it needs
 -- a reason and, with the switch on, a second person. The old row is reversed (kept), never deleted.
 
-CREATE TABLE public.sales_corrections (
+CREATE TABLE IF NOT EXISTS public.sales_corrections (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES public.organizations(id),
   branch_id uuid NOT NULL REFERENCES public.branches(id),
@@ -24,21 +24,22 @@ CREATE TABLE public.sales_corrections (
   decision_note text CHECK (decision_note IS NULL OR length(decision_note) <= 500),
   batch_id uuid REFERENCES public.import_batches(id)
 );
-CREATE UNIQUE INDEX sales_corrections_one_pending ON public.sales_corrections (branch_id, business_date) WHERE state = 'PENDING';
+CREATE UNIQUE INDEX IF NOT EXISTS sales_corrections_one_pending ON public.sales_corrections (branch_id, business_date) WHERE state = 'PENDING';
 ALTER TABLE public.sales_corrections ENABLE ROW LEVEL SECURITY;
 GRANT SELECT ON public.sales_corrections TO authenticated;
+DROP POLICY IF EXISTS sales_corrections_read ON public.sales_corrections;
 CREATE POLICY sales_corrections_read ON public.sales_corrections FOR SELECT TO authenticated
   USING (organization_id = private.current_org_id() AND private.has_role(ARRAY['OWNER','FINANCE','AUDITOR','MANAGER'], branch_id));
 
 -- Owners and the general manager may publish their own daily entries while the pre-launch switch is off.
-CREATE FUNCTION private.daily_self_publish(p_branch uuid) RETURNS boolean
+CREATE OR REPLACE FUNCTION private.daily_self_publish(p_branch uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
   SELECT (private.has_role(ARRAY['OWNER'], p_branch) OR private.has_role(ARRAY['MANAGER'], NULL))
      AND NOT coalesce((SELECT require_second_signoff FROM public.organizations WHERE id = private.current_org_id()), true)
 $$;
 
 -- Publish a staged batch on behalf of the person who entered it (only called after daily_self_publish).
-CREATE FUNCTION private.publish_now(p_batch uuid) RETURNS void
+CREATE OR REPLACE FUNCTION private.publish_now(p_batch uuid) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE v_user uuid := private.current_user_id(); b public.import_batches%ROWTYPE; v_rows integer; v_cents bigint;
 BEGIN
@@ -59,7 +60,7 @@ BEGIN
 END $$;
 
 -- Stage (and, when allowed, publish) day totals for one branch as one batch.
-CREATE FUNCTION private.stage_days(p_branch uuid, p_label text, p_days jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION private.stage_days(p_branch uuid, p_label text, p_days jsonb) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
   v_code text; v_stamp text := to_char(clock_timestamp(), 'YYYYMMDDHH24MISSUS');
@@ -87,7 +88,7 @@ END $$;
 
 -- Enter day totals for a branch: one day from the Daily sales page, or many from a tracker upload.
 -- p_rows = [{"date": "2026-11-24", "cents": 100000}, ...]. All rows must pass or nothing is saved.
-CREATE FUNCTION public.record_daily_sales(p_branch uuid, p_rows jsonb, p_source text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION public.record_daily_sales(p_branch uuid, p_rows jsonb, p_source text) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
   v_user uuid := private.current_user_id(); v_org uuid := private.current_org_id();
@@ -129,7 +130,7 @@ BEGIN
     v_days);
 END $$;
 
-CREATE FUNCTION private.apply_correction(p_id uuid) RETURNS jsonb
+CREATE OR REPLACE FUNCTION private.apply_correction(p_id uuid) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE c public.sales_corrections%ROWTYPE; v_res jsonb; v_user uuid := private.current_user_id();
 BEGIN
@@ -155,7 +156,7 @@ BEGIN
 END $$;
 
 -- Ask to change a recorded day's total. Applies at once only while the pre-launch switch is off.
-CREATE FUNCTION public.request_sales_correction(p_branch uuid, p_date date, p_cents bigint, p_reason text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION public.request_sales_correction(p_branch uuid, p_date date, p_cents bigint, p_reason text) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE v_user uuid := private.current_user_id(); v_org uuid := private.current_org_id(); v_old bigint; v_id uuid;
 BEGIN
@@ -182,7 +183,7 @@ BEGIN
 END $$;
 
 -- Second person (owner or finance, never the requester) approves or rejects a correction.
-CREATE FUNCTION public.decide_sales_correction(p_id uuid, p_approve boolean, p_note text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION public.decide_sales_correction(p_id uuid, p_approve boolean, p_note text) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE v_user uuid := private.current_user_id(); c public.sales_corrections%ROWTYPE;
 BEGIN
@@ -212,7 +213,7 @@ END $$;
 
 -- What the OS holds per branch and day: recorded total, Closed/No sales mark, waiting sign-off,
 -- and the service log total for the same day (non-rejected entries) to compare against.
-CREATE FUNCTION public.daily_sales_status(p_start date, p_end date) RETURNS jsonb
+CREATE OR REPLACE FUNCTION public.daily_sales_status(p_start date, p_end date) RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
 DECLARE v_org uuid := private.current_org_id();
 BEGIN
