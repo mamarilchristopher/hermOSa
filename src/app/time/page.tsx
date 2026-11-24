@@ -77,7 +77,7 @@ export default async function TimePage() {
         {manager && (
           <>
             <div className="card">
-              <div className="card-head"><h2>On duty today, {dayLabel(today)}</h2><Link className="small" href="/schedule">Schedule →</Link></div>
+              <div className="card-head"><h2>On duty today, {dayLabel(today)}</h2><span className="small"><Link href="/time/photos">Time-in photos →</Link> · <Link href="/schedule">Schedule →</Link></span></div>
               <OnDutyList rows={rows} branches={short} photos={photos} nowHm={nowHm()} />
             </div>
 

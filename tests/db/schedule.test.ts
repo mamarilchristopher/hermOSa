@@ -117,6 +117,13 @@ describe("time clock and On Duty", () => {
     expect(r.distance_m).toBeGreaterThan(90);
     expect(r.distance_m).toBeLessThan(110);
     expect((await db.rpc(ana, "aal1", "clock_punch", ["IN", FV, photo, null, null, null])).error).toBe("ALREADY_IN");
+    // The photo's own time is kept next to the server time; a nonsense one (a phone with a broken clock) is dropped.
+    const taken = new Date(Date.now() - 3 * 3600_000).toISOString();
+    expect((await db.rpc(ana, "aal1", "clock_punch", ["OUT", FV, photo, null, null, null, taken])).ok).toBe(true);
+    expect((await db.rpc(ana, "aal1", "clock_punch", ["IN", FV, photo, null, null, null, "1999-01-01T00:00:00Z"])).ok).toBe(true);
+    const { rows: kept } = await db.sql<{ kind: string; photo_taken_at: Date | null }>(
+      "SELECT kind, photo_taken_at FROM public.time_punches WHERE employee_id = $1 AND work_date = $2 ORDER BY punched_at", [anaE, d]);
+    expect(kept.map((k) => k.photo_taken_at?.toISOString() ?? null)).toEqual([null, taken, null]);
     const duty = await db.rpc(gm, "aal1", "on_duty", [d]);
     const row = duty.find((x: { employee_id: string }) => x.employee_id === anaE);
     expect(row.time_in).toBeTruthy();

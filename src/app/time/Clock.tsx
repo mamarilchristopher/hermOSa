@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { clockPunch, setBranchLocation, type PunchState } from "./actions";
 import { parseCoords } from "@/lib/schedule";
+import { photoTakenAt } from "@/lib/exif";
 
 type B = { id: string; name: string };
 
@@ -61,7 +62,7 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
     setRes(undefined); setNoLoc(false);
     try {
       setBusy("Getting your location…");
-      const [blob, pos] = await Promise.all([shrink(f), locate()]);
+      const [blob, pos, taken] = await Promise.all([shrink(f), locate(), f.slice(0, 262144).arrayBuffer().then((b) => photoTakenAt(b), () => null)]);
       setBusy("Saving your photo…");
       const path = `${userId}/${crypto.randomUUID()}.jpg`;
       const up = createClient().storage.from("timeclock").upload(path, blob, { contentType: "image/jpeg" });
@@ -69,7 +70,7 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
       if (error) { setRes({ error: "Could not upload the photo. Check your internet and try again." }); return; }
       setBusy(kind === "IN" ? "Timing in…" : "Timing out…");
       const r = await clockPunch({ kind, branch, photo: path, lat: pos?.coords.latitude, lng: pos?.coords.longitude,
-        acc: pos ? Math.round(pos.coords.accuracy) : undefined });
+        acc: pos ? Math.round(pos.coords.accuracy) : undefined, taken: taken ?? undefined });
       setRes(r); setNoLoc(!pos);
       if (r?.ok) router.refresh();
     } catch {
