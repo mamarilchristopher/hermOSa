@@ -6,6 +6,7 @@ import { centsToPhp } from "@/lib/csv";
 import { manilaToday } from "@/lib/dates";
 import { monthStart } from "@/lib/insights";
 import { EmployeeForm } from "./EmployeeForm";
+import { byRankThenName, staffRank } from "@/lib/staffOrder";
 
 export default async function People() {
   const { supabase, access, branches } = await requireAccess();
@@ -14,11 +15,14 @@ export default async function People() {
   if (manage.length === 0 && !viewAll) redirect("/");
   const isOwner = can(access, ["OWNER"], null);
   const from = monthStart(manilaToday());
-  const [{ data: emps }, { data: lines }, { data: users }] = await Promise.all([
+  const [{ data: emps }, { data: lines }, { data: users }, { data: grants }] = await Promise.all([
     supabase.from("employees").select("id, full_name, branch_id, position, commission_eligible, active, app_user_id").order("full_name"),
     supabase.from("commission_lines").select("employee_id, amount_cents, service_logs!inner(service_date, state)").gte("service_logs.service_date", from).neq("service_logs.state", "REJECTED"),
     isOwner ? supabase.from("app_users").select("id, display_name").eq("active", true).order("display_name") : Promise.resolve({ data: null }),
+    supabase.from("role_grants").select("user_id, role_code, branch_id").is("revoked_at", null),
   ]);
+  type Emp = { full_name: string; position: string | null; app_user_id: string | null; active: boolean };
+  const rank = (e: Emp) => staffRank((grants ?? []).filter((g) => g.user_id === e.app_user_id), e.position) + (e.active ? 0 : 10);
   const monthTotals = new Map<string, { approved: number; pending: number }>();
   for (const l of (lines ?? []) as unknown as { employee_id: string; amount_cents: number; service_logs: { state: string } }[]) {
     const t = monthTotals.get(l.employee_id) ?? { approved: 0, pending: 0 };
@@ -26,7 +30,7 @@ export default async function People() {
     else t.pending += Number(l.amount_cents);
     monthTotals.set(l.employee_id, t);
   }
-  const byBranch = branches.filter((b) => b.kind === "CLINIC").map((b) => ({ b, list: (emps ?? []).filter((e) => e.branch_id === b.id) })).filter((x) => x.list.length > 0);
+  const byBranch = branches.filter((b) => b.kind === "CLINIC").map((b) => ({ b, list: byRankThenName((emps ?? []).filter((e) => e.branch_id === b.id), rank, (e) => e.full_name) })).filter((x) => x.list.length > 0);
 
   return (
     <>

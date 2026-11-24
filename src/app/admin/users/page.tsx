@@ -5,17 +5,24 @@ import { TopBar } from "@/components/TopBar";
 import { GrantForm } from "./GrantForm";
 import { rejectJoin, revokeInvite, revokeRole, setActive } from "./actions";
 import { ApproveForm, CopyLink, NewInviteForm } from "./JoinForms";
+import Link from "next/link";
+import { byRankThenName, staffRank } from "@/lib/staffOrder";
 
-export default async function UsersPage() {
+export default async function UsersPage({ searchParams }: { searchParams: Promise<{ sort?: string }> }) {
+  const sortByName = (await searchParams).sort === "name";
   const { supabase, access, branches } = await requireAccess();
   if (!can(access, ["OWNER"], null)) redirect("/");
-  const [{ data: all }, { data: grants }, { data: invites }] = await Promise.all([
+  const [{ data: all }, { data: grants }, { data: invites }, { data: emps }] = await Promise.all([
     supabase.from("app_users").select("id, display_name, email, active, join_status, requested_branch_id, joined_at").order("display_name"),
     supabase.from("role_grants").select("id, user_id, role_code, branch_id").is("revoked_at", null),
     supabase.from("staff_invites").select("id, code, expires_at, use_count").is("revoked_at", null)
       .gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }),
+    supabase.from("employees").select("app_user_id, position"),
   ]);
-  const users = (all ?? []).filter((u) => u.join_status !== "PENDING" && u.join_status !== "REJECTED");
+  const positionOf = new Map((emps ?? []).map((e) => [e.app_user_id, e.position as string | null]));
+  const grantsOf = (id: string) => (grants ?? []).filter((g) => g.user_id === id);
+  const listed = (all ?? []).filter((u) => u.join_status !== "PENDING" && u.join_status !== "REJECTED");
+  const users = sortByName ? listed : byRankThenName(listed, (u) => staffRank(grantsOf(u.id), positionOf.get(u.id)) + (u.active ? 0 : 10), (u) => u.display_name);
   const waiting = (all ?? []).filter((u) => u.join_status === "PENDING").sort((a, b) => a.joined_at.localeCompare(b.joined_at));
   const clinics = branches.filter((b) => b.kind === "CLINIC").map((b) => ({ id: b.id, name: b.name }));
   const h = await headers();
@@ -68,13 +75,21 @@ export default async function UsersPage() {
           <NewInviteForm />
         </section>
 
+        <div className="list-head">
+          <h2>Staff</h2>
+          <div className="segmented" aria-label="Sort">
+            <Link href="/admin/users" className={sortByName ? "" : "on"}>By role</Link>
+            <Link href="/admin/users?sort=name" className={sortByName ? "on" : ""}>By name</Link>
+          </div>
+        </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Name</th><th>Email</th><th>Roles</th><th></th></tr></thead>
+            <thead><tr><th>Name</th><th>Position</th><th>Email</th><th>Roles</th><th></th></tr></thead>
             <tbody>
               {users.map((u) => (
                 <tr key={u.id}>
                   <td>{u.display_name}{!u.active && <span className="pill REVERSED" style={{ marginLeft: 6 }}>Inactive</span>}</td>
+                  <td>{positionOf.get(u.id) ?? <span className="muted">–</span>}</td>
                   <td className="small">{u.email}</td>
                   <td>
                     {(grants ?? []).filter((g) => g.user_id === u.id).map((g) => (
