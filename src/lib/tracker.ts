@@ -14,6 +14,7 @@ export type TrackerSheet = {
   branchCode: string | null;
   rows: TrackerRow[];
   problems: Problem[];
+  notes: Problem[]; // informational only, e.g. a sheet total that doesn't add up (the days themselves still load)
   blankDays: number;
   fileTotal: number | null;
   sum: number;
@@ -78,7 +79,7 @@ function salesColumn(row: Cell[]): number {
  * against its days.
  */
 export function readSheet(sheet: string, grid: Grid): TrackerSheet {
-  const out: TrackerSheet = { sheet, branchCode: null, rows: [], problems: [], blankDays: 0, fileTotal: null, sum: 0, closed: [], isBranchTab: false };
+  const out: TrackerSheet = { sheet, branchCode: null, rows: [], problems: [], notes: [], blankDays: 0, fileTotal: null, sum: 0, closed: [], isBranchTab: false };
   const titles: string[] = [];
   const seen = new Map<string, number>();
   let dc = -1, sc = -1, blockSum = 0, blockStart = 0, inBlock = false;
@@ -101,7 +102,7 @@ export function readSheet(sheet: string, grid: Grid): TrackerSheet {
       if (t !== null && !Number.isNaN(t)) {
         out.fileTotal = (out.fileTotal ?? 0) + t;
         if (t !== blockSum) {
-          out.problems.push({ line, text: `The total (₱${(t / 100).toLocaleString("en-PH")}) doesn't match its days (₱${(blockSum / 100).toLocaleString("en-PH")}), rows ${blockStart + 1} to ${line - 1}.` });
+          out.notes.push({ line, text: `The sheet's total (₱${(t / 100).toLocaleString("en-PH")}) doesn't match its days (₱${(blockSum / 100).toLocaleString("en-PH")}), rows ${blockStart + 1} to ${line - 1}.` });
         }
       }
       inBlock = false; // the next block starts at its own header row

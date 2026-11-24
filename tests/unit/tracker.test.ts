@@ -44,11 +44,9 @@ describe("readSheet", () => {
     expect(s.closed.map((c) => c.date)).toEqual(["2026-11-03"]);
     expect(s.blankDays).toBe(1);
   });
-  it("flags repeated days and block totals that don't add up", () => {
-    expect(s.problems.map((p) => p.text)).toEqual([
-      "2026-11-02 is listed twice (rows 4 and 7).",
-      "The total (₱999) doesn't match its days (₱1,000), rows 13 to 13.",
-    ]);
+  it("flags repeated days; a sheet total that doesn't add up is only a note", () => {
+    expect(s.problems.map((p) => p.text)).toEqual(["2026-11-02 is listed twice (rows 4 and 7)."]);
+    expect(s.notes.map((p) => p.text)).toEqual(["The sheet's total (₱999) doesn't match its days (₱1,000), rows 13 to 13."]);
   });
 });
 

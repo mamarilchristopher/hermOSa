@@ -139,11 +139,12 @@ export function TrackerUpload({ today }: { today: string }) {
               </table>
             </div>
 
-            {results.map((r) => (r.sheet.problems.length + r.check.blocked.length + r.sheet.closed.length > 0) && (
+            {results.map((r) => (r.sheet.problems.length + r.sheet.notes.length + r.check.blocked.length + r.sheet.closed.length > 0) && (
               <details key={r.sheet.sheet} className="check-detail">
                 <summary><strong>{r.branch?.name ?? r.sheet.sheet}</strong>: {r.sheet.problems.length} problem{r.sheet.problems.length === 1 ? "" : "s"}, {r.check.blocked.length + r.sheet.closed.length} held back</summary>
                 <ul className="small">
                   {r.sheet.problems.map((p, i) => <li key={`p${i}`} className="field-error">Row {p.line}: {p.text}</li>)}
+                  {r.sheet.notes.map((p, i) => <li key={`n${i}`} className="muted">Row {p.line}: {p.text} For information only: the days are checked one by one.</li>)}
                   {r.check.blocked.filter((b) => b.cents > 0 || !b.why.startsWith("₱0")).map((b) => <li key={`b${b.date}`}>{b.date} {centsToPhp(b.cents)}: {b.why}</li>)}
                   {(() => {
                     const zero = r.check.blocked.filter((b) => b.cents === 0 && b.why.startsWith("₱0")).map((b) => b.date);
@@ -158,7 +159,7 @@ export function TrackerUpload({ today }: { today: string }) {
 
           <div className="card">
             <h2>3. Load the new days</h2>
-            <p className="small">{toAdd > 0 ? `${toAdd} new day${toAdd === 1 ? "" : "s"} will be added. Days already in the OS are left alone.` : "There are no new days to add."}</p>
+            <p className="small">{toAdd > 0 ? `${toAdd} new day${toAdd === 1 ? "" : "s"} will be added. Days already in the OS are left alone: the OS keeps its history unless you tick a day below.` : "There are no new days to add."}</p>
             <button type="button" onClick={loadAll} disabled={!!busy || toAdd === 0}>Load {toAdd} new day{toAdd === 1 ? "" : "s"}</button>
           </div>
 
