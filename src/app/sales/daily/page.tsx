@@ -3,9 +3,10 @@ import { redirect } from "next/navigation";
 import { requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { centsToPhp } from "@/lib/csv";
-import { isIsoDate, manilaToday } from "@/lib/dates";
-import { addDays, sortBranches, weekday, WEEKDAYS } from "@/lib/insights";
-import { CorrectForm, DecideForm, EnterForm } from "./Forms";
+import { manilaToday } from "@/lib/dates";
+import { addDays, addMonths, monthEnd, monthLabel, sortBranches } from "@/lib/insights";
+import { DecideForm } from "./Forms";
+import { MonthGrid, type GridCell } from "./MonthGrid";
 
 type Status = {
   ok: boolean; error?: string; second_signoff: boolean;
@@ -14,77 +15,59 @@ type Status = {
   corrections: { id: string; branch_id: string; date: string; old_cents: number; new_cents: number; reason: string; requested_by: string; mine: boolean }[];
 };
 
-const nice = (d: string) => `${WEEKDAYS[weekday(d)]}, ${new Date(`${d}T00:00:00Z`).toLocaleDateString("en-PH", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}`;
-const short = (c: number) => (c >= 100_000_00 ? `${(c / 100_000_00).toFixed(c >= 1_000_000_00 ? 0 : 1)}M` : c >= 100_000 ? `${Math.round(c / 100_000)}k` : `${Math.round(c / 100)}`);
-
-/** Daily sales: replaces the daily Google Sheet update. One screen for every branch the user looks after. */
-export default async function DailySales({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
+/** Daily sales tracker: the month as a sheet (a row per day, a column per branch), typed in place. */
+export default async function DailySales({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const { supabase, access } = await requireAccess();
   if (!access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role))) redirect("/me");
   const today = manilaToday();
   const sp = await searchParams;
-  const date = isIsoDate(sp.date) && sp.date <= today ? sp.date : today;
-  const weekStart = addDays(date, -6);
-  const { data } = await supabase.rpc("daily_sales_status", { p_start: weekStart, p_end: date });
+  const thisMonth = today.slice(0, 7);
+  const ym = /^\d{4}-\d{2}$/.test(sp.month ?? "") && sp.month! <= thisMonth ? sp.month! : thisMonth;
+  const start = `${ym}-01`;
+  const end = ym === thisMonth ? today : monthEnd(start);
+  const { data } = await supabase.rpc("daily_sales_status", { p_start: start, p_end: end });
   const st = (data ?? { ok: false }) as Status;
   const branches = st.ok ? sortBranches(st.branches) : [];
-  const cell = (b: string, d: string) => st.days?.find((x) => x[0] === b && x[1] === d);
-  const week = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const dates: string[] = [];
+  for (let d = start; d <= end; d = addDays(d, 1)) dates.push(d);
+  const cells: Record<string, GridCell> = {};
+  for (const [b, d, rec, mark, staged, service] of st.days ?? []) {
+    cells[`${b}|${d}`] = [rec === null ? null : Number(rec), mark, staged, service === null ? null : Number(service), false];
+  }
+  for (const c of st.corrections ?? []) {
+    const k = `${c.branch_id}|${c.date}`;
+    if (cells[k]) cells[k][4] = true;
+  }
+  const prev = addMonths(start, -1).slice(0, 7), next = addMonths(start, 1).slice(0, 7);
   const anyEnter = branches.some((b) => b.can_enter);
-  const dayTotal = branches.reduce((s, b) => s + Number(cell(b.id, date)?.[2] ?? 0), 0);
-  const missingToday = branches.filter((b) => { const c = cell(b.id, date); return !c || (c[2] === null && !c[3] && !c[4]); }).length;
+  const gaps = dates.filter((d) => d < today).reduce((n, d) => n + branches.filter((b) => {
+    const c = cells[`${b.id}|${d}`];
+    return !c || (c[0] === null && !c[1] && !c[2]);
+  }).length, 0);
 
   return (
     <>
       <TopBar access={access} />
-      <main>
+      <main className="wide">
         <h1>Daily sales</h1>
-        <p className="muted small">Each branch&apos;s total for the day, in place of the Sales Source Tracker sheet. Amounts are declared sales (cash and online).</p>
+        <p className="muted small">Type each branch&apos;s total for the day, like the Sales Source Tracker. Press Save (or Enter) to keep them. Amounts are declared sales (cash and online).</p>
 
         <div className="periods card">
           <div className="segmented">
-            <Link href={`/sales/daily?date=${addDays(date, -1)}`}>← Previous day</Link>
-            <Link href={`/sales/daily?date=${date}`} className="on">{date === today ? "Today" : nice(date)}</Link>
-            {date < today && <Link href={`/sales/daily?date=${addDays(date, 1)}`}>Next day →</Link>}
+            <Link href={`/sales/daily?month=${prev}`}>← {monthLabel(prev)}</Link>
+            <Link href={`/sales/daily?month=${ym}`} className="on">{monthLabel(ym)}</Link>
+            {ym < thisMonth && <Link href={`/sales/daily?month=${next}`}>{monthLabel(next)} →</Link>}
           </div>
-          <form>
-            <input type="date" name="date" defaultValue={date} max={today} aria-label="Date" />
-            <button type="submit" className="secondary">Go</button>
-          </form>
-          {anyEnter && <span><Link className="button secondary" href="/sales/upload">Upload tracker file</Link></span>}
+          {anyEnter && <span><Link className="button secondary small" href="/sales/upload">Upload a tracker file instead</Link></span>}
         </div>
 
         {!st.ok && <div className="notice error">Daily sales isn&apos;t set up yet. The owner needs to run update-0013 in Supabase.</div>}
         {st.ok && (
           <>
-            <p className="small"><strong>{nice(date)}</strong> · {centsToPhp(dayTotal)} recorded{missingToday > 0 && ` · ${missingToday} branch${missingToday > 1 ? "es" : ""} still to enter`}</p>
-            <div className="grid branches">
-              {branches.map((b) => {
-                const c = cell(b.id, date);
-                const recorded = c?.[2] ?? null, mark = c?.[3] ?? null, staged = c?.[4] ?? false, service = c?.[5] ?? null;
-                const pendingFix = st.corrections.find((x) => x.branch_id === b.id && x.date === date);
-                const diff = recorded !== null && service !== null ? Number(recorded) - Number(service) : null;
-                return (
-                  <div key={b.id} className="card day-card">
-                    <div className="day-card-head"><h2>{b.name}</h2>
-                      {recorded !== null ? <span className="pill PUBLISHED">Recorded</span> : mark ? <span className="pill PUBLISHED">{mark === "CLOSED" ? "Closed" : "No sales"}</span>
-                        : staged ? <span className="pill STAGED">Waiting sign-off</span> : <span className="pill REVERSED">Not entered</span>}
-                    </div>
-                    {recorded !== null && <div className="value-lg">{centsToPhp(recorded)}</div>}
-                    {staged && recorded === null && <p className="small muted">Entered, waiting for a second person on <Link href="/imports">Imports</Link>.</p>}
-                    {recorded === null && !mark && !staged && b.can_enter && <EnterForm branch={b.id} date={date} />}
-                    {recorded === null && !mark && !staged && !b.can_enter && <p className="small muted">Not entered yet.</p>}
-                    <p className="small service-line">
-                      Service log: {service !== null ? centsToPhp(service) : "no entries"}
-                      {diff !== null && diff !== 0 && <span className="delta down"> {diff > 0 ? `${centsToPhp(diff)} more declared than logged` : `${centsToPhp(-diff)} more logged than declared`}</span>}
-                      {diff === 0 && <span className="saved-tick"> ✓ matches</span>}
-                    </p>
-                    {pendingFix && <p className="small notice info">Correction to {centsToPhp(pendingFix.new_cents)} waiting for sign-off ({pendingFix.reason}).</p>}
-                    {recorded !== null && !pendingFix && b.can_enter && <CorrectForm branch={b.id} date={date} current={centsToPhp(recorded)} />}
-                  </div>
-                );
-              })}
-            </div>
+            {gaps > 0 && <p className="small">{gaps} branch-day{gaps === 1 ? "" : "s"} this month with nothing entered (highlighted). Closed days go on <Link href="/sales/missing">Missing days</Link>.</p>}
+            <MonthGrid dates={dates} branches={branches.map((b) => ({ id: b.id, name: b.name, can_enter: b.can_enter }))} cells={cells} today={today} />
+            <p className="small muted">• the total differs from that day&apos;s service log (hover to see it). ✎ a correction is waiting for sign-off.
+              {st.second_signoff ? " Entries wait for a second person on Imports before they count." : " While second sign-off is off, entries by owners and the general manager count right away."}</p>
 
             {st.corrections.length > 0 && (
               <div className="card">
@@ -103,27 +86,6 @@ export default async function DailySales({ searchParams }: { searchParams: Promi
                 </ul>
               </div>
             )}
-
-            <h2>Last 7 days</h2>
-            <div className="table-wrap">
-              <table className="week">
-                <thead><tr><th>Branch</th>{week.map((d) => <th key={d} className="num"><Link href={`/sales/daily?date=${d}`}>{WEEKDAYS[weekday(d)]} {Number(d.slice(8))}</Link></th>)}</tr></thead>
-                <tbody>
-                  {branches.map((b) => (
-                    <tr key={b.id}>
-                      <td>{b.name.replace(/ \(.*\)$/, "")}</td>
-                      {week.map((d) => {
-                        const c = cell(b.id, d);
-                        const v = c?.[2] != null ? `₱${short(Number(c[2]))}` : c?.[3] ? (c[3] === "CLOSED" ? "Closed" : "₱0") : c?.[4] ? "Waiting" : "–";
-                        const flag = c?.[2] != null && c?.[5] != null && Number(c[2]) !== Number(c[5]);
-                        return <td key={d} className={`num ${v === "–" && d < today ? "gap" : ""} ${d === date ? "sel" : ""}`} title={flag ? "Differs from the service log" : undefined}>{v}{flag && " •"}</td>;
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="small muted">• = the declared total differs from the service log that day. A dash on a past day means nothing was entered.</p>
           </>
         )}
       </main>

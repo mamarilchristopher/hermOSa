@@ -113,3 +113,43 @@ export async function correctFromUpload(input: unknown) {
   done();
   return { ok: true, state: data.state as string };
 }
+
+const Grid = z.object({
+  entries: z.array(z.object({ branch: z.uuid(), date: z.iso.date(), cents: z.number().int().positive() })).max(400),
+  fixes: z.array(z.object({ branch: z.uuid(), date: z.iso.date(), cents: z.number().int().positive() })).max(100),
+  reason: z.string().trim().max(500),
+});
+export type GridResult = { ok: boolean; saved: number; waiting: number; failed: { branch: string; date: string; error: string }[] };
+
+/** Month grid: save every typed cell at once. New days per branch go in one batch; changed days are corrections. */
+export async function saveGrid(input: unknown): Promise<GridResult> {
+  const p = Grid.safeParse(input);
+  if (!p.success) return { ok: false, saved: 0, waiting: 0, failed: [{ branch: "", date: "", error: "Check the amounts and try again." }] };
+  if (p.data.fixes.length > 0 && p.data.reason.length < 8) {
+    return { ok: false, saved: 0, waiting: 0, failed: [{ branch: "", date: "", error: "Changing a recorded day needs a reason (at least 8 characters)." }] };
+  }
+  const supabase = await createClient();
+  const out: GridResult = { ok: true, saved: 0, waiting: 0, failed: [] };
+  const byBranch = new Map<string, { date: string; cents: number }[]>();
+  for (const e of p.data.entries) byBranch.set(e.branch, [...(byBranch.get(e.branch) ?? []), { date: e.date, cents: e.cents }]);
+  for (const [branch, rows] of byBranch) {
+    const { data, error } = await supabase.rpc("record_daily_sales", { p_branch: branch, p_rows: rows, p_source: "Daily sales" });
+    if (error || !data?.ok) {
+      const problems = (data?.problems ?? []) as { date: string; error: string }[];
+      for (const r of rows) {
+        const pr = problems.find((x) => x.date === r.date);
+        out.failed.push({ branch, date: r.date, error: pr ? say(pr.error === "DAY_ALREADY_RECORDED" ? "ROWS_REJECTED" : pr.error) : error?.message ?? say(data?.error ?? "UNKNOWN") });
+      }
+      continue;
+    }
+    if (data.state === "PUBLISHED") out.saved += rows.length; else out.waiting += rows.length;
+  }
+  for (const f of p.data.fixes) {
+    const { data, error } = await supabase.rpc("request_sales_correction", { p_branch: f.branch, p_date: f.date, p_cents: f.cents, p_reason: p.data.reason });
+    if (error || !data?.ok) out.failed.push({ branch: f.branch, date: f.date, error: error?.message ?? say(data.error) });
+    else if (data.state === "APPLIED") out.saved++; else out.waiting++;
+  }
+  out.ok = out.failed.length === 0;
+  done();
+  return out;
+}

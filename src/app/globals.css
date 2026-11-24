@@ -108,7 +108,7 @@ main > h1 + p.muted { margin-top: 0; margin-bottom: 20px; }
   .mobile-bar img { height: 30px; width: auto; margin-right: auto; }
   .mobile-bar .avatar { width: 32px; height: 32px; font-size: 0.72rem; }
   .tab-nav {
-    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; position: fixed; z-index: 20; left: 0; right: 0; bottom: 0;
+    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(66px, 1fr); overflow-x: auto; scrollbar-width: none; position: fixed; z-index: 20; left: 0; right: 0; bottom: 0;
     padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: rgba(255, 255, 255, 0.96);
     backdrop-filter: saturate(1.4) blur(12px); border-top: 1px solid var(--line);
   }
@@ -397,3 +397,27 @@ ul.plain { margin: 0; padding-left: 18px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .day-card > button, .day-card > .correct-form { justify-self: start; }
 .day-card > .correct-form { justify-self: stretch; }
+
+/* Daily sales tracker grid */
+main.wide { max-width: 1180px; }
+.grid-tools { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin: 8px 0; font-size: 0.88rem; }
+.check-inline { display: inline-flex; gap: 8px; align-items: center; font-weight: 600; }
+.check-inline input { accent-color: var(--gold); width: 18px; height: 18px; }
+table.tracker { font-variant-numeric: tabular-nums; }
+table.tracker th[scope="row"] { position: sticky; left: 0; background: var(--surface); white-space: nowrap; font-weight: 600; z-index: 1; }
+table.tracker td, table.tracker th { padding-top: 6px; padding-bottom: 6px; }
+table.tracker tr.today th[scope="row"], table.tracker tr.today td { background: var(--gold-soft); }
+table.tracker td.gap { background: var(--warn-bg); color: var(--warn); }
+table.tracker td.strong { font-weight: 800; }
+table.tracker td.draft { font-style: italic; color: var(--brown); }
+table.tracker td.cell-input { padding: 3px 6px; }
+table.tracker td.cell-input input { width: 100%; min-width: 92px; min-height: 34px; padding: 4px 8px; text-align: right; font-size: 0.92rem; font-variant-numeric: tabular-nums; border-color: var(--gold-line); background: #fffdf8; }
+table.tracker td.cell-input.editing input { background: var(--surface); border-style: dashed; }
+table.tracker td.cell-input.bad input { border-color: var(--bad); background: var(--bad-bg); }
+table.tracker tfoot th, table.tracker tfoot td { font-weight: 800; border-top: 2px solid var(--line-strong); }
+table.tracker .flag { color: var(--bad); font-weight: 800; }
+.save-bar { position: sticky; bottom: 12px; z-index: 3; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 12px; padding: 10px; border-radius: 14px; }
+.save-bar.on { background: var(--surface); box-shadow: var(--shadow-lift); border: 1px solid var(--gold-line); }
+.save-bar input { flex: 1 1 260px; }
+@media (max-width: 760px) { .save-bar { bottom: 76px; } }
+.save-bar:not(.on) { position: static; justify-content: flex-start; padding: 0; }

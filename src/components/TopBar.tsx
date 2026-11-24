@@ -28,9 +28,9 @@ export async function TopBar({ access }: { access: Access }) {
   const items: NavItem[] = [
     { href: "/me", label: "Home", short: "Home", icon: "home" },
     ...(management ? [{ href: "/", label: "Sales dashboard", short: "Sales", icon: "chart" } as NavItem] : []),
+    ...(filler ? [{ href: "/sales/daily", label: "Daily Sales", short: "Daily", icon: "pen" } as NavItem] : []),
     ...(logger ? [{ href: "/services", label: "Service log", short: "Services", icon: "clipboard", badge: overdue.length || undefined } as NavItem] : []),
     ...(people ? [{ href: "/people", label: "Employees", short: "Staff", icon: "people" } as NavItem] : []),
-    ...(filler ? [{ href: "/sales/daily", label: "Daily sales", short: "Daily", icon: "pen" } as NavItem] : []),
     ...(filler ? [{ href: "/sales/missing", label: "Missing days", short: "Missing", icon: "calendar" } as NavItem] : []),
     ...(importer ? [{ href: "/imports", label: "Imports", short: "Imports", icon: "upload" } as NavItem] : []),
     ...(owner ? [{ href: "/admin/details", label: "Staff details", short: "Details", icon: "idcard", badge: detailsWaiting || undefined } as NavItem] : []),
