@@ -1,9 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconCalendar, IconChart, IconClipboard, IconCoins, IconHome, IconIdCard, IconPen, IconPeople, IconUpload, IconUsers } from "./Icons";
+import { IconCalendar, IconChart, IconClipboard, IconCoins, IconHome, IconIdCard, IconPen, IconPeople, IconUpload, IconUsers, IconWeek, IconClock } from "./Icons";
 
-const ICONS = { chart: IconChart, calendar: IconCalendar, upload: IconUpload, users: IconUsers, clipboard: IconClipboard, people: IconPeople, coins: IconCoins, home: IconHome, idcard: IconIdCard, pen: IconPen };
+const ICONS = { chart: IconChart, calendar: IconCalendar, upload: IconUpload, users: IconUsers, clipboard: IconClipboard, people: IconPeople, coins: IconCoins, home: IconHome, idcard: IconIdCard, pen: IconPen, week: IconWeek, clock: IconClock };
 export type NavItem = { href: string; label: string; short: string; icon: keyof typeof ICONS; badge?: number };
 
 export function NavLinks({ items, variant }: { items: NavItem[]; variant: "side" | "tabs" }) {

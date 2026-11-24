@@ -8,6 +8,8 @@ import { monthEnd, monthLabel, monthStart } from "@/lib/insights";
 import { ROLE_TEXT } from "@/lib/commission";
 import { markNoticesRead } from "./actions";
 import { ManagerHome, TodoCard, type Todo } from "./ManagerHome";
+import type { DutyRow } from "@/components/OnDuty";
+import { branchShort, timeLabel } from "@/lib/schedule";
 import { noticeHref } from "@/lib/noticeLink";
 import { computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
 import { addDays, sortBranches } from "@/lib/insights";
@@ -17,14 +19,16 @@ type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: s
   corrections?: { id: string; mine: boolean }[] };
 
 /** Everything the management Home needs, in one round of queries. Missing pieces (older database) just drop out. */
-async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>>["supabase"], today: string, owner: boolean) {
-  const [{ data: st }, { data: overdueData }, { data: signData }, { count: uploads }, { count: details }, { count: joins }] = await Promise.all([
+async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>>["supabase"], today: string, owner: boolean, userId: string) {
+  const [{ data: st }, { data: overdueData }, { data: signData }, { count: uploads }, { count: details }, { count: joins }, { data: dutyData }, { count: schedReqs }] = await Promise.all([
     supabase.rpc("daily_sales_status", { p_start: glanceFetchStart(today), p_end: today }),
     supabase.rpc("overdue_commission_days"),
     supabase.rpc("pending_signoffs"),
     supabase.from("import_batches").select("id", { count: "exact", head: true }).eq("state", "STAGED"),
     owner ? supabase.from("employee_detail_submissions").select("id", { count: "exact", head: true }).eq("state", "PENDING") : Promise.resolve({ count: 0 }),
     owner ? supabase.from("app_users").select("id", { count: "exact", head: true }).eq("join_status", "PENDING") : Promise.resolve({ count: 0 }),
+    supabase.rpc("on_duty", { p_date: today }), // errors (before update-0022) mean no On Duty card
+    supabase.from("schedule_requests").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("requested_by", userId),
   ]);
   const s = (st ?? { ok: false }) as DailyStatus;
   if (!s.ok) return null;
@@ -45,7 +49,14 @@ async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>
   if (uploads) todos.push({ text: `${plural(uploads, "upload is", "uploads are")} waiting for sign-off`, href: "/imports" });
   if (details) todos.push({ text: `${plural(details, "staff member sent", "staff members sent")} employee details to review`, href: "/admin/details" });
   if (joins) todos.push({ text: `${plural(joins, "person is", "people are")} asking to join the app`, href: "/admin/users" });
-  return { g, todos };
+  if (schedReqs) todos.push({ text: `${plural(schedReqs, "schedule change is", "schedule changes are")} waiting for approval (swaps or day-off moves)`, href: "/schedule" });
+  const duty = Array.isArray(dutyData) ? (dutyData as DutyRow[]) : null;
+  if (duty) {
+    const hm = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" });
+    const notIn = duty.filter((r) => !r.off && r.start && !r.time_in && r.start.slice(0, 5) <= hm);
+    if (notIn.length) todos.push({ text: `Not timed in yet: ${notIn.slice(0, 5).map((r) => r.name.split(" ")[0]).join(", ")}${notIn.length > 5 ? ", and more" : ""}`, href: "/time", urgent: true });
+  }
+  return { g, todos, duty };
 }
 
 type Notice = { id: string; title: string; body: string | null; link: string | null; created_at: string; read_at: string | null };
@@ -88,10 +99,23 @@ export default async function Me() {
   const first = (emp?.full_name || access.display_name).trim().split(/\s+/)[0];
   const management = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
   const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
-  const home = management ? await managementHome(supabase, today, isOwner) : null;
+  const home = management ? await managementHome(supabase, today, isOwner, access.user_id) : null;
   const staffTodos = management ? null : await staffHome();
+  const timeTodo = await timeInTodo();
+  if (timeTodo) (home?.todos ?? staffTodos)?.unshift(timeTodo);
   if (home && !isOwner && detailState !== "APPROVED" && detailState !== "PENDING") {
     home.todos.push({ text: detailState === "RETURNED" ? "The owner sent your employee details back. Please fix them" : "Fill in your employee details (needed for payroll and government reports)", href: "/me/details" });
+  }
+
+  /** Scheduled today and not timed in yet: remind them to time in. */
+  async function timeInTodo(): Promise<Todo | null> {
+    if (!emp) return null;
+    const [{ data: sh }, { count: ins, error }] = await Promise.all([
+      supabase.from("shifts").select("is_off, start_time").eq("employee_id", emp.id).eq("work_date", today).eq("state", "PUBLISHED").maybeSingle(),
+      supabase.from("time_punches").select("id", { count: "exact", head: true }).eq("employee_id", emp.id).eq("work_date", today).eq("kind", "IN"),
+    ]);
+    if (error || !sh || sh.is_off || ins) return null;
+    return { text: `Time in when you arrive. Your shift today starts at ${timeLabel(sh.start_time)}`, href: "/time", urgent: true };
   }
 
   /** Staff Home to-dos: unfinished employee details, service entries sent back, commission waiting for sign-off. */
@@ -124,7 +148,7 @@ export default async function Me() {
         <p className="muted small">{emp?.position ?? (isOwner ? "Owner" : "Staff")}{emp && ` · ${branchName[emp.branch_id]}`} · {dayLabel(today)}</p>
 
         {staffTodos && <TodoCard todos={staffTodos} />}
-        {home && <ManagerHome g={home.g} todos={home.todos} />}
+        {home && <ManagerHome g={home.g} todos={home.todos} duty={home.duty} branches={branches.filter((b) => b.kind === "CLINIC").map((b) => ({ id: b.id, name: branchShort(b.name) }))} />}
         {notices.length > 0 && (
           <div className="card">
             <div className="card-head">

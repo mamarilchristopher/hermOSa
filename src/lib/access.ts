@@ -58,6 +58,13 @@ export function branchesFor(a: Access, branches: Branch[], roles: Role[]) {
 
 export const ERROR_TEXT: Record<string, string> = {
   FORBIDDEN: "You don't have access to that.",
+  NOT_SCHEDULED: "That day isn't on the published schedule yet.",
+  SAME_SHIFT: "You both have the same schedule that day, so there's nothing to swap.",
+  NOT_A_DAY_OFF: "Pick one of your days off as the day you'll work.",
+  NO_EMPLOYEE_RECORD: "You don't have an employee record yet. Ask the owner to add you on Employees.",
+  PHOTO_REQUIRED: "Take a selfie to time in or out.",
+  ALREADY_IN: "You're already timed in. Time out first.",
+  NOT_IN: "You haven't timed in yet today.",
   DUPLICATE_RECEIPT: "That waiver / OR number is already in the log for this branch. Check the entries below.",
   PIN_WRONG: "That PIN isn't right.",
   PIN_LOCKED: "Too many wrong tries. Wait 15 minutes, or ask the owner to reset your PIN.",
