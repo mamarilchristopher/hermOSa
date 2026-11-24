@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import "./themes.css";
+import { VERSION } from "@/lib/version";
 
 const sans = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
@@ -18,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {children}
         <footer className="build-note" title="The code version this page is running">
-          Version {process.env.NEXT_PUBLIC_BUILD_SHA} · updated {process.env.NEXT_PUBLIC_BUILD_TIME} · {process.env.NEXT_PUBLIC_BUILD_HOST}
+          Hermosa OS v{VERSION} · {process.env.NEXT_PUBLIC_BUILD_SHA} · updated {process.env.NEXT_PUBLIC_BUILD_TIME} · {process.env.NEXT_PUBLIC_BUILD_HOST}
         </footer>
       </body>
     </html>
