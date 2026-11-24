@@ -46,7 +46,7 @@ export async function TopBar({ access }: { access: Access }) {
       <aside className="sidebar">
         <div className="brand">
           {/* Approved logo, original aspect ratio preserved via width + auto height. */}
-          <img src="/hermosa-logo.png" alt="Hermosa Aesthetics" />
+          <img src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
           <span className="brand-tag">OS</span>
         </div>
         <NavLinks items={items} variant="side" />
@@ -62,7 +62,7 @@ export async function TopBar({ access }: { access: Access }) {
         </div>
       </aside>
       <header className="mobile-bar">
-        <img src="/hermosa-logo.png" alt="Hermosa Aesthetics" />
+        <img src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
         <span className="avatar" title={`${access.display_name} · ${role}`}>{initials}</span>
         <form action="/auth/signout" method="post">
           <button className="icon-btn" type="submit" aria-label="Sign out"><IconLogout /></button>

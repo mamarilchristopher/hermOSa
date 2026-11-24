@@ -8,7 +8,7 @@ export default async function MfaPage() {
   return (
     <div className="center">
       <div className="card auth-card">
-        <img src="/hermosa-logo.png" alt="Hermosa Aesthetics" />
+        <img src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
         <h1>Verify it's you</h1>
         <p className="muted small">Owner, finance and HR accounts need a second step to protect payroll, approvals and company totals.</p>
         <MfaForm />
