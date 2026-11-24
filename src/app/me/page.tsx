@@ -7,6 +7,41 @@ import { manilaToday } from "@/lib/dates";
 import { monthEnd, monthLabel, monthStart } from "@/lib/insights";
 import { ROLE_TEXT } from "@/lib/commission";
 import { markNoticesRead } from "./actions";
+import { ManagerHome, type Todo } from "./ManagerHome";
+import { computeGlance, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
+import { sortBranches } from "@/lib/insights";
+
+type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: string }[]; days?: StatusDay[];
+  corrections?: { id: string; mine: boolean }[] };
+
+/** Everything the management Home needs, in one round of queries. Missing pieces (older database) just drop out. */
+async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>>["supabase"], today: string, owner: boolean) {
+  const [{ data: st }, { data: overdueData }, { count: logsWaiting }, { count: uploads }, { count: details }, { count: joins }] = await Promise.all([
+    supabase.rpc("daily_sales_status", { p_start: glanceFetchStart(today), p_end: today }),
+    supabase.rpc("overdue_commission_days"),
+    supabase.from("service_logs").select("id", { count: "exact", head: true }).eq("state", "PENDING"),
+    supabase.from("import_batches").select("id", { count: "exact", head: true }).eq("state", "STAGED"),
+    owner ? supabase.from("employee_detail_submissions").select("id", { count: "exact", head: true }).eq("state", "PENDING") : Promise.resolve({ count: 0 }),
+    owner ? supabase.from("app_users").select("id", { count: "exact", head: true }).eq("join_status", "PENDING") : Promise.resolve({ count: 0 }),
+  ]);
+  const s = (st ?? { ok: false }) as DailyStatus;
+  if (!s.ok) return null;
+  const g = computeGlance(today, sortBranches(s.branches ?? []), s.days ?? []);
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const todos: Todo[] = [];
+  if (g.yesterdayMissing.length) todos.push({ text: `Yesterday's sales not entered yet: ${g.yesterdayMissing.join(", ")}`, href: "/sales/daily", urgent: true });
+  const olderEmpty = g.emptyDays - g.yesterdayMissing.length;
+  if (olderEmpty > 0) todos.push({ text: `${plural(olderEmpty, "earlier day", "earlier days")} this month with nothing entered (enter the total or mark Zero sales / Closed)`, href: "/sales/daily" });
+  const changes = (s.corrections ?? []).filter((c) => !c.mine).length;
+  if (changes) todos.push({ text: `${plural(changes, "sales change needs", "sales changes need")} a second person to confirm`, href: "/sales/daily", urgent: true });
+  const overdue = (Array.isArray(overdueData) ? overdueData : []) as { name: string; date: string; pending: number }[];
+  if (overdue.length) todos.push({ text: `Commission sign-off overdue: ${overdue.slice(0, 4).map((o) => `${o.name.replace(/ \(.*\)$/, "")} ${dayLabel(o.date).slice(5)}`).join(", ")}${overdue.length > 4 ? ", and more" : ""}`, href: "/services", urgent: true });
+  else if (logsWaiting) todos.push({ text: `${plural(logsWaiting, "service log entry is", "service log entries are")} waiting for sign-off`, href: "/services" });
+  if (uploads) todos.push({ text: `${plural(uploads, "upload is", "uploads are")} waiting for sign-off`, href: "/imports" });
+  if (details) todos.push({ text: `${plural(details, "staff member sent", "staff members sent")} employee details to review`, href: "/admin/details" });
+  if (joins) todos.push({ text: `${plural(joins, "person is", "people are")} asking to join the app`, href: "/admin/users" });
+  return { g, todos };
+}
 
 type Notice = { id: string; title: string; body: string | null; link: string | null; created_at: string; read_at: string | null };
 const when = (iso: string) => new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -46,6 +81,8 @@ export default async function Me() {
   const scope = access.grants.map((g) => `${ROLE_LABEL[g.role] ?? g.role}, ${g.branch_id ? branchName[g.branch_id] ?? "branch" : "all branches"}`);
   const isOwner = access.grants.some((g) => g.role === "OWNER");
   const first = (emp?.full_name || access.display_name).trim().split(/\s+/)[0];
+  const management = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
+  const home = management ? await managementHome(supabase, today, isOwner) : null;
   const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
 
   return (
@@ -53,7 +90,7 @@ export default async function Me() {
       <TopBar access={access} />
       <main>
         <h1>Hi, {first}</h1>
-        <p className="muted small">{emp?.position ?? (isOwner ? "Owner" : "Staff")}{emp && ` · ${branchName[emp.branch_id]}`}</p>
+        <p className="muted small">{emp?.position ?? (isOwner ? "Owner" : "Staff")}{emp && ` · ${branchName[emp.branch_id]}`} · {dayLabel(today)}</p>
 
         {!isOwner && detailState !== "APPROVED" && detailState !== "PENDING" && (
           <div className={`notice ${detailState === "RETURNED" ? "error" : "info"}`}>
@@ -61,6 +98,7 @@ export default async function Me() {
             <Link href="/me/details">{detailState === "RETURNED" ? "Fix my details" : "Fill them in"}</Link>
           </div>
         )}
+        {home && <ManagerHome g={home.g} todos={home.todos} />}
         {notices.length > 0 && (
           <div className="card">
             <div className="card-head">
@@ -110,8 +148,8 @@ export default async function Me() {
           </>
         )}
 
-        <div className="card">
-          <h2>My details</h2>
+        <details className="card my-details" open={!management}>
+          <summary><h2>My details</h2></summary>
           <dl className="kv" style={{ borderTop: 0, paddingTop: 0 }}>
             <dt>Name</dt><dd>{emp?.full_name ?? access.display_name}</dd>
             <dt>Position</dt><dd>{emp?.position ?? (isOwner ? "Owner" : "Not set yet")}</dd>
@@ -125,7 +163,7 @@ export default async function Me() {
             <Link href="/me/details">My employee details</Link>{detailState === "PENDING" ? " (waiting for approval)" : detailState === "APPROVED" ? " (approved)" : ""}.
             Something else wrong? Tell your manager or the owner.
           </p>
-        </div>
+        </details>
 
         {logger && (
           <div className="card">
