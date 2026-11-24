@@ -13,6 +13,7 @@ const ERR: Record<string, string> = {
   REASON_REQUIRED: "Give a reason of at least 8 characters.",
   CORRECTION_PENDING: "A correction is already waiting for that day.",
 };
+const CONFIRM = "Are you sure? This change will notify all other management members and will need confirmation from two people to change again.";
 const sumOf = (rows: { cents: number }[]) => rows.reduce((s, r) => s + r.cents, 0);
 
 export function TrackerUpload({ today }: { today: string }) {
@@ -67,6 +68,7 @@ export function TrackerUpload({ today }: { today: string }) {
 
   async function loadAll() {
     if (!results) return;
+    if (!window.confirm(`${CONFIRM}\n\nLoad ${toAdd} new day${toAdd === 1 ? "" : "s"}?`)) return;
     const out: string[] = [];
     for (const r of results) {
       if (!r.branch?.can_enter || r.check.add.length === 0) continue;
@@ -87,6 +89,7 @@ export function TrackerUpload({ today }: { today: string }) {
   async function replacePicked() {
     if (!results) return;
     if (reason.trim().length < 8) { setError("Give a reason of at least 8 characters for the replacements."); return; }
+    if (!window.confirm(`${CONFIRM}\n\nReplace ${pick.size} day${pick.size === 1 ? "" : "s"}? Each waits for a second person to confirm.`)) return;
     setError(null);
     const out: string[] = [];
     for (const r of results) {

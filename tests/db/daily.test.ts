@@ -50,12 +50,15 @@ describe("pre-launch (second sign-off off)", () => {
     expect((await db.rpc(fvManager, "aal1", "record_daily_sales", [db.branches.QC_MAIN, rows([["2026-11-05", 1]]), null])).error).toBe("FORBIDDEN");
   });
 
-  it("a correction needs a reason and applies at once, keeping the old row reversed", async () => {
+  it("a correction needs a reason and a second person, keeping the old row reversed", async () => {
     expect((await db.rpc(gm, "aal1", "request_sales_correction", [db.branches.MARIKINA, "2026-11-02", 7500, "typo"])).error).toBe("REASON_REQUIRED");
     expect((await db.rpc(gm, "aal1", "request_sales_correction", [db.branches.MARIKINA, "2026-11-02", 7000, "Same amount again"])).error).toBe("SAME_AMOUNT");
     expect((await db.rpc(gm, "aal1", "request_sales_correction", [db.branches.MARIKINA, "2026-11-09", 7000, "Nothing recorded"])).error).toBe("NOTHING_TO_CORRECT");
     const r = await db.rpc(gm, "aal1", "request_sales_correction", [db.branches.MARIKINA, "2026-11-02", 7500, "Sheet said 75, typed 70"]);
-    expect(r.state).toBe("APPLIED");
+    expect(r.state).toBe("PENDING");
+    expect(await total("MARIKINA", "2026-11-02")).toBe(7000);
+    expect((await db.rpc(gm, "aal1", "decide_sales_correction", [r.id, true, null])).error).toBe("SELF_APPROVAL_DENIED");
+    expect((await db.rpc(owner, "aal2", "decide_sales_correction", [r.id, true, null])).state).toBe("APPLIED");
     expect(await total("MARIKINA", "2026-11-02")).toBe(7500);
     const { rows: all } = await db.sql("SELECT count(*)::int AS n FROM public.historical_sales WHERE branch_id = $1 AND posting_date = '2026-11-02'", [db.branches.MARIKINA]);
     expect(all[0].n).toBe(2);
@@ -76,7 +79,7 @@ describe("after launch (second sign-off on)", () => {
     expect(await total("QC_MAIN", today)).toBe(100000);
     expect((await db.rpc(owner, "aal2", "request_sales_correction", [db.branches.QC_MAIN, today, 130000, "Another change now"])).error).toBe("CORRECTION_PENDING");
     expect((await db.rpc(owner, "aal2", "decide_sales_correction", [r.id, true, null])).error).toBe("SELF_APPROVAL_DENIED");
-    expect((await db.rpc(gm, "aal1", "decide_sales_correction", [r.id, true, null])).error).toBe("FORBIDDEN");
+    expect((await db.rpc(fvManager, "aal1", "decide_sales_correction", [r.id, true, null])).error).toBe("FORBIDDEN");
     expect((await db.rpc(owner2, "aal2", "decide_sales_correction", [r.id, true, "ok"])).state).toBe("APPLIED");
     expect(await total("QC_MAIN", today)).toBe(120000);
   });

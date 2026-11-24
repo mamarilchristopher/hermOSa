@@ -74,7 +74,7 @@ export default async function DailySales({ searchParams }: { searchParams: Promi
           <>
             {gaps > 0 && <p className="small">{gaps} branch-day{gaps === 1 ? "" : "s"} this month with nothing entered (highlighted). Use the ▾ in a cell to mark it Zero sales or Closed.</p>}
             <MonthGrid dates={dates} branches={branches.map((b) => ({ id: b.id, name: b.name, can_enter: b.can_enter }))} cells={cells} today={today} changed={changed} />
-            <p className="small muted">▾ in an empty cell: Zero sales, Closed or Enter sales (typing 0 also means zero sales). • the total differs from that day&apos;s service log (hover to see it). ✎ a change is waiting for sign-off. ↺ changed before: another change needs a second person to confirm. Every change notifies the other management members.
+            <p className="small muted">▾ in an empty cell: Zero sales, Closed or Enter sales (typing 0 also means zero sales). • the total differs from that day&apos;s service log (hover to see it). ✎ a change is waiting for sign-off. ↺ changed before. Every save notifies the other management members, and changing a saved day needs a second person to confirm.
               {st.second_signoff ? " Entries wait for a second person on Imports before they count." : " While second sign-off is off, entries by owners and the general manager count right away."}</p>
 
             {st.corrections.length > 0 && (

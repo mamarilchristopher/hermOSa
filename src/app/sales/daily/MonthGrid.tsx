@@ -99,9 +99,8 @@ export function MonthGrid({ dates, branches, cells, today, changed = [] }: {
     if (parsed.fixes.length > 0 && reason.trim().length < 8) {
       setMsg({ ok: false, text: "Write why you're changing recorded days (at least 8 characters)." }); return;
     }
-    // Ask first whenever a day is changed or marked Zero sales / Closed. New amounts in empty days save straight away.
-    if (parsed.fixes.length > 0 || parsed.zero.length > 0) { setMsg(null); setConfirming(true); return; }
-    save();
+    // Every save asks first: it notifies the other management members (owner request).
+    setMsg(null); setConfirming(true);
   }
 
   async function save() {
@@ -196,7 +195,7 @@ export function MonthGrid({ dates, branches, cells, today, changed = [] }: {
                       {rec !== null ? php(rec) : mark ? <span className="cell-mark">{mark === "CLOSED" ? "Closed" : "Zero sales"}</span> : staged ? "Waiting" : "–"}
                       {flag && <span className="flag" aria-label="differs from the service log"> •</span>}
                       {fixing && <span className="flag"> ✎</span>}
-                      {changedSet.has(k) && !fixing && <span className="changed-mark" title="Changed before. Another change needs a second person to confirm."> ↺</span>}
+                      {changedSet.has(k) && !fixing && <span className="changed-mark" title="Changed before"> ↺</span>}
                     </td>
                   );
                 })}
@@ -229,10 +228,12 @@ export function MonthGrid({ dates, branches, cells, today, changed = [] }: {
         <div className="modal-back" role="presentation" onClick={() => setConfirming(false)}>
           <div className="modal card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" onClick={(e) => e.stopPropagation()}>
             <h2 id="confirm-title">Are you sure?</h2>
-            {parsed.fixes.length > 0
-              ? <p>This change will notify all other management members, and changing {parsed.fixes.length === 1 ? "this day" : "these days"} again will need confirmation from two people.</p>
-              : <p>{parsed.zero.length === 1 ? "This day" : "These days"} will count as filled. A day with Zero sales counts as ₱0 in the daily average; Closed days are left out.</p>}
+            <p>This change will notify all other management members and will need confirmation from two people to change again.</p>
+            {parsed.fixes.length > 0 && <p className="small">Changes to days already saved wait until a second person (an owner or the general manager) confirms them.</p>}
             <ul className="plain-list small">
+              {parsed.entries.map((e) => (
+                <li key={key(e.branch, e.date)}><span><strong>{branches.find((b) => b.id === e.branch)?.name ?? ""}</strong>, {label(e.date)}: <strong>{php(e.cents)}</strong></span></li>
+              ))}
               {parsed.zero.map((z) => (
                 <li key={key(z.branch, z.date)}><span><strong>{branches.find((b) => b.id === z.branch)?.name ?? ""}</strong>, {label(z.date)}: <strong>{MARK_LABEL[z.status]}</strong></span></li>
               ))}
@@ -241,7 +242,7 @@ export function MonthGrid({ dates, branches, cells, today, changed = [] }: {
                 const old = cells[key(f.branch, f.date)]?.[0] ?? 0;
                 return (
                   <li key={key(f.branch, f.date)}><span><strong>{name}</strong>, {label(f.date)}: {php(old)} → <strong>{f.cents === 0 ? "Zero sales (₱0)" : php(f.cents)}</strong>
-                    {changedSet.has(key(f.branch, f.date)) && <span className="muted"> · changed before, so this waits for a second person</span>}</span></li>
+                    <span className="muted"> · waits for a second person</span></span></li>
                 );
               })}
             </ul>
