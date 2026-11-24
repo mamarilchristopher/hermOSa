@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 type Person = { id: string; name: string; position: string | null };
 
 /** Small "View as" button in the top strip (desktop and phone): pick someone to see their Home, read only. */
-export function ViewAsButton({ people }: { people: Person[] }) {
+export function ViewAsButton({ people, variant = "top" }: { people: Person[]; variant?: "top" | "side" }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -17,8 +17,8 @@ export function ViewAsButton({ people }: { people: Person[] }) {
   }, [open]);
   if (people.length === 0) return null;
   return (
-    <div className="view-as-btn" ref={box}>
-      <button type="button" className="secondary small" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+    <div className={`view-as-btn ${variant}`} ref={box}>
+      <button type="button" className={variant === "side" ? "view-as-side" : "secondary small"} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" />
         </svg>

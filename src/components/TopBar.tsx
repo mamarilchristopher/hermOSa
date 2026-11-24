@@ -54,6 +54,7 @@ export async function TopBar({ access }: { access: Access }) {
           <span className="brand-tag">OS</span>
         </div>
         <NavLinks items={items} variant="side" />
+        {viewList.length > 0 && <ViewAsButton people={viewList} variant="side" />}
         <div className="me">
           <span className="avatar" aria-hidden>{initials}</span>
           <span className="me-text">
