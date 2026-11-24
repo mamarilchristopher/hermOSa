@@ -22,7 +22,7 @@ export function MfaForm() {
       if (verified) return setSetup({ factorId: verified.id, enrolling: false });
       // Remove half-finished enrolments before starting a new one.
       for (const f of data.all.filter((f) => f.status === "unverified")) await supabase.auth.mfa.unenroll({ factorId: f.id });
-      const enrolled = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `Hermosa OS ${Date.now()}` });
+      const enrolled = await supabase.auth.mfa.enroll({ factorType: "totp", issuer: "Hermosa OS", friendlyName: `Hermosa OS ${Date.now()}` });
       if (enrolled.error) return setError("Could not start authenticator setup.");
       setSetup({ factorId: enrolled.data.id, qr: enrolled.data.totp.qr_code, secret: enrolled.data.totp.secret, enrolling: true });
     })();
@@ -50,9 +50,15 @@ export function MfaForm() {
           <p>Scan this with Google Authenticator, Microsoft Authenticator or 1Password, then enter the 6-digit code.</p>
           {setup.qr && <img src={setup.qr} alt="Authenticator QR code" width={200} height={200} />}
           <p className="small muted">Can't scan? Enter this key: <code>{setup.secret}</code></p>
+          <p className="small">In your authenticator app it will be listed as <strong>Hermosa OS</strong>. Keep it: you'll need it every time you sign in.</p>
         </>
       )}
-      {setup && !setup.enrolling && <p>Enter the 6-digit code from your authenticator app.</p>}
+      {setup && !setup.enrolling && (
+        <>
+          <p>Enter the 6-digit code shown for <strong>Hermosa OS</strong> in your authenticator app.</p>
+          <p className="small muted">Lost your authenticator or can&apos;t find Hermosa OS in it? Ask the owner to reset your 2-step verification.</p>
+        </>
+      )}
       <label>
         Code
         <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="one-time-code" required />
