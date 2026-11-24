@@ -10,6 +10,9 @@ export async function signIn(_prev: { error?: string } | undefined, formData: Fo
   if (!parsed.success) return { error: "Enter your email and password." };
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  if (error?.code === "email_not_confirmed") {
+    return { error: "Your email isn't confirmed yet. Open the confirmation email from Hermosa OS (check Spam), or ask the owner to confirm it." };
+  }
   // Same message for unknown email and wrong password.
   if (error) return { error: "Wrong email or password." };
   redirect("/");
