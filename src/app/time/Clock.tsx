@@ -7,16 +7,16 @@ import { parseCoords } from "@/lib/schedule";
 
 type B = { id: string; name: string };
 
-/** Shrinks the time-in photo to about 480 px wide JPEG (well under the 1 MB limit) before upload. */
+/** Shrinks the time-in photo to about 1024 px JPEG (clock still readable, well under the 1 MB limit) before upload. */
 async function shrink(file: File): Promise<Blob> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = url; });
-    const scale = Math.min(1, 480 / Math.max(img.width, img.height));
+    const scale = Math.min(1, 1024 / Math.max(img.width, img.height));
     const c = document.createElement("canvas");
     c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
     c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-    return await new Promise<Blob>((ok, bad) => c.toBlob((b) => (b ? ok(b) : bad(new Error("photo"))), "image/jpeg", 0.72));
+    return await new Promise<Blob>((ok, bad) => c.toBlob((b) => (b ? ok(b) : bad(new Error("photo"))), "image/jpeg", 0.8));
   } finally { URL.revokeObjectURL(url); }
 }
 
@@ -93,7 +93,7 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
       <button className={`clock-btn ${isIn ? "out" : ""}`} disabled={!!busy || !branch} onClick={() => file.current?.click()}>
         {busy ?? (isIn ? "Time out" : "Time in")}
       </button>
-      <p className="small muted" style={{ margin: 0 }}>Take a photo at the clinic, like the clinic clock. Your location and the server time are saved with it, not your phone's time.</p>
+      <p className="small muted" style={{ margin: 0 }}>Take a photo of the clinic clock showing the date and time. The server time and your location are saved with it.</p>
       {busy === "Getting your location…" && <div className="notice info">If your phone asks, tap Allow for location. This takes up to 15 seconds.</div>}
       {res?.error && <div className="notice error">{res.error}</div>}
       {res?.ok && noLoc && <div className="notice warn">Saved without your location. Turn on location for this browser so next time shows you&apos;re at the clinic.</div>}
