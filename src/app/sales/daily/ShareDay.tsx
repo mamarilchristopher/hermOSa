@@ -19,7 +19,7 @@ export function ShareDay({ dates, branches, cellOf, today }: {
       const s = dailySummary(day, branches, dates, cellOf);
       const font = getComputedStyle(document.body).fontFamily || "sans-serif";
       await document.fonts.ready;
-      const canvas = await drawDailyImage(s, "/hermosa-logo.png", font);
+      const canvas = await drawDailyImage(s, "/hermosa-logo-transparent.png", font);
       const blob = await new Promise<Blob>((ok, bad) => canvas.toBlob((b) => (b ? ok(b) : bad(new Error("image"))), "image/png"));
       const file = new File([blob], `hermosa-daily-sales-${day}.png`, { type: "image/png" });
       const text = dailyShareText(day, branches, dates, cellOf);
