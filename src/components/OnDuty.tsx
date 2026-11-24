@@ -8,7 +8,7 @@ export type DutyRow = {
 const clock = (ts: string) => new Date(ts).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" });
 const mins = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`);
 
-/** Who's on duty, per branch: scheduled hours, time in (with clock photo), late minutes, time out. */
+/** Who's on duty, per branch: scheduled hours, time in (with photo), late minutes, time out. */
 export function OnDutyList({ rows, branches, photos, nowHm, compact }: {
   rows: DutyRow[]; branches: { id: string; name: string }[]; photos?: Record<string, string>; nowHm: string; compact?: boolean;
 }) {
