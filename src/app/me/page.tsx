@@ -28,7 +28,8 @@ async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>
     supabase.rpc("pending_signoffs"),
     supabase.from("import_batches").select("id", { count: "exact", head: true }).eq("state", "STAGED"),
     owner ? supabase.from("employee_detail_submissions").select("id", { count: "exact", head: true }).eq("state", "PENDING") : Promise.resolve({ count: 0 }),
-    owner ? supabase.from("app_users").select("id", { count: "exact", head: true }).eq("join_status", "PENDING") : Promise.resolve({ count: 0 }),
+    supabase.from("app_users").select("id", { count: "exact", head: true }).eq("join_status", "PENDING"), // owner, or GM after update-0027
+
     supabase.rpc("on_duty", { p_date: today }), // errors (before update-0022) mean no On Duty card
     supabase.from("schedule_requests").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("requested_by", userId),
     supabase.rpc("incident_list"), // errors (before update-0023) mean no IR to-dos
@@ -51,7 +52,7 @@ async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>
     href: `/services?date=${toSign.oldest}`, urgent: !overdue.length });
   if (uploads) todos.push({ text: `${plural(uploads, "upload is", "uploads are")} waiting for sign-off`, href: "/imports" });
   if (details) todos.push({ text: `${plural(details, "staff member sent", "staff members sent")} employee details to review`, href: "/admin/details" });
-  if (joins) todos.push({ text: `${plural(joins, "person is", "people are")} asking to join the app`, href: "/admin/users" });
+  if (joins) todos.push({ text: `${plural(joins, "person is", "people are")} asking to join the app`, href: owner ? "/admin/users" : "/admin/joins" });
   if (schedReqs) todos.push({ text: `${plural(schedReqs, "schedule change is", "schedule changes are")} waiting for approval (swaps or day-off moves)`, href: "/schedule" });
   const irs = ((irData as { reports?: Ir[] } | null)?.reports ?? []).filter((r) => r.can_manage);
   const irDraft = irs.filter((r) => r.state === "DRAFT").length, irExplained = irs.filter((r) => r.state === "EXPLAINED").length;

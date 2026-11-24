@@ -98,6 +98,7 @@ export const ERROR_TEXT: Record<string, string> = {
   NAME_REQUIRED: "Type a name.",
   BAD_REQUEST: "Something was missing. Try again.",
   LEVEL_REQUIRED: "Choose a staff level first.",
+  OWNER_ONLY_LEVEL: "Only an owner can approve that level. Choose a staff level, or ask an owner.",
   BRANCH_REQUIRED: "Choose their home branch.",
   UNKNOWN_USER: "That person isn't in the list any more. Refresh the page.",
   SELF_ESCALATION_DENIED: "You can't change your own access.",

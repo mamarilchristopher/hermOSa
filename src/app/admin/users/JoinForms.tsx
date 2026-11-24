@@ -12,7 +12,10 @@ export const LEVEL_TEXT: Record<string, string> = {
   CASHIER: "Front desk / cashier (one branch)",
 };
 
-export function ApproveForm({ user, branchId, branches }: { user: string; branchId: string | null; branches: { id: string; name: string }[] }) {
+/** Levels a General Manager may approve; the others stay owner-only (the database checks this too). */
+export const GM_LEVELS = ["SENIOR_CMA", "CMA", "TRAINEE", "MANAGER", "CASHIER"];
+
+export function ApproveForm({ user, branchId, branches, levels }: { user: string; branchId: string | null; branches: { id: string; name: string }[]; levels?: string[] }) {
   const [state, action, pending] = useActionState(approveJoin, undefined);
   const v = state?.values ?? {};
   return (
@@ -22,7 +25,7 @@ export function ApproveForm({ user, branchId, branches }: { user: string; branch
         <span>Staff level</span>
         <select name="level" required defaultValue={v.level ?? ""}>
           <option value="" disabled>Choose a level…</option>
-          {Object.entries(LEVEL_TEXT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          {Object.entries(LEVEL_TEXT).filter(([k]) => !levels || levels.includes(k)).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
       </label>
       <label>

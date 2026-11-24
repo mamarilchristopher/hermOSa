@@ -64,13 +64,14 @@ export async function approveJoin(prev: FormState, fd: FormData): Promise<FormSt
     p_user: p.data.user, p_level: p.data.level, p_branch: p.data.branch, p_position: p.data.position ?? null,
     p_commission: p.data.commission === "default" ? null : p.data.commission === "yes",
   });
-  // Owner-only screen: show the database's own reason so a setup problem can be fixed quickly.
+  // Owner and GM screens: show the database's own reason so a setup problem can be fixed quickly.
   if (error) {
     console.error("approve_join_request failed", error.code, error.message);
     return fail(`Could not save. Database says: ${error.message}${error.code ? ` (${error.code})` : ""}`);
   }
   if (!data.ok) return fail(errorText(data.error));
   revalidatePath("/admin/users");
+  revalidatePath("/admin/joins");
   return { ok: "Approved. They can use the app now." };
 }
 
@@ -80,6 +81,7 @@ export async function rejectJoin(fd: FormData) {
   const supabase = await createClient();
   await supabase.rpc("reject_join_request", { p_user: p.data });
   revalidatePath("/admin/users");
+  revalidatePath("/admin/joins");
 }
 
 export async function createInvite(_prev: FormState, fd: FormData): Promise<FormState> {

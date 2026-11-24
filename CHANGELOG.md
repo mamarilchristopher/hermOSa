@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.27.0 | Nov 25, 2026 | update-0027 | General Manager can accept or reject join requests on a new Join requests page; owner-level accounts stay owner-only |
 | 0.26.2 | Nov 25, 2026 | none | Service log: staff who are not on commission no longer see commission choices |
 | 0.26.1 | Nov 25, 2026 | none | Version shown at the bottom of every page |
 | 0.26.0 | Nov 25, 2026 | update-0026 | Photo's own time saved with each time-in, "Old photo" flag, Time-in photos page with download; clock photo at 1024 px; time clock never hangs on location/upload |

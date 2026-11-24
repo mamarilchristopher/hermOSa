@@ -18,11 +18,13 @@ export async function TopBar({ access }: { access: Access }) {
   const approver = access.grants.some((g) => g.role === "OWNER" || g.role === "MANAGER");
   const owner = can(access, ["OWNER"], null);
   const viewAs = access.grants.some((g) => (g.role === "OWNER" || g.role === "MANAGER") && g.branch_id === null);
-  const [{ data: overdueData }, { count: detailsWaiting }, { count: unreadNotices }, { data: viewPeople }] = await Promise.all([
+  const gm = !owner && can(access, ["MANAGER"], null);
+  const [{ data: overdueData }, { count: detailsWaiting }, { count: unreadNotices }, { data: viewPeople }, { count: joinsWaiting }] = await Promise.all([
     approver ? supabase.rpc("overdue_commission_days") : Promise.resolve({ data: [] }),
     owner ? supabase.from("employee_detail_submissions").select("id", { count: "exact", head: true }).eq("state", "PENDING") : Promise.resolve({ count: 0 }),
     supabase.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null),
     viewAs ? supabase.rpc("view_as_people") : Promise.resolve({ data: null }),
+    gm ? supabase.from("app_users").select("id", { count: "exact", head: true }).eq("join_status", "PENDING") : Promise.resolve({ count: 0 }),
   ]);
   const viewList = Array.isArray(viewPeople) ? (viewPeople as { id: string; name: string; position: string | null }[]) : [];
   const overdue = (Array.isArray(overdueData) ? overdueData : []) as { code: string; name: string; date: string; pending: number }[];
@@ -44,6 +46,7 @@ export async function TopBar({ access }: { access: Access }) {
     ...(importer ? [{ href: "/imports", label: "Imports", short: "Imports", icon: "upload" } as NavItem] : []),
     ...(owner ? [{ href: "/admin/details", label: "Staff details", short: "Details", icon: "idcard", badge: detailsWaiting || undefined } as NavItem] : []),
     ...(owner ? [{ href: "/admin/users", label: "Users and roles", short: "Users", icon: "users" } as NavItem] : []),
+    ...(gm ? [{ href: "/admin/joins", label: "Join requests", short: "Joins", icon: "users", badge: joinsWaiting || undefined } as NavItem] : []),
   ];
   const initials = access.display_name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "?";
   const role = [...new Set(access.grants.map((g) => ROLE_LABEL[g.role] ?? g.role))].join(", ") || "No role yet";
