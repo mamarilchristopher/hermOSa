@@ -94,7 +94,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
               {users.map((u) => (
                 <tr key={u.id}>
                   <td>{u.display_name}{!u.active && <span className="pill REVERSED" style={{ marginLeft: 6 }}>Inactive</span>}</td>
-                  <td>{employeeOf.get(u.id) ? <PositionCell employeeId={employeeOf.get(u.id)!} position={positionOf.get(u.id) ?? null} /> : <span className="muted small">No employee record</span>}</td>
+                  <td>{employeeOf.get(u.id) ? <PositionCell employeeId={employeeOf.get(u.id)!} position={positionOf.get(u.id) ?? null} /> : grantsOf(u.id).some((g) => g.role_code === "OWNER") ? "Owner" : <span className="muted small">No employee record</span>}</td>
                   <td className="small">{u.email}</td>
                   <td>
                     {(grants ?? []).filter((g) => g.user_id === u.id).map((g) => (

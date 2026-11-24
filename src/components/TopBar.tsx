@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { can } from "@/lib/access";
 import { IconLogout, IconShield } from "./Icons";
 import { NavLinks, type NavItem } from "./NavLinks";
+import { OnlineNow } from "./OnlineNow";
 
 const ROLE_LABEL: Record<string, string> = {
   OWNER: "Owner", FINANCE: "Finance", MANAGER: "Manager", CASHIER: "Cashier", HR: "HR",
@@ -68,6 +69,7 @@ export async function TopBar({ access }: { access: Access }) {
         </form>
       </header>
       <NavLinks items={items} variant="tabs" />
+      <OnlineNow show={access.grants.some((g) => g.role === "OWNER" || g.role === "MANAGER")} />
       {overdue.length > 0 && (
         <div className="alert-strip" role="status">
           <strong>Commission sign-off overdue:</strong>

@@ -44,7 +44,8 @@ export default async function Me() {
     .sort((a, b) => b.service_logs.service_date.localeCompare(a.service_logs.service_date)).slice(0, 5);
   const branchName = Object.fromEntries(branches.map((b) => [b.id, b.name]));
   const scope = access.grants.map((g) => `${ROLE_LABEL[g.role] ?? g.role}, ${g.branch_id ? branchName[g.branch_id] ?? "branch" : "all branches"}`);
-  const first = access.display_name.split(/\s+/)[0];
+  const isOwner = access.grants.some((g) => g.role === "OWNER");
+  const first = (emp?.full_name || access.display_name).trim().split(/\s+/)[0];
   const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
 
   return (
@@ -52,9 +53,9 @@ export default async function Me() {
       <TopBar access={access} />
       <main>
         <h1>Hi, {first}</h1>
-        <p className="muted small">{emp?.position ?? "Staff"}{emp && ` · ${branchName[emp.branch_id]}`}</p>
+        <p className="muted small">{emp?.position ?? (isOwner ? "Owner" : "Staff")}{emp && ` · ${branchName[emp.branch_id]}`}</p>
 
-        {detailState !== "APPROVED" && detailState !== "PENDING" && (
+        {!isOwner && detailState !== "APPROVED" && detailState !== "PENDING" && (
           <div className={`notice ${detailState === "RETURNED" ? "error" : "info"}`}>
             {detailState === "RETURNED" ? "The owner sent your employee details back to fix. " : "Please fill in your employee details for payroll and government reports. "}
             <Link href="/me/details">{detailState === "RETURNED" ? "Fix my details" : "Fill them in"}</Link>
@@ -113,9 +114,9 @@ export default async function Me() {
           <h2>My details</h2>
           <dl className="kv" style={{ borderTop: 0, paddingTop: 0 }}>
             <dt>Name</dt><dd>{emp?.full_name ?? access.display_name}</dd>
-            <dt>Position</dt><dd>{emp?.position ?? "Not set yet"}</dd>
-            <dt>Home branch</dt><dd>{emp ? branchName[emp.branch_id] : "Not set yet"}</dd>
-            <dt>Commission</dt><dd>{emp ? (emp.commission_eligible ? "Yes, 5% of amount paid" : "No") : "Not set yet"}</dd>
+            <dt>Position</dt><dd>{emp?.position ?? (isOwner ? "Owner" : "Not set yet")}</dd>
+            <dt>Home branch</dt><dd>{emp ? branchName[emp.branch_id] : isOwner ? "All branches" : "Not set yet"}</dd>
+            <dt>Commission</dt><dd>{emp ? (emp.commission_eligible ? "Yes, 5% of amount paid" : "No") : isOwner ? "No" : "Not set yet"}</dd>
             <dt>App access</dt><dd>{scope.join("; ") || "None yet"}</dd>
             <dt>Login email</dt><dd>{user?.email ?? ""}</dd>
             {user?.joined_at && <><dt>Joined the app</dt><dd>{user.joined_at.slice(0, 10)}</dd></>}
