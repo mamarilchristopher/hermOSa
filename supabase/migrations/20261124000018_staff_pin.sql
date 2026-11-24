@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS private.pin_sessions (
   expires_at timestamptz NOT NULL
 );
 REVOKE ALL ON private.user_pins, private.pin_sessions FROM PUBLIC, anon, authenticated;
+-- No policies on purpose: only the functions below (run as the table owner) can read or write these.
+ALTER TABLE private.user_pins ENABLE ROW LEVEL SECURITY;
+ALTER TABLE private.pin_sessions ENABLE ROW LEVEL SECURITY;
 
 -- True unless the signed-in person has a PIN and hasn't entered it in this sign-in session.
 CREATE OR REPLACE FUNCTION private.pin_ok() RETURNS boolean
