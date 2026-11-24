@@ -13,27 +13,28 @@ export const LEVEL_TEXT: Record<string, string> = {
 
 export function ApproveForm({ user, branchId, branches }: { user: string; branchId: string | null; branches: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState(approveJoin, undefined);
+  const v = state?.values ?? {};
   return (
-    <form action={action} className="approve-form">
+    <form action={action} className="approve-form" key={state?.n ?? 0}>
       <input type="hidden" name="user" value={user} />
       <label>
         <span>Staff level</span>
-        <select name="level" required defaultValue="">
+        <select name="level" required defaultValue={v.level ?? ""}>
           <option value="" disabled>Choose a level…</option>
           {Object.entries(LEVEL_TEXT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
       </label>
       <label>
         <span>Home branch</span>
-        <select name="branch" required defaultValue={branchId ?? ""}>
+        <select name="branch" required defaultValue={v.branch || branchId || ""}>
           <option value="" disabled>Choose…</option>
           {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
       </label>
-      <label><span>Position title (optional)</span><input name="position" maxLength={80} placeholder="Uses the level name" /></label>
+      <label><span>Position title (optional)</span><input name="position" maxLength={80} placeholder="Uses the level name" defaultValue={v.position ?? ""} /></label>
       <label>
         <span>Commission</span>
-        <select name="commission" defaultValue="default">
+        <select name="commission" defaultValue={v.commission || "default"}>
           <option value="default">By level (CMAs yes, others no)</option>
           <option value="yes">Yes</option>
           <option value="no">No</option>
