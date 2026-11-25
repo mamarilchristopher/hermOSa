@@ -145,16 +145,15 @@ export function NotifyRequired() {
     if (err) setMsg(err); else setS("ok");
   };
   return (
-    <div className="notify-required" role="alert">
-      <strong>Notifications are required while you&apos;re timed in.</strong>
-      <span>
-        {s === "ask" && "Turn them on so you get chat messages and urgent reminders on this phone."}
-        {s === "denied" && "They're blocked on this phone. Open your phone's Settings, find Hermosapp (or your browser) › Notifications, and allow them. Then come back here."}
-        {s === "install" && <>On iPhone, add Hermosapp to your Home Screen first: in Safari tap <b>Share</b> ⬆︎, then <b>Add to Home Screen</b>. Open it from there and turn on notifications.</>}
-        {s === "unsupported" && "This phone or browser can't get notifications. Update your phone (iPhone: iOS 16.4 or newer) or open Hermosapp in Chrome."}
+    <div className="notify-required" role="status">
+      <span className="nr-text">
+        <span aria-hidden>🔔</span> <b>Notifications are required while timed in.</b>{" "}
+        {s === "denied" && "They're blocked: allow them in your phone's Settings › Notifications."}
+        {s === "install" && <>Add Hermosapp to your Home Screen first (Safari › Share › Add to Home Screen).</>}
+        {s === "unsupported" && "This phone can't get them. Update it or use Chrome."}
+        {msg && <span className="nr-msg"> {msg}</span>}
       </span>
-      {msg && <span className="nr-msg">{msg}</span>}
-      {s === "ask" && <button type="button" className="small" onClick={turnOn} disabled={busy}>{busy ? "Turning on…" : "Turn on notifications"}</button>}
+      {s === "ask" && <button type="button" className="small" onClick={turnOn} disabled={busy}>{busy ? "Turning on…" : "Turn on"}</button>}
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
 type Opt = { id: string; name: string; eligible?: boolean; here?: boolean; price?: number | null; commission?: number | null };
 
 const TYPES: { v: CommissionType; label: string; hint: string }[] = [
-  { v: "LEAD", label: "Lead", hint: "You led, someone assisted (60/40)" },
+  { v: "LEAD", label: "Lead", hint: "You led. Choose an assistant to split 60/40, or leave None for 100%" },
   { v: "ASSIST", label: "Assist", hint: "You assisted someone (40%)" },
   { v: "SOLO", label: "Solo", hint: "Done alone (100% of 5%)" },
   { v: "NONCOMMI", label: "No commission", hint: "Not commission-based" },
@@ -65,7 +65,9 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
   }, [person]);
   const cents = Math.round(Number(amount.replace(/[,₱\s]/g, "")) * 100) || 0;
   const svc = services.find((x) => x.id === service);
-  const p = previewCommission(paid ? cents : 0, paid ? type : "NONCOMMI", svc?.commission, svc?.price);
+  // Lead with "Assisted by: None" is saved as Solo; the 60/40 split applies only once an assistant is chosen (CHRIS Nov 26).
+  const effType: CommissionType = type === "LEAD" && !partner ? "SOLO" : type;
+  const p = previewCommission(paid ? cents : 0, paid ? effType : "NONCOMMI", svc?.commission, svc?.price);
   const listPrice = svc?.price ?? null;
   const priceDiffers = paid && listPrice != null && listPrice > 0 && cents > 0 && cents !== listPrice;
   const needsPhotos = kind === "PAID" || kind === "BACKJOB";
@@ -91,7 +93,7 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
       <Msg s={state} />
       <input type="hidden" name="branch" value={branch} />
       <input type="hidden" name="date" value={date} />
-      <input type="hidden" name="type" value={type} />
+      <input type="hidden" name="type" value={effType} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="folder" value={photos.folder} />
       <input type="hidden" name="photos" value={photos.json} />
@@ -155,7 +157,17 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
         </label>
         {needsPartner && (
           <label>{type === "ASSIST" ? "Lead (who led it)" : "Assisted by"}
-            <select name="partner" required value={partner} onChange={(e) => setPartner(e.target.value)}>{people}</select>
+            {type === "LEAD" ? (
+              <select name="partner" value={partner} onChange={(e) => setPartner(e.target.value)}>
+                <option value="">None</option>
+                {employees.filter((e) => e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}{e.eligible === false ? " (no commission)" : ""}</option>)}
+                {employees.some((e) => !e.here && e.id !== who) && (
+                  <optgroup label="Other branches">{employees.filter((e) => !e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</optgroup>
+                )}
+              </select>
+            ) : (
+              <select name="partner" required value={partner} onChange={(e) => setPartner(e.target.value)}>{people}</select>
+            )}
           </label>
         )}
         <label className="span2"><span>Note <span className="muted">(optional)</span></span>
@@ -167,8 +179,8 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
           {noCommission ? null : p.total > 0 ? (
             <>
               <span>Commission {centsToPhp(p.total)}</span>
-              {type === "SOLO" && <span className="muted">all to the performer</span>}
-              {needsPartner && <span className="muted">lead {centsToPhp(p.lead)} · assist {centsToPhp(p.assist)}</span>}
+              {effType === "SOLO" && <span className="muted">all to the performer{type === "LEAD" ? " (no assistant)" : ""}</span>}
+              {needsPartner && effType !== "SOLO" && <span className="muted">lead {centsToPhp(p.lead)} · assist {centsToPhp(p.assist)}</span>}
             </>
           ) : (
             <span className="muted">{!paid ? "Unpaid visit: no commission" : type === "NONCOMMI" ? "No commission for this service" : "Enter the amount paid to see the commission"}</span>

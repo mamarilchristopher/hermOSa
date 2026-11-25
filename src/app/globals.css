@@ -1239,11 +1239,11 @@ main.chat-main { --page: 1280px; padding-top: 20px; padding-bottom: 20px; }
 .hermosapp-text { display: grid; gap: 6px; }
 .hermosapp-text .fill-row { margin-top: 4px; }
 .notice.ok.test-pass { font-size: 1.05rem; padding: 16px 18px; }
-/* Required notifications for timed-in staff (v0.55.2): red bar, can't be closed */
-.notify-required { position: fixed; z-index: 40; left: calc(var(--side) + 16px); right: 16px; bottom: 16px; display: grid; gap: 6px; justify-items: start; padding: 14px 16px; border-radius: 14px; background: #b3261e; color: #fff; box-shadow: var(--shadow-lift); font-size: 0.9rem; line-height: 1.4; }
-.notify-required strong { font-size: 0.98rem; }
-.notify-required .nr-msg { background: rgba(255,255,255,0.16); padding: 4px 8px; border-radius: 8px; }
-.notify-required button { background: #fff; color: #b3261e; border-color: #fff; font-weight: 800; }
-@media (max-width: 900px) { .notify-required { left: 10px; right: 10px; bottom: calc(70px + env(safe-area-inset-bottom)); } }
+/* Required notifications for timed-in staff (v0.55.2): a slim strip that can't be closed */
+.notify-required { position: fixed; z-index: 40; left: calc(var(--side) + 16px); right: 16px; bottom: 12px; display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 10px 8px 14px; border-radius: 12px; background: var(--bad-bg, #fdecea); color: var(--bad, #b3261e); border: 1px solid rgba(179, 38, 30, 0.25); box-shadow: var(--shadow-sm); font-size: 0.82rem; line-height: 1.35; }
+.notify-required b { font-weight: 700; }
+.notify-required .nr-msg { font-weight: 600; }
+.notify-required button { flex: none; padding: 6px 12px; }
+@media (max-width: 900px) { .notify-required { left: 10px; right: 10px; bottom: calc(68px + env(safe-area-inset-bottom)); } }
 @media print { .notify-required { display: none; } }
-body:has(.notify-required) main { padding-bottom: 170px; }
+body:has(.notify-required) main { padding-bottom: 80px; }

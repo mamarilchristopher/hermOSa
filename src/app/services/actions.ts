@@ -44,7 +44,7 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
   }
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("log_client_visit", {
-    p_branch: p.data.branch, p_date: p.data.date, p_service: p.data.service, p_amount_cents: cents, p_type: paid ? p.data.type : "NONCOMMI",
+    p_branch: p.data.branch, p_date: p.data.date, p_service: p.data.service, p_amount_cents: cents, p_type: !paid ? "NONCOMMI" : p.data.type === "LEAD" && !p.data.partner ? "SOLO" : p.data.type,
     p_employee: p.data.employee, p_partner: paid ? p.data.partner || null : null, p_note: p.data.note || null,
     p_kind: p.data.kind, p_confirm: fd.get("confirm") === "1",
     p_client: p.data.client, p_price_note: p.data.price_note || null, p_folder: p.data.folder, p_photos: photos, p_share: p.data.share === "1",
@@ -62,7 +62,7 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     supabase.from("employees").select("commission_eligible").eq("id", p.data.employee).maybeSingle(),
   ]);
   if (isTestService(svc?.name)) {
-    return { ok: testResult({ kind: p.data.kind, cents, type: paid ? p.data.type : "NONCOMMI", eligible: emp?.commission_eligible ?? null, photos, photosDue: !!data.photos_due }), at: Date.now() };
+    return { ok: testResult({ kind: p.data.kind, cents, type: !paid ? "NONCOMMI" : p.data.type === "LEAD" && !p.data.partner ? "SOLO" : p.data.type, eligible: emp?.commission_eligible ?? null, photos, photosDue: !!data.photos_due }), at: Date.now() };
   }
   if (data.photos_due) return { ok: "Saved. The lead and assist were asked to add the client photos and waiver; their commission is held until they do.", at: Date.now() };
   return { ok: paid ? "Saved. Waiting for manager sign-off." : "Saved. Unpaid visit logged (no commission).", at: Date.now() };
