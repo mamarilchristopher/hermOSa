@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.55.8 | Nov 26, 2026 | none | Service log staff lists show clinic staff only (CSRs and WFH staff removed) |
 | 0.55.7 | Nov 26, 2026 | none | Service log: one "Add before & after photos" button; pick the batch at once, earlier photos become Before and later ones After (by time taken), tap a photo's label to switch |
 | 0.55.6 | Nov 26, 2026 | none | Service log: staff not on commission never see commission amounts or choices (they still pick who assisted, so a commissioned assistant gets her 40%; the lead's 60% goes to no one). A commissioned lead with a non-commission assistant sees only her own share. "(no commission)" labels removed from staff lists |
 | 0.55.5 | Nov 26, 2026 | none | Service log: the General Manager is no longer in the Lead / Assisted by lists (she can still log entries for others) |
