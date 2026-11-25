@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { z } from "zod";
-import { requireAccess, can } from "@/lib/access";
+import { requireAccess, can, canApprove as canApproveAs } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { centsToPhp } from "@/lib/csv";
 import { formatManila } from "@/lib/dates";
@@ -24,10 +24,10 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
   const validCents = all.filter((r) => r.state !== "INVALID").reduce((s, r) => s + Number(r.gross_cents ?? 0), 0);
   const branch = branches.find((x) => x.id === b.branch_id);
   const isUploader = b.created_by === access.user_id;
-  const canApprove = can(access, ["OWNER", "FINANCE"], b.branch_id);
+  const canApprove = canApproveAs(access, b.branch_id, ["OWNER", "FINANCE"]);
   const { data: org } = await supabase.from("organizations").select("require_second_signoff").maybeSingle();
   const secondSignoff = org?.require_second_signoff !== false;
-  const selfAllowed = !secondSignoff && can(access, ["OWNER"], b.branch_id);
+  const selfAllowed = !secondSignoff && canApproveAs(access, b.branch_id);
   const countsMatch = invalid.length === 0 && all.length === b.expected_row_count && validCents === Number(b.expected_gross_cents);
 
   return (
@@ -50,7 +50,7 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
           <div className="card"><h2 style={{ marginTop: 0 }}>Sign off</h2><PublishForm batch={b.id} /></div>
         )}
         {selfAllowed && b.state === "STAGED" && <div className="notice info">Pre-launch mode: second-person sign-off is off, so you can publish your own upload. Turn it back on before launch.</div>}
-        {b.state === "STAGED" && isUploader && !selfAllowed && <div className="notice info">Someone else with Owner or Finance access has to sign this off.</div>}
+        {b.state === "STAGED" && isUploader && !selfAllowed && <div className="notice info">Someone else (an owner, Finance or the General Manager) has to sign this off.</div>}
         {b.state === "STAGED" && !countsMatch && <div className="notice error">This batch can't be published. Discard it below, then upload the corrected file or totals.</div>}
         {b.state === "STAGED" && can(access, ["OWNER", "FINANCE", "MANAGER"], b.branch_id) && (
           <div className="card"><h2 style={{ marginTop: 0 }}>Discard</h2><p className="small muted">Use this if the file or the expected totals were wrong. Nothing was published, and the record is kept.</p><DiscardForm batch={b.id} /></div>

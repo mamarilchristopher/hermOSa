@@ -12,8 +12,8 @@ export const LEVEL_TEXT: Record<string, string> = {
   CASHIER: "Front desk / cashier (one branch)",
 };
 
-/** Levels a General Manager may approve; the others stay owner-only (the database checks this too). */
-export const GM_LEVELS = ["SENIOR_CMA", "CMA", "TRAINEE", "MANAGER", "CASHIER"];
+/** Levels a General Manager may approve: everything but Owner (update-0028; the database checks this too). */
+export const GM_LEVELS = Object.keys(LEVEL_TEXT).filter((k) => k !== "OWNER");
 
 export function ApproveForm({ user, branchId, branches, levels }: { user: string; branchId: string | null; branches: { id: string; name: string }[]; levels?: string[] }) {
   const [state, action, pending] = useActionState(approveJoin, undefined);

@@ -1,19 +1,19 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
-import { requireAccess, can } from "@/lib/access";
+import { requireAccess, can, canApprove } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { DetailsForm } from "@/components/DetailsForm";
 import { legalName, type Details } from "@/lib/employeeDetails";
 import { approveDetails } from "../actions";
 import { ReturnForm } from "./ReturnForm";
 
-/** Owner reviews one submission: correct anything, then approve (applies it) or send back with a note. */
+/** Owner or GM reviews one submission: correct anything, then approve (applies it) or send back with a note. */
 export default async function Review({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) notFound();
   const { supabase, access } = await requireAccess();
-  if (!can(access, ["OWNER"], null)) redirect("/");
+  if (!canApprove(access, null)) redirect("/");
   const { data: s } = await supabase.from("employee_detail_submissions").select("id, user_id, data, state, submitted_at").eq("id", id).maybeSingle();
   if (!s) notFound();
   const [{ data: u }, { data: emp }] = await Promise.all([
@@ -31,6 +31,8 @@ export default async function Review({ params }: { params: Promise<{ id: string 
         <p className="muted small">{u?.email} · {emp ? `${emp.position ?? "No position yet"}` : "No employee record yet"}</p>
         {s.state !== "PENDING" ? (
           <div className="notice info">This one was already decided, or they sent a newer copy.</div>
+        ) : s.user_id === access.user_id && !can(access, ["OWNER"], null) ? (
+          <div className="notice info">These are your own details, so an owner approves them.</div>
         ) : (
           <>
             {u?.join_status === "PENDING" && <div className="notice error">Approve their join request on Users and roles first. These details can only be applied once they're on staff.</div>}

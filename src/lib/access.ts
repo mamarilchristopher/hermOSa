@@ -52,6 +52,14 @@ export function can(a: Access, roles: Role[], branchId: string | null): boolean 
   );
 }
 
+/** The General Manager: a company-wide MANAGER grant (Geraldine). Since update-0028 the GM gives every owner-level approval. */
+export const isGM = (a: Access) => can(a, ["MANAGER"], null);
+
+/** Owner-level approver: an owner, or the GM. Pass ["OWNER", "FINANCE"] where Finance also approves. */
+export function canApprove(a: Access, branchId: string | null, roles: Role[] = ["OWNER"]) {
+  return can(a, roles, branchId) || isGM(a);
+}
+
 export function branchesFor(a: Access, branches: Branch[], roles: Role[]) {
   return branches.filter((b) => b.kind === "CLINIC" && can(a, roles, b.id));
 }

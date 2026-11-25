@@ -23,7 +23,7 @@ export default async function JoinsPage() {
         <h1>Join requests</h1>
         <p className="muted small">
           Staff who registered with the invite link wait here with no access. Check it's really them, pick their staff level and
-          home branch, then tap Approve. Owner, General Manager, Finance and HR accounts can only be approved by an owner.
+          home branch, then tap Approve. Only an owner can make someone an Owner.
         </p>
         <section className="card">
           <h2>Waiting{waiting.length > 0 && <span className="nav-badge inline">{waiting.length}</span>}</h2>

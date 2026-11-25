@@ -102,17 +102,14 @@ describe("join requests", () => {
     await expect(db.sql("INSERT INTO public.role_grants (user_id, role_code, branch_id) VALUES ($1, 'CASHIER', $2)", [nope.appUserId, db.branches.QC_MAIN])).rejects.toThrow(/USER_REJECTED/);
   });
 
-  it("the General Manager can see and approve staff join requests, but not owner-level accounts", async () => {
+  it("the General Manager can see and approve join requests at every level except Owner", async () => {
     const s1 = await signUp("staff1@demo.invalid", { full_name: "DEMO Staff One", invite_code: code });
     const s2 = await signUp("staff2@demo.invalid", { full_name: "DEMO Staff Two", invite_code: code });
     const seen = (await db.as(gm, "aal1", "SELECT id FROM public.app_users WHERE join_status = 'PENDING'")).rows.map((r) => r.id);
     expect(seen).toEqual(expect.arrayContaining([s1.appUserId, s2.appUserId]));
     expect(seen).not.toContain(owner.appUserId);
-    expect((await db.as(gm, "aal1", "SELECT id FROM public.app_users WHERE id = $1", [owner.appUserId])).rows).toEqual([]);
     expect((await db.as(manager, "aal1", "SELECT id FROM public.app_users WHERE join_status = 'PENDING'")).rows).toEqual([]);
-    for (const lvl of ["OWNER", "GM", "FINANCE", "HR"]) {
-      expect((await db.rpc(gm, "aal1", "approve_join_request", [s1.appUserId, lvl, db.branches.QC_MAIN, null, null])).error).toBe("OWNER_ONLY_LEVEL");
-    }
+    expect((await db.rpc(gm, "aal1", "approve_join_request", [s1.appUserId, "OWNER", db.branches.QC_MAIN, null, null])).error).toBe("OWNER_ONLY_LEVEL");
     expect((await db.rpc(gm, "aal1", "approve_join_request", [s1.appUserId, "CMA", db.branches.QC_MAIN, null, null])).ok).toBe(true);
     const { rows } = await db.sql("SELECT role_code, branch_id FROM public.role_grants WHERE user_id = $1 AND revoked_at IS NULL", [s1.appUserId]);
     expect(rows).toEqual([{ role_code: "CLINICIAN", branch_id: db.branches.QC_MAIN }]);

@@ -1,18 +1,19 @@
-// Employee details: staff submit, only the owner approves, sensitive data stays private. DEMO fixtures only.
+// Employee details: staff submit, the owner or the General Manager approves, sensitive data stays private. DEMO fixtures only.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Person, TestDb } from "./harness";
 
 let db: TestDb;
-let owner: Person, manager: Person, cma: Person, other: Person;
+let owner: Person, gm: Person, manager: Person, cma: Person, other: Person;
 const DEMO = { first_name: "Demo", last_name: "Staffer", birth_date: "1999-01-02", tin: "123456789", hire_date: "2024-03-01", consent: "yes" };
 
 beforeAll(async () => {
   db = await TestDb.create();
   owner = await db.person("Owner", [["OWNER", null]]);
-  manager = await db.person("Manager", [["MANAGER", null]]);
+  gm = await db.person("GM", [["MANAGER", null]]);
+  manager = await db.person("Branch manager", [["MANAGER", "FAIRVIEW"]]);
   cma = await db.person("Cma", [["CLINICIAN", "FAIRVIEW"]]);
   other = await db.person("Other", [["CLINICIAN", "FAIRVIEW"]]);
-  for (const p of [cma, other]) {
+  for (const p of [cma, other, gm]) {
     await db.sql(`INSERT INTO public.employees (organization_id, branch_id, full_name, app_user_id, created_by)
                   VALUES ('00000000-0000-4000-8000-000000000001', $1, $2, $3, $4)`, [db.branches.FAIRVIEW, `DEMO ${p.name}`, p.appUserId, owner.appUserId]);
   }
@@ -35,23 +36,31 @@ describe("employee details", () => {
     expect(rows.map((x) => x.state)).toEqual(["SUPERSEDED", "PENDING"]);
   });
 
-  it("only the person and owners can read submissions; managers and coworkers can't", async () => {
+  it("only the person, owners and the GM read submissions; branch managers and coworkers can't", async () => {
     expect((await db.as(cma, "aal1", "SELECT data->>'tin' AS t FROM public.employee_detail_submissions WHERE state = 'PENDING'")).rows).toEqual([{ t: "123456789" }]);
     expect((await db.as(other, "aal1", "SELECT 1 FROM public.employee_detail_submissions")).rows).toHaveLength(0);
     expect((await db.as(manager, "aal2", "SELECT 1 FROM public.employee_detail_submissions")).rows).toHaveLength(0);
     expect((await db.as(owner, "aal2", "SELECT 1 FROM public.employee_detail_submissions WHERE state = 'PENDING'")).rows).toHaveLength(1);
     expect((await db.as(owner, "aal1", "SELECT 1 FROM public.employee_detail_submissions")).rows).toHaveLength(0);
+    expect((await db.as(gm, "aal1", "SELECT 1 FROM public.employee_detail_submissions WHERE state = 'PENDING'")).rows).toHaveLength(1);
   });
 
-  it("only an MFA owner decides, and sending back needs a note", async () => {
+  it("only an MFA owner or the GM decides, and sending back needs a note", async () => {
     expect((await db.rpc(manager, "aal2", "decide_employee_details", [sub, true, null, "DEMO Name", null])).error).toBe("FORBIDDEN");
     expect((await db.rpc(owner, "aal1", "decide_employee_details", [sub, true, null, "DEMO Name", null])).error).toBe("MFA_REQUIRED");
     expect((await db.rpc(owner, "aal2", "decide_employee_details", [sub, false, null, null, ""])).error).toBe("NOTE_REQUIRED");
+    expect((await db.rpc(gm, "aal1", "decide_employee_details", [sub, false, null, null, ""])).error).toBe("NOTE_REQUIRED");
+  });
+
+  it("the GM approves other people's details, but an owner approves the GM's own", async () => {
+    const mine = await db.rpc(gm, "aal1", "submit_employee_details", [JSON.stringify({ ...DEMO, first_name: "Gm" })]);
+    expect((await db.rpc(gm, "aal1", "decide_employee_details", [mine.id, true, null, "DEMO GM", null])).error).toBe("SELF_APPROVAL_DENIED");
+    expect((await db.rpc(owner, "aal2", "decide_employee_details", [mine.id, true, null, "DEMO GM", null])).ok).toBe(true);
   });
 
   it("approving with a correction applies it to the employee record", async () => {
     const fixed = { ...DEMO, nickname: "Dem", hire_date: "2024-02-15" };
-    const r = await db.rpc(owner, "aal2", "decide_employee_details", [sub, true, JSON.stringify(fixed), "Demo Staffer", null]);
+    const r = await db.rpc(gm, "aal1", "decide_employee_details", [sub, true, JSON.stringify(fixed), "Demo Staffer", null]);
     expect(r.ok).toBe(true);
     const { rows } = await db.sql("SELECT full_name, hire_date::text AS h FROM public.employees WHERE app_user_id = $1", [cma.appUserId]);
     expect(rows[0]).toEqual({ full_name: "Demo Staffer", h: "2024-02-15" });

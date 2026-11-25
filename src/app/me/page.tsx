@@ -21,13 +21,13 @@ type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: s
   corrections?: { id: string; mine: boolean }[] };
 
 /** Everything the management Home needs, in one round of queries. Missing pieces (older database) just drop out. */
-async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>>["supabase"], today: string, owner: boolean, userId: string) {
+async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>>["supabase"], today: string, owner: boolean, userId: string, gm = false) {
   const [{ data: st }, { data: overdueData }, { data: signData }, { count: uploads }, { count: details }, { count: joins }, { data: dutyData }, { count: schedReqs }, { data: irData }] = await Promise.all([
     supabase.rpc("daily_sales_status", { p_start: glanceFetchStart(today), p_end: today }),
     supabase.rpc("overdue_commission_days"),
     supabase.rpc("pending_signoffs"),
     supabase.from("import_batches").select("id", { count: "exact", head: true }).eq("state", "STAGED"),
-    owner ? supabase.from("employee_detail_submissions").select("id", { count: "exact", head: true }).eq("state", "PENDING") : Promise.resolve({ count: 0 }),
+    owner || gm ? supabase.from("employee_detail_submissions").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("user_id", userId) : Promise.resolve({ count: 0 }),
     supabase.from("app_users").select("id", { count: "exact", head: true }).eq("join_status", "PENDING"), // owner, or GM after update-0027
 
     supabase.rpc("on_duty", { p_date: today }), // errors (before update-0022) mean no On Duty card
@@ -110,7 +110,7 @@ export default async function Me() {
   const first = (emp?.full_name || access.display_name).trim().split(/\s+/)[0];
   const management = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
   const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
-  const home = management ? await managementHome(supabase, today, isOwner, access.user_id) : null;
+  const home = management ? await managementHome(supabase, today, isOwner, access.user_id, !isOwner && access.grants.some((g) => g.role === "MANAGER" && g.branch_id === null)) : null;
   const staffTodos = management ? null : await staffHome();
   const timeTodo = await timeInTodo();
   if (emp) {

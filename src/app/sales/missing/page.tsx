@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAccess, can, errorText } from "@/lib/access";
+import { requireAccess, can, canApprove, errorText } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { computeInsights, dateRuns, resolvePeriod, sortBranches, WEEKDAYS, weekday, type BranchInfo, type DayRow, type ZeroMark } from "@/lib/insights";
@@ -35,8 +35,8 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
     const ins = computeInsights({ period, today, branches, days: daily.days, closed: daily.closed });
     body = ins.branches.map((b) => {
       const editable = can(access, ["OWNER", "FINANCE", "MANAGER"], b.branch.id);
-      const approver = can(access, ["OWNER", "FINANCE"], b.branch.id);
-      const selfOk = preLaunch && can(access, ["OWNER"], b.branch.id);
+      const approver = canApprove(access, b.branch.id, ["OWNER", "FINANCE"]);
+      const selfOk = preLaunch && canApprove(access, b.branch.id);
       const marks = new Map(daily.closed.filter((m) => m[0] === b.branch.id && m[3] === "PENDING").map((m) => [m[1], m]));
       if (editable) canMark = true;
       if (approver) for (const m of marks.values()) if (!m[6] || selfOk) confirmable.push(m[4]);
@@ -104,13 +104,13 @@ export default async function MissingDays({ searchParams }: { searchParams: Prom
           Enter the day&apos;s sales if you have them, or mark the day Closed or Zero sales. Nothing is guessed.
           {preLaunch
             ? "Pre-launch mode: an owner's Closed / Zero sales marks count right away. This turns back to two-person confirmation before launch."
-            : "Closed and Zero sales need a second person (Owner or Finance) to confirm before the day stops counting as missing."}
+            : "Closed and Zero sales need a second person (Owner, Finance or the General Manager) to confirm before the day stops counting as missing."}
           Sales entered by managers wait for an owner&apos;s sign-off on the Imports page.
         </p>
         {msg && (
           <div className="notice ok">
             {msg[1] === "marked"
-              ? `${msg[2]} day${msg[2] === "1" ? "" : "s"} marked.${preLaunch && can(access, ["OWNER"], null) ? "" : " A second person (Owner or Finance) now has to confirm them."}`
+              ? `${msg[2]} day${msg[2] === "1" ? "" : "s"} marked.${preLaunch && canApprove(access, null) ? "" : " A second person (Owner, Finance or the General Manager) now has to confirm them."}`
               : `${msg[2]} day${msg[2] === "1" ? "" : "s"} confirmed.`}
             {msg[3] !== "0" && ` ${msg[3]} could not be saved (already recorded, or not allowed).`}
           </div>

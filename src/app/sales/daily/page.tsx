@@ -89,7 +89,7 @@ export default async function DailySales({ searchParams }: { searchParams: Promi
                         <span><strong>{b?.name}</strong>, {x.date}: {centsToPhp(x.old_cents)} → <strong>{centsToPhp(x.new_cents)}</strong>
                           <span className="small muted"> · {x.reason} · asked by {x.requested_by}</span></span>
                         {needsTwo.has(x.id) && <span className="tag">needs a second person</span>}
-                        {(b?.can_approve || (gm && needsTwo.has(x.id))) && <DecideForm id={x.id} mine={x.mine} />}
+                        {(b?.can_approve || gm) && <DecideForm id={x.id} mine={x.mine} />}
                       </li>
                     );
                   })}
