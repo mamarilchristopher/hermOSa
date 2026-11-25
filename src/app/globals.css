@@ -752,3 +752,13 @@ h1 .uid { font-size: 0.9rem; }
 
 /* Users and roles: Active / Inactive sections */
 .list-sub { font-size: 0.95rem; margin: 18px 0 8px; color: var(--ink-2); }
+
+/* Profile pictures (update-0034) */
+.avatar.photo { object-fit: cover; padding: 0; background: var(--pearl); }
+.photo-pick { display: grid; gap: 14px; justify-items: start; }
+.photo-preview { width: 180px; height: 180px; border-radius: 50%; object-fit: cover; border: 3px solid var(--gold-line); background: var(--pearl); }
+.photo-review { display: grid; grid-template-columns: 120px 1fr; gap: 16px; align-items: start; padding: 14px 0; border-top: 1px solid var(--line); }
+.photo-review:first-of-type { border-top: 0; }
+.photo-review img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 2px solid var(--gold-line); }
+.name-with-photo { display: inline-flex; align-items: center; gap: 8px; vertical-align: middle; }
+@media (max-width: 520px) { .photo-review { grid-template-columns: 1fr; } }

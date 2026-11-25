@@ -10,13 +10,15 @@ import { byRankThenName, staffRank } from "@/lib/staffOrder";
 import { PositionCell } from "../../people/PositionCell";
 import { PinCell } from "./PinCell";
 import { Uid } from "@/components/Uid";
+import { Avatar } from "@/components/Avatar";
+import { photoUrls } from "@/lib/photos";
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<{ sort?: string }> }) {
   const sortByName = (await searchParams).sort === "name";
   const { supabase, access, branches } = await requireAccess();
   if (!can(access, ["OWNER"], null)) redirect("/");
   const [{ data: all }, { data: grants }, { data: invites }, { data: emps }, { data: pinData }] = await Promise.all([
-    supabase.from("app_users").select("id, uid, display_name, email, active, join_status, requested_branch_id, joined_at").order("display_name"),
+    supabase.from("app_users").select("id, uid, display_name, email, active, join_status, requested_branch_id, joined_at, photo_path").order("display_name"),
     supabase.from("role_grants").select("id, user_id, role_code, branch_id").is("revoked_at", null),
     supabase.from("staff_invites").select("id, code, expires_at, use_count").is("revoked_at", null)
       .gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }),
@@ -37,6 +39,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const branchName = Object.fromEntries(branches.map((b) => [b.id, b.name]));
   const others = (users ?? []).filter((u) => u.id !== access.user_id && u.active);
 
+  const photos = await photoUrls(supabase, (all ?? []).map((u) => u.photo_path));
   const activeUsers = users.filter((u) => u.active), inactiveUsers = users.filter((u) => !u.active);
   const staffTable = (list: typeof users) => (
         <div className="table-wrap">
@@ -45,7 +48,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
             <tbody>
               {list.map((u) => (
                 <tr key={u.id}>
-                  <td>{u.display_name}<Uid v={u.uid} /><Uid v={staffUidOf.get(u.id)} /></td>
+                  <td><span className="name-with-photo"><Avatar name={u.display_name} url={u.photo_path ? photos.get(u.photo_path) : null} size={32} /><span>{u.display_name}<Uid v={u.uid} /><Uid v={staffUidOf.get(u.id)} /></span></span></td>
                   <td>{employeeOf.get(u.id) ? <PositionCell employeeId={employeeOf.get(u.id)!} position={positionOf.get(u.id) ?? null} /> : grantsOf(u.id).some((g) => g.role_code === "OWNER") ? "Owner" : <span className="muted small">No employee record</span>}</td>
                   <td className="small">{u.email}</td>
                   <td>

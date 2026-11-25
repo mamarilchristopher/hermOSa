@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.34.0 | Nov 25, 2026 | update-0034 | Profile pictures: staff send their photo from Home (cropped square); owners and the GM approve or send back with a note (the GM's own needs an owner); Home to-dos for both; approved photos show in the sidebar, phone top bar and Users and roles; new Profile pictures page with badge |
 | 0.33.1 | Nov 25, 2026 | none | View as is back for the General Manager on laptops: the button now sits above the menu, and a long menu scrolls inside the sidebar instead of pushing View as (and the sign-out row) below the screen |
 | 0.33.0 | Nov 25, 2026 | update-0033 | Owners and the General Manager can set or correct any staff member's start date on the employee's page (Employees > name > Start date); the date shows under the name and every change is logged |
 | 0.32.3 | Nov 25, 2026 | none | Time clock works in the Messenger in-app browser and older phones: the photo name no longer needs crypto.randomUUID (the "Something went wrong" Saralyn and Vanessa saw) |

@@ -133,6 +133,16 @@ export default async function Me() {
   const myNtes = (myNteData ?? []) as { id: string; nte_no: number; work_date: string; shift_start: string; time_in: string; late_minutes: number; respond_by?: string | null; ir_id?: string | null }[];
   const tardy = trackData ? tracker((trackData as NteList).ntes, (trackData as NteList).ir_minutes) : [];
   if (missingTodo && !isOwner) (home?.todos ?? staffTodos)?.push(missingTodo);
+  // Profile pictures (update-0034): ask everyone for one; owners and the GM see how many wait for approval.
+  const [{ data: myPhotoRow, error: photoErr }, { count: photosWaiting }] = await Promise.all([
+    supabase.from("profile_photos").select("state, note").eq("user_id", access.user_id).neq("state", "SUPERSEDED").order("submitted_at", { ascending: false }).limit(1).maybeSingle(),
+    ownerLevel ? supabase.from("profile_photos").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("user_id", isOwner ? "00000000-0000-0000-0000-000000000000" : access.user_id) : Promise.resolve({ count: 0 }),
+  ]);
+  if (!photoErr) {
+    if (!myPhotoRow) (home?.todos ?? staffTodos)?.push({ text: "Add your profile picture (an owner approves it)", href: "/me/photo" });
+    else if (myPhotoRow.state === "RETURNED") (home?.todos ?? staffTodos)?.push({ text: `Your profile picture was sent back${myPhotoRow.note ? `: ${myPhotoRow.note}` : ""}. Please upload another`, href: "/me/photo", urgent: true });
+    if (photosWaiting) (home?.todos ?? staffTodos)?.push({ text: `${photosWaiting} profile picture${photosWaiting === 1 ? " is" : "s are"} waiting for your approval`, href: "/admin/photos" });
+  }
   if (home && !isOwner && detailState !== "APPROVED" && detailState !== "PENDING") {
     home.todos.push({ text: detailState === "RETURNED" ? "The owner sent your employee details back. Please fix them" : "Fill in your employee details (needed for payroll and government reports)", href: "/me/details" });
   }
@@ -268,6 +278,7 @@ export default async function Me() {
             <dt>App access</dt><dd>{scope.join("; ") || "None yet"}</dd>
             <dt>Login email</dt><dd>{user?.email ?? ""}</dd>
             <dt>UID</dt><dd>{emp?.uid ? <>Staff record <code className="uid" style={{ marginLeft: 0 }}>{emp.uid}</code> · </> : ""}Login account <code className="uid" style={{ marginLeft: 0 }}>{user?.uid ?? ""}</code></dd>
+            <dt>Profile picture</dt><dd><Link href="/me/photo">Add or change your picture</Link></dd>
             <dt>Salary payout</dt><dd>Paid in cash by default. Bank accounts are for records only.</dd>
             {user?.joined_at && <><dt>Joined the app</dt><dd>{user.joined_at.slice(0, 10)}</dd></>}
           </dl>

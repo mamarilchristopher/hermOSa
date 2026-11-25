@@ -6,6 +6,8 @@ import { IconLogout, IconShield } from "./Icons";
 import { NavLinks, type NavItem } from "./NavLinks";
 import { OnlineNow } from "./OnlineNow";
 import { ViewAsButton } from "./ViewAsButton";
+import { Avatar } from "./Avatar";
+import { photoUrls } from "@/lib/photos";
 
 const ROLE_LABEL: Record<string, string> = {
   OWNER: "Owner", FINANCE: "Finance", MANAGER: "Manager", CASHIER: "Cashier", HR: "HR",
@@ -20,13 +22,17 @@ export async function TopBar({ access }: { access: Access }) {
   const viewAs = access.grants.some((g) => (g.role === "OWNER" || g.role === "MANAGER") && g.branch_id === null);
   const gm = !owner && can(access, ["MANAGER"], null);
   const detailsApprover = owner || gm;
-  const [{ data: overdueData }, { count: detailsWaiting }, { count: unreadNotices }, { data: viewPeople }, { count: joinsWaiting }] = await Promise.all([
+  const [{ data: overdueData }, { count: detailsWaiting }, { count: unreadNotices }, { data: viewPeople }, { count: joinsWaiting }, { data: meRow }, { count: photosWaiting }] = await Promise.all([
     approver ? supabase.rpc("overdue_commission_days") : Promise.resolve({ data: [] }),
     detailsApprover ? supabase.from("employee_detail_submissions").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("user_id", access.user_id) : Promise.resolve({ count: 0 }),
     supabase.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null),
     viewAs ? supabase.rpc("view_as_people") : Promise.resolve({ data: null }),
     gm ? supabase.from("app_users").select("id", { count: "exact", head: true }).eq("join_status", "PENDING") : Promise.resolve({ count: 0 }),
+    supabase.from("app_users").select("photo_path").eq("id", access.user_id).maybeSingle(), // errors (before update-0034) mean initials
+    detailsApprover ? supabase.from("profile_photos").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("user_id", owner ? "00000000-0000-0000-0000-000000000000" : access.user_id) : Promise.resolve({ count: 0 }),
   ]);
+  const myPhoto = (meRow as { photo_path?: string | null } | null)?.photo_path ?? null;
+  const myPhotoUrl = myPhoto ? (await photoUrls(supabase, [myPhoto])).get(myPhoto) ?? null : null;
   const viewList = Array.isArray(viewPeople) ? (viewPeople as { id: string; name: string; position: string | null }[]) : [];
   const overdue = (Array.isArray(overdueData) ? overdueData : []) as { code: string; name: string; date: string; pending: number }[];
   const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
@@ -47,10 +53,10 @@ export async function TopBar({ access }: { access: Access }) {
     ...(filler ? [{ href: "/sales/missing", label: "Missing days", short: "Missing", icon: "calendar" } as NavItem] : []),
     ...(importer ? [{ href: "/imports", label: "Imports", short: "Imports", icon: "upload" } as NavItem] : []),
     ...(detailsApprover ? [{ href: "/admin/details", label: "Staff details", short: "Details", icon: "idcard", badge: detailsWaiting || undefined } as NavItem] : []),
+    ...(detailsApprover ? [{ href: "/admin/photos", label: "Profile pictures", short: "Photos", icon: "people", badge: photosWaiting || undefined } as NavItem] : []),
     ...(owner ? [{ href: "/admin/users", label: "Users and roles", short: "Users", icon: "users" } as NavItem] : []),
     ...(gm ? [{ href: "/admin/joins", label: "Join requests", short: "Joins", icon: "users", badge: joinsWaiting || undefined } as NavItem] : []),
   ];
-  const initials = access.display_name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "?";
   const role = [...new Set(access.grants.map((g) => ROLE_LABEL[g.role] ?? g.role))].join(", ") || "No role yet";
 
   return (
@@ -65,7 +71,7 @@ export async function TopBar({ access }: { access: Access }) {
         {viewList.length > 0 && <ViewAsButton people={viewList} variant="side" />}
         <NavLinks items={items} variant="side" />
         <div className="me">
-          <span className="avatar" aria-hidden>{initials}</span>
+          <Avatar name={access.display_name} url={myPhotoUrl} />
           <span className="me-text">
             <strong>{access.display_name}</strong>
             <span>{role}{access.mfa && <span className="mfa" title="Signed in with 2-step verification"><IconShield /> 2FA</span>}</span>
@@ -77,7 +83,7 @@ export async function TopBar({ access }: { access: Access }) {
       </aside>
       <header className="mobile-bar">
         <img src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
-        <span className="avatar" title={`${access.display_name} · ${role}`}>{initials}</span>
+        <a href="/me/photo" title={`${access.display_name} · ${role} · change your picture`}><Avatar name={access.display_name} url={myPhotoUrl} size={32} /></a>
         <form action="/auth/signout" method="post">
           <button className="icon-btn" type="submit" aria-label="Sign out"><IconLogout /></button>
         </form>
