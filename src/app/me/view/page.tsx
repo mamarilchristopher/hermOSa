@@ -29,10 +29,12 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
   if (!access.grants.some((g) => (g.role === "OWNER" || g.role === "MANAGER") && g.branch_id === null)) redirect("/me");
   const id = z.uuid().safeParse((await searchParams).u);
   if (!id.success) redirect("/me");
-  const [{ data }, { data: chatData }] = await Promise.all([
+  const [{ data }, { data: chatData }, { data: noticeData }] = await Promise.all([
     supabase.rpc("view_as", { p_user: id.data }),
     supabase.rpc("view_as_chat", { p_user: id.data }), // counts only; chats stay private (update-0051)
+    supabase.rpc("view_as_notices", { p_user: id.data }), // their bell; chat notices without the message (update-0052)
   ]);
+  const notices = (noticeData ?? null) as { ok: boolean; unread: number; latest: { title: string; body: string | null; created_at: string; read: boolean }[] } | null;
   const chat = (chatData ?? null) as { ok: boolean; unread: number; mgmt_unread: number; tagged_unread: number } | null;
   const v = (data ?? { ok: false, error: "UNKNOWN" }) as ViewAs;
   const today = manilaToday();
@@ -65,6 +67,22 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
         <h1>Hi, {first}</h1>
         <p className="muted small">{v.employee?.position ?? "Staff"}{v.employee && ` · ${branchName[v.employee.branch_id] ?? ""}`} · {dayLabel(today)}{seen && ` · last in the app ${seen}`}</p>
         <TodoCard todos={todos} />
+        {notices?.ok && (
+          <div className="card">
+            <h2>Notifications {notices.unread > 0 && <span className="nav-badge">{notices.unread}</span>}</h2>
+            {notices.latest.length === 0 ? <p className="muted small">None yet.</p> : (
+              <ul className="view-notices">
+                {notices.latest.map((n, i) => (
+                  <li key={i} className={n.read ? "" : "unread"}>
+                    <strong>{n.title}</strong>{!n.read && <span className="pill STAGED">Unread</span>}
+                    {n.body && <span className="small">{n.body}</span>}
+                    <span className="small muted">{new Date(n.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         {v.employee?.commission_eligible && (
           <div className="grid">
             <div className="card stat"><div className="label">Approved commission this month</div><div className="value">{centsToPhp(v.month_approved_cents)}</div></div>

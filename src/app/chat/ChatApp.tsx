@@ -16,11 +16,20 @@ export type ChatRoomRow = {
 type Member = { id: string; name: string; photo_path: string | null; last_read_at: string };
 type RoomInfo = { id: string; kind: "DM" | "GROUP"; auto: boolean; name: string; members: Member[] };
 type Msg = { id: string; room_id: string; sender_id: string; body: string | null; photo_path: string | null; gif_url: string | null; from_management?: boolean; mentions?: string[]; mention_all?: boolean; created_at: string; deleted_at: string | null };
+type Reaction = { message_id: string; user_id: string; emoji: string };
+type Deleted = { message_id: string; body: string | null; photo_path: string | null; gif_url: string | null };
+type Gif = { id: string; title: string; preview: string; url: string };
+
+/** Quick reactions, and the emoji picker (v0.52). */
+const QUICK = ["❤️", "👍", "😂", "😮", "😢", "🙏"];
+const EMOJI = ("😀 😁 😂 🤣 😊 😍 🥰 😘 😉 😎 🤩 🥳 😇 🙂 🙃 😅 😆 😋 😜 🤪 🤗 🤭 🤔 🤨 😐 😴 😌 😔 😢 😭 😤 😡 🥺 😱 😳 🙄 😬 🤯 🤒 🤧 " +
+  "👍 👎 👌 ✌️ 🤞 👏 🙌 🙏 💪 👋 🤝 ✋ 👀 💯 🔥 ✨ 🎉 🎊 🎂 🎁 💐 🌸 🌹 💖 ❤️ 🧡 💛 💚 💙 💜 🤍 💔 💕 💋 " +
+  "☕ 🍰 🍕 🍔 🍜 🍩 🍫 🍓 🥤 🍷 ☀️ 🌙 ⭐ 🌈 ☔ ⏰ 📅 📌 ✅ ❌ ⚠️ ❓ ❗ 💰 💸 📣 📸 💅 💄 💉 🩺 🏥 🚗 🏃 🙋 🙆 🤷").split(" ");
 
 const PAGE = 50;
 const ERR: Record<string, string> = {
   FORBIDDEN: "You can't do that in this chat.", EMPTY_MESSAGE: "Type a message or add a photo.", MESSAGE_TOO_LONG: "That message is too long.",
-  NAME_REQUIRED: "Give the group a name.", ALL_NOT_ALLOWED: "Only owners and the GM can use @all.", NOT_FOUND: "That chat isn't available.", BAD_REQUEST: "That didn't work. Try again.",
+  TOO_MANY: "That's enough reactions on one message.", NAME_REQUIRED: "Give the group a name.", ALL_NOT_ALLOWED: "Only owners and the GM can use @all.", NOT_FOUND: "That chat isn't available.", BAD_REQUEST: "That didn't work. Try again.",
 };
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
 const dayKey = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
@@ -63,6 +72,10 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
   const [panel, setPanel] = useState<null | "new" | "info">(null);
   const [picked, setPicked] = useState<string | null>(null); // message whose actions are open (phones)
   const [photos, setPhotos] = useState<Record<string, string>>({});
+  // Reactions and, for owners and the GM, what deleted messages said (update-0052).
+  const [reactions, setReactions] = useState<Reaction[]>([]);
+  const [deleted, setDeleted] = useState<Record<string, Deleted>>({});
+  const [picker, setPicker] = useState<null | "emoji" | "gif" | { react: string }>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const [sounds, setSounds] = useState(true);
@@ -91,7 +104,7 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
     });
   }, [supabase, faces]);
 
-  const signPhotos = useCallback(async (list: Msg[]) => {
+  const signPhotos = useCallback(async (list: { photo_path: string | null }[]) => {
     const need = list.map((m) => m.photo_path).filter((p): p is string => !!p);
     if (!need.length) return;
     const { data } = await supabase.storage.from("chat").createSignedUrls([...new Set(need)], 3600);
@@ -105,9 +118,27 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
     setRooms((rs) => rs.map((r) => (r.id === room ? { ...r, unread: 0 } : r)));
   }, [supabase]);
 
+  // Reactions on these messages; for owners and the GM, the deleted ones' text.
+  const loadExtras = useCallback(async (room: string, list: Msg[]) => {
+    const ids = list.map((m) => m.id);
+    if (ids.length) {
+      const { data } = await supabase.from("chat_reactions").select("message_id,user_id,emoji").in("message_id", ids).order("created_at");
+      const got = (data ?? []) as Reaction[];
+      setReactions((old) => [...old.filter((r) => !ids.includes(r.message_id)), ...got]);
+    }
+    if (management && list.some((m) => m.deleted_at)) {
+      const { data } = await supabase.rpc("chat_deleted_list", { p_room: room });
+      if (Array.isArray(data) && activeRef.current === room) {
+        setDeleted(Object.fromEntries((data as Deleted[]).map((d) => [d.message_id, d])));
+        void signPhotos(data as Deleted[]);
+      }
+    }
+  }, [supabase, management, signPhotos]);
+
   // Open a chat: its members and the newest messages.
   useEffect(() => {
     setInfo(null); setMsgs([]); setMore(false); setError(null); setPanel((p) => (p === "info" ? null : p));
+    setReactions([]); setDeleted({}); setPicker(null);
     if (!active) return;
     let gone = false;
     setLoading(true);
@@ -124,11 +155,12 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
       setMsgs(list);
       setMore(list.length === PAGE);
       void signPhotos(list);
+      void loadExtras(active, list);
       markRead(active);
       requestAnimationFrame(() => scroller.current?.scrollTo({ top: scroller.current.scrollHeight }));
     })();
     return () => { gone = true; };
-  }, [active, supabase, signPhotos, markRead]);
+  }, [active, supabase, signPhotos, markRead, loadExtras]);
 
   // Live: new and deleted messages, and "seen" updates. The database only sends rows from chats you're in.
   useEffect(() => {
@@ -147,6 +179,22 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_messages" }, (p) => {
         const m = p.new as Msg;
         setMsgs((list) => list.map((x) => (x.id === m.id ? m : x)));
+        if (m.deleted_at && m.room_id === activeRef.current) void loadExtras(m.room_id, [m]);
+      })
+      // Removed for everyone (deleted by an owner or the GM).
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "chat_messages" }, (p) => {
+        const id = (p.old as { id?: string }).id;
+        if (id) setMsgs((list) => list.filter((x) => x.id !== id));
+        void refreshList();
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_reactions" }, (p) => {
+        const r = p.new as Reaction & { room_id: string };
+        if (r.room_id !== activeRef.current) return;
+        setReactions((list) => (list.some((x) => x.message_id === r.message_id && x.user_id === r.user_id && x.emoji === r.emoji) ? list : [...list, r]));
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "chat_reactions" }, (p) => {
+        const r = p.old as Partial<Reaction>;
+        if (r.message_id) setReactions((list) => list.filter((x) => !(x.message_id === r.message_id && x.user_id === r.user_id && x.emoji === r.emoji)));
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_members" }, (p) => {
         const row = p.new as { room_id: string; user_id: string; last_read_at: string };
@@ -156,7 +204,7 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
     // Fallback if live updates drop (weak signal): refresh the list every 30 seconds.
     const t = setInterval(() => { void refreshList(); }, 30000);
     return () => { clearInterval(t); void supabase.removeChannel(ch); };
-  }, [supabase, me.id, refreshList, signPhotos, markRead]);
+  }, [supabase, me.id, refreshList, signPhotos, markRead, loadExtras]);
 
   // Back/forward buttons move between chats.
   useEffect(() => {
@@ -177,21 +225,23 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
     setMsgs((m) => [...list, ...m]);
     setMore(list.length === PAGE);
     void signPhotos(list);
+    void loadExtras(active, list);
     requestAnimationFrame(() => { if (el) el.scrollTop = el.scrollHeight - before; });
   };
 
-  const send = async (photo?: string) => {
+  const send = async (photo?: string, gif?: string) => {
     if (!active || busy) return;
-    const body = photo ? null : text.trim();
-    if (!photo && !body) return;
+    const body = photo || gif ? null : text.trim();
+    if (!photo && !gif && !body) return;
     setBusy(true); setError(null);
     const isGroup = info?.kind === "GROUP";
     const ids = isGroup && body ? [...tagged.current].filter(([, n]) => body.includes(`@${n}`)).map(([id]) => id) : [];
     const all = isGroup && management && !!body && /(^|\s)@all\b/i.test(body);
-    const { data, error: e } = await supabase.rpc("chat_send", { p_room: active, p_body: body, p_photo_path: photo ?? null, p_gif_url: null, p_mentions: ids, p_all: all });
+    const { data, error: e } = await supabase.rpc("chat_send", { p_room: active, p_body: body, p_photo_path: photo ?? null, p_gif_url: gif ?? null, p_mentions: ids, p_all: all });
     setBusy(false);
     if (e || !data?.ok) { setError(ERR[data?.error] ?? "Couldn't send. Check your connection and try again."); return; }
-    if (!photo) { setText(""); tagged.current.clear(); setTagQuery(null); }
+    if (!photo && !gif) { setText(""); tagged.current.clear(); setTagQuery(null); }
+    if (gif) setPicker(null);
     playChatSound("sent");
     const m = data.message as Msg;
     setMsgs((list) => (list.some((x) => x.id === m.id) ? list : [...list, m]));
@@ -221,13 +271,33 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
   };
 
   const remove = async (m: Msg) => {
-    if (!confirm("Delete this message for everyone?")) return;
+    if (!confirm(management ? "Delete this message? It will be gone for everyone." : "Delete this message? Others will see \"Message deleted\".")) return;
     const { data } = await supabase.rpc("chat_delete_message", { p_message: m.id });
     if (!data?.ok) { setError("Couldn't delete that message."); return; }
     if (data.photo_path) void supabase.storage.from("chat").remove([data.photo_path]);
-    setMsgs((list) => list.map((x) => (x.id === m.id ? { ...x, body: null, photo_path: null, gif_url: null, deleted_at: new Date().toISOString() } : x)));
+    if (data.gone) setMsgs((list) => list.filter((x) => x.id !== m.id));
+    else setMsgs((list) => list.map((x) => (x.id === m.id ? { ...x, body: null, photo_path: null, gif_url: null, deleted_at: new Date().toISOString() } : x)));
     setPicked(null);
     void refreshList();
+  };
+
+  const react = async (messageId: string, emoji: string) => {
+    setPicker(null); setPicked(null);
+    const mineHas = (list: Reaction[]) => list.some((r) => r.message_id === messageId && r.user_id === me.id && r.emoji === emoji);
+    const had = mineHas(reactions);
+    const flip = (list: Reaction[], on: boolean) => (on
+      ? (mineHas(list) ? list : [...list, { message_id: messageId, user_id: me.id, emoji }])
+      : list.filter((r) => !(r.message_id === messageId && r.user_id === me.id && r.emoji === emoji)));
+    setReactions((list) => flip(list, !had));
+    const { data } = await supabase.rpc("chat_react", { p_message: messageId, p_emoji: emoji });
+    if (!data?.ok) { setReactions((list) => flip(list, had)); setError(ERR[data?.error] ?? "Couldn't add that reaction."); }
+  };
+  const insertEmoji = (e: string) => {
+    const el = box.current;
+    const at = el?.selectionStart ?? text.length;
+    const next = text.slice(0, at) + e + text.slice(el?.selectionEnd ?? at);
+    setText(next);
+    requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(at + e.length, at + e.length); });
   };
 
   // People you can tag: the chat's members A to Z (not you), plus @all for owners and the GM.
@@ -260,7 +330,7 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
     if (!tagNames.length) return body;
     const esc = tagNames.sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
     const parts = body.split(new RegExp(`(@(?:${esc.join("|")}))`, "g"));
-    return parts.map((p, i) => (i % 2 ? <span key={i} className={`chat-tag ${p === `@${me.name}` || p === "@all" ? "me" : ""}`}>{p}</span> : p));
+    return parts.map((p, i) => (i % 2 ? <span key={i} className={`chat-tag ${p === `@${me.name}` || p === "@all" ? "self" : ""}`}>{p}</span> : p));
   };
 
   const room = rooms.find((r) => r.id === active);
@@ -314,7 +384,7 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
             {panel === "info" && info && <GroupInfo key={info.id} info={info} me={me.id} canAdd={info.kind === "GROUP" && (!info.auto || management)} people={people} supabase={supabase}
               onCleared={() => { setMsgs([]); setPanel(null); void refreshList(); }}
               onChanged={async (left) => { if (left) { await refreshList(); open(null); return; } const { data } = await supabase.rpc("chat_room", { p_room: info.id }); if (data?.ok) setInfo(data as RoomInfo); void refreshList(); }} />}
-            <div className="chat-scroll" ref={scroller} onClick={() => setPicked(null)}>
+            <div className="chat-scroll" ref={scroller} onClick={() => { setPicked(null); setPicker((p) => (p && typeof p === "object" ? null : p)); }}>
               {more && <p className="chat-older"><button type="button" className="link-like small" onClick={older}>Load older messages</button></p>}
               {loading && <p className="muted small chat-older">Loading…</p>}
               {msgs.map((m, i) => {
@@ -328,14 +398,14 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
                 return (
                   <div key={m.id}>
                     {newDay && <div className="chat-day"><span>{dayLabel(m.created_at)}</span></div>}
-                    <div className={`chat-msg ${mine ? "mine" : ""} ${first ? "first" : ""} ${m.from_management && !m.deleted_at ? "mgmt" : ""} ${!mine && !m.deleted_at && (m.mention_all || m.mentions?.includes(me.id)) ? "tagged" : ""}`}>
+                    <div className={`chat-msg ${mine ? "mine" : ""} ${first ? "first" : ""} ${picked === m.id ? "picked" : ""} ${m.from_management && !m.deleted_at ? "mgmt" : ""} ${!mine && !m.deleted_at && (m.mention_all || m.mentions?.includes(me.id)) ? "tagged" : ""}`}>
                       {!mine && group && (first ? <Avatar name={who?.name ?? "?"} url={faces.get(m.sender_id) ?? null} size={30} /> : <span className="chat-face-gap" />)}
                       <div className="chat-bubble-wrap">
                         {!mine && group && first && <span className="chat-name">{who?.name ?? "Former member"}</span>}
                         {!mine && m.from_management && !m.deleted_at && <span className="mgmt-chip">📣 Management</span>}
                         <div className={`chat-bubble ${m.deleted_at ? "deleted" : ""} ${m.photo_path && !m.body ? "photo-only" : ""}`}
-                          onClick={(e) => { if (mine && !m.deleted_at) { e.stopPropagation(); setPicked(picked === m.id ? null : m.id); } }} title={time(m.created_at)}>
-                          {m.deleted_at ? <em>Message deleted</em> : (
+                          onClick={(e) => { if (!m.deleted_at) { e.stopPropagation(); setPicked(picked === m.id ? null : m.id); setPicker(null); } }} title={time(m.created_at)}>
+                          {m.deleted_at ? (management && deleted[m.id] ? <DeletedView d={deleted[m.id]} photo={deleted[m.id].photo_path ? photos[deleted[m.id].photo_path!] : undefined} /> : <em>Message deleted</em>) : (
                             <>
                               {m.photo_path && (photos[m.photo_path]
                                 // eslint-disable-next-line @next/next/no-img-element
@@ -347,6 +417,14 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
                             </>
                           )}
                         </div>
+                        {!m.deleted_at && <Reactions list={reactions.filter((r) => r.message_id === m.id)} me={me.id} names={names} onToggle={(e) => void react(m.id, e)} />}
+                        {picked === m.id && !m.deleted_at && (
+                          <div className="chat-react-bar" role="toolbar" aria-label="React" onClick={(e) => e.stopPropagation()}>
+                            {QUICK.map((e) => <button key={e} type="button" aria-label={`React ${e}`} onClick={() => void react(m.id, e)}>{e}</button>)}
+                            <button type="button" className="more" aria-label="More emoji" onClick={() => setPicker({ react: m.id })}>＋</button>
+                          </div>
+                        )}
+                        {typeof picker === "object" && picker?.react === m.id && <EmojiGrid onPick={(e) => void react(m.id, e)} onClose={() => setPicker(null)} />}
                         <span className={`chat-meta ${last ? "" : "quiet"} ${picked === m.id ? "show" : ""}`}>
                           {time(m.created_at)}
                           {mine && !m.deleted_at && <button type="button" className={`link-like chat-del ${picked === m.id ? "show" : ""}`} onClick={(e) => { e.stopPropagation(); void remove(m); }}>Delete</button>}
@@ -365,6 +443,10 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
             <form className="chat-compose" onSubmit={(e) => { e.preventDefault(); void send(); }}>
               <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => void sendPhoto(e.target.files?.[0])} />
               <button type="button" className="icon-btn" aria-label="Send a photo" title="Send a photo" disabled={busy} onClick={() => fileInput.current?.click()}><IconImage /></button>
+              <button type="button" className={`icon-btn chat-gif-btn ${picker === "gif" ? "on" : ""}`} aria-label="Send a GIF" title="Send a GIF" disabled={busy} onClick={() => setPicker(picker === "gif" ? null : "gif")}>GIF</button>
+              <button type="button" className={`icon-btn chat-emoji-btn ${picker === "emoji" ? "on" : ""}`} aria-label="Add an emoji" title="Add an emoji" onClick={() => setPicker(picker === "emoji" ? null : "emoji")}>🙂</button>
+              {picker === "emoji" && <EmojiGrid onPick={insertEmoji} onClose={() => setPicker(null)} composer />}
+              {picker === "gif" && <GifPicker onPick={(url) => void send(undefined, url)} onClose={() => setPicker(null)} />}
               {tagOptions.length > 0 && (
                 <ul className="chat-tags-pop" role="listbox" aria-label="Tag someone">
                   {tagOptions.map((o, i) => (
@@ -398,6 +480,81 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
 }
 
 type Sb = ReturnType<typeof createClient>;
+
+/** A deleted message as owners and the GM see it: crossed out (update-0052). */
+function DeletedView({ d, photo }: { d: Deleted; photo?: string }) {
+  return (
+    <span className="chat-deleted-shown">
+      <span className="chat-deleted-label">Deleted by sender · only owners and the GM see this</span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {d.photo_path && (photo ? <img src={photo} alt="Deleted photo" className="chat-photo" /> : <span className="chat-photo loading">Photo</span>)}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {d.gif_url && <img src={d.gif_url} alt="Deleted GIF" className="chat-photo" />}
+      {d.body && <s className="chat-text">{d.body}</s>}
+    </span>
+  );
+}
+
+/** Reactions under a message: one chip per emoji with a count; yours are highlighted, tap to add or take back. */
+function Reactions({ list, me, names, onToggle }: { list: Reaction[]; me: string; names: Map<string, { name: string }>; onToggle: (emoji: string) => void }) {
+  if (!list.length) return null;
+  const groups = new Map<string, Reaction[]>();
+  for (const r of list) groups.set(r.emoji, [...(groups.get(r.emoji) ?? []), r]);
+  return (
+    <span className="chat-reactions">
+      {[...groups].map(([e, rs]) => {
+        const who = rs.map((r) => (r.user_id === me ? "You" : names.get(r.user_id)?.name.split(" ")[0] ?? "Someone")).join(", ");
+        return (
+          <button key={e} type="button" className={`chat-reaction ${rs.some((r) => r.user_id === me) ? "mine" : ""}`} title={who} aria-label={`${e} ${who}`}
+            onClick={(ev) => { ev.stopPropagation(); onToggle(e); }}>{e}{rs.length > 1 && <span>{rs.length}</span>}</button>
+        );
+      })}
+    </span>
+  );
+}
+
+function EmojiGrid({ onPick, onClose, composer = false }: { onPick: (e: string) => void; onClose: () => void; composer?: boolean }) {
+  return (
+    <div className={`chat-pop chat-emoji ${composer ? "composer" : ""}`} role="dialog" aria-label="Emoji" onClick={(e) => e.stopPropagation()}>
+      <div className="chat-pop-head"><span className="small muted">Emoji</span><button type="button" className="link-like small" onClick={onClose}>Close</button></div>
+      <div className="chat-emoji-grid">{EMOJI.map((e) => <button key={e} type="button" onClick={() => onPick(e)}>{e}</button>)}</div>
+    </div>
+  );
+}
+
+function GifPicker({ onPick, onClose }: { onPick: (url: string) => void; onClose: () => void }) {
+  const [q, setQ] = useState("");
+  const [gifs, setGifs] = useState<Gif[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    let gone = false;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/gif?q=${encodeURIComponent(q.trim())}`);
+        const body = (await res.json()) as { ok: boolean; error?: string; gifs?: Gif[] };
+        if (gone) return;
+        if (!body.ok) { setErr(body.error === "NO_KEY" ? "GIFs turn on once the owner adds the GIPHY key." : "GIFs aren't loading right now. Try again."); setGifs([]); return; }
+        setErr(null); setGifs(body.gifs ?? []);
+      } catch { if (!gone) { setErr("GIFs aren't loading right now. Try again."); setGifs([]); } }
+    }, q ? 350 : 0);
+    return () => { gone = true; clearTimeout(t); };
+  }, [q]);
+  return (
+    <div className="chat-pop chat-gifs" role="dialog" aria-label="GIFs">
+      <div className="chat-pop-head">
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search GIFs" aria-label="Search GIFs" autoFocus />
+        <button type="button" className="link-like small" onClick={onClose}>Close</button>
+      </div>
+      {err && <p className="small muted">{err}</p>}
+      {gifs === null && <p className="small muted">Loading…</p>}
+      <div className="chat-gif-grid">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {(gifs ?? []).map((g) => <button key={g.id} type="button" onClick={() => onPick(g.url)} title={g.title}><img src={g.preview} alt={g.title} loading="lazy" /></button>)}
+      </div>
+      <p className="chat-giphy small muted">Powered by GIPHY</p>
+    </div>
+  );
+}
 
 function PeoplePicker({ people, chosen, toggle, filter }: { people: ChatPerson[]; chosen: Set<string>; toggle: (id: string) => void; filter: string }) {
   const q = filter.trim().toLowerCase();

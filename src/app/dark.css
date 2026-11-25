@@ -87,3 +87,7 @@
 [data-mode="dark"] .chat-tags-pop button.on, [data-mode="dark"] .chat-tags-pop button:hover { background: #2a2c31; }
 [data-mode="dark"] .chat-tag { background: #3a3220; color: #e3c27f; }
 [data-mode="dark"] .chat-msg.mine .chat-tag { background: rgba(0,0,0,.12); color: #16171a; }
+[data-mode="dark"] .chat-reaction, [data-mode="dark"] .chat-react-bar, [data-mode="dark"] .chat-pop { background: #2a2c31; color: var(--ink); border-color: #3a3c42; }
+[data-mode="dark"] .chat-reaction.mine { background: #3a3220; border-color: #d9b56b; }
+[data-mode="dark"] .chat-emoji-grid button:hover, [data-mode="dark"] .chat-react-bar button:hover { background: #3a3c42; }
+[data-mode="dark"] .chat-deleted-label { color: #f08a75; }

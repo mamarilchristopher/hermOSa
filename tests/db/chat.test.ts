@@ -176,3 +176,45 @@ describe("update-0051: View as shows chat counts only", () => {
     expect((await db.rpc(ana, "aal1", "view_as_chat", [bea.appUserId])).ok).toBe(false);
   });
 });
+
+describe("update-0052: reactions and deleted messages", () => {
+  it("staff deletions stay readable, crossed out, for management in that chat only; management deletions are gone", async () => {
+    const g = (await db.rpc(ana, "aal1", "chat_create_group", ["DEMO Delete test", [bea.appUserId, gm.appUserId]])).id;
+    const s = await db.rpc(ana, "aal1", "chat_send", [g, "@DEMO Bea oops wrong chat", null, null, [bea.appUserId], false]);
+    expect((await db.rpc(ana, "aal1", "chat_delete_message", [s.message.id])).gone).toBe(false);
+    expect(await read(bea, g)).toEqual([null]);
+    const n = await db.sql("select count(*)::int as n from public.notifications where kind = 'CHAT_MENTION' and user_id = $1 and link = $2", [bea.appUserId, `/chat/${g}`]);
+    expect(n.rows[0].n).toBe(0); // the tag notice went with it
+    expect(await db.rpc(gm, "aal1", "chat_deleted_list", [g])).toEqual([{ message_id: s.message.id, body: "@DEMO Bea oops wrong chat", photo_path: null, gif_url: null }]);
+    expect(await db.rpc(bea, "aal1", "chat_deleted_list", [g])).toEqual([]);
+    expect(await db.rpc(owner, "aal2", "chat_deleted_list", [g])).toEqual([]); // not in this chat
+    expect((await db.as(ana, "aal1", "SELECT * FROM public.chat_deleted", []).catch((e) => e)).message).toMatch(/permission denied/);
+    const m = await db.rpc(gm, "aal1", "chat_send", [g, "DEMO management note", null, null]);
+    expect((await db.rpc(gm, "aal1", "chat_delete_message", [m.message.id])).gone).toBe(true);
+    expect(await read(gm, g)).toEqual([null]);
+    expect(await db.rpc(gm, "aal1", "chat_deleted_list", [g])).toHaveLength(1);
+  });
+
+  it("reactions: members toggle emoji; outsiders and non-emoji are refused", async () => {
+    const g = (await db.rpc(ana, "aal1", "chat_create_group", ["DEMO React test", [bea.appUserId]])).id;
+    const s = await db.rpc(ana, "aal1", "chat_send", [g, "DEMO lunch?", null, null]);
+    expect(await db.rpc(bea, "aal1", "chat_react", [s.message.id, "👍"])).toEqual({ ok: true, on: true });
+    expect((await db.rpc(ana, "aal1", "chat_react", [s.message.id, "❤️"])).on).toBe(true);
+    expect((await db.rpc(bea, "aal1", "chat_react", [s.message.id, "hi"])).error).toBe("BAD_REQUEST");
+    expect((await db.rpc(cy, "aal1", "chat_react", [s.message.id, "👍"])).error).toBe("NOT_FOUND");
+    const seen = (who: Person) => db.as(who, "aal1", "SELECT emoji FROM public.chat_reactions WHERE message_id = $1 ORDER BY emoji", [s.message.id]).then((r) => r.rows.length);
+    expect(await seen(ana)).toBe(2);
+    expect(await seen(cy)).toBe(0);
+    expect((await db.rpc(bea, "aal1", "chat_react", [s.message.id, "👍"])).on).toBe(false);
+    expect(await seen(ana)).toBe(1);
+  });
+
+  it("View as shows notifications, chat ones without the message", async () => {
+    const v = await db.rpc(owner, "aal2", "view_as_notices", [bea.appUserId]);
+    expect(v.ok).toBe(true);
+    const chat = (v.latest as { kind: string; title: string; body: string | null }[]).filter((x) => x.kind === "CHAT_MENTION");
+    expect(chat.length).toBeGreaterThan(0);
+    expect(chat.every((x) => x.title === "Tagged in a chat" && x.body === null)).toBe(true);
+    expect((await db.rpc(ana, "aal1", "view_as_notices", [bea.appUserId])).ok).toBe(false);
+  });
+});
