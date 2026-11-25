@@ -8,13 +8,14 @@ const Join = z.object({
   code: z.string().regex(/^[a-z0-9]{12,40}$/),
   full_name: z.string().trim().min(2).max(120),
   branch: z.uuid(),
+  level: z.enum(["SENIOR_CMA", "CMA", "TRAINEE", "CSR", "CASHIER", "MANAGER", "OWNER", "OTHER"]),
   email: z.email().max(254),
   password: z.string().min(10).max(200),
 });
 
 export async function register(_prev: State, fd: FormData): Promise<State> {
-  const p = Join.safeParse(Object.fromEntries(["code", "full_name", "branch", "email", "password"].map((k) => [k, fd.get(k)])));
-  if (!p.success) return { error: "Fill in every field. The password needs at least 10 characters." };
+  const p = Join.safeParse(Object.fromEntries(["code", "full_name", "branch", "level", "email", "password"].map((k) => [k, fd.get(k)])));
+  if (!p.success) return { error: "Fill in every field, including your role. The password needs at least 10 characters." };
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
   const supabase = await createClient();
@@ -23,7 +24,7 @@ export async function register(_prev: State, fd: FormData): Promise<State> {
     password: p.data.password,
     options: {
       emailRedirectTo: `${origin}/login`,
-      data: { full_name: p.data.full_name, invite_code: p.data.code, requested_branch: p.data.branch },
+      data: { full_name: p.data.full_name, invite_code: p.data.code, requested_branch: p.data.branch, requested_level: p.data.level },
     },
   });
   if (error) {

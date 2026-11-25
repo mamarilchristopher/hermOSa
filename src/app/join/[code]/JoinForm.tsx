@@ -1,9 +1,13 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { register } from "./actions";
+import { ROLE_CHOICES } from "@/lib/staffLevels";
+
 
 export function JoinForm({ code, branches }: { code: string; branches: { id: string; code: string; name: string }[] }) {
   const [state, action, pending] = useActionState(register, undefined);
+  const [branch, setBranch] = useState("");
+  const wfh = branches.find((b) => b.code === "WFH")?.id;
   if (state?.done) {
     return (
       <div className="notice ok">
@@ -18,8 +22,15 @@ export function JoinForm({ code, branches }: { code: string; branches: { id: str
       <input type="hidden" name="code" value={code} />
       <label>Full name<input name="full_name" autoComplete="name" required minLength={2} maxLength={120} /></label>
       <label>
+        Your role
+        <select name="level" required defaultValue="" onChange={(e) => { if (e.target.value === "CSR" && wfh) setBranch(wfh); }}>
+          <option value="" disabled>Choose…</option>
+          {ROLE_CHOICES.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+      </label>
+      <label>
         Your branch
-        <select name="branch" required defaultValue="">
+        <select name="branch" required value={branch} onChange={(e) => setBranch(e.target.value)}>
           <option value="" disabled>Choose…</option>
           {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>

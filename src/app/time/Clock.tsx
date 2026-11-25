@@ -6,7 +6,7 @@ import { clockPunch, setBranchLocation, type PunchState } from "./actions";
 import { parseCoords } from "@/lib/schedule";
 import { photoTakenAt } from "@/lib/exif";
 
-type B = { id: string; name: string };
+type B = { id: string; name: string; wfh?: boolean };
 const PENDING = "hermosa-pending-punch";
 /** A random v4 UUID. crypto.randomUUID is missing in some in-app browsers (Messenger) and older phones. */
 function newId(): string {
@@ -68,6 +68,8 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
   const [reload, setReload] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const kind = isIn ? "OUT" : "IN";
+  /** Working from home (CSRs, update-0038): the photo is of the PC's clock, and no location is asked for. */
+  const online = !!branches.find((b) => b.id === branch)?.wfh;
 
   /** Sends the punch. If the app was updated while this page was open, the old page can't reach the new
    *  server code and the call throws: keep the uploaded photo, reload once, and finish the punch after. */
@@ -101,8 +103,8 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
     setRes(undefined); setNoLoc(false); setReload(false);
     let step = "photo";
     try {
-      setBusy("Getting your location…");
-      const [blob, pos, taken] = await Promise.all([shrink(f).catch(() => null), locate(), f.slice(0, 262144).arrayBuffer().then((b) => photoTakenAt(b), () => null)]);
+      setBusy(online ? "Preparing your photo…" : "Getting your location…");
+      const [blob, pos, taken] = await Promise.all([shrink(f).catch(() => null), online ? Promise.resolve(null) : locate(), f.slice(0, 262144).arrayBuffer().then((b) => photoTakenAt(b), () => null)]);
       if (!blob) { setRes({ error: "This photo couldn't be read. Take the photo again with the phone's camera." }); return; }
       setBusy("Saving your photo…"); step = "upload";
       const path = `${userId}/${newId()}.jpg`;
@@ -136,10 +138,12 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
       <button className={`clock-btn ${isIn ? "out" : ""}`} disabled={!!busy || !branch} onClick={() => file.current?.click()}>
         {busy ?? (isIn ? "Time out" : "Time in")}
       </button>
-      <p className="small muted" style={{ margin: 0 }}>Take a photo of the clinic clock showing the date and time. The server time and your location are saved with it.</p>
+      <p className="small muted" style={{ margin: 0 }}>{online
+        ? "Working from home: take a photo of your PC's clock showing the date and time (bottom corner of the screen). The server time is saved with it."
+        : "Take a photo of the clinic clock showing the date and time. The server time and your location are saved with it."}</p>
       {busy === "Getting your location…" && <div className="notice info">If your phone asks, tap Allow for location. This takes up to 15 seconds.</div>}
       {res?.error && <div className="notice error">{res.error}{reload && <> <button className="secondary small" onClick={() => window.location.reload()}>Reload</button></>}</div>}
-      {res?.ok && noLoc && <div className="notice warn">Saved without your location. Turn on location for this browser so next time shows you&apos;re at the clinic.</div>}
+      {res?.ok && noLoc && !online && <div className="notice warn">Saved without your location. Turn on location for this browser so next time shows you&apos;re at the clinic.</div>}
       {res?.ok && <div className="notice ok">{res.ok}{res.far != null && res.far > 300 && ` Your phone looked about ${res.far >= 1000 ? `${(res.far / 1000).toFixed(1)} km` : `${res.far} m`} away from the branch, so a manager may check.`}</div>}
     </div>
   );

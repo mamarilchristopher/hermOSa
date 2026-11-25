@@ -17,8 +17,8 @@ const nowHm = () => new Date().toLocaleTimeString("en-GB", { hour: "2-digit", mi
 export default async function TimePage() {
   const { supabase, access, branches } = await requireAccess();
   const today = manilaToday();
-  const clinics = branches.filter((b) => b.kind === "CLINIC");
-  const short = clinics.map((b) => ({ id: b.id, name: branchShort(b.name) }));
+  const clinics = branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH"); // WFH: CSRs working from home (update-0038)
+  const short = clinics.map((b) => ({ id: b.id, name: branchShort(b.name), wfh: b.kind === "WFH" }));
   const manager = can(access, ["OWNER", "MANAGER"], null) || access.grants.some((g) => g.role === "MANAGER");
   const cutStart = Number(today.slice(8)) <= 15 ? `${today.slice(0, 7)}-01` : `${today.slice(0, 7)}-16`;
 
@@ -48,7 +48,7 @@ export default async function TimePage() {
   const photos: Record<string, string> = Object.fromEntries((signed ?? []).filter((s) => s.signedUrl && s.path).map((s) => [s.path!, s.signedUrl as string]));
   const attendance = (Array.isArray(att.data) ? att.data : []) as Att[];
   const locSet = new Set(((locs ?? []) as { id: string; lat: number | null }[]).filter((b) => b.lat != null).map((b) => b.id));
-  const myBranches = short.filter((b) => can(access, ["OWNER", "MANAGER"], b.id)).map((b) => ({ ...b, set: locSet.has(b.id) }));
+  const myBranches = short.filter((b) => !b.wfh && can(access, ["OWNER", "MANAGER"], b.id)).map((b) => ({ ...b, set: locSet.has(b.id) }));
 
   // A late time-in today makes a Late NTE: ask for the explanation right here.
   const { data: nteToday } = me

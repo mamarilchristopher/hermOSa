@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { errorText } from "@/lib/access";
 
 export type FormState = { error?: string; ok?: string; values?: Record<string, string>; n?: number } | undefined;
-const ROLES = ["OWNER", "FINANCE", "MANAGER", "CASHIER", "HR", "MARKETING", "CLINICIAN", "INVENTORY", "AUDITOR"] as const;
+const ROLES = ["OWNER", "FINANCE", "MANAGER", "CASHIER", "HR", "MARKETING", "CLINICIAN", "INVENTORY", "AUDITOR", "CSR"] as const;
 
 const Grant = z.object({ user: z.uuid(), role: z.enum(ROLES), branch: z.union([z.uuid(), z.literal("ALL")]) });
 
@@ -39,7 +39,7 @@ export async function setActive(fd: FormData) {
   revalidatePath("/admin/users");
 }
 
-const LEVELS = ["OWNER", "GM", "SENIOR_CMA", "CMA", "TRAINEE", "MANAGER", "CASHIER", "FINANCE", "HR"] as const;
+const LEVELS = ["OWNER", "GM", "SENIOR_CMA", "CMA", "TRAINEE", "CSR", "MANAGER", "CASHIER", "FINANCE", "HR"] as const;
 const Approve = z.object({
   user: z.uuid(),
   level: z.enum(LEVELS),

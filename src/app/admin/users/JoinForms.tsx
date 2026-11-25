@@ -8,6 +8,7 @@ export const LEVEL_TEXT: Record<string, string> = {
   SENIOR_CMA: "Senior CMA (own branch, on commission)",
   CMA: "CMA (own branch, on commission)",
   TRAINEE: "Trainee (own branch, no commission by default)",
+  CSR: "CSR (online bookings, all branches, WFH, basic pay only)",
   MANAGER: "Branch manager (one branch)",
   CASHIER: "Front desk / cashier (one branch)",
 };
@@ -15,7 +16,7 @@ export const LEVEL_TEXT: Record<string, string> = {
 /** Levels a General Manager may approve: everything but Owner (update-0028; the database checks this too). */
 export const GM_LEVELS = Object.keys(LEVEL_TEXT).filter((k) => k !== "OWNER");
 
-export function ApproveForm({ user, branchId, branches, levels }: { user: string; branchId: string | null; branches: { id: string; name: string }[]; levels?: string[] }) {
+export function ApproveForm({ user, branchId, branches, levels, asked }: { user: string; branchId: string | null; branches: { id: string; name: string }[]; levels?: string[]; asked?: string | null }) {
   const [state, action, pending] = useActionState(approveJoin, undefined);
   const v = state?.values ?? {};
   return (
@@ -23,7 +24,7 @@ export function ApproveForm({ user, branchId, branches, levels }: { user: string
       <input type="hidden" name="user" value={user} />
       <label>
         <span>Staff level</span>
-        <select name="level" required defaultValue={v.level ?? ""}>
+        <select name="level" required defaultValue={v.level || (asked && asked in LEVEL_TEXT && (!levels || levels.includes(asked)) ? asked : "")}>
           <option value="" disabled>Choose a level…</option>
           {Object.entries(LEVEL_TEXT).filter(([k]) => !levels || levels.includes(k)).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>

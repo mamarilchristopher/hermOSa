@@ -26,7 +26,7 @@ export default async function TimePhotosPage({ searchParams }: { searchParams: P
   const sp = await searchParams;
   const today = manilaToday();
   const day = isIsoDate(sp.date) && sp.date <= today ? sp.date : today;
-  const clinics = branches.filter((b) => b.kind === "CLINIC").map((b) => ({ id: b.id, name: branchShort(b.name) }));
+  const clinics = branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: branchShort(b.name) }));
   const branch = clinics.some((b) => b.id === sp.branch) ? sp.branch! : "";
 
   let q = supabase.from("time_punches").select("id, kind, punched_at, photo_taken_at, photo_path, distance_m, branch_id, employee_id, employees(full_name, uid)")

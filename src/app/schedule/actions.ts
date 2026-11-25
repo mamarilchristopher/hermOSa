@@ -104,7 +104,7 @@ export async function cancelRequest(_p: ActionState, fd: FormData): Promise<Acti
   return call("cancel_schedule_request", { p_id: id.data }, "Cancelled");
 }
 
-type WkPerson = { id: string; branch_id: string | null; can_edit: boolean; pattern: { branch_id: string; days_off: number[]; start: string; end: string } | null };
+type WkPerson = { id: string; branch_id: string | null; can_edit: boolean; csr?: boolean; pattern: { branch_id: string; days_off: number[]; start: string; end: string } | null };
 type WkShift = { employee_id: string; date: string; off: boolean; branch_id: string | null; state: string; leave?: string | null };
 
 /** Suggest a week: plans every unpublished day from the rules; published and leave days are kept. */
@@ -120,7 +120,7 @@ export async function suggestWeekAction(_p: ActionState, fd: FormData): Promise<
   ]);
   if (error || rErr) return { error: rErr?.code === "PGRST202" ? "The owner needs to run update-0025 in Supabase first." : "Could not load the week. Try again." };
   const w = wk as { people: WkPerson[]; shifts: WkShift[] };
-  const people = w.people.filter((p) => p.can_edit).map((p) => ({ id: p.id, home: p.pattern?.branch_id ?? p.branch_id,
+  const people = w.people.filter((p) => p.can_edit && !p.csr).map((p) => ({ id: p.id, home: p.pattern?.branch_id ?? p.branch_id,
     daysOff: p.pattern?.days_off, start: p.pattern?.start, end: p.pattern?.end }));
   if (!people.length) return { error: "No staff to schedule." };
   const dayIdx = (d: string, monday: string) => Math.round((Date.parse(d) - Date.parse(monday)) / 86400000);

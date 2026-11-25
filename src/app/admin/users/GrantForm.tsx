@@ -4,7 +4,7 @@ import { grantRole } from "./actions";
 
 const ROLE_LABELS: Record<string, string> = {
   OWNER: "Owner / System admin", FINANCE: "Finance", MANAGER: "Branch manager", CASHIER: "Cashier / front desk",
-  HR: "HR / Payroll", MARKETING: "Marketing", CLINICIAN: "Clinician / therapist", INVENTORY: "Inventory / purchasing", AUDITOR: "Auditor (read-only)",
+  HR: "HR / Payroll", MARKETING: "Marketing", CLINICIAN: "Clinician / therapist", INVENTORY: "Inventory / purchasing", AUDITOR: "Auditor (read-only)", CSR: "CSR (online bookings)",
 };
 
 export function GrantForm({ users, branches }: { users: { id: string; display_name: string }[]; branches: { id: string; name: string }[] }) {

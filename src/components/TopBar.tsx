@@ -11,7 +11,7 @@ import { photoUrls } from "@/lib/photos";
 
 const ROLE_LABEL: Record<string, string> = {
   OWNER: "Owner", FINANCE: "Finance", MANAGER: "Manager", CASHIER: "Cashier", HR: "HR",
-  MARKETING: "Marketing", CLINICIAN: "Clinician", INVENTORY: "Inventory", AUDITOR: "Auditor",
+  MARKETING: "Marketing", CLINICIAN: "Clinician", INVENTORY: "Inventory", AUDITOR: "Auditor", CSR: "CSR",
 };
 
 /** App navigation: a sidebar on wide screens, a top bar plus bottom tabs on phones. */

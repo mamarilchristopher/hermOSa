@@ -1,3 +1,4 @@
+import { ROLE_CHOICES } from "@/lib/staffLevels";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireAccess, can } from "@/lib/access";
@@ -18,7 +19,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const { supabase, access, branches } = await requireAccess();
   if (!can(access, ["OWNER"], null)) redirect("/");
   const [{ data: all }, { data: grants }, { data: invites }, { data: emps }, { data: pinData }] = await Promise.all([
-    supabase.from("app_users").select("id, uid, display_name, email, active, join_status, requested_branch_id, joined_at, photo_path").order("display_name"),
+    supabase.from("app_users").select("id, uid, display_name, email, active, join_status, requested_branch_id, requested_level, joined_at, photo_path").order("display_name"),
     supabase.from("role_grants").select("id, user_id, role_code, branch_id").is("revoked_at", null),
     supabase.from("staff_invites").select("id, code, expires_at, use_count").is("revoked_at", null)
       .gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }),
@@ -33,7 +34,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const listed = (all ?? []).filter((u) => u.join_status !== "PENDING" && u.join_status !== "REJECTED");
   const users = sortByName ? listed : byRankThenName(listed, (u) => staffRank(grantsOf(u.id), positionOf.get(u.id)) + (u.active ? 0 : 10), (u) => u.display_name);
   const waiting = (all ?? []).filter((u) => u.join_status === "PENDING").sort((a, b) => a.joined_at.localeCompare(b.joined_at));
-  const clinics = branches.filter((b) => b.kind === "CLINIC").map((b) => ({ id: b.id, name: b.name }));
+  const clinics = branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: b.name }));
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
   const branchName = Object.fromEntries(branches.map((b) => [b.id, b.name]));
@@ -95,9 +96,9 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
               <div className="join-who">
                 <strong>{u.display_name}<Uid v={u.uid} /></strong>
                 <span className="small muted">{u.email} · registered {new Date(u.joined_at).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" })}
-                  {u.requested_branch_id && ` · says ${branchName[u.requested_branch_id] ?? "a branch"}`}</span>
+                  {u.requested_branch_id && ` · says ${branchName[u.requested_branch_id] ?? "a branch"}`}{u.requested_level && ` · as ${ROLE_CHOICES.find(([k]) => k === u.requested_level)?.[1] ?? u.requested_level}`}</span>
               </div>
-              <ApproveForm user={u.id} branchId={u.requested_branch_id} branches={clinics} />
+              <ApproveForm user={u.id} branchId={u.requested_branch_id} branches={clinics} asked={u.requested_level} />
               <form action={rejectJoin}>
                 <input type="hidden" name="user" value={u.id} />
                 <button type="submit" className="secondary small">Reject</button>

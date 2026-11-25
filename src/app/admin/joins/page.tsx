@@ -1,3 +1,4 @@
+import { ROLE_CHOICES } from "@/lib/staffLevels";
 import { redirect } from "next/navigation";
 import { requireAccess, can } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
@@ -11,10 +12,10 @@ export default async function JoinsPage() {
   const owner = can(access, ["OWNER"], null);
   if (owner) redirect("/admin/users");
   if (!can(access, ["MANAGER"], null)) redirect("/");
-  const { data } = await supabase.from("app_users").select("id, uid, display_name, email, requested_branch_id, joined_at")
+  const { data } = await supabase.from("app_users").select("id, uid, display_name, email, requested_branch_id, requested_level, joined_at")
     .eq("join_status", "PENDING").order("joined_at");
   const waiting = data ?? [];
-  const clinics = branches.filter((b) => b.kind === "CLINIC").map((b) => ({ id: b.id, name: b.name }));
+  const clinics = branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: b.name }));
   const branchName = Object.fromEntries(branches.map((b) => [b.id, b.name]));
 
   return (
@@ -34,9 +35,9 @@ export default async function JoinsPage() {
               <div className="join-who">
                 <strong>{u.display_name}<Uid v={u.uid} /></strong>
                 <span className="small muted">{u.email} · registered {new Date(u.joined_at).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" })}
-                  {u.requested_branch_id && ` · says ${branchName[u.requested_branch_id] ?? "a branch"}`}</span>
+                  {u.requested_branch_id && ` · says ${branchName[u.requested_branch_id] ?? "a branch"}`}{u.requested_level && ` · as ${ROLE_CHOICES.find(([k]) => k === u.requested_level)?.[1] ?? u.requested_level}`}</span>
               </div>
-              <ApproveForm user={u.id} branchId={u.requested_branch_id} branches={clinics} levels={GM_LEVELS} />
+              <ApproveForm user={u.id} branchId={u.requested_branch_id} branches={clinics} levels={GM_LEVELS} asked={u.requested_level} />
               <form action={rejectJoin}>
                 <input type="hidden" name="user" value={u.id} />
                 <button type="submit" className="secondary small">Reject</button>

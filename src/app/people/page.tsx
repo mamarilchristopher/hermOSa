@@ -32,7 +32,7 @@ export default async function People() {
     else t.pending += Number(l.amount_cents);
     monthTotals.set(l.employee_id, t);
   }
-  const byBranch = branches.filter((b) => b.kind === "CLINIC").map((b) => ({ b, list: byRankThenName((emps ?? []).filter((e) => e.active && e.branch_id === b.id), rank, (e) => e.full_name) })).filter((x) => x.list.length > 0);
+  const byBranch = branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ b, list: byRankThenName((emps ?? []).filter((e) => e.active && e.branch_id === b.id), rank, (e) => e.full_name) })).filter((x) => x.list.length > 0);
   // Inactive records go in their own section at the bottom (CHRIS, Nov 25).
   const inactive = byRankThenName((emps ?? []).filter((e) => !e.active), rank, (e) => e.full_name);
   if (inactive.length) byBranch.push({ b: { ...branches[0], id: "inactive", name: `Inactive (${inactive.length})` }, list: inactive });
@@ -71,7 +71,7 @@ export default async function People() {
         {manage.length > 0 && (
           <div className="card">
             <h2>Add an employee</h2>
-            <EmployeeForm branches={manage.map((b) => ({ id: b.id, name: b.name }))} logins={users ? users.map((u) => ({ id: u.id, name: u.display_name })) : null} />
+            <EmployeeForm branches={[...manage, ...branches.filter((b) => b.kind === "WFH" && can(access, ["OWNER"], null))].map((b) => ({ id: b.id, name: b.name }))} logins={users ? users.map((u) => ({ id: u.id, name: u.display_name })) : null} />
           </div>
         )}
       </main>

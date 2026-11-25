@@ -1,7 +1,7 @@
 // Employee details that staff fill in themselves (owner request 2026-11-23). The owner reviews each
 // submission, can correct it, and only an approved copy is applied to the employee record.
 // Position is NOT asked: the owner assigns it. One flat object of strings keeps storage and review simple.
-// Fields trimmed to the owner's checklist (2026-11-25): only what operations need, all of it required.
+// Fields trimmed to the owner's checklist (2026-11-25): only what operations need, all of it required except government IDs, tax and payout (optional since 2026-11-25).
 import { z } from "zod";
 
 export type FieldType = "text" | "date" | "select" | "tel" | "email" | "textarea" | "checkbox";
@@ -61,12 +61,12 @@ export const SECTIONS: Section[] = [
   {
     id: "government",
     title: "Government IDs",
-    note: "Needed for SSS, PhilHealth, Pag-IBIG and BIR (tax) reports. Only you and the owners can see these. If you don't have a number yet, type NONE.",
+    note: "Needed for SSS, PhilHealth, Pag-IBIG and BIR (tax) reports. Only you and the owners can see these. Optional: fill in what you have, leave the rest blank (or type NONE).",
     fields: [
-      { key: "tin", required: true, none: true, label: "TIN (tax number)", type: "text", digits: [9, 12], sensitive: true, hint: "000-000-000 or 000-000-000-000", half: true },
-      { key: "sss", required: true, none: true, label: "SSS number", type: "text", digits: [10, 10], sensitive: true, hint: "00-0000000-0", half: true },
-      { key: "philhealth", required: true, none: true, label: "PhilHealth number (PIN)", type: "text", digits: [12, 12], sensitive: true, hint: "00-000000000-0", half: true },
-      { key: "pagibig", required: true, none: true, label: "Pag-IBIG MID number", type: "text", digits: [12, 12], sensitive: true, hint: "0000-0000-0000", half: true },
+      { key: "tin", none: true, label: "TIN (tax number)", type: "text", digits: [9, 12], sensitive: true, hint: "000-000-000 or 000-000-000-000", half: true },
+      { key: "sss", none: true, label: "SSS number", type: "text", digits: [10, 10], sensitive: true, hint: "00-0000000-0", half: true },
+      { key: "philhealth", none: true, label: "PhilHealth number (PIN)", type: "text", digits: [12, 12], sensitive: true, hint: "00-000000000-0", half: true },
+      { key: "pagibig", none: true, label: "Pag-IBIG MID number", type: "text", digits: [12, 12], sensitive: true, hint: "0000-0000-0000", half: true },
     ],
   },
   {
@@ -74,7 +74,7 @@ export const SECTIONS: Section[] = [
     title: "Tax and previous employment",
     note: "The owner needs this for your year-end tax certificate (BIR Form 2316).",
     fields: [
-      { key: "prev_employer_this_year", label: "Did you work for another employer earlier this calendar year?", type: "select", required: true, options: ["No", "Yes"] },
+      { key: "prev_employer_this_year", label: "Did you work for another employer earlier this calendar year? (optional)", type: "select", options: ["No", "Yes"] },
       { key: "prev_employer_name", label: "Previous employer's name", type: "text", max: 120, when: ["prev_employer_this_year", "Yes"], half: true },
       { key: "prev_employer_end", label: "Last day there", type: "date", when: ["prev_employer_this_year", "Yes"], half: true },
       { key: "prev_2316", label: "Can you give the owner a copy of their BIR Form 2316?", type: "select", options: ["Yes", "Not yet", "No"], when: ["prev_employer_this_year", "Yes"] },
@@ -85,7 +85,7 @@ export const SECTIONS: Section[] = [
     title: "Salary payout",
     note: "All salaries are still paid out in cash by default. Bank account and GCash details are kept for records only. Only you and the owners can see this.",
     fields: [
-      { key: "payout_method", label: "Preferred payout method (for records)", type: "select", required: true, options: ["Bank account", "GCash", "Cash"] },
+      { key: "payout_method", label: "Preferred payout method (for records, optional)", type: "select", options: ["Bank account", "GCash", "Cash"] },
       { key: "bank_name", label: "Bank", type: "text", max: 80, sensitive: true, when: ["payout_method", "Bank account"], half: true },
       { key: "bank_account_name", label: "Account name", type: "text", max: 120, sensitive: true, when: ["payout_method", "Bank account"], half: true },
       { key: "bank_account_number", label: "Account number", type: "text", digits: [6, 20], sensitive: true, when: ["payout_method", "Bank account"], half: true },

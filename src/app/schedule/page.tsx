@@ -8,7 +8,7 @@ import { normalizeRules, checkWeek } from "@/lib/scheduleAuto";
 import { RulesForm } from "./Forms";
 import { BranchWeek, WeekGrid, WeekButtons, PatternForm, RequestForm, DecideForm, CancelForm, RespondSwapForm } from "./Forms";
 
-export type Person = { id: string; name: string; position: string | null; branch_id: string | null; can_edit: boolean;
+export type Person = { id: string; name: string; position: string | null; branch_id: string | null; can_edit: boolean; csr?: boolean;
   pattern: { branch_id: string; days_off: number[]; start: string; end: string } | null };
 export type Shift = { employee_id: string; date: string; off: boolean; branch_id: string | null; start: string | null; end: string | null; state: "DRAFT" | "PUBLISHED"; note: string | null; leave: "VL" | "SL" | "ABSENT" | null };
 type Req = { id: string; kind: "SWAP" | "DAY_OFF"; employee_id: string; name: string; date: string; other_employee_id: string | null; other_name: string | null;
@@ -28,6 +28,8 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
     supabase.rpc("schedule_rules"), // errors (before update-0025) mean the default rules
   ]);
   const clinics = branches.filter((b) => b.kind === "CLINIC").map((b) => ({ id: b.id, name: branchShort(b.name) }));
+  // Work locations shown on the schedule: the clinics plus WFH for CSRs (update-0038). Minimum-staff rules are clinics only.
+  const places = branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: branchShort(b.name) }));
 
   if (error) {
     return (<><TopBar access={access} /><main><h1>Schedule</h1>
@@ -36,13 +38,13 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const w = data as Week;
   const scheduler = w.people.some((p) => p.can_edit);
   const rules = normalizeRules(rulesRaw, clinics.map((b) => b.id));
-  const editable = w.people.filter((p) => p.can_edit);
+  const editable = w.people.filter((p) => p.can_edit && !p.csr); // CSRs (WFH) don't count toward clinic staffing
   const warnings = scheduler ? checkWeek({ dates, people: editable.map((p) => ({ id: p.id, name: p.name.split(" ")[0] })), branches: clinics,
     shifts: w.shifts.filter((s) => editable.some((p) => p.id === s.employee_id)), rules, dayLabel: dayName }) : [];
   const drafts = w.shifts.filter((s) => s.state === "DRAFT").length;
   const published = w.shifts.filter((s) => s.state === "PUBLISHED").length;
   const myDays = w.me ? w.shifts.filter((s) => s.employee_id === w.me && s.state === "PUBLISHED").sort((a, b) => a.date.localeCompare(b.date)) : [];
-  const bname = (id: string | null) => clinics.find((b) => b.id === id)?.name ?? "";
+  const bname = (id: string | null) => places.find((b) => b.id === id)?.name ?? "";
   const byPerson = sp.view === "person";
   const link = (m: string, v = byPerson ? "person" : "") => `/schedule?week=${m}${v ? `&view=${v}` : ""}`;
   const thisMonday = mondayOf(today);
@@ -140,8 +142,8 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
             </div>
           </div>
           {w.people.length > 0 && (w.shifts.length > 0 || scheduler) ? (
-            byPerson ? <WeekGrid dates={dates} today={today} people={w.people} shifts={w.shifts} branches={clinics} me={w.me} />
-              : <BranchWeek dates={dates} today={today} people={w.people} shifts={w.shifts} branches={clinics} me={w.me} />
+            byPerson ? <WeekGrid dates={dates} today={today} people={w.people} shifts={w.shifts} branches={places} me={w.me} />
+              : <BranchWeek dates={dates} today={today} people={w.people} shifts={w.shifts} branches={places} me={w.me} />
           ) : <p className="muted" style={{ margin: "8px 0 0" }}>The schedule for this week isn&apos;t published yet.</p>}
           {scheduler && warnings.length > 0 && (
             <div className="notice warn sched-warn">
@@ -191,7 +193,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
                 <li key={p.id}>
                   <div className="pattern-who"><strong>{p.name}</strong>{p.position && <span className="small muted"> · {p.position}</span>}
                     {!p.pattern && <span className="pill STAGED">Not set</span>}</div>
-                  <PatternForm employee={p.id} pattern={p.pattern} homeBranch={p.branch_id} branches={clinics} />
+                  <PatternForm employee={p.id} pattern={p.pattern} homeBranch={p.branch_id} branches={places} />
                 </li>
               ))}
             </ul>

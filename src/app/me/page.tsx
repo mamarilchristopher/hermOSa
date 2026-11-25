@@ -212,7 +212,7 @@ export default async function Me() {
           </div>
         )}
         {staffTodos && <TodoCard todos={staffTodos} />}
-        {home && <ManagerHome g={home.g} todos={home.todos} duty={home.duty} branches={branches.filter((b) => b.kind === "CLINIC").map((b) => ({ id: b.id, name: branchShort(b.name) }))} />}
+        {home && <ManagerHome g={home.g} todos={home.todos} duty={home.duty} branches={branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: branchShort(b.name) }))} />}
         {ownerLevel && trackData != null && (
           <div className="card">
             <div className="card-head"><h2>Tardiness tracker, {monthLabel(today.slice(0, 7))}</h2><Link className="small" href="/nte">All Late NTEs</Link></div>

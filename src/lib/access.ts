@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "./supabase/server";
 import { sortBranches } from "./insights";
 
-export type Role = "OWNER" | "FINANCE" | "MANAGER" | "CASHIER" | "HR" | "MARKETING" | "CLINICIAN" | "INVENTORY" | "AUDITOR";
+export type Role = "OWNER" | "FINANCE" | "MANAGER" | "CASHIER" | "HR" | "MARKETING" | "CLINICIAN" | "INVENTORY" | "AUDITOR" | "CSR";
 export type Access = {
   user_id: string;
   display_name: string;
@@ -12,7 +12,7 @@ export type Access = {
   join_status?: "PENDING" | "APPROVED" | "REJECTED";
   grants: { role: Role; branch_id: string | null }[];
 };
-export type Branch = { id: string; code: string; name: string; kind: "CLINIC" | "HQ" };
+export type Branch = { id: string; code: string; name: string; kind: "CLINIC" | "HQ" | "WFH" };
 
 /**
  * Loads the signed-in user's access for building the UI. Redirects to /login when signed out,
