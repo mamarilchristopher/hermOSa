@@ -16,15 +16,25 @@ const Punch = z.object({
 export async function clockPunch(input: { kind: string; branch: string; photo: string; lat?: number; lng?: number; acc?: number; taken?: string }): Promise<PunchState> {
   const p = Punch.safeParse(input);
   if (!p.success) return { error: "Take your photo, then try again." };
+  try {
+    return await punch(p.data);
+  } catch (e) {
+    console.error("clock_punch failed", e);
+    return { error: `Could not save. Try again. (${e instanceof Error ? e.message.slice(0, 120) : "server error"})` };
+  }
+}
+
+async function punch(d: z.infer<typeof Punch>): Promise<PunchState> {
+  const p = { data: d };
   const supabase = await createClient();
   const args = { p_kind: p.data.kind, p_branch: p.data.branch, p_photo: p.data.photo,
     p_lat: p.data.lat ?? null, p_lng: p.data.lng ?? null, p_accuracy: p.data.acc ?? null };
   let { data, error } = await supabase.rpc("clock_punch", { ...args, p_photo_taken_at: p.data.taken ?? null });
   // Before update-0026 the function has no photo-time argument: save without it.
   if (error?.code === "PGRST202") ({ data, error } = await supabase.rpc("clock_punch", args));
-  if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0022 in Supabase first." : "Could not save. Try again." };
+  if (error) { console.error("clock_punch rpc", error); return { error: error.code === "PGRST202" ? "The owner needs to run update-0022 in Supabase first." : `Could not save. Try again. (${error.message.slice(0, 120)})` }; }
   if (!data?.ok) return { error: errorText(data?.error) };
-  revalidatePath("/time"); revalidatePath("/me");
+  try { revalidatePath("/time"); revalidatePath("/me"); } catch (e) { console.error("revalidate", e); }
   const at = new Date(data.at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" });
   return { ok: `${p.data.kind === "IN" ? "Timed in" : "Timed out"} at ${at}.`, at: Date.now(), far: data.distance_m ?? null };
 }

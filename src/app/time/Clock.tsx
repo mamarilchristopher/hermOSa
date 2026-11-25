@@ -7,6 +7,9 @@ import { parseCoords } from "@/lib/schedule";
 import { photoTakenAt } from "@/lib/exif";
 
 type B = { id: string; name: string };
+const PENDING = "hermosa-pending-punch";
+/** A short reason from any error, for the on-screen message. */
+const why = (e: unknown) => (e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : String(e)).slice(0, 120) || "unknown";
 
 /** Shrinks the time-in photo to about 1024 px JPEG (clock still readable, well under the 1 MB limit) before upload. */
 async function shrink(file: File): Promise<Blob> {
@@ -54,27 +57,58 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
   const [busy, setBusy] = useState<string | null>(null);
   const [res, setRes] = useState<PunchState>();
   const [noLoc, setNoLoc] = useState(false);
+  const [reload, setReload] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const kind = isIn ? "OUT" : "IN";
 
+  /** Sends the punch. If the app was updated while this page was open, the old page can't reach the new
+   *  server code and the call throws: keep the uploaded photo, reload once, and finish the punch after. */
+  async function send(args: Parameters<typeof clockPunch>[0], fromReload = false) {
+    let r: PunchState;
+    try {
+      r = await clockPunch(args);
+    } catch (e) {
+      if (!fromReload) {
+        try { sessionStorage.setItem(PENDING, JSON.stringify({ ...args, saved: Date.now() })); window.location.reload(); return; } catch { /* no storage */ }
+      }
+      setRes({ error: `Could not reach Hermosa OS to save your ${args.kind === "IN" ? "time in" : "time out"}. Reload this page and try again. (${why(e)})` }); setReload(true); return;
+    }
+    setRes(r); setNoLoc(args.lat == null);
+    if (r?.ok) router.refresh();
+  }
+
+  // Finish a punch that was interrupted by an app update (see send).
+  useEffect(() => {
+    let p: (Parameters<typeof clockPunch>[0] & { saved: number }) | null = null;
+    try { const raw = sessionStorage.getItem(PENDING); sessionStorage.removeItem(PENDING); p = raw ? JSON.parse(raw) : null; } catch { /* ignore */ }
+    if (!p || Date.now() - p.saved > 120000) return;
+    const { saved: _saved, ...args } = p; void _saved;
+    setBusy(args.kind === "IN" ? "Timing in…" : "Timing out…");
+    send(args, true).finally(() => setBusy(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function onPhoto(f: File | undefined) {
     if (!f) return;
-    setRes(undefined); setNoLoc(false);
+    setRes(undefined); setNoLoc(false); setReload(false);
+    let step = "photo";
     try {
       setBusy("Getting your location…");
-      const [blob, pos, taken] = await Promise.all([shrink(f), locate(), f.slice(0, 262144).arrayBuffer().then((b) => photoTakenAt(b), () => null)]);
-      setBusy("Saving your photo…");
+      const [blob, pos, taken] = await Promise.all([shrink(f).catch(() => null), locate(), f.slice(0, 262144).arrayBuffer().then((b) => photoTakenAt(b), () => null)]);
+      if (!blob) { setRes({ error: "This photo couldn't be read. Take the photo again with the phone's camera." }); return; }
+      setBusy("Saving your photo…"); step = "upload";
       const path = `${userId}/${crypto.randomUUID()}.jpg`;
       const up = createClient().storage.from("timeclock").upload(path, blob, { contentType: "image/jpeg" });
       const { error } = await within(up, 30000, () => ({ data: null, error: new Error("timeout") }) as unknown as Awaited<typeof up>);
-      if (error) { setRes({ error: "Could not upload the photo. Check your internet and try again." }); return; }
+      if (error) { setRes({ error: `Could not upload the photo. Check your internet and try again. (${why(error)})` }); return; }
+      step = "save";
       setBusy(kind === "IN" ? "Timing in…" : "Timing out…");
-      const r = await clockPunch({ kind, branch, photo: path, lat: pos?.coords.latitude, lng: pos?.coords.longitude,
+      await send({ kind, branch, photo: path, lat: pos?.coords.latitude, lng: pos?.coords.longitude,
         acc: pos ? Math.round(pos.coords.accuracy) : undefined, taken: taken ?? undefined });
-      setRes(r); setNoLoc(!pos);
-      if (r?.ok) router.refresh();
-    } catch {
-      setRes({ error: "Something went wrong. Try again." });
+    } catch (e) {
+      // Shown in full so a screenshot tells us exactly which step failed.
+      setRes({ error: step === "upload" ? `Could not upload the photo. Check your internet and try again. (${why(e)})`
+        : `Something went wrong (${step}: ${why(e)}). Reload this page and try again.` }); setReload(true);
     } finally {
       setBusy(null);
       if (file.current) file.current.value = "";
@@ -96,7 +130,7 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
       </button>
       <p className="small muted" style={{ margin: 0 }}>Take a photo of the clinic clock showing the date and time. The server time and your location are saved with it.</p>
       {busy === "Getting your location…" && <div className="notice info">If your phone asks, tap Allow for location. This takes up to 15 seconds.</div>}
-      {res?.error && <div className="notice error">{res.error}</div>}
+      {res?.error && <div className="notice error">{res.error}{reload && <> <button className="secondary small" onClick={() => window.location.reload()}>Reload</button></>}</div>}
       {res?.ok && noLoc && <div className="notice warn">Saved without your location. Turn on location for this browser so next time shows you&apos;re at the clinic.</div>}
       {res?.ok && <div className="notice ok">{res.ok}{res.far != null && res.far > 300 && ` Your phone looked about ${res.far >= 1000 ? `${(res.far / 1000).toFixed(1)} km` : `${res.far} m`} away from the branch, so a manager may check.`}</div>}
     </div>
