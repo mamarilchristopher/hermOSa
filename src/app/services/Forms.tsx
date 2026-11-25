@@ -153,7 +153,7 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
       </div>}
       <div className="entry-grid">
         <label className={needsPartner ? "" : "span2"}>{!paid ? "Handled by" : type === "ASSIST" ? "Assisted by (you)" : type === "LEAD" ? "Lead (done by)" : "Done by"}
-          <select name="employee" required value={who} onChange={(e) => setWho(e.target.value)}>{people}</select>
+          <select name="employee" required value={who} onChange={(e) => { setWho(e.target.value); if (e.target.value === partner) setPartner(""); }}>{people}</select>
         </label>
         {needsPartner && (
           <label>{type === "ASSIST" ? "Lead (who led it)" : "Assisted by"}
@@ -166,7 +166,13 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
                 )}
               </select>
             ) : (
-              <select name="partner" required value={partner} onChange={(e) => setPartner(e.target.value)}>{people}</select>
+              <select name="partner" required value={partner} onChange={(e) => setPartner(e.target.value)}>
+                <option value="">Choose…</option>
+                {employees.filter((e) => e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}{e.eligible === false ? " (no commission)" : ""}</option>)}
+                {employees.some((e) => !e.here && e.id !== who) && (
+                  <optgroup label="Other branches">{employees.filter((e) => !e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</optgroup>
+                )}
+              </select>
             )}
           </label>
         )}

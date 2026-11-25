@@ -32,6 +32,7 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
   if (!p.success) return { error: "Fill in the client's name, the service, the amount paid and who did it." };
   let photos;
   try { photos = Photos.parse(JSON.parse(p.data.photos || "[]")); } catch { return { error: "The photos didn't attach. Remove them and add them again." }; }
+  if (p.data.partner && p.data.partner === p.data.employee) return { error: "The lead and the assistant must be different people." };
   const paid = p.data.kind === "PAID";
   let cents = 0;
   if (paid) {
