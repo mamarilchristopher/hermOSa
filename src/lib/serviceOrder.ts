@@ -1,6 +1,7 @@
 // Service order in every service list (CHRIS, Nov 26): his price-list order, best sellers first.
 // Services not on this list (added later) come after, A to Z.
 const ORDER = [
+  "TEST Service", // staff phone test, Nov 26 (CHRIS will delete it later)
   "Hiko Deluxe", "Hiko Pro", "Ultra Max Hiko", "Diamond Tip (No Alartox)", "Diamond Tip (with Alartox)", "Additional per Thread",
   "Alar Botox", "Fox Eye", "Hexalift", "Ultra VLift", "Barbie Arms Trio",
   "Additional Mono Thread (20pcs)", "Additional Mono Thread (30pcs)", "Additional Mono Thread (50pcs)", "Fillers", "Signature facial",
@@ -24,3 +25,6 @@ export function sortServices<T extends { name: string }>(list: T[]): T[] {
     return ra !== rb ? ra - rb : a.name.localeCompare(b.name);
   });
 }
+
+/** The temporary phone-test service (CHRIS, Nov 26). */
+export const isTestService = (name: string | null | undefined) => !!name && key(name).startsWith("testservice");

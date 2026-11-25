@@ -4,6 +4,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { phpToCents } from "@/lib/csv";
 import { errorText } from "@/lib/access";
+import { isTestService } from "@/lib/serviceOrder";
+import { testResult } from "@/lib/serviceTest";
 
 export type ActionState = { error?: string; ok?: string; at?: number; duplicate?: string } | undefined;
 
@@ -55,6 +57,13 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
   if (!data.ok) return { error: errorText(data.error) };
   revalidatePath("/services");
   revalidatePath("/me");
+  const [{ data: svc }, { data: emp }] = await Promise.all([
+    supabase.from("services").select("name").eq("id", p.data.service).maybeSingle(),
+    supabase.from("employees").select("commission_eligible").eq("id", p.data.employee).maybeSingle(),
+  ]);
+  if (isTestService(svc?.name)) {
+    return { ok: testResult({ kind: p.data.kind, cents, type: paid ? p.data.type : "NONCOMMI", eligible: emp?.commission_eligible ?? null, photos, photosDue: !!data.photos_due }), at: Date.now() };
+  }
   if (data.photos_due) return { ok: "Saved. The lead and assist were asked to add the client photos and waiver; their commission is held until they do.", at: Date.now() };
   return { ok: paid ? "Saved. Waiting for manager sign-off." : "Saved. Unpaid visit logged (no commission).", at: Date.now() };
 }

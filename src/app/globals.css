@@ -1233,3 +1233,4 @@ main.chat-main { --page: 1280px; padding-top: 20px; padding-bottom: 20px; }
 .photos-due { display: grid; gap: 8px; margin-top: 6px; }
 .add-later { display: grid; gap: 10px; padding: 10px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); background: var(--pearl); }
 .log-table tr.entry-focus { background: var(--gold-soft); }
+.notice.ok.test-pass { font-size: 1.05rem; padding: 16px 18px; }

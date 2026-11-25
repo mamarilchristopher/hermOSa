@@ -25,6 +25,8 @@ type Kind = (typeof KINDS)[number]["v"];
 
 function Msg({ s }: { s: ActionState }) {
   if (s?.error) return <div className="notice error">{s.error}</div>;
+  if (s?.ok?.startsWith("Test saved, but")) return <div className="notice warn">{s.ok}</div>;
+  if (s?.ok?.startsWith("✅")) return <div className="notice ok test-pass"><strong>{s.ok}</strong></div>;
   if (s?.ok) return <div className="notice ok">{s.ok}</div>;
   return null;
 }
