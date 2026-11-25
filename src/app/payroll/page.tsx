@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { Uid } from "@/components/Uid";
-import { openPayroll, deleteHoliday, addThirteenth } from "./actions";
-import { FinalizeForm, HolidayForm, PayRateForm, RulesForm, type PaySetting } from "./Forms";
+import { openPayroll, deleteHoliday, addThirteenth, decideCola } from "./actions";
+import { ColaForm, FinalizeForm, HolidayForm, PayRateForm, RulesForm, type PaySetting } from "./Forms";
 import { peso, periodLabel, manilaToday } from "@/lib/payroll";
 
 type Run = { id: string; period_start: string; period_end: string; state: "DRAFT" | "FINAL"; computed_at: string | null; finalized_at: string | null };
@@ -16,6 +16,7 @@ type Emp = { id: string; uid: string | null; full_name: string; position: string
 export default async function PayrollPage({ searchParams }: { searchParams: Promise<{ run?: string }> }) {
   const { supabase, access } = await requireAccess();
   if (!can(access, ["OWNER"], null) && !can(access, ["MANAGER"], null)) redirect("/payslips");
+  const owner = can(access, ["OWNER"], null);
   const { run: runParam } = await searchParams;
   const today = manilaToday();
   const lastCutoff = Number(today.slice(8, 10)) <= 15
@@ -25,10 +26,16 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   const [{ data: runsData, error: runsErr }, { data: emps }, { data: settings }, { data: hols }, { data: org }] = await Promise.all([
     supabase.from("payroll_runs").select("id, period_start, period_end, state, computed_at, finalized_at").order("period_start", { ascending: false }).limit(24),
     supabase.from("employees").select("id, uid, full_name, position").eq("active", true).order("full_name"),
-    supabase.from("pay_settings").select("employee_id, basis, rate_cents, allowance_cents, statutory, tax, deduct_lates, declared_cents"),
+    supabase.from("pay_settings").select("employee_id, basis, rate_cents, allowance_cents, statutory, tax, deduct_lates, declared_cents, cola_cents"),
     supabase.from("holidays").select("holiday_date, name, kind").gte("holiday_date", `${Number(today.slice(0, 4)) - 1}-12-01`).order("holiday_date"),
     supabase.from("organizations").select("payroll_rules").maybeSingle(),
   ]);
+  type ColaReq = { id: string; employee_id: string; old_cents: number; new_cents: number; created_at: string; employees: { full_name: string; uid: string | null } | null; app_users: { display_name: string | null } | null };
+  const { data: colaData } = await supabase.from("cola_requests")
+    .select("id, employee_id, old_cents, new_cents, created_at, employees(full_name, uid), app_users!cola_requests_requested_by_fkey(display_name)")
+    .eq("state", "PENDING").order("created_at");
+  const colaWaiting = (colaData ?? []) as unknown as ColaReq[];
+  const waitingFor = new Map(colaWaiting.map((c) => [c.employee_id, Number(c.new_cents)]));
   const rules = ((org as { payroll_rules?: { statutory_cutoff?: string; special_worked_premium?: boolean } } | null)?.payroll_rules) ?? {};
   const runs = (runsData ?? []) as Run[];
   const run = runs.find((r) => r.id === runParam) ?? runs[0] ?? null;
@@ -111,6 +118,27 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
           </div>
         )}
 
+        {colaWaiting.length > 0 && (
+          <div className="card" id="cola">
+            <h2>COLA changes waiting for an owner</h2>
+            <ul className="plain-list">
+              {colaWaiting.map((c) => (
+                <li key={c.id} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                  <strong>{c.employees?.full_name}</strong><Uid v={c.employees?.uid ?? null} />
+                  <span>{peso(c.old_cents)} → <strong>{peso(c.new_cents)}</strong> a month</span>
+                  <span className="small muted">asked by {c.app_users?.display_name ?? "the GM"}</span>
+                  {owner ? (
+                    <>
+                      <form action={decideCola}><input type="hidden" name="id" value={c.id} /><input type="hidden" name="approve" value="1" /><button className="small">Approve</button></form>
+                      <form action={decideCola}><input type="hidden" name="id" value={c.id} /><input type="hidden" name="approve" value="0" /><button className="small secondary">Turn down</button></form>
+                    </>
+                  ) : <span className="small muted">Only an owner can approve.</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {thirteenth.length > 0 && (
           <div className="card">
             <h2>13th month pay ({year})</h2>
@@ -149,13 +177,14 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
           <h2>Pay rates</h2>
           <p className="muted small">
             Monthly: half is paid each cutoff, and a day&apos;s pay (for absences) is monthly ÷ 26. Daily: paid for days worked, paid leave and regular holidays.
-            Allowance is per cutoff and not taxed. A declared salary, if set, is what SSS, PhilHealth, Pag-IBIG and tax are based on. Lates are only deducted when ticked. Staff without a rate aren&apos;t in payroll{noRate.length > 0 ? ` (${noRate.length} without one yet)` : ""}.
+            Allowance is per cutoff and not taxed. COLA is a month's amount, not taxed, paid in full on the 1st–15th cutoff; only an owner can set or approve it. A declared salary, if set, is what SSS, PhilHealth, Pag-IBIG and tax are based on. Lates are only deducted when ticked. Staff without a rate aren&apos;t in payroll{noRate.length > 0 ? ` (${noRate.length} without one yet)` : ""}.
           </p>
           <div className="pay-rates">
             {staff.map((e) => (
               <div key={e.id} className={`pay-rate-row${setting.has(e.id) ? "" : " missing"}`}>
                 <div><strong>{e.full_name}</strong><Uid v={e.uid} /> <span className="small muted">{e.position ?? ""}</span></div>
                 <PayRateForm employee={e.id} s={setting.get(e.id) ?? null} csr={(e.position ?? "").toUpperCase() === "CSR"} />
+                {setting.has(e.id) && <ColaForm key={`${e.id}-${setting.get(e.id)?.cola_cents ?? 0}`} employee={e.id} cola={Number(setting.get(e.id)?.cola_cents ?? 0)} owner={owner} waiting={waitingFor.get(e.id) ?? null} />}
               </div>
             ))}
           </div>

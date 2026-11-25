@@ -99,6 +99,8 @@ export const ERROR_TEXT: Record<string, string> = {
   NOT_AUTHENTICATED: "Please sign in again.",
   PAYROLL_IS_FINAL: "This payroll is final and can't change. Add it to the next cutoff instead.",
   CUTOFF_NOT_OVER: "This cutoff isn't over yet. You can finalize it on its last day.",
+  NO_PAY_RATE: "Save this person's pay rate first, then set the COLA.",
+  ALREADY_DECIDED: "Someone already decided this. Refresh the page.",
   INVALID_RULE: "Pick when government shares are deducted.",
   INVALID_HOLIDAY: "Pick a date, type the holiday's name and choose regular or special.",
   DAY_ALREADY_RECORDED: "That day already has sales or a mark.",

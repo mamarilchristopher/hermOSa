@@ -123,3 +123,27 @@ export async function addThirteenth(fd: FormData) {
   await supabase.rpc("add_thirteenth_month", { p_run: run.data });
   revalidatePath("/payroll"); revalidatePath("/payslips");
 }
+
+/** COLA for one person (a month's amount, paid on the 1st-15th cutoff). An Owner's change applies at once; the GM's waits for an Owner. */
+export async function requestCola(prev: PayState, fd: FormData): Promise<PayState> {
+  const n = (prev?.n ?? 0) + 1;
+  const emp = z.uuid().safeParse(String(fd.get("employee") ?? ""));
+  if (!emp.success) return { error: "Refresh the page and try again.", n };
+  const amount = cents(fd.get("cola"));
+  if (amount === "bad") return { error: "COLA is a peso amount, like 1500, or 0 for none.", n };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("request_cola", { p_employee: emp.data, p_cents: amount ?? 0 });
+  if (error) return { error: missing(error.code), n };
+  if (!data?.ok) return { error: errorText(data?.error), n };
+  revalidatePath("/payroll");
+  return { ok: data.applied ? "Saved." : "Sent to the owners to approve.", n };
+}
+
+/** Owners only: approve or turn down a COLA change the GM asked for. */
+export async function decideCola(fd: FormData) {
+  const id = z.uuid().safeParse(String(fd.get("id") ?? ""));
+  if (!id.success) return;
+  const supabase = await createClient();
+  await supabase.rpc("decide_cola", { p_request: id.data, p_approve: fd.get("approve") === "1" });
+  revalidatePath("/payroll");
+}

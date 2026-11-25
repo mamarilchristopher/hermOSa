@@ -9,11 +9,14 @@
 --   * 13th month pay: a month's basic pay x months worked in the year / 12, prorated from the start date for staff hired
 --     in the year (CHRIS: from Jan 1, 2026), less unpaid absences on final payslips / 12. CSRs (contractors) excluded.
 --     Added as a non-taxable line on a draft cutoff's payslips (due by Dec 24).
+--   * COLA per person: a monthly amount paid in full on the 1st-15th cutoff, not taxed. Only an Owner sets it; when the
+--     GM changes it, the change waits for an Owner to approve (CHRIS Nov 25).
 
 ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS payroll_rules jsonb NOT NULL
   DEFAULT '{"statutory_cutoff": "FIRST", "special_worked_premium": true, "daily_divisor": 26}';
 UPDATE public.organizations SET payroll_rules = payroll_rules || '{"special_worked_premium": true}';
 ALTER TABLE public.pay_settings ADD COLUMN IF NOT EXISTS declared_cents bigint CHECK (declared_cents IS NULL OR (declared_cents >= 0 AND declared_cents <= 100000000));
+ALTER TABLE public.pay_settings ADD COLUMN IF NOT EXISTS cola_cents bigint NOT NULL DEFAULT 0 CHECK (cola_cents >= 0 AND cola_cents <= 10000000);
 ALTER TABLE public.pay_settings ALTER COLUMN deduct_lates SET DEFAULT false;
 UPDATE public.pay_settings SET deduct_lates = false;
 
@@ -158,6 +161,10 @@ BEGIN
     v_earn := v_earn || jsonb_build_object('label', 'Allowance', 'amount', ps.allowance_cents);
     v_nontax := v_nontax + ps.allowance_cents;
   END IF;
+  IF ps.cola_cents > 0 AND v_first THEN
+    v_earn := v_earn || jsonb_build_object('label', 'COLA', 'amount', ps.cola_cents);
+    v_nontax := v_nontax + ps.cola_cents;
+  END IF;
   FOR a IN SELECT * FROM public.payslip_adjustments WHERE run_id = p_run AND employee_id = p_employee AND kind = 'EARNING' ORDER BY created_at LOOP
     v_earn := v_earn || jsonb_build_object('label', a.label, 'amount', a.amount_cents, 'adjustment', a.id);
     IF NOT a.taxable THEN v_nontax := v_nontax + a.amount_cents; END IF;
@@ -253,6 +260,84 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.thirteenth_month(integer), public.add_thirteenth_month(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.thirteenth_month(integer), public.add_thirteenth_month(uuid) TO authenticated;
+
+-- COLA changes. An Owner's change applies at once; the GM's waits for an Owner (one waiting change per person).
+CREATE TABLE IF NOT EXISTS public.cola_requests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES public.organizations(id),
+  employee_id uuid NOT NULL REFERENCES public.employees(id),
+  old_cents bigint NOT NULL DEFAULT 0,
+  new_cents bigint NOT NULL CHECK (new_cents >= 0 AND new_cents <= 10000000),
+  state text NOT NULL DEFAULT 'PENDING' CHECK (state IN ('PENDING','APPROVED','REJECTED')),
+  requested_by uuid NOT NULL REFERENCES public.app_users(id),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  decided_by uuid REFERENCES public.app_users(id),
+  decided_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS cola_requests_pending ON public.cola_requests (organization_id) WHERE state = 'PENDING';
+ALTER TABLE public.cola_requests ENABLE ROW LEVEL SECURITY;
+GRANT SELECT ON public.cola_requests TO authenticated;
+DROP POLICY IF EXISTS cola_requests_read ON public.cola_requests;
+CREATE POLICY cola_requests_read ON public.cola_requests FOR SELECT TO authenticated
+  USING (organization_id = private.current_org_id() AND private.can_payroll());
+
+CREATE OR REPLACE FUNCTION public.request_cola(p_employee uuid, p_cents bigint) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE v_org uuid := private.current_org_id(); v_me uuid := private.current_user_id(); v_old bigint; v_owner boolean; v_name text;
+BEGIN
+  IF v_me IS NULL THEN RETURN jsonb_build_object('ok', false, 'error', 'NOT_AUTHENTICATED'); END IF;
+  IF NOT private.can_payroll() THEN RETURN private.deny(NULL, 'cola'); END IF;
+  IF p_cents IS NULL OR p_cents < 0 OR p_cents > 10000000 THEN RETURN jsonb_build_object('ok', false, 'error', 'INVALID_AMOUNT'); END IF;
+  SELECT s.cola_cents, e.full_name INTO v_old, v_name FROM public.pay_settings s JOIN public.employees e ON e.id = s.employee_id
+  WHERE s.employee_id = p_employee AND s.organization_id = v_org;
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'NO_PAY_RATE'); END IF;
+  v_owner := private.has_role(ARRAY['OWNER'], NULL);
+  -- A newer change replaces one still waiting.
+  UPDATE public.cola_requests SET state = 'REJECTED', decided_by = v_me, decided_at = now()
+  WHERE employee_id = p_employee AND state = 'PENDING';
+  IF v_owner THEN
+    INSERT INTO public.cola_requests (organization_id, employee_id, old_cents, new_cents, state, requested_by, decided_by, decided_at)
+    VALUES (v_org, p_employee, v_old, p_cents, 'APPROVED', v_me, v_me, now());
+    UPDATE public.pay_settings SET cola_cents = p_cents, updated_by = v_me, updated_at = now() WHERE employee_id = p_employee;
+    PERFORM private.audit(NULL, 'COLA_SET', 'employee', p_employee::text, jsonb_build_object('cola_cents', v_old), jsonb_build_object('cola_cents', p_cents));
+    RETURN jsonb_build_object('ok', true, 'applied', true);
+  END IF;
+  INSERT INTO public.cola_requests (organization_id, employee_id, old_cents, new_cents, requested_by)
+  VALUES (v_org, p_employee, v_old, p_cents, v_me);
+  INSERT INTO public.notifications (organization_id, user_id, kind, title, body, link, created_by)
+  SELECT DISTINCT v_org, u.id, 'COLA_REQUEST', 'COLA change to approve',
+         left(v_name || ': ₱' || to_char(v_old / 100.0, 'FM999,990') || ' → ₱' || to_char(p_cents / 100.0, 'FM999,990') || ' a month. Asked by '
+           || coalesce((SELECT display_name FROM public.app_users WHERE id = v_me), 'the GM') || '.', 1000), '/payroll', v_me
+  FROM public.app_users u JOIN public.role_grants g ON g.user_id = u.id
+  WHERE u.organization_id = v_org AND u.active AND g.revoked_at IS NULL AND g.role_code = 'OWNER' AND u.id <> v_me;
+  PERFORM private.audit(NULL, 'COLA_REQUESTED', 'employee', p_employee::text, jsonb_build_object('cola_cents', v_old), jsonb_build_object('cola_cents', p_cents));
+  RETURN jsonb_build_object('ok', true, 'applied', false);
+END $$;
+
+-- Owners only (not the GM): approve or turn down a waiting COLA change.
+CREATE OR REPLACE FUNCTION public.decide_cola(p_request uuid, p_approve boolean) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE v_me uuid := private.current_user_id(); q public.cola_requests;
+BEGIN
+  IF v_me IS NULL THEN RETURN jsonb_build_object('ok', false, 'error', 'NOT_AUTHENTICATED'); END IF;
+  IF NOT private.has_role(ARRAY['OWNER'], NULL) THEN RETURN private.deny(NULL, 'cola_approve'); END IF;
+  SELECT * INTO q FROM public.cola_requests WHERE id = p_request AND organization_id = private.current_org_id() FOR UPDATE;
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'NOT_FOUND'); END IF;
+  IF q.state <> 'PENDING' THEN RETURN jsonb_build_object('ok', false, 'error', 'ALREADY_DECIDED'); END IF;
+  UPDATE public.cola_requests SET state = CASE WHEN p_approve THEN 'APPROVED' ELSE 'REJECTED' END, decided_by = v_me, decided_at = now() WHERE id = q.id;
+  IF p_approve THEN
+    UPDATE public.pay_settings SET cola_cents = q.new_cents, updated_by = v_me, updated_at = now() WHERE employee_id = q.employee_id;
+  END IF;
+  INSERT INTO public.notifications (organization_id, user_id, kind, title, body, link, created_by)
+  SELECT q.organization_id, q.requested_by, 'COLA_DECIDED', CASE WHEN p_approve THEN 'COLA change approved' ELSE 'COLA change not approved' END,
+         left(e.full_name || ': ₱' || to_char(q.new_cents / 100.0, 'FM999,990') || ' a month.', 1000), '/payroll', v_me
+  FROM public.employees e WHERE e.id = q.employee_id AND q.requested_by <> v_me;
+  PERFORM private.audit(NULL, CASE WHEN p_approve THEN 'COLA_APPROVED' ELSE 'COLA_REJECTED' END, 'employee', q.employee_id::text,
+    jsonb_build_object('cola_cents', q.old_cents), jsonb_build_object('cola_cents', q.new_cents));
+  RETURN jsonb_build_object('ok', true);
+END $$;
+REVOKE ALL ON FUNCTION public.request_cola(uuid, bigint), public.decide_cola(uuid, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.request_cola(uuid, bigint), public.decide_cola(uuid, boolean) TO authenticated;
 
 -- Recompute open (draft) payrolls with the new rules.
 DO $$ DECLARE r record; BEGIN FOR r IN SELECT id FROM public.payroll_runs WHERE state = 'DRAFT' LOOP PERFORM private.compute_run(r.id); END LOOP; END $$;

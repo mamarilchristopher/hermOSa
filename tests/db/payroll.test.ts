@@ -162,6 +162,25 @@ describe("payroll", () => {
     await db.sql("UPDATE public.employees SET position = 'CMA' WHERE id = $1", [beaE]);
   });
 
+  it("COLA: only an owner sets it, the GM's change waits for an owner; paid in full on the 1st-15th cutoff, not taxed", async () => {
+    expect((await db.rpc(lead, "aal1", "request_cola", [anaE, 150_000])).ok).toBe(false);
+    expect(await db.rpc(gm, "aal1", "request_cola", [anaE, 150_000])).toMatchObject({ ok: true, applied: false });
+    expect((await db.sql("SELECT cola_cents FROM public.pay_settings WHERE employee_id = $1", [anaE])).rows[0].cola_cents).toBe("0");
+    const req = (await db.sql("SELECT id FROM public.cola_requests WHERE employee_id = $1 AND state = 'PENDING'", [anaE])).rows[0].id;
+    expect((await db.sql("SELECT count(*)::int AS n FROM public.notifications WHERE user_id = $1 AND kind = 'COLA_REQUEST'", [owner.appUserId])).rows[0].n).toBe(1);
+    expect((await db.rpc(gm, "aal1", "decide_cola", [req, true])).ok).toBe(false); // the GM can't approve
+    expect((await db.rpc(owner, "aal2", "decide_cola", [req, true])).ok).toBe(true);
+    expect((await db.rpc(owner, "aal2", "decide_cola", [req, true])).error).toBe("ALREADY_DECIDED");
+    expect((await db.sql("SELECT cola_cents FROM public.pay_settings WHERE employee_id = $1", [anaE])).rows[0].cola_cents).toBe("150000");
+    expect(await db.rpc(owner, "aal2", "request_cola", [beaE, 250_000])).toMatchObject({ ok: true, applied: true });
+    const first = await db.rpc(gm, "aal1", "open_payroll", ["2026-08-01"]);
+    const second = await db.rpc(gm, "aal1", "open_payroll", ["2026-08-20"]);
+    const s1 = (await db.sql("SELECT * FROM public.payslips WHERE run_id = $1 AND employee_id = $2", [first.id, anaE])).rows[0];
+    const s2 = (await db.sql("SELECT * FROM public.payslips WHERE run_id = $1 AND employee_id = $2", [second.id, anaE])).rows[0];
+    expect(amt(s1.earnings, "COLA")).toBe(150_000);
+    expect(amt(s2.earnings, "COLA")).toBeUndefined();
+  });
+
   it("a cutoff that hasn't ended can't be finalized", async () => {
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
     const o = await db.rpc(gm, "aal1", "open_payroll", [today]);

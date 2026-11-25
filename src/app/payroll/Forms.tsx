@@ -1,6 +1,6 @@
 "use client";
 import { useActionState } from "react";
-import { addAdjustment, finalizePayroll, saveHoliday, savePaySettings, savePayrollRules } from "./actions";
+import { addAdjustment, finalizePayroll, requestCola, saveHoliday, savePaySettings, savePayrollRules } from "./actions";
 
 const php = (c: number | null | undefined) => (c == null ? "" : String(c / 100));
 const Msg = ({ st }: { st?: { ok?: string; error?: string } }) => (
@@ -10,7 +10,7 @@ const Msg = ({ st }: { st?: { ok?: string; error?: string } }) => (
   </>
 );
 
-export type PaySetting = { basis: "MONTHLY" | "DAILY"; rate_cents: number; allowance_cents: number; statutory: boolean; tax: boolean; deduct_lates: boolean; declared_cents?: number | null };
+export type PaySetting = { basis: "MONTHLY" | "DAILY"; rate_cents: number; allowance_cents: number; statutory: boolean; tax: boolean; deduct_lates: boolean; declared_cents?: number | null; cola_cents?: number | null };
 
 /** One staff member's pay rate and switches. CSRs default to basic pay only (no government shares or tax). */
 export function PayRateForm({ employee, s, csr }: { employee: string; s: PaySetting | null; csr: boolean }) {
@@ -96,6 +96,21 @@ export function RulesForm({ statutory, special }: { statutory: string; special: 
       </label>
       <label className="check"><input type="checkbox" name="special" defaultChecked={special} /> +30% for working a special day</label>
       <button className="small" disabled={pending}>{pending ? "Saving…" : "Save rules"}</button>
+      <Msg st={st} />
+    </form>
+  );
+}
+
+/** COLA (a month's amount, paid on the 1st-15th cutoff). Owners save it; the GM's change goes to the owners to approve. */
+export function ColaForm({ employee, cola, owner, waiting }: { employee: string; cola: number; owner: boolean; waiting: number | null }) {
+  const [st, action, pending] = useActionState(requestCola, undefined);
+  return (
+    <form action={action} className="pay-rate">
+      <input type="hidden" name="employee" value={employee} />
+      <span className="small">COLA ₱/month</span>
+      <input name="cola" defaultValue={php(cola)} inputMode="decimal" placeholder="0" aria-label="COLA per month" />
+      <button className="small secondary" disabled={pending}>{pending ? "Saving…" : owner ? "Save COLA" : "Ask owner to approve"}</button>
+      {waiting != null && <span className="small muted">Waiting for an owner: ₱{(waiting / 100).toLocaleString("en-PH")}</span>}
       <Msg st={st} />
     </form>
   );
