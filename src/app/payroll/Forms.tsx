@@ -19,16 +19,20 @@ export function PayRateForm({ employee, s, csr }: { employee: string; s: PaySett
   return (
     <form action={action} className="pay-rate">
       <input type="hidden" name="employee" value={employee} />
-      <select name="basis" defaultValue={s?.basis ?? "MONTHLY"} aria-label="Pay basis">
-        <option value="MONTHLY">Monthly</option>
-        <option value="DAILY">Daily</option>
-      </select>
-      <input name="rate" defaultValue={php(s?.rate_cents)} inputMode="decimal" placeholder="Rate ₱" aria-label="Rate in pesos" required />
-      <input name="allowance" defaultValue={php(s?.allowance_cents || null)} inputMode="decimal" placeholder="Allowance ₱/cutoff" aria-label="Allowance per cutoff" />
-      <input name="declared" defaultValue={php(s?.declared_cents ?? null)} inputMode="decimal" placeholder="Declared salary ₱" aria-label="Declared salary for SSS, PhilHealth, Pag-IBIG and tax" title="Leave empty to use the rate" />
-      <label className="check"><input type="checkbox" name="statutory" defaultChecked={gov} /> SSS, PhilHealth, Pag-IBIG</label>
-      <label className="check"><input type="checkbox" name="tax" defaultChecked={tax} /> Tax</label>
-      <label className="check"><input type="checkbox" name="lates" defaultChecked={s ? s.deduct_lates : false} /> Deduct lates</label>
+      <label className="mini">Basis
+        <select name="basis" defaultValue={s?.basis ?? "MONTHLY"}>
+          <option value="MONTHLY">Monthly</option>
+          <option value="DAILY">Daily</option>
+        </select>
+      </label>
+      <label className="mini">Rate ₱<input name="rate" defaultValue={php(s?.rate_cents)} inputMode="decimal" placeholder="e.g. 15000" required /></label>
+      <label className="mini">Allowance ₱/cutoff<input name="allowance" defaultValue={php(s?.allowance_cents || null)} inputMode="decimal" placeholder="0" /></label>
+      <label className="mini" title="Leave empty to use the rate">Declared salary ₱<input name="declared" defaultValue={php(s?.declared_cents ?? null)} inputMode="decimal" placeholder="same as rate" /></label>
+      <div className="pay-switches">
+        <label className="check"><input type="checkbox" name="statutory" defaultChecked={gov} /> SSS, PhilHealth, Pag-IBIG</label>
+        <label className="check"><input type="checkbox" name="tax" defaultChecked={tax} /> Tax</label>
+        <label className="check"><input type="checkbox" name="lates" defaultChecked={s ? s.deduct_lates : false} /> Deduct lates</label>
+      </div>
       <button className="small" disabled={pending}>{pending ? "Saving…" : "Save"}</button>
       <Msg st={st} />
     </form>
@@ -38,9 +42,9 @@ export function PayRateForm({ employee, s, csr }: { employee: string; s: PaySett
 export function FinalizeForm({ run }: { run: string }) {
   const [st, action, pending] = useActionState(finalizePayroll, undefined);
   return (
-    <form action={action} className="row-buttons">
+    <form action={action} className="finalize-bar">
       <input type="hidden" name="run" value={run} />
-      <label className="check"><input type="checkbox" name="confirm" /> I checked the payslips</label>
+      <label className="finalize-check"><input type="checkbox" name="confirm" /> <span>I checked every payslip</span></label>
       <button disabled={pending}>{pending ? "Finalizing…" : "Finalize and send payslips"}</button>
       <Msg st={st} />
     </form>
@@ -105,10 +109,9 @@ export function RulesForm({ statutory, special }: { statutory: string; special: 
 export function ColaForm({ employee, cola, owner, waiting }: { employee: string; cola: number; owner: boolean; waiting: number | null }) {
   const [st, action, pending] = useActionState(requestCola, undefined);
   return (
-    <form action={action} className="pay-rate">
+    <form action={action} className="pay-rate cola-form">
       <input type="hidden" name="employee" value={employee} />
-      <span className="small">COLA ₱/month</span>
-      <input name="cola" defaultValue={php(cola)} inputMode="decimal" placeholder="0" aria-label="COLA per month" />
+      <label className="mini">COLA ₱/month<input name="cola" defaultValue={php(cola)} inputMode="decimal" placeholder="0" /></label>
       <button className="small secondary" disabled={pending}>{pending ? "Saving…" : owner ? "Save COLA" : "Ask owner to approve"}</button>
       {waiting != null && <span className="small muted">Waiting for an owner: ₱{(waiting / 100).toLocaleString("en-PH")}</span>}
       <Msg st={st} />

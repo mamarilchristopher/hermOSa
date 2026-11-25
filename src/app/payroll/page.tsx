@@ -19,9 +19,6 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   const owner = can(access, ["OWNER"], null);
   const { run: runParam, find } = await searchParams;
   const today = manilaToday();
-  const lastCutoff = Number(today.slice(8, 10)) <= 15
-    ? new Date(Date.parse(`${today.slice(0, 7)}-01T00:00:00Z`) - 86400000).toISOString().slice(0, 10)
-    : `${today.slice(0, 7)}-01`;
 
   const cutoffs: string[] = [];
   {
@@ -47,6 +44,8 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   const waitingFor = new Map(colaWaiting.map((c) => [c.employee_id, Number(c.new_cents)]));
   const rules = ((org as { payroll_rules?: { statutory_cutoff?: string; special_worked_premium?: boolean } } | null)?.payroll_rules) ?? {};
   const runs = (runsData ?? []) as Run[];
+  const runState = new Map(runs.map((r) => [r.period_start, r.state === "FINAL" ? "Final" : "Draft"]));
+  const when = (t: string) => new Date(t).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   const run = runs.find((r) => r.id === runParam) ?? runs[0] ?? null;
   const { data: slipsData } = run
     ? await supabase.from("payslips").select("id, employee_id, slip_no, gross_cents, deductions_cents, net_cents, earnings, employees(full_name, uid)").eq("run_id", run.id)
@@ -74,73 +73,76 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         </p>
         {runsErr && <div className="notice info">{runsErr.code === "42P01" ? "The owner needs to run update-0046 in Supabase first." : "Could not load. Try again."}</div>}
 
-        <div className="card">
-          <h2>Open a payslip</h2>
-          <form action={openPayslip} className="pay-rate">
-            <select name="employee" required defaultValue="" aria-label="Employee">
-              <option value="" disabled>Employee…</option>
-              {staff.map((e) => <option key={e.id} value={e.id}>{e.full_name}{e.uid ? ` (${e.uid})` : ""}</option>)}
-            </select>
-            <select name="date" defaultValue={cutoffs[0]} aria-label="Cutoff">
-              {cutoffs.map((d) => <option key={d} value={d}>{periodLabel(d)}{d === cutoffs[0] ? " (current)" : ""}</option>)}
-            </select>
-            <button className="small">Open payslip</button>
+        <div className="card pay-tools">
+          <form action={openPayroll} className="pay-tool">
+            <span className="pay-tool-title">Cutoff</span>
+            <div className="pay-tool-row">
+              <select name="date" defaultValue={run?.period_start ?? cutoffs[0]} aria-label="Cutoff">
+                {cutoffs.map((d) => <option key={d} value={d}>{periodLabel(d)}{runState.get(d) ? ` · ${runState.get(d)}` : d === cutoffs[0] ? " · current" : ""}</option>)}
+              </select>
+              <button>Open</button>
+            </div>
           </form>
-          {find === "none" && <p className="small" style={{ color: "var(--bad)" }}>No payslip for that person on that cutoff. Check that they have a pay rate.</p>}
-          {find === "error" && <p className="small" style={{ color: "var(--bad)" }}>Could not open that cutoff. Try again.</p>}
-          <p className="small muted" style={{ marginBottom: 0 }}>A cutoff that isn&apos;t final yet is worked out fresh when you open it.</p>
-        </div>
-
-        <div className="card">
-          <h2>Cutoff</h2>
-          <div className="row-buttons">
-            <form action={openPayroll}><input type="hidden" name="date" value={lastCutoff} /><button className="secondary">Open {periodLabel(lastCutoff)}</button></form>
-            <form action={openPayroll}><input type="hidden" name="date" value={today} /><button className="secondary">Open {periodLabel(today)} (so far)</button></form>
-          </div>
-          {runs.length > 0 && (
-            <p className="small" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 0 }}>
-              {runs.map((r) => (
-                <Link key={r.id} href={`/payroll?run=${r.id}`} className={`chip${run?.id === r.id ? " on" : ""}`}>
-                  {periodLabel(r.period_start)} · {r.state === "FINAL" ? "Final" : "Draft"}
-                </Link>
-              ))}
-            </p>
-          )}
+          <form action={openPayslip} className="pay-tool">
+            <span className="pay-tool-title">One person&apos;s payslip</span>
+            <div className="pay-tool-row">
+              <select name="employee" required defaultValue="" aria-label="Employee">
+                <option value="" disabled>Employee…</option>
+                {staff.map((e) => <option key={e.id} value={e.id}>{e.full_name}{e.uid ? ` (${e.uid})` : ""}</option>)}
+              </select>
+              <select name="date" defaultValue={run?.period_start ?? cutoffs[0]} aria-label="Cutoff">
+                {cutoffs.map((d) => <option key={d} value={d}>{periodLabel(d)}</option>)}
+              </select>
+              <button className="secondary">View</button>
+            </div>
+          </form>
+          {find === "none" && <p className="small" style={{ color: "var(--bad)", margin: 0 }}>No payslip for that person on that cutoff. Check that they have a pay rate.</p>}
+          {find === "error" && <p className="small" style={{ color: "var(--bad)", margin: 0 }}>Could not open that cutoff. Try again.</p>}
         </div>
 
         {run && (
           <div className="card">
-            <h2>{periodLabel(run.period_start)} <span className={`pill ${run.state === "FINAL" ? "PUBLISHED" : "STAGED"}`}>{run.state === "FINAL" ? "Final" : "Draft"}</span></h2>
-            {run.state === "DRAFT" && (
-              <form action={openPayroll} className="small muted" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <input type="hidden" name="date" value={run.period_start} />
-                Worked out {run.computed_at ? new Date(run.computed_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "not yet"}.
-                <button className="secondary small">Recompute now</button>
-              </form>
-            )}
+            <div className="run-head">
+              <h2>{periodLabel(run.period_start)} <span className={`pill ${run.state === "FINAL" ? "PUBLISHED" : "STAGED"}`}>{run.state === "FINAL" ? "Final" : "Draft"}</span></h2>
+              {run.state === "DRAFT" ? (
+                <form action={openPayroll} className="run-head-meta">
+                  <input type="hidden" name="date" value={run.period_start} />
+                  <span>Worked out {run.computed_at ? when(run.computed_at) : "not yet"}</span>
+                  <button className="secondary small">Recompute</button>
+                </form>
+              ) : (
+                <span className="run-head-meta">Finalized {run.finalized_at ? when(run.finalized_at) : ""}</span>
+              )}
+            </div>
             {slips.length === 0 && <p className="muted small">No payslips. Set pay rates below first.</p>}
             {slips.length > 0 && (
-              <div className="table-wrap">
-                <table>
-                  <thead><tr><th>Name</th><th className="num">Commission</th><th className="num">Gross</th><th className="num">Deductions</th><th className="num">Net pay</th><th></th></tr></thead>
-                  <tbody>
-                    {slips.map((s) => (
-                      <tr key={s.id}>
-                        <td>{s.employees?.full_name}<Uid v={s.employees?.uid ?? null} /></td>
-                        <td className="num">{peso(comm(s))}</td>
-                        <td className="num">{peso(s.gross_cents)}</td>
-                        <td className="num">{peso(s.deductions_cents)}</td>
-                        <td className="num"><strong>{peso(s.net_cents)}</strong></td>
-                        <td><Link href={`/payslips/${s.id}`}>{run.state === "DRAFT" ? "Check / add lines" : "Payslip"}</Link></td>
-                      </tr>
-                    ))}
-                    <tr className="total"><td>Total ({slips.length})</td><td></td><td className="num">{peso(sum("gross_cents"))}</td><td className="num">{peso(sum("deductions_cents"))}</td><td className="num"><strong>{peso(sum("net_cents"))}</strong></td><td></td></tr>
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div className="run-totals">
+                  <div><span>People</span><strong>{slips.length}</strong></div>
+                  <div><span>Gross</span><strong>{peso(sum("gross_cents"))}</strong></div>
+                  <div><span>Deductions</span><strong>{peso(sum("deductions_cents"))}</strong></div>
+                  <div className="net"><span>Net pay</span><strong>{peso(sum("net_cents"))}</strong></div>
+                </div>
+                <div className="slip-list">
+                  <div className="slip-head" aria-hidden="true">
+                    <span>Name</span><span>Commission</span><span>Gross</span><span>Deductions</span><span>Net pay</span><span />
+                  </div>
+                  {slips.map((s) => (
+                    <Link key={s.id} href={`/payslips/${s.id}`} className="slip-row" title={run.state === "DRAFT" ? "Check or add lines" : "Open payslip"}>
+                      <span className="slip-name">{s.employees?.full_name}<Uid v={s.employees?.uid ?? null} /></span>
+                      <span className="slip-fig"><small>Commission</small>{comm(s) ? peso(comm(s)) : "–"}</span>
+                      <span className="slip-fig"><small>Gross</small>{peso(s.gross_cents)}</span>
+                      <span className="slip-fig"><small>Deductions</small>{Number(s.deductions_cents) ? peso(s.deductions_cents) : "–"}</span>
+                      <span className="slip-net"><small>Net pay</small>{peso(s.net_cents)}</span>
+                      <span className="slip-go" aria-hidden="true">›</span>
+                      <span className="slip-sub">Gross {peso(s.gross_cents)} · Deductions {peso(s.deductions_cents)}{comm(s) ? ` · Commission ${peso(comm(s))}` : ""}</span>
+                    </Link>
+                  ))}
+                </div>
+              </>
             )}
             {run.state === "DRAFT" && slips.length > 0 && <FinalizeForm run={run.id} />}
-            {run.state === "FINAL" && <p className="small muted">Finalized {run.finalized_at ? new Date(run.finalized_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""}. Staff can see their payslips under My payslips.</p>}
+            {run.state === "FINAL" && <p className="small muted" style={{ marginBottom: 0 }}>Staff can see their payslips under My payslips.</p>}
           </div>
         )}
 
