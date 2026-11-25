@@ -110,3 +110,51 @@ export function HermosappCard() {
     </div>
   );
 }
+
+/**
+ * Timed-in staff must have phone notifications on (CHRIS Nov 26: "Red reminder only").
+ * A red bar that can't be closed stays on every page until this device is subscribed.
+ */
+export function NotifyRequired() {
+  const [s, setS] = useState<"ok" | "ask" | "denied" | "install" | "unsupported" | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const check = async () => {
+      const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+      const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
+      const push = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+      if (!push) { setS(ios && !standalone ? "install" : "unsupported"); return; }
+      if (Notification.permission === "denied") { setS("denied"); return; }
+      if (Notification.permission === "granted") {
+        const reg = await navigator.serviceWorker.getRegistration("/");
+        if (await reg?.pushManager.getSubscription()) { setS("ok"); return; }
+      }
+      setS("ask");
+    };
+    void check();
+    const on = () => { if (document.visibilityState === "visible") void check(); };
+    document.addEventListener("visibilitychange", on);
+    return () => document.removeEventListener("visibilitychange", on);
+  }, []);
+  if (!s || s === "ok") return null;
+  const turnOn = async () => {
+    setBusy(true); setMsg(null);
+    const err = await subscribe().catch(() => "Couldn't turn on notifications. Try again.");
+    setBusy(false);
+    if (err) setMsg(err); else setS("ok");
+  };
+  return (
+    <div className="notify-required" role="alert">
+      <strong>Notifications are required while you&apos;re timed in.</strong>
+      <span>
+        {s === "ask" && "Turn them on so you get chat messages and urgent reminders on this phone."}
+        {s === "denied" && "They're blocked on this phone. Open your phone's Settings, find Hermosapp (or your browser) › Notifications, and allow them. Then come back here."}
+        {s === "install" && <>On iPhone, add Hermosapp to your Home Screen first: in Safari tap <b>Share</b> ⬆︎, then <b>Add to Home Screen</b>. Open it from there and turn on notifications.</>}
+        {s === "unsupported" && "This phone or browser can't get notifications. Update your phone (iPhone: iOS 16.4 or newer) or open Hermosapp in Chrome."}
+      </span>
+      {msg && <span className="nr-msg">{msg}</span>}
+      {s === "ask" && <button type="button" className="small" onClick={turnOn} disabled={busy}>{busy ? "Turning on…" : "Turn on notifications"}</button>}
+    </div>
+  );
+}

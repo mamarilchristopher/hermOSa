@@ -11,6 +11,8 @@ import { Avatar } from "./Avatar";
 import { photoUrls } from "@/lib/photos";
 import { NotifBell } from "./NotifBell";
 import { ChatAlerts } from "./ChatAlerts";
+import { NotifyRequired } from "./Hermosapp";
+import { manilaToday } from "@/lib/dates";
 
 const ROLE_LABEL: Record<string, string> = {
   OWNER: "Owner", FINANCE: "Finance", MANAGER: "Manager", CASHIER: "Cashier", HR: "HR",
@@ -36,6 +38,9 @@ export async function TopBar({ access }: { access: Access }) {
     detailsApprover ? supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("filed_by", owner ? "00000000-0000-0000-0000-000000000000" : access.user_id) : Promise.resolve({ count: 0 }),
     supabase.rpc("chat_unread"), // errors (before update-0049) mean no badge
   ]);
+  // Timed in right now (last punch today is IN): phone notifications are required (CHRIS Nov 26, red reminder).
+  const { data: lastPunch } = await supabase.from("time_punches").select("kind").eq("user_id", access.user_id).eq("work_date", manilaToday()).order("punched_at", { ascending: false }).limit(1).maybeSingle();
+  const timedIn = (lastPunch as { kind?: string } | null)?.kind === "IN";
   const myPhoto = (meRow as { photo_path?: string | null } | null)?.photo_path ?? null;
   const myPhotoUrl = myPhoto ? (await photoUrls(supabase, [myPhoto])).get(myPhoto) ?? null : null;
   const viewList = Array.isArray(viewPeople) ? (viewPeople as { id: string; name: string; position: string | null }[]) : [];
@@ -144,6 +149,7 @@ export async function TopBar({ access }: { access: Access }) {
       <HubTabs hubs={hubs} />
       {/* v0.49: chat sounds, and the can't-miss notice when management messages staff. */}
       <ChatAlerts me={access.user_id} management={viewAs} />
+      {timedIn && <NotifyRequired />}
     </>
   );
 }
