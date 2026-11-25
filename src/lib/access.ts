@@ -66,6 +66,7 @@ export function branchesFor(a: Access, branches: Branch[], roles: Role[]) {
 
 export const ERROR_TEXT: Record<string, string> = {
   FORBIDDEN: "You don't have access to that.",
+  BAD_START_DATE: "That start date doesn't look right. Check the year.",
   NOT_SCHEDULED: "That day isn't on the published schedule yet.",
   SAME_SHIFT: "You both have the same schedule that day, so there's nothing to swap.",
   NOT_A_DAY_OFF: "Pick one of your days off as the day you'll work.",

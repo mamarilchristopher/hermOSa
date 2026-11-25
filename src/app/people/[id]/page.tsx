@@ -8,6 +8,7 @@ import { manilaToday } from "@/lib/dates";
 import { addMonths, monthEnd, monthLabel } from "@/lib/insights";
 import { ROLE_TEXT } from "@/lib/commission";
 import { EmployeeForm } from "../EmployeeForm";
+import { StartDateForm } from "../StartDateForm";
 import { Reveal } from "@/components/Reveal";
 import { DetailsView } from "@/components/DetailsView";
 import type { Details } from "@/lib/employeeDetails";
@@ -19,7 +20,7 @@ export default async function Employee({ params, searchParams }: { params: Promi
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) notFound();
   const { supabase, access, branches } = await requireAccess();
-  const { data: e } = await supabase.from("employees").select("id, uid, full_name, branch_id, position, commission_eligible, app_user_id, active").eq("id", id).maybeSingle();
+  const { data: e } = await supabase.from("employees").select("id, uid, full_name, branch_id, position, commission_eligible, app_user_id, active, hire_date").eq("id", id).maybeSingle();
   if (!e) notFound();
   const sp = await searchParams;
   const thisMonth = manilaToday().slice(0, 7);
@@ -35,6 +36,8 @@ export default async function Employee({ params, searchParams }: { params: Promi
   const branchName = Object.fromEntries(branches.map((b) => [b.id, b.name]));
   const canEdit = can(access, ["OWNER", "HR", "MANAGER"], e.branch_id);
   const isOwner = can(access, ["OWNER"], null);
+  // Owners and the General Manager (company-wide manager) may override the start date.
+  const ownerLevel = isOwner || access.grants.some((g) => g.role === "MANAGER" && !g.branch_id);
   const { data: users } = isOwner ? await supabase.from("app_users").select("id, display_name").eq("active", true).order("display_name") : { data: null };
   const isMe = e.app_user_id === access.user_id;
   // Approved personal details (IDs, bank): owners only. RLS enforces the same.
@@ -49,7 +52,7 @@ export default async function Employee({ params, searchParams }: { params: Promi
       <main>
         {!isMe && <nav className="crumbs"><Link className="back" href="/people">← Employees</Link></nav>}
         <h1>{isMe ? "My commissions" : e.full_name} <Uid v={e.uid} /></h1>
-        <p className="muted small">{e.position ?? "Staff"} · {branchName[e.branch_id]} · {e.commission_eligible ? "commission-based" : "not commission-based"}{!e.active && " · inactive"}</p>
+        <p className="muted small">{e.position ?? "Staff"} · {branchName[e.branch_id]} · {e.commission_eligible ? "commission-based" : "not commission-based"}{e.hire_date && ` · started ${new Date(`${e.hire_date}T00:00:00+08:00`).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" })}`}{!e.active && " · inactive"}</p>
 
         <div className="periods card">
           <div className="segmented">
@@ -105,6 +108,12 @@ export default async function Employee({ params, searchParams }: { params: Promi
               {det ? `approved ${String(det.approved_at).slice(0, 10)} · owners only` : "not sent or not approved yet"}</span></summary>
             {det ? <DetailsView data={det.data as Details} /> : <p className="small muted">They fill these in from their Home page. Review them under Staff details.</p>}
           </details>
+        )}
+        {ownerLevel && (
+          <div className="card">
+            <h2>Start date</h2>
+            <StartDateForm id={e.id} date={e.hire_date} />
+          </div>
         )}
         {canEdit && !isMe && (
           <div className="card">

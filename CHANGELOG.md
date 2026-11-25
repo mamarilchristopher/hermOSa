@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.33.0 | Nov 25, 2026 | update-0033 | Owners and the General Manager can set or correct any staff member's start date on the employee's page (Employees > name > Start date); the date shows under the name and every change is logged |
 | 0.32.3 | Nov 25, 2026 | none | Time clock works in the Messenger in-app browser and older phones: the photo name no longer needs crypto.randomUUID (the "Something went wrong" Saralyn and Vanessa saw) |
 | 0.32.2 | Nov 25, 2026 | none | Users and roles: staff split into Active and Inactive sections; Employees: inactive records moved to their own Inactive section at the bottom |
 | 0.32.1 | Nov 25, 2026 | none | Time clock: if Hermosa OS is updated while the clock page is open, Time in / Time out no longer fails with "Something went wrong"; the page reloads itself and finishes the punch with the photo already taken. A photo the phone can't read now says so instead of a general error, and errors show a Reload button |

@@ -47,3 +47,16 @@ export async function setPosition(_prev: EmpState, fd: FormData): Promise<EmpSta
   revalidatePath("/admin/users");
   return { ok: "Saved" };
 }
+
+/** Owners and the General Manager set or correct a staff member's start date (update-0033). Empty clears it. */
+export async function setStartDate(_prev: EmpState, fd: FormData): Promise<EmpState> {
+  const p = z.object({ id: z.uuid(), date: z.union([z.iso.date(), z.literal("")]) }).safeParse({ id: fd.get("id"), date: fd.get("date") ?? "" });
+  if (!p.success) return { error: "Pick a date." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_employee_start_date", { p_employee: p.data.id, p_date: p.data.date || null });
+  if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0033 in Supabase first." : "Could not save. Try again." };
+  if (!data?.ok) return { error: errorText(data?.error) };
+  revalidatePath(`/people/${p.data.id}`);
+  revalidatePath("/people");
+  return { ok: data.changed ? "Start date saved." : "No change." };
+}
