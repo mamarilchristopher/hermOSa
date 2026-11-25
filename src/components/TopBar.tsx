@@ -41,11 +41,14 @@ export async function TopBar({ access }: { access: Access }) {
   const importer = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
   const filler = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER"].includes(g.role));
   const management = access.grants.some((g) => ["OWNER", "FINANCE", "AUDITOR", "MANAGER"].includes(g.role));
+  // Bookings (update-0040): CSRs, owners and the GM book; branch staff see their branch's visits.
+  const booker = access.grants.some((g) => ["CSR", "OWNER", "MANAGER", "CLINICIAN", "CASHIER"].includes(g.role));
   const items: NavItem[] = [
     { href: "/me", label: "Home", short: "Home", icon: "home", badge: unreadNotices || undefined },
     ...(management ? [{ href: "/", label: "Sales dashboard", short: "Sales", icon: "chart" } as NavItem] : []),
     ...(filler ? [{ href: "/sales/daily", label: "Daily Sales", short: "Daily", icon: "pen" } as NavItem] : []),
     ...(logger ? [{ href: "/services", label: "Service log", short: "Services", icon: "clipboard", badge: overdue.length || undefined } as NavItem] : []),
+    ...(booker ? [{ href: "/bookings", label: "Bookings", short: "Bookings", icon: "calendar" } as NavItem] : []),
     { href: "/schedule", label: "Schedule", short: "Schedule", icon: "week" } as NavItem,
     { href: "/time", label: "Time clock", short: "Clock", icon: "clock" } as NavItem,
     { href: "/leave", label: "Leave", short: "Leave", icon: "calendar", badge: leaveWaiting || undefined } as NavItem,

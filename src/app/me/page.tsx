@@ -154,6 +154,18 @@ export default async function Me() {
   if (swapAsks) (home?.todos ?? staffTodos)?.unshift({ text: `${swapAsks === 1 ? "A coworker asked" : `${swapAsks} coworkers asked`} to swap schedules with you. Accept or decline`, href: "/schedule", urgent: true });
   if (!leaveErr && leaveWaiting) (home?.todos ?? staffTodos)?.unshift({ text: `${leaveWaiting} leave request${leaveWaiting === 1 ? " is" : "s are"} waiting for your approval`, href: "/leave" });
   for (const l of (myLeave ?? []) as { kind: string; start_date: string }[]) (home?.todos ?? staffTodos)?.push({ text: `Your ${l.kind} from ${l.start_date} was not approved. See the note`, href: "/leave" });
+  // Bookings (update-0040): CSRs confirm tomorrow's visits; branch staff see today's online bookings.
+  const csr = access.grants.some((g) => g.role === "CSR");
+  const branchStaff = access.grants.some((g) => ["MANAGER", "CLINICIAN", "CASHIER"].includes(g.role) && g.branch_id !== null);
+  if (csr || branchStaff) {
+    const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+    const [{ count: toConfirm, error: bErr }, { count: todayVisits }] = await Promise.all([
+      csr ? supabase.from("bookings").select("id", { count: "exact", head: true }).eq("appointment_date", tomorrow).eq("status", "BOOKED") : Promise.resolve({ count: 0, error: null }),
+      branchStaff ? supabase.from("bookings").select("id", { count: "exact", head: true }).eq("appointment_date", today).in("status", ["BOOKED", "CONFIRMED"]) : Promise.resolve({ count: 0 }),
+    ]);
+    if (!bErr && toConfirm) (home?.todos ?? staffTodos)?.unshift({ text: `${toConfirm} visit${toConfirm === 1 ? "" : "s"} tomorrow still to confirm. Message them and mark Confirmed`, href: `/bookings?d=${tomorrow}`, urgent: true });
+    if (todayVisits) (home?.todos ?? staffTodos)?.push({ text: `${todayVisits} online booking${todayVisits === 1 ? "" : "s"} today not marked yet. Tap Arrived when they come in`, href: "/bookings" });
+  }
   if (home && !isOwner && detailState !== "APPROVED" && detailState !== "PENDING") {
     home.todos.push({ text: detailState === "RETURNED" ? "The owner sent your employee details back. Please fix them" : "Fill in your employee details (needed for payroll and government reports)", href: "/me/details" });
   }
