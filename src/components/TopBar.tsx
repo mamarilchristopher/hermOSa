@@ -22,7 +22,7 @@ export async function TopBar({ access }: { access: Access }) {
   const viewAs = access.grants.some((g) => (g.role === "OWNER" || g.role === "MANAGER") && g.branch_id === null);
   const gm = !owner && can(access, ["MANAGER"], null);
   const detailsApprover = owner || gm;
-  const [{ data: overdueData }, { count: detailsWaiting }, { count: unreadNotices }, { data: viewPeople }, { count: joinsWaiting }, { data: meRow }, { count: photosWaiting }] = await Promise.all([
+  const [{ data: overdueData }, { count: detailsWaiting }, { count: unreadNotices }, { data: viewPeople }, { count: joinsWaiting }, { data: meRow }, { count: photosWaiting }, { count: leaveWaiting }] = await Promise.all([
     approver ? supabase.rpc("overdue_commission_days") : Promise.resolve({ data: [] }),
     detailsApprover ? supabase.from("employee_detail_submissions").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("user_id", access.user_id) : Promise.resolve({ count: 0 }),
     supabase.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null),
@@ -30,6 +30,7 @@ export async function TopBar({ access }: { access: Access }) {
     gm ? supabase.from("app_users").select("id", { count: "exact", head: true }).eq("join_status", "PENDING") : Promise.resolve({ count: 0 }),
     supabase.from("app_users").select("photo_path").eq("id", access.user_id).maybeSingle(), // errors (before update-0034) mean initials
     detailsApprover ? supabase.from("profile_photos").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("user_id", owner ? "00000000-0000-0000-0000-000000000000" : access.user_id) : Promise.resolve({ count: 0 }),
+    detailsApprover ? supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("filed_by", owner ? "00000000-0000-0000-0000-000000000000" : access.user_id) : Promise.resolve({ count: 0 }),
   ]);
   const myPhoto = (meRow as { photo_path?: string | null } | null)?.photo_path ?? null;
   const myPhotoUrl = myPhoto ? (await photoUrls(supabase, [myPhoto])).get(myPhoto) ?? null : null;
@@ -47,6 +48,7 @@ export async function TopBar({ access }: { access: Access }) {
     ...(logger ? [{ href: "/services", label: "Service log", short: "Services", icon: "clipboard", badge: overdue.length || undefined } as NavItem] : []),
     { href: "/schedule", label: "Schedule", short: "Schedule", icon: "week" } as NavItem,
     { href: "/time", label: "Time clock", short: "Clock", icon: "clock" } as NavItem,
+    { href: "/leave", label: "Leave", short: "Leave", icon: "calendar", badge: leaveWaiting || undefined } as NavItem,
     ...(approver ? [{ href: "/nte", label: "Late NTEs", short: "NTEs", icon: "clock" } as NavItem] : []),
     ...(approver ? [{ href: "/incidents", label: "Incident reports", short: "IRs", icon: "clipboard" } as NavItem] : []),
     ...(people ? [{ href: "/people", label: "Employees", short: "Staff", icon: "people" } as NavItem] : []),

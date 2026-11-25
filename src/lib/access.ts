@@ -111,5 +111,8 @@ export const ERROR_TEXT: Record<string, string> = {
   BRANCH_REQUIRED: "Choose their home branch.",
   UNKNOWN_USER: "That person isn't in the list any more. Refresh the page.",
   SELF_ESCALATION_DENIED: "You can't change your own access.",
+  LEAVE_DATES: "Those dates can't be filed: vacation leave is filed ahead, sick leave up to 14 days after, and up to 6 months ahead.",
+  LEAVE_OVERLAP: "You already filed leave on some of those days.",
+  PAY_CHOICE_REQUIRED: "Choose with pay or without pay.",
 };
 export const errorText = (code: string | undefined) => (code && ERROR_TEXT[code]) || "Something went wrong.";

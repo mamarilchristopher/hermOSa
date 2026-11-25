@@ -3,6 +3,9 @@ export function noticeButton(kind: string | null | undefined): string {
   if (kind === "COMMISSION_APPROVED") return "Check your current commission total";
   if (kind === "COMMISSION_REJECTED") return "See my commissions";
   if (kind === "DETAILS_APPROVED" || kind === "DETAILS_RETURNED") return "Open my details";
+  if (kind === "LEAVE_APPROVED") return "See the schedule";
+  if (kind === "LEAVE_FILED") return "Review leave";
+  if (kind === "LEAVE_DECLINED") return "See my leave";
   return "Open";
 }
 

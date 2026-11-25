@@ -762,3 +762,7 @@ h1 .uid { font-size: 0.9rem; }
 .photo-review img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 2px solid var(--gold-line); }
 .name-with-photo { display: inline-flex; align-items: center; gap: 8px; vertical-align: middle; }
 @media (max-width: 520px) { .photo-review { grid-template-columns: 1fr; } }
+
+/* Leave requests (update-0035) */
+.leave-review { padding: 14px 0; border-top: 1px solid var(--line); }
+.leave-review:first-of-type { border-top: 0; }

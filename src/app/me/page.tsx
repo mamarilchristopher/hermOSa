@@ -143,6 +143,13 @@ export default async function Me() {
     else if (myPhotoRow.state === "RETURNED") (home?.todos ?? staffTodos)?.push({ text: `Your profile picture was sent back${myPhotoRow.note ? `: ${myPhotoRow.note}` : ""}. Please upload another`, href: "/me/photo", urgent: true });
     if (photosWaiting) (home?.todos ?? staffTodos)?.push({ text: `${photosWaiting} profile picture${photosWaiting === 1 ? " is" : "s are"} waiting for your approval`, href: "/admin/photos" });
   }
+  // Leave (update-0035): owners and the GM see how many wait; staff see a decision on their own leave.
+  const [{ count: leaveWaiting, error: leaveErr }, { data: myLeave }] = await Promise.all([
+    ownerLevel ? supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("filed_by", isOwner ? "00000000-0000-0000-0000-000000000000" : access.user_id) : Promise.resolve({ count: 0, error: null }),
+    emp ? supabase.from("leave_requests").select("kind, start_date, state").eq("employee_id", emp.id).eq("state", "DECLINED").gte("decided_at", new Date(Date.now() - 3 * 86400000).toISOString()).limit(3) : Promise.resolve({ data: [] }),
+  ]);
+  if (!leaveErr && leaveWaiting) (home?.todos ?? staffTodos)?.unshift({ text: `${leaveWaiting} leave request${leaveWaiting === 1 ? " is" : "s are"} waiting for your approval`, href: "/leave" });
+  for (const l of (myLeave ?? []) as { kind: string; start_date: string }[]) (home?.todos ?? staffTodos)?.push({ text: `Your ${l.kind} from ${l.start_date} was not approved. See the note`, href: "/leave" });
   if (home && !isOwner && detailState !== "APPROVED" && detailState !== "PENDING") {
     home.todos.push({ text: detailState === "RETURNED" ? "The owner sent your employee details back. Please fix them" : "Fill in your employee details (needed for payroll and government reports)", href: "/me/details" });
   }
