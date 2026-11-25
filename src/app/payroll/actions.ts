@@ -147,3 +147,17 @@ export async function decideCola(fd: FormData) {
   await supabase.rpc("decide_cola", { p_request: id.data, p_approve: fd.get("approve") === "1" });
   revalidatePath("/payroll");
 }
+
+/** Opens one person's payslip for a cutoff (works it out first if the cutoff is still a draft). */
+export async function openPayslip(fd: FormData) {
+  const emp = z.uuid().safeParse(String(fd.get("employee") ?? ""));
+  const date = String(fd.get("date") ?? "");
+  if (!emp.success || !/^\d{4}-\d{2}-\d{2}$/.test(date)) redirect("/payroll?find=pick");
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("open_payroll", { p_date: date });
+  if (!data?.ok) redirect("/payroll?find=error");
+  const { data: slip } = await supabase.from("payslips").select("id").eq("run_id", data.id).eq("employee_id", emp.data).maybeSingle();
+  revalidatePath("/payroll");
+  if (slip?.id) redirect(`/payslips/${slip.id}`);
+  redirect(`/payroll?run=${data.id}&find=none`);
+}

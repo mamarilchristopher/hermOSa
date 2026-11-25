@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { Uid } from "@/components/Uid";
-import { openPayroll, deleteHoliday, addThirteenth, decideCola } from "./actions";
+import { openPayroll, deleteHoliday, addThirteenth, decideCola, openPayslip } from "./actions";
 import { ColaForm, FinalizeForm, HolidayForm, PayRateForm, RulesForm, type PaySetting } from "./Forms";
 import { peso, periodLabel, manilaToday } from "@/lib/payroll";
 
@@ -13,16 +13,25 @@ type Slip = { id: string; employee_id: string; slip_no: string; gross_cents: num
 type Emp = { id: string; uid: string | null; full_name: string; position: string | null };
 
 /** Payroll per cutoff (update-0046). Owners and the GM. */
-export default async function PayrollPage({ searchParams }: { searchParams: Promise<{ run?: string }> }) {
+export default async function PayrollPage({ searchParams }: { searchParams: Promise<{ run?: string; find?: string }> }) {
   const { supabase, access } = await requireAccess();
   if (!can(access, ["OWNER"], null) && !can(access, ["MANAGER"], null)) redirect("/payslips");
   const owner = can(access, ["OWNER"], null);
-  const { run: runParam } = await searchParams;
+  const { run: runParam, find } = await searchParams;
   const today = manilaToday();
   const lastCutoff = Number(today.slice(8, 10)) <= 15
     ? new Date(Date.parse(`${today.slice(0, 7)}-01T00:00:00Z`) - 86400000).toISOString().slice(0, 10)
     : `${today.slice(0, 7)}-01`;
 
+  const cutoffs: string[] = [];
+  {
+    let y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7)), first = Number(today.slice(8, 10)) <= 15;
+    for (let i = 0; i < 36; i++) {
+      cutoffs.push(`${y}-${String(m).padStart(2, "0")}-${first ? "01" : "16"}`);
+      if (first) { m -= 1; if (m === 0) { m = 12; y -= 1; } }
+      first = !first;
+    }
+  }
   const [{ data: runsData, error: runsErr }, { data: emps }, { data: settings }, { data: hols }, { data: org }] = await Promise.all([
     supabase.from("payroll_runs").select("id, period_start, period_end, state, computed_at, finalized_at").order("period_start", { ascending: false }).limit(24),
     supabase.from("employees").select("id, uid, full_name, position").eq("active", true).order("full_name"),
@@ -64,6 +73,23 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
           Have your accountant check the first one.
         </p>
         {runsErr && <div className="notice info">{runsErr.code === "42P01" ? "The owner needs to run update-0046 in Supabase first." : "Could not load. Try again."}</div>}
+
+        <div className="card">
+          <h2>Open a payslip</h2>
+          <form action={openPayslip} className="pay-rate">
+            <select name="employee" required defaultValue="" aria-label="Employee">
+              <option value="" disabled>Employee…</option>
+              {staff.map((e) => <option key={e.id} value={e.id}>{e.full_name}{e.uid ? ` (${e.uid})` : ""}</option>)}
+            </select>
+            <select name="date" defaultValue={cutoffs[0]} aria-label="Cutoff">
+              {cutoffs.map((d) => <option key={d} value={d}>{periodLabel(d)}{d === cutoffs[0] ? " (current)" : ""}</option>)}
+            </select>
+            <button className="small">Open payslip</button>
+          </form>
+          {find === "none" && <p className="small" style={{ color: "var(--bad)" }}>No payslip for that person on that cutoff. Check that they have a pay rate.</p>}
+          {find === "error" && <p className="small" style={{ color: "var(--bad)" }}>Could not open that cutoff. Try again.</p>}
+          <p className="small muted" style={{ marginBottom: 0 }}>A cutoff that isn&apos;t final yet is worked out fresh when you open it.</p>
+        </div>
 
         <div className="card">
           <h2>Cutoff</h2>
