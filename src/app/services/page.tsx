@@ -64,7 +64,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
       <TopBar access={access} />
       <main>
         <h1>Service Log</h1>
-        <p className="muted small">Every service done today, who did it and the commission. A manager signs off each entry.</p>
+        <p className="muted small">{noCommission ? "Every service done today and who did it. A manager signs off each entry." : "Every service done today, who did it and the commission. A manager signs off each entry."}</p>
 
         <div className="periods card">
           <div className="segmented" aria-label="Branch">
@@ -107,7 +107,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
         <div className="table-wrap">
           <table className="log-table">
             <thead>
-              <tr><th>Service</th><th className="num">Paid</th><th>Type</th><th>Staff</th><th className="num">Commission</th><th>Status</th></tr>
+              <tr><th>Service</th><th className="num">Paid</th><th>Type</th><th>Staff</th><th className="num">{noCommission ? "Role" : "Commission"}</th><th>Status</th></tr>
             </thead>
             <tbody>
               {list.map((l) => {
@@ -122,7 +122,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                       {l.photos_due && l.state !== "REJECTED" && (
                         <div className="photos-due">
                           <span className="pill REVERSED">Photos missing</span>
-                          <span className="small muted"> Commission held until they&apos;re added.</span>
+                          {!noCommission && <span className="small muted"> Commission held until they&apos;re added.</span>}
                           {(topMgmt || l.created_by === access.user_id || staff.some((x) => mine.has(x))) && (
                             <AddPhotosLater log={l.id} branch={l.branch_id ?? branch.id} folder={l.photo_folder ?? null} needs="before and after photos and both waiver pages" />
                           )}
@@ -145,7 +145,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                         const role = l.commission_type === "LEAD" ? (i === 0 ? "lead" : "assist") : l.commission_type === "SOLO" ? "solo" : "";
                         return (
                           <div key={id} className="staff-line comm">
-                            {line ? <><strong>{centsToPhp(line.amount_cents)}</strong> <span className="muted small">{ROLE_TEXT[line.role]}</span></>
+                            {noCommission ? <span className="muted small">{role || "-"}</span> : line ? <><strong>{centsToPhp(line.amount_cents)}</strong> <span className="muted small">{ROLE_TEXT[line.role]}</span></>
                               : <span className="muted small">{l.commission_type === "NONCOMMI" ? "-" : approver || mine.has(id) ? `no commission · ${role}` : role}</span>}
                           </div>
                         );

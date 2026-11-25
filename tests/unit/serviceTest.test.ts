@@ -5,7 +5,8 @@ const full = [{ kind: "BEFORE" }, { kind: "AFTER" }, { kind: "WAIVER" }, { kind:
 it("passes a complete Solo test for commission-based staff", () => {
   expect(testResult({ kind: "PAID", cents: 10000, type: "SOLO", eligible: true, photos: full, photosDue: false })).toBe(TEST_OK);
 });
-it("passes No commission for non-commission staff", () => {
+it("passes for non-commission staff whatever the type", () => {
+  expect(testResult({ kind: "PAID", cents: 10000, type: "SOLO", eligible: false, photos: full, photosDue: false })).toBe(TEST_OK);
   expect(testResult({ kind: "PAID", cents: 10000, type: "NONCOMMI", eligible: false, photos: full, photosDue: false })).toBe(TEST_OK);
 });
 it("lists what's missing", () => {

@@ -12,7 +12,6 @@ export function testProblems(t: TestEntry): string[] {
   if (t.kind !== "PAID") out.push("choose Paid");
   if (t.cents !== 10000) out.push("enter 100 as the amount paid");
   if (t.eligible === true && t.type !== "SOLO") out.push("choose Solo commission (you're commission-based)");
-  if (t.eligible === false && t.type !== "NONCOMMI") out.push("choose No commission (you're not commission-based)");
   if (n("BEFORE") < 1) out.push("add a before photo");
   if (n("AFTER") < 1) out.push("add an after photo");
   if (n("WAIVER") < 2) out.push("add both waiver pages");

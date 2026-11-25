@@ -51,7 +51,8 @@ function Msg({ s }: { s: ActionState }) {
 
 export function EntryForm({ branch, date, services, employees, noCommission = false, photosOptional = false }: { branch: string; date: string; services: Opt[]; employees: Opt[]; noCommission?: boolean; photosOptional?: boolean }) {
   const [state, action, pending] = useActionState(logService, undefined);
-  const startType: CommissionType = noCommission ? "NONCOMMI" : "LEAD";
+  // CHRIS Nov 26: staff not on commission still pick who assisted, so a commissioned assistant gets her 40%.
+  const startType: CommissionType = "LEAD";
   const [type, setType] = useState<CommissionType>(startType);
   const [kind, setKind] = useState<Kind>("PAID");
   const paid = kind === "PAID";
@@ -78,14 +79,20 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
     }
   }, [state]);
   const person = employees.find((e) => e.id === who);
-  useEffect(() => {
-    if (person && person.eligible === false) setType("NONCOMMI");
-  }, [person]);
+  const partnerEmp = employees.find((e) => e.id === partner);
   const cents = Math.round(Number(amount.replace(/[,₱\s]/g, "")) * 100) || 0;
   const svc = services.find((x) => x.id === service);
   // Lead with "Assisted by: None" is saved as Solo; the 60/40 split applies only once an assistant is chosen (CHRIS Nov 26).
   const effType: CommissionType = type === "LEAD" && !partner ? "SOLO" : type;
-  const p = previewCommission(paid ? cents : 0, paid ? effType : "NONCOMMI", svc?.commission, svc?.price);
+  const raw = previewCommission(paid ? cents : 0, paid ? effType : "NONCOMMI", svc?.commission, svc?.price);
+  // Only commission-based people get a share; someone not on commission is never mentioned (CHRIS Nov 26).
+  const leadEmp = type === "ASSIST" ? partnerEmp : person, assistEmp = type === "ASSIST" ? person : partnerEmp;
+  const shown = {
+    lead: leadEmp?.eligible === false ? 0 : raw.lead,
+    assist: assistEmp?.eligible === false ? 0 : raw.assist,
+    solo: person?.eligible === false ? 0 : raw.solo,
+  };
+  const p = { ...raw, total: shown.lead + shown.assist + shown.solo };
   const listPrice = svc?.price ?? null;
   const priceDiffers = paid && listPrice != null && listPrice > 0 && cents > 0 && cents !== listPrice;
   const needsPhotos = kind === "PAID" || kind === "BACKJOB";
@@ -98,7 +105,7 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
   const people = (
     <>
       <option value="">Choose…</option>
-      {employees.filter((e) => e.here).map((e) => <option key={e.id} value={e.id}>{e.name}{e.eligible === false ? " (no commission)" : ""}</option>)}
+      {employees.filter((e) => e.here).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
       {employees.some((e) => !e.here) && (
         <optgroup label="Other branches">
           {employees.filter((e) => !e.here).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
@@ -122,7 +129,7 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
             <button type="button" key={k.v} role="radio" aria-checked={kind === k.v} className={kind === k.v ? "on" : ""} onClick={() => setKind(k.v)}>{k.label}</button>
           ))}
         </div>
-        {!paid && <span className="small muted">Logged at ₱0 with no commission, so you can see every client handled.</span>}
+        {!paid && <span className="small muted">{noCommission ? "Logged at ₱0, so you can see every client handled." : "Logged at ₱0 with no commission, so you can see every client handled."}</span>}
       </div>
       <div className="entry-grid">
         <label className="span2">Client name
@@ -178,7 +185,7 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
             {type === "LEAD" ? (
               <select name="partner" value={partner} onChange={(e) => setPartner(e.target.value)}>
                 <option value="">None</option>
-                {employees.filter((e) => e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}{e.eligible === false ? " (no commission)" : ""}</option>)}
+                {employees.filter((e) => e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
                 {employees.some((e) => !e.here && e.id !== who) && (
                   <optgroup label="Other branches">{employees.filter((e) => !e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</optgroup>
                 )}
@@ -186,7 +193,7 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
             ) : (
               <select name="partner" required value={partner} onChange={(e) => setPartner(e.target.value)}>
                 <option value="">Choose…</option>
-                {employees.filter((e) => e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}{e.eligible === false ? " (no commission)" : ""}</option>)}
+                {employees.filter((e) => e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
                 {employees.some((e) => !e.here && e.id !== who) && (
                   <optgroup label="Other branches">{employees.filter((e) => !e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</optgroup>
                 )}
@@ -204,10 +211,12 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
             <>
               <span>Commission {centsToPhp(p.total)}</span>
               {effType === "SOLO" && <span className="muted">all to the performer{type === "LEAD" ? " (no assistant)" : ""}</span>}
-              {needsPartner && effType !== "SOLO" && <span className="muted">lead {centsToPhp(p.lead)} · assist {centsToPhp(p.assist)}</span>}
+              {needsPartner && effType !== "SOLO" && shown.lead > 0 && shown.assist === 0 && <span className="muted">lead {centsToPhp(shown.lead)}</span>}
+              {needsPartner && effType !== "SOLO" && shown.lead === 0 && shown.assist > 0 && <span className="muted">assist {centsToPhp(shown.assist)}</span>}
+              {needsPartner && effType !== "SOLO" && shown.lead > 0 && shown.assist > 0 && <span className="muted">lead {centsToPhp(p.lead)} · assist {centsToPhp(p.assist)}</span>}
             </>
           ) : (
-            <span className="muted">{!paid ? "Unpaid visit: no commission" : type === "NONCOMMI" ? "No commission for this service" : "Enter the amount paid to see the commission"}</span>
+            <span className="muted">{!paid ? "Unpaid visit: no commission" : type === "NONCOMMI" ? "No commission for this service" : cents > 0 ? "" : "Enter the amount paid to see the commission"}</span>
           )}
         </div>
         <button type="submit" disabled={pending || photos.uploading || !!missing} title={missing ?? undefined}>
