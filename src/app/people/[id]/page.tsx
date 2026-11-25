@@ -15,7 +15,7 @@ import { DetailsView } from "@/components/DetailsView";
 import type { Details } from "@/lib/employeeDetails";
 import { Uid } from "@/components/Uid";
 
-type Line = { id: string; role: string; amount_cents: number; service_logs: { id: string; service_date: string; state: string; amount_paid_cents: number; branch_id: string; services: { name: string } | null } };
+type Line = { id: string; role: string; amount_cents: number; service_logs: { id: string; service_date: string; state: string; photos_due?: boolean; amount_paid_cents: number; branch_id: string; services: { name: string } | null } };
 
 export default async function Employee({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ month?: string }> }) {
   const { id } = await params;
@@ -28,12 +28,12 @@ export default async function Employee({ params, searchParams }: { params: Promi
   const ym = /^\d{4}-\d{2}$/.test(sp.month ?? "") && sp.month! <= thisMonth ? sp.month! : thisMonth;
   const start = `${ym}-01`, end = monthEnd(start);
   const { data } = await supabase.from("commission_lines")
-    .select("id, role, amount_cents, service_logs!inner(id, service_date, state, amount_paid_cents, branch_id, services(name))")
+    .select("id, role, amount_cents, service_logs!inner(id, service_date, state, photos_due, amount_paid_cents, branch_id, services(name))")
     .eq("employee_id", id).gte("service_logs.service_date", start).lte("service_logs.service_date", end);
   const lines = ((data ?? []) as unknown as Line[]).sort((a, b) => a.service_logs.service_date.localeCompare(b.service_logs.service_date));
-  const approved = lines.filter((l) => l.service_logs.state === "APPROVED").reduce((s, l) => s + Number(l.amount_cents), 0);
-  const pending = lines.filter((l) => l.service_logs.state === "PENDING").reduce((s, l) => s + Number(l.amount_cents), 0);
-  const byRole = (r: string) => lines.filter((l) => l.role === r && l.service_logs.state === "APPROVED").reduce((s, l) => s + Number(l.amount_cents), 0);
+  const approved = lines.filter((l) => l.service_logs.state === "APPROVED" && !l.service_logs.photos_due).reduce((s, l) => s + Number(l.amount_cents), 0);
+  const pending = lines.filter((l) => l.service_logs.state === "PENDING" && !l.service_logs.photos_due).reduce((s, l) => s + Number(l.amount_cents), 0);
+  const byRole = (r: string) => lines.filter((l) => l.role === r && l.service_logs.state === "APPROVED" && !l.service_logs.photos_due).reduce((s, l) => s + Number(l.amount_cents), 0);
   const branchName = Object.fromEntries(branches.map((b) => [b.id, b.name]));
   const canEdit = can(access, ["OWNER", "HR", "MANAGER"], e.branch_id);
   const isOwner = can(access, ["OWNER"], null);

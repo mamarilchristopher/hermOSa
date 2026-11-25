@@ -24,8 +24,8 @@ async function thumbOf(file: File): Promise<Blob | null> {
   } catch { return null; } finally { URL.revokeObjectURL(url); }
 }
 
-export function usePhotoSlots(branch: string) {
-  const [folder, setFolder] = useState(uuid);
+export function usePhotoSlots(branch: string, fixedFolder?: string | null) {
+  const [folder, setFolder] = useState(() => fixedFolder || uuid());
   const [slots, setSlots] = useState<Slot[]>([]);
   const patch = (key: string, p: Partial<Slot>) => setSlots((l) => l.map((s) => (s.key === key ? { ...s, ...p } : s)));
 
@@ -80,6 +80,39 @@ export function PhotoGroup({ api, kinds, title, hint }: { api: Api; kinds: { kin
           </label>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** Service log (update-0054): add the missing photos to an entry logged without them. */
+export function AddPhotosLater({ log, branch, folder, needs }: { log: string; branch: string; folder: string | null; needs: string }) {
+  const api = usePhotoSlots(branch, folder);
+  const [open, setOpen] = useState(false);
+  const [msg, setMsg] = useState<{ ok?: string; error?: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (msg?.ok === "done") return <span className="pill PUBLISHED">Photos complete</span>;
+  if (!open) return <button type="button" className="small" onClick={() => setOpen(true)}>Add photos</button>;
+  const save = async () => {
+    setBusy(true); setMsg(null);
+    const { data, error } = await createClient().rpc("add_visit_photos", { p_log: log, p_folder: api.folder, p_photos: JSON.parse(api.json) });
+    setBusy(false);
+    if (error || !data?.ok) { setMsg({ error: data?.error === "PHOTO_NOT_UPLOADED" ? "A photo didn't finish uploading. Remove it and add it again." : "Could not save. Try again." }); return; }
+    if (data.complete) { setMsg({ ok: "done" }); return; }
+    api.reset();
+    setMsg({ ok: `Saved. Still needed: ${[data.before < 1 && "a before photo", data.after < 1 && "an after photo", data.waivers < 2 && `${2 - data.waivers} waiver page${data.waivers === 1 ? "" : "s"}`].filter(Boolean).join(", ")}.` });
+  };
+  return (
+    <div className="add-later">
+      <span className="small muted">Needed: {needs}</span>
+      <PhotoGroup api={api} title="Before and after photos" kinds={[{ kind: "BEFORE", label: "Add before photo" }, { kind: "AFTER", label: "Add after photo" }]} />
+      <PhotoGroup api={api} title="Waiver (2 pages)" kinds={[{ kind: "WAIVER", label: "Add waiver page" }]} />
+      <div className="fill-row">
+        <button type="button" className="small" disabled={busy || api.uploading || api.slots.every((s) => s.status !== "done")} onClick={save}>
+          {busy ? "Saving…" : api.uploading ? "Uploading…" : "Save photos"}</button>
+        <button type="button" className="secondary small" onClick={() => { api.reset(); setOpen(false); }}>Cancel</button>
+      </div>
+      {msg?.ok && <span className="small" style={{ color: "var(--good)" }}>{msg.ok}</span>}
+      {msg?.error && <span className="small" style={{ color: "var(--bad)" }}>{msg.error}</span>}
     </div>
   );
 }

@@ -55,6 +55,7 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
   if (!data.ok) return { error: errorText(data.error) };
   revalidatePath("/services");
   revalidatePath("/me");
+  if (data.photos_due) return { ok: "Saved. The lead and assist were asked to add the client photos and waiver; their commission is held until they do.", at: Date.now() };
   return { ok: paid ? "Saved. Waiting for manager sign-off." : "Saved. Unpaid visit logged (no commission).", at: Date.now() };
 }
 

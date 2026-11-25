@@ -7,16 +7,17 @@ import { isIsoDate, manilaToday } from "@/lib/dates";
 import { addDays, WEEKDAYS, weekday } from "@/lib/insights";
 import { ROLE_TEXT, TYPE_TEXT } from "@/lib/commission";
 import { DecideButtons, EntryForm } from "./Forms";
+import { AddPhotosLater } from "./PhotoSlots";
 
 type Log = {
   id: string; service_date: string; amount_paid_cents: number; commission_type: string; performer_id: string; assistant_id: string | null;
-  receipt_no: string | null; note: string | null; client_name?: string | null; price_note?: string | null; photo_folder?: string | null; share_ok?: boolean; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
+  receipt_no: string | null; note: string | null; branch_id?: string; client_name?: string | null; price_note?: string | null; photo_folder?: string | null; share_ok?: boolean; photos_due?: boolean; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
   services: { name: string } | null;
 };
 const VISIT_TEXT: Record<string, string> = { BACKJOB: "Backjob (unpaid)", CHECKUP: "Check-up (unpaid)", NO_CHARGE: "No charge" };
 type Line = { service_log_id: string; employee_id: string; role: string; amount_cents: number };
 
-export default async function ServiceLog({ searchParams }: { searchParams: Promise<{ date?: string; branch?: string }> }) {
+export default async function ServiceLog({ searchParams }: { searchParams: Promise<{ date?: string; branch?: string; entry?: string }> }) {
   const { supabase, access, branches } = await requireAccess();
   const sp = await searchParams;
   const viewable = branchesFor(access, branches, ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"]);
@@ -26,6 +27,8 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const date = isIsoDate(sp.date) && sp.date <= today ? sp.date : today;
   const canLog = can(access, ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN"], branch.id);
   const approver = can(access, ["OWNER", "MANAGER"], branch.id);
+  // Owners and the GM (update-0054) may log without photos; the lead and assist add them later.
+  const topMgmt = can(access, ["OWNER"], null) || can(access, ["MANAGER"], null);
   const isManager = can(access, ["OWNER", "MANAGER"], null) || branchesFor(access, branches, ["MANAGER"]).length > 0;
 
   const [{ data: services }, { data: emps }, { data: logs }] = await Promise.all([
@@ -35,6 +38,8 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
       .eq("branch_id", branch.id).eq("service_date", date).order("created_at"),
   ]);
   const list = (logs ?? []) as unknown as Log[];
+  // update-0054 (CHRIS Nov 26): only staff timed in today add entries; owners and the GM always can.
+  const { data: onDuty } = canLog && !topMgmt ? await supabase.rpc("can_log_services_now") : { data: true };
   const { data: lineRows } = list.length
     ? await supabase.from("commission_lines").select("service_log_id, employee_id, role, amount_cents").in("service_log_id", list.map((l) => l.id))
     : { data: [] as Line[] };
@@ -82,13 +87,15 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
         {canLog && (
           <div className="card">
             <h2>Add a service</h2>
-            {(services ?? []).length === 0 || employees.length === 0 ? (
+            {onDuty === false ? (
+              <div className="notice info">Time in first to add services. Only staff who are timed in today can add to the Service log. <Link href="/time">Go to Time clock</Link></div>
+            ) : (services ?? []).length === 0 || employees.length === 0 ? (
               <div className="notice info">
                 {employees.length === 0 ? <>Add the branch&apos;s staff first on <Link href="/people">Employees</Link>. </> : null}
                 {(services ?? []).length === 0 ? "Add your services below first." : null}
               </div>
             ) : (
-              <EntryForm branch={branch.id} date={date} services={(services ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null }))} employees={employees} noCommission={noCommission} />
+              <EntryForm branch={branch.id} date={date} services={(services ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
             )}
             {isManager && <p className="small" style={{ marginTop: 12 }}><Link href="/services/prices">Price list and commissions</Link> (add a service, set its price and commission)</p>}
           </div>
@@ -105,11 +112,20 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 const ls = lines.filter((x) => x.service_log_id === l.id);
                 const staff = [l.performer_id, l.assistant_id].filter(Boolean) as string[];
                 return (
-                  <tr key={l.id} className={l.state === "REJECTED" ? "rejected" : undefined}>
+                  <tr key={l.id} id={`entry-${l.id}`} className={[l.state === "REJECTED" ? "rejected" : "", sp.entry === l.id ? "entry-focus" : ""].join(" ").trim() || undefined}>
                     <td>{l.client_name && <div className="log-client">{l.client_name}</div>}<strong>{l.services?.name}</strong>
                       {l.receipt_no && <div className="small muted">Waiver / OR {l.receipt_no}</div>}
                       {l.price_note && <div className="small muted">Price: {l.price_note}</div>}
                       {l.note && <div className="small muted">{l.note}</div>}
+                      {l.photos_due && l.state !== "REJECTED" && (
+                        <div className="photos-due">
+                          <span className="pill REVERSED">Photos missing</span>
+                          <span className="small muted"> Commission held until they&apos;re added.</span>
+                          {(topMgmt || l.created_by === access.user_id || staff.some((x) => mine.has(x))) && (
+                            <AddPhotosLater log={l.id} branch={l.branch_id ?? branch.id} folder={l.photo_folder ?? null} needs="before and after photos and both waiver pages" />
+                          )}
+                        </div>
+                      )}
                       {l.photo_folder && l.client_name && <div className="small"><Link href={`/clinic/archive?month=${l.service_date.slice(0, 7)}#${l.id}`}>Photos</Link>{l.share_ok ? <span className="muted"> · sharing OK</span> : null}</div>}</td>
                     <td className="num">{centsToPhp(l.amount_paid_cents)}</td>
                     <td>{l.visit_kind && l.visit_kind !== "PAID"

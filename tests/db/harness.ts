@@ -21,7 +21,7 @@ export class TestDb {
     private admin: pg.Client,
   ) {}
 
-  static async create(): Promise<TestDb> {
+  static async create(opts: { timeClockRule?: boolean } = {}): Promise<TestDb> {
     const name = `hermosa_test_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
     const admin = new pg.Client({ connectionString: ADMIN_URL });
     await admin.connect();
@@ -36,6 +36,8 @@ export class TestDb {
       await db.sql(readFileSync(join(migDir, f), "utf8"));
     }
     await db.sql(readFileSync(join(root, "supabase/seed.sql"), "utf8"));
+    // update-0054 only lets timed-in staff log services. Tests skip that rule unless they ask for it (photos_due.test.ts).
+    if (!opts.timeClockRule) await db.sql("CREATE OR REPLACE FUNCTION private.on_duty(p_user uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT true $$");
     const { rows } = await pool.query("SELECT code, id FROM public.branches");
     for (const r of rows) db.branches[r.code] = r.id;
     return db;

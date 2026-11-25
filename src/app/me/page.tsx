@@ -46,7 +46,7 @@ const ROLE_LABEL: Record<string, string> = {
   MARKETING: "Marketing", CLINICIAN: "Clinician", INVENTORY: "Inventory", AUDITOR: "Auditor",
 };
 
-type Line = { role: string; amount_cents: number; service_logs: { service_date: string; state: string; services: { name: string } | null } };
+type Line = { role: string; amount_cents: number; service_logs: { service_date: string; state: string; photos_due?: boolean; services: { name: string } | null } };
 
 /** Staff Home: your own details and, for commission staff, this month's running commission (covered until tapped). */
 export default async function Me() {
@@ -67,12 +67,14 @@ export default async function Me() {
   const missing = detailState === "APPROVED" || detailState === "PENDING" ? missingRequired((subs?.[0]?.data ?? {}) as Details) : [];
   const missingTodo: Todo | null = missing.length ? { text: `Your employee details need ${missing.length <= 3 ? missing.map((f) => f.label.replace(/\s*\(.*\)/, "")).join(", ") : `${missing.length} more items`}. Please add them`, href: "/me/details" } : null;
   const { data } = emp?.commission_eligible
-    ? await supabase.from("commission_lines").select("role, amount_cents, service_logs!inner(service_date, state, services(name))")
+    ? await supabase.from("commission_lines").select("role, amount_cents, service_logs!inner(service_date, state, photos_due, services(name))")
         .eq("employee_id", emp.id).gte("service_logs.service_date", start).lte("service_logs.service_date", monthEnd(start))
     : { data: [] };
   const lines = (data ?? []) as unknown as Line[];
-  const sum = (state: string) => lines.filter((l) => l.service_logs.state === state).reduce((s, l) => s + Number(l.amount_cents), 0);
+  // update-0054: entries still missing client photos don't count until they're added.
+  const sum = (state: string) => lines.filter((l) => l.service_logs.state === state && !l.service_logs.photos_due).reduce((s, l) => s + Number(l.amount_cents), 0);
   const approved = sum("APPROVED"), waiting = sum("PENDING");
+  const held = lines.filter((l) => l.service_logs.state !== "REJECTED" && l.service_logs.photos_due).reduce((s, l) => s + Number(l.amount_cents), 0);
   const recent = lines.filter((l) => l.service_logs.state !== "REJECTED")
     .sort((a, b) => b.service_logs.service_date.localeCompare(a.service_logs.service_date)).slice(0, 5);
   const branchName = Object.fromEntries(branches.map((b) => [b.id, b.name]));
@@ -98,6 +100,9 @@ export default async function Me() {
   ]);
   const fromMgmt = Array.isArray(mgmtChat) ? (mgmtChat as { id: string; room_id: string; sender: string; room_name: string | null; text: string }[]) : [];
   const otherUnread = Math.max(0, (typeof chatUnread === "number" ? chatUnread : 0) - fromMgmt.length);
+  // Client photos and waivers I still owe (update-0054): always urgent on Home.
+  const { data: dueData } = emp ? await supabase.rpc("my_photos_due") : { data: null };
+  const photosDue = (Array.isArray(dueData) ? dueData : []) as { id: string; date: string; client: string | null; service: string | null; branch: string; amount: number }[];
   const tardy = trackData ? tracker((trackData as NteList).ntes, (trackData as NteList).ir_minutes) : [];
 
   return (
@@ -107,6 +112,18 @@ export default async function Me() {
         <h1>Hi, {first}</h1>
         <p className="muted small">{emp?.position ?? (isOwner ? "Owner" : "Staff")}{emp && ` · ${branchName[emp.branch_id]}`} · {dayLabel(today)}</p>
 
+        {photosDue.length > 0 && (
+          <div className="card nte-urgent">
+            <h2>Urgent: add client photos and waiver<span className="nav-badge inline">{photosDue.length}</span></h2>
+            <p className="small" style={{ margin: 0 }}>Incomplete files: your commission for these entries won&apos;t count toward your totals until the before and after photos and both waiver pages are added.</p>
+            {photosDue.map((d) => (
+              <div key={d.id} className="nte-box">
+                <p className="small" style={{ margin: 0 }}><strong>{d.client ?? "Client"} · {d.service ?? "Service"}</strong> · {dayLabel(d.date)}</p>
+                <Link className="button small" href={`/services?date=${d.date}&branch=${d.branch}&entry=${d.id}#entry-${d.id}`}>Add photos</Link>
+              </div>
+            ))}
+          </div>
+        )}
         {myNtes.length > 0 && (
           <div className="card nte-urgent">
             <h2>Late NTE: please explain<span className="nav-badge inline">{myNtes.length}</span></h2>
@@ -165,6 +182,11 @@ export default async function Me() {
               <div className="card stat">
                 <Reveal label="Waiting sign-off" note="Counts once your manager approves it.">{centsToPhp(waiting)}</Reveal>
               </div>
+              {held > 0 && (
+                <div className="card stat">
+                  <Reveal label="Held: photos missing" note="Counts once the client photos and waiver are added.">{centsToPhp(held)}</Reveal>
+                </div>
+              )}
             </div>
             <p className="small muted">Only you and management can see your commission. Figures stay covered until you tap them.</p>
             {recent.length > 0 && (

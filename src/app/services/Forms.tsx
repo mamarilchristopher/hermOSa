@@ -29,7 +29,7 @@ function Msg({ s }: { s: ActionState }) {
   return null;
 }
 
-export function EntryForm({ branch, date, services, employees, noCommission = false }: { branch: string; date: string; services: Opt[]; employees: Opt[]; noCommission?: boolean }) {
+export function EntryForm({ branch, date, services, employees, noCommission = false, photosOptional = false }: { branch: string; date: string; services: Opt[]; employees: Opt[]; noCommission?: boolean; photosOptional?: boolean }) {
   const [state, action, pending] = useActionState(logService, undefined);
   const startType: CommissionType = noCommission ? "NONCOMMI" : "LEAD";
   const [type, setType] = useState<CommissionType>(startType);
@@ -67,9 +67,11 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
   const listPrice = svc?.price ?? null;
   const priceDiffers = paid && listPrice != null && listPrice > 0 && cents > 0 && cents !== listPrice;
   const needsPhotos = kind === "PAID" || kind === "BACKJOB";
-  const missing = !needsPhotos ? null
+  const missingPhotos = !needsPhotos ? null
     : photos.count("BEFORE") < 1 || photos.count("AFTER") < 1 ? "Add at least one before and one after photo."
     : photos.count("WAIVER") < 2 ? "Add both pages of the signed waiver." : null;
+  // update-0054: owners and the GM may save without photos; the lead and assist are then asked to add them.
+  const missing = photosOptional ? null : missingPhotos;
   const needsPartner = paid && (type === "LEAD" || type === "ASSIST");
   const people = (
     <>
@@ -175,6 +177,9 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
         </button>
       </div>
       {missing && !photos.uploading && <p className="small muted entry-missing">{missing}</p>}
+      {photosOptional && missingPhotos && !photos.uploading && (
+        <p className="small muted entry-missing">You can save without photos. The lead and assist will get an urgent notice to add them, and their commission for this entry is held until they do.</p>
+      )}
       {state?.duplicate && (
         <div className="notice warn dup-check">
           <span><strong>Already logged?</strong> {state.duplicate}</span>

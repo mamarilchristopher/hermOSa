@@ -76,6 +76,7 @@ export const ERROR_TEXT: Record<string, string> = {
   PHOTO_REQUIRED: "Take a photo of the clinic clock to time in or out.",
   ALREADY_IN: "You're already timed in. Time out first.",
   NOT_IN: "You haven't timed in yet today.",
+  NOT_TIMED_IN: "Time in first. Only staff who are timed in today can add to the Service log.",
   CLIENT_NAME_REQUIRED: "Type the client's name.",
   PRICE_NOTE_REQUIRED: "The amount is different from the list price. Add the reason (e.g. the promo or discount).",
   WAIVER_PHOTOS_REQUIRED: "Add both pages of the signed waiver.",
