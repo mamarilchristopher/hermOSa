@@ -46,6 +46,9 @@ export function ManagerHome({ g, duty, faces = {}, branches }: { g: Glance; duty
   const ym = g.today.slice(0, 7);
   const hm = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" });
   const entered = g.branches.filter((b) => b.todayCell.kind !== "empty").length;
+  // CHRIS (Nov 26): "Not entered yet" boxes show only during clinic hours to 11:59 PM, never 12:00 AM to 9:59 AM.
+  const open = hm >= "10:00";
+  const shown = g.branches.filter((b) => open || b.todayCell.kind !== "empty");
   return (
     <>
       {/* CHRIS (Nov 25): today's sales logged so far is the top view for management. */}
@@ -54,15 +57,15 @@ export function ManagerHome({ g, duty, faces = {}, branches }: { g: Glance; duty
           <h2>Today so far, {dayLabel(g.today)}</h2>
           <Link className="small" href="/sales/daily">Daily Sales →</Link>
         </div>
-        <div className="glance-total"><strong>{php(g.todaySoFar)}</strong><span className="muted small">{entered} of {g.branches.length} branches entered</span></div>
-        <div className="glance-branches">
-          {g.branches.map((b) => (
+        <div className="glance-total"><strong>{php(g.todaySoFar)}</strong><span className="muted small">{open ? `${entered} of ${g.branches.length} branches entered` : "Clinics open at 10 AM"}</span></div>
+        {shown.length > 0 && <div className="glance-branches">
+          {shown.map((b) => (
             <div key={b.id} className={`glance-branch ${b.todayCell.kind === "empty" ? "missing" : ""}`}>
               <span className="small muted">{b.name}</span>
               <strong>{b.todayCell.kind === "empty" ? <span className="muted">Not entered yet</span> : <Cell c={b.todayCell} />}</strong>
             </div>
           ))}
-        </div>
+        </div>}
       </div>
 
 

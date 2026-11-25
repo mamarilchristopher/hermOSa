@@ -73,24 +73,24 @@ describe("log_client_visit", () => {
       "DEMO Client", null, folder, JSON.stringify(photos(folder, FULL)), false])).ok).toBe(false);
   });
 
-  it("client archive: owners, the GM and the branch's staff; other branches and CSRs see nothing", async () => {
+  it("client archive: every employee can view it (update-0057)", async () => {
     const month = today();
     const mine = await db.rpc(staff, "aal1", "client_photo_folders", [month, null, false]);
     expect(mine.length).toBe(2);
     expect(mine[0].photos.length).toBe(4);
     expect((await db.rpc(gm, "aal1", "client_photo_folders", [month, null, false])).length).toBe(2);
     expect((await db.rpc(owner, "aal2", "client_photo_folders", [month, db.branches.FAIRVIEW, false])).length).toBe(2);
-    expect(await db.rpc(qcStaff, "aal1", "client_photo_folders", [month, null, false])).toEqual([]);
-    expect(await db.rpc(csr, "aal1", "client_photo_folders", [month, null, false])).toEqual([]);
+    expect((await db.rpc(qcStaff, "aal1", "client_photo_folders", [month, null, false])).length).toBe(2);
+    expect((await db.rpc(csr, "aal1", "client_photo_folders", [month, null, false])).length).toBe(2);
   });
 
-  it("social media: only visits the client allowed, never waivers, for owners, the GM and CSRs", async () => {
+  it("social media: only visits the client allowed, never waivers, for every employee", async () => {
     const month = today();
     const s = await db.rpc(csr, "aal1", "client_photo_folders", [month, null, true]);
     expect(s.length).toBe(1);
     expect(s[0].client).toBe("DEMO Client One");
     expect(s[0].photos.map((p: { kind: string }) => p.kind)).toEqual(["BEFORE", "AFTER"]);
-    expect(await db.rpc(staff, "aal1", "client_photo_folders", [month, null, true])).toEqual([]);
+    expect((await db.rpc(staff, "aal1", "client_photo_folders", [month, null, true])).length).toBe(1);
   });
 
   it("owners and the GM can change the sharing choice, even after sign-off; staff can't", async () => {
@@ -102,17 +102,13 @@ describe("log_client_visit", () => {
     await expect(db.sql("SELECT set_config('hermosa.photo_sharing','on',false); UPDATE public.service_logs SET amount_paid_cents = 1 WHERE id = $1", [shared])).rejects.toThrow();
   });
 
-  it("the file rule: archive staff open any of the visit's files, CSRs only shared before/after", async () => {
+  it("the file rule: every employee opens the visit's files (update-0057)", async () => {
     const p = (await db.sql("SELECT path, kind FROM public.service_photos WHERE service_log_id = $1 ORDER BY kind", [shared])).rows;
     const can = async (who: Person, name: string) =>
       (await db.as(who, "aal1", "SELECT private.can_open_client_photo($1) ok", [name])).rows[0].ok;
     expect(await can(staff, p[0].path)).toBe(true);
-    expect(await can(qcStaff, p[0].path)).toBe(false);
-    expect(await can(csr, p[0].path)).toBe(false); // sharing was turned off above
-    await db.rpc(owner, "aal2", "set_photo_sharing", [shared, true]);
-    const waiver = p.find((x: { kind: string }) => x.kind === "WAIVER").path;
-    const after = p.find((x: { kind: string }) => x.kind === "AFTER").path;
-    expect(await can(csr, after)).toBe(true);
-    expect(await can(csr, waiver)).toBe(false);
+    expect(await can(qcStaff, p[0].path)).toBe(true);
+    expect(await can(csr, p[0].path)).toBe(true);
+    expect(await can(staff, "nope/not-a-photo.jpg")).toBe(false);
   });
 });

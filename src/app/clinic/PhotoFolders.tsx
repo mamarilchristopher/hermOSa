@@ -9,6 +9,7 @@ import { branchShort } from "@/lib/schedule";
 import { BRANCH_ORDER } from "@/lib/insights";
 import { ShareToggle } from "./ShareToggle";
 import { TaggedDownload } from "./TaggedDownload";
+import { DeleteFolder } from "./DeleteFolder";
 
 type Photo = { id: string; kind: "WAIVER" | "BEFORE" | "AFTER"; path: string; thumb: string | null };
 type Visit = { id: string; date: string; client: string; service: string | null; branch_id: string; branch: string | null; lead: string | null;
@@ -25,14 +26,12 @@ const KIND_TEXT = { BEFORE: "Before", AFTER: "After", WAIVER: "Waiver" } as cons
 export async function PhotoFolders({ social, searchParams }: { social: boolean; searchParams: Promise<{ month?: string; branch?: string; q?: string }> }) {
   const { supabase, access, branches } = await requireAccess();
   const owner = can(access, ["OWNER"], null), gm = can(access, ["MANAGER"], null);
-  const allowed = social
-    ? owner || gm || access.grants.some((g) => g.role === "MARKETING" || g.role === "CSR")
-    : access.grants.some((g) => ["OWNER", "MANAGER", "CLINICIAN", "CASHIER"].includes(g.role));
-  if (!allowed) redirect("/");
+  // update-0057 (CHRIS Nov 26): every employee can view and download; only owners and the GM delete.
+  if (!access.grants.length) redirect("/");
   const sp = await searchParams;
   const thisMonth = manilaToday().slice(0, 7);
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") && sp.month! <= thisMonth ? sp.month! : thisMonth;
-  const clinics = branches.filter((b) => b.kind === "CLINIC").filter((b) => social || owner || gm || can(access, ["MANAGER", "CLINICIAN", "CASHIER"], b.id));
+  const clinics = branches.filter((b) => b.kind === "CLINIC");
   const branch = clinics.find((b) => b.id === sp.branch)?.id ?? null;
   const q = (sp.q ?? "").trim().toLowerCase().slice(0, 60);
 
@@ -150,6 +149,7 @@ export async function PhotoFolders({ social, searchParams }: { social: boolean; 
                           <div className="folder-foot">
                             <ShareToggle id={v.id} on={v.share_ok} />
                             <Link className="small" href={`/services?date=${v.date}`}>Service log</Link>
+                            <DeleteFolder id={v.id} client={v.client} />
                           </div>
                         )}
                       </details>

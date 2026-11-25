@@ -50,8 +50,9 @@ export async function TopBar({ access }: { access: Access }) {
   const importer = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
   const filler = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER"].includes(g.role));
   const management = access.grants.some((g) => ["OWNER", "FINANCE", "AUDITOR", "MANAGER"].includes(g.role));
-  const archiver = access.grants.some((g) => ["OWNER", "MANAGER", "CLINICIAN", "CASHIER"].includes(g.role));
-  const socialTeam = owner || gm || access.grants.some((g) => ["MARKETING", "CSR"].includes(g.role));
+  // update-0057: every employee sees both photo tabs.
+  const archiver = access.grants.length > 0;
+  const socialTeam = archiver;
   // Bookings (update-0040): CSRs, owners and the GM book; branch staff see their branch's visits.
   const booker = access.grants.some((g) => ["CSR", "OWNER", "MANAGER", "CLINICIAN", "CASHIER"].includes(g.role));
   // Menu grouped into hubs (v0.48, CHRIS Nov 25): related pages become tabs inside one menu item. Time clock stays its own item.
