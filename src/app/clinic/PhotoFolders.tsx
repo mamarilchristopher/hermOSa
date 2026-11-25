@@ -7,6 +7,7 @@ import { manilaToday } from "@/lib/dates";
 import { dayLabel } from "@/lib/homeGlance";
 import { branchShort } from "@/lib/schedule";
 import { ShareToggle } from "./ShareToggle";
+import { TaggedDownload } from "./TaggedDownload";
 
 type Photo = { id: string; kind: "WAIVER" | "BEFORE" | "AFTER"; path: string; thumb: string | null };
 type Visit = { id: string; date: string; client: string; service: string | null; branch_id: string; branch: string | null; lead: string | null;
@@ -17,6 +18,7 @@ const shiftMonth = (m: string, by: number) => {
   const d = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1 + by, 1));
   return d.toISOString().slice(0, 7);
 };
+const longDate = (d: string) => `${MONTHS[Number(d.slice(5, 7)) - 1].slice(0, 3)} ${Number(d.slice(8, 10))}, ${d.slice(0, 4)}`;
 const KIND_TEXT = { BEFORE: "Before", AFTER: "After", WAIVER: "Waiver" } as const;
 
 export async function PhotoFolders({ social, searchParams }: { social: boolean; searchParams: Promise<{ month?: string; branch?: string; q?: string }> }) {
@@ -64,7 +66,7 @@ export async function PhotoFolders({ social, searchParams }: { social: boolean; 
         <p className="muted small">
           {social
             ? "Before and after photos of clients who allowed sharing. Tap a photo to open the full-quality original. Waivers are never shown here."
-            : "Every client's waiver and before/after photos from the service log, by month and day. Tap a photo to open the full-quality original."}
+            : "Every client's waiver and before/after photos from the service log, by month and day. Each photo is tagged with the client, service, branch, date and staff; Download saves it with that tag at the bottom. Tap a photo to open the untagged full-quality original."}
         </p>
 
         <div className="card">
@@ -98,6 +100,8 @@ export async function PhotoFolders({ social, searchParams }: { social: boolean; 
                 <h2>{dayLabel(d)}</h2>
                 <div className="client-folders">
                   {visits.filter((v) => v.date === d).map((v) => {
+                    // Archive auto-tag (CHRIS Nov 26): client, service, branch, date, lead/assist. Social media photos stay clean.
+                    const tag = [v.client, v.service, branchShort(v.branch ?? ""), longDate(v.date), v.lead && `Lead ${v.lead}`, v.assist && `Assist ${v.assist}`].filter(Boolean).join(" · ");
                     const groups = ([["Before and after", ["BEFORE", "AFTER"]], ["Waiver", ["WAIVER"]]] as const)
                       .map(([t, ks]) => [t, v.photos.filter((p) => (ks as readonly string[]).includes(p.kind))] as const).filter(([, l]) => l.length);
                     return (
@@ -123,8 +127,12 @@ export async function PhotoFolders({ social, searchParams }: { social: boolean; 
                                     <a href={view[p.path]} target="_blank" rel="noreferrer" className="folder-photo">
                                       {src ? <img src={src} alt={`${KIND_TEXT[p.kind]} photo of ${v.client}`} loading="lazy" />
                                         : <span className="folder-nothumb">Open photo</span>}
+                                      {!social && <span className="photo-tag">{KIND_TEXT[p.kind]} · {tag}</span>}
                                     </a>
-                                    <span className="small"><span className="muted">{KIND_TEXT[p.kind]}</span>{save[p.path] && <> · <a href={save[p.path]}>Download</a></>}</span>
+                                    <span className="small"><span className="muted">{KIND_TEXT[p.kind]}</span>
+                                      {social ? save[p.path] && <> · <a href={save[p.path]}>Download</a></>
+                                        : view[p.path] && <> · <TaggedDownload url={view[p.path]} tag={`${KIND_TEXT[p.kind]} · ${tag}`}
+                                          filename={`${v.date} ${v.client} ${KIND_TEXT[p.kind]} ${p.id.slice(0, 4)}.jpg`.replace(/[\\/:*?"<>|]/g, "")} /></>}</span>
                                   </li>
                                 );
                               })}
