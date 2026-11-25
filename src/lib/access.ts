@@ -88,6 +88,7 @@ export const ERROR_TEXT: Record<string, string> = {
   NOT_STAGED: "This batch is no longer waiting for sign-off.",
   NOT_PUBLISHED: "Only published batches can be reversed.",
   REASON_REQUIRED: "Give a reason of at least 8 characters.",
+  OTHER_REASON_REQUIRED: "Type the reason when you pick Other.",
   BAD_EXPECTED_TOTAL: "Enter the expected row count and total from the branch report.",
   CSV_HAS_NO_RECORDS: "The file has no sales rows.",
   MISSING_CSV_COLUMNS: "The file needs the columns source_id, posting_date and amount_php.",

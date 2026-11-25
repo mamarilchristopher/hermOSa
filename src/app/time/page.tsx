@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAccess, can } from "@/lib/access";
+import { requireAccess, can, canApprove } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { OnDutyList, type DutyRow } from "@/components/OnDuty";
 import { manilaToday } from "@/lib/dates";
@@ -92,7 +92,7 @@ export default async function TimePage() {
           <>
             <div className="card">
               <div className="card-head"><h2>On duty today, {dayLabel(today)}</h2><span className="small"><Link href="/time/photos">Time-in photos →</Link> · <Link href="/schedule">Schedule →</Link></span></div>
-              <OnDutyList rows={rows} branches={short} photos={photos} nowHm={nowHm()} />
+              <OnDutyList rows={rows} branches={short} photos={photos} nowHm={nowHm()} tagDate={canApprove(access, null) ? today : undefined} />
             </div>
 
             <div className="card">

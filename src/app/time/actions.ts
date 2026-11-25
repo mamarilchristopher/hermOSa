@@ -50,3 +50,35 @@ export async function setBranchLocation(input: { branch: string; lat: number; ln
   revalidatePath("/time");
   return { ok: "Branch location saved.", at: Date.now() };
 }
+
+// Irregular days (update-0044): owners and the GM tag a day so lateness that day is ignored.
+export type TagState = { error?: string; ok?: string } | undefined;
+const Tag = z.object({
+  date: z.iso.date(), employee: z.union([z.uuid(), z.literal("")]), reason: z.enum(["MAINTENANCE", "EMERGENCY", "OTHER"]),
+  note: z.string().trim().max(300),
+});
+export async function tagIrregular(_: TagState, form: FormData): Promise<TagState> {
+  const p = Tag.safeParse({ date: form.get("date"), employee: form.get("employee") ?? "", reason: form.get("reason"), note: form.get("note") ?? "" });
+  if (!p.success) return { error: "Pick a reason." };
+  if (p.data.reason === "OTHER" && p.data.note.length < 3) return { error: errorText("OTHER_REASON_REQUIRED") };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_irregular_day", {
+    p_date: p.data.date, p_employee: p.data.employee || null, p_reason: p.data.reason, p_note: p.data.reason === "OTHER" ? p.data.note : null,
+  });
+  if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0044 in Supabase first." : "Could not save. Try again." };
+  if (!data?.ok) return { error: errorText(data?.error) };
+  revalidatePath("/time"); revalidatePath("/me");
+  const extra = data.ntes_voided ? ` ${data.ntes_voided} Late NTE${data.ntes_voided === 1 ? "" : "s"} cancelled.` : "";
+  const ir = data.ntes_with_ir ? ` ${data.ntes_with_ir} already became an IR; handle those on the IR page.` : "";
+  return { ok: `Marked irregular. Lateness is ignored.${extra}${ir}` };
+}
+export async function untagIrregular(_: TagState, form: FormData): Promise<TagState> {
+  const id = z.uuid().safeParse(form.get("id"));
+  if (!id.success) return { error: "Could not undo. Reload and try again." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("clear_irregular_day", { p_id: id.data });
+  if (error) return { error: "Could not undo. Try again." };
+  if (!data?.ok) return { error: errorText(data?.error) };
+  revalidatePath("/time"); revalidatePath("/me");
+  return { ok: "Undone. Lateness counts again (cancelled NTEs stay cancelled)." };
+}

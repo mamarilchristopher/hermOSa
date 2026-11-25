@@ -787,3 +787,11 @@ h1 .uid { font-size: 0.9rem; }
 .price-edit { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .price-edit input, .price-edit select { width: auto; flex: 1 1 120px; }
 .price-edit input[name="name"] { flex: 2 1 220px; }
+
+/* Irregular days (update-0044) */
+.irregular-tag { margin-top: 4px; }
+.irregular-tag summary { cursor: pointer; color: var(--muted, #7a6f66); }
+.irregular-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.duty-list .irregular-form { justify-content: flex-end; }
+.irregular-form select, .irregular-form input { max-width: 100%; }
+.irregular-day { margin: 0 0 10px; }
