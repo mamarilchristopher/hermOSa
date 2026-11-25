@@ -138,6 +138,8 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
       <button className={`clock-btn ${isIn ? "out" : ""}`} disabled={!!busy || !branch} onClick={() => file.current?.click()}>
         {busy ?? (isIn ? "Time out" : "Time in")}
       </button>
+      {/* Example photo (CHRIS, Nov 25): one for CSRs working from home, one for everyone at a clinic. */}
+      <img className="time-example" src={online ? "/time-in-csr.svg" : "/time-in-clinic.svg"} alt={online ? "Example: phone photo of the PC clock corner showing time and date" : "Example: phone photo of the clinic clock showing time and date"} />
       <p className="small muted" style={{ margin: 0 }}>{online
         ? "Working from home: take a photo of your PC's clock showing the date and time (bottom corner of the screen). The server time is saved with it."
         : "Take a photo of the clinic clock showing the date and time. The server time and your location are saved with it."}</p>

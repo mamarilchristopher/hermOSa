@@ -773,3 +773,14 @@ h1 .uid { font-size: 0.9rem; }
 .photo-zoom input { flex: 1; accent-color: var(--gold); }
 .online-name .avatar { flex: none; }
 .online-name.owner { background: var(--brown-dark); border-color: var(--brown-dark); color: #fff; }
+
+/* Bookings (update-0040) */
+.booking-nav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.booking-nav + .booking-nav { margin-top: 8px; }
+.booking-nav a.on { font-weight: 800; color: var(--brown-dark); text-decoration: underline; }
+.booking-row { padding: 10px 0; border-top: 1px solid var(--line); }
+.booking-row:first-of-type { border-top: 0; }
+.booking-actions { display: inline-flex; flex-direction: column; gap: 6px; }
+.booking-resched { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.booking-resched input { width: auto; flex: 1 1 140px; }
+.time-example { display: block; width: 100%; max-width: 420px; height: auto; margin: 4px 0 8px; border-radius: 12px; border: 1px solid var(--line); }

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 310" font-family="Arial, Helvetica, sans-serif">
+  <rect width="480" height="310" rx="16" fill="#faf6f0"/>
+  <!-- PC monitor -->
+  <rect x="40" y="30" width="300" height="190" rx="10" fill="#3b3a3a"/>
+  <rect x="50" y="40" width="280" height="160" fill="#dfe7ef"/>
+  <rect x="70" y="60" width="120" height="70" rx="4" fill="#ffffff" stroke="#c9d3dd"/>
+  <rect x="200" y="80" width="110" height="80" rx="4" fill="#ffffff" stroke="#c9d3dd"/>
+  <!-- taskbar -->
+  <rect x="50" y="180" width="280" height="20" fill="#1f2a36"/>
+  <rect x="58" y="185" width="10" height="10" fill="#7fb2e5"/>
+  <text x="322" y="189" font-size="7.5" fill="#fff" text-anchor="end">6:12 PM</text>
+  <text x="322" y="197" font-size="7.5" fill="#fff" text-anchor="end">11/25/2026</text>
+  <rect x="160" y="220" width="60" height="20" fill="#3b3a3a"/>
+  <rect x="130" y="240" width="120" height="8" rx="4" fill="#3b3a3a"/>
+  <!-- highlight on the clock corner -->
+  <circle cx="306" cy="191" r="24" fill="none" stroke="#c9a14a" stroke-width="4"/>
+  <path d="M325 180 L372 120" stroke="#c9a14a" stroke-width="3" fill="none"/>
+  <!-- phone showing the zoomed clock -->
+  <rect x="360" y="40" width="96" height="176" rx="14" fill="#2b2523"/>
+  <rect x="366" y="54" width="84" height="148" rx="6" fill="#1f2a36"/>
+  <text x="408" y="118" font-size="17" fill="#fff" text-anchor="middle" font-weight="bold">6:12 PM</text>
+  <text x="408" y="140" font-size="13" fill="#fff" text-anchor="middle">11/25/2026</text>
+  <circle cx="408" cy="209" r="4" fill="#5b4f4a"/>
+  <text x="240" y="278" font-size="15" fill="#5a3e2b" text-anchor="middle" font-weight="bold">CSR (WFH): photo of your PC's clock corner</text>
+  <text x="240" y="295" font-size="11.5" fill="#7a6a5e" text-anchor="middle">Time AND date must be clear. Fill the screen with it, no blur.</text>
+</svg>

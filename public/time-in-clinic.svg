@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 310" font-family="Arial, Helvetica, sans-serif">
+  <rect width="480" height="310" rx="16" fill="#faf6f0"/>
+  <!-- clinic wall -->
+  <rect x="30" y="24" width="300" height="220" rx="8" fill="#efe4d6"/>
+  <rect x="30" y="200" width="300" height="44" fill="#e3d3bf"/>
+  <!-- digital wall clock with date -->
+  <rect x="90" y="60" width="180" height="100" rx="10" fill="#2b2523" stroke="#c9a14a" stroke-width="3"/>
+  <text x="180" y="112" font-size="34" fill="#ffd98a" text-anchor="middle" font-weight="bold">10:02</text>
+  <text x="180" y="142" font-size="14" fill="#ffd98a" text-anchor="middle">WED 11/25/2026</text>
+  <path d="M256 92 L372 92" stroke="#c9a14a" stroke-width="3"/>
+  <!-- phone showing the clock -->
+  <rect x="360" y="40" width="96" height="176" rx="14" fill="#2b2523"/>
+  <rect x="366" y="54" width="84" height="148" rx="6" fill="#efe4d6"/>
+  <rect x="372" y="96" width="72" height="56" rx="5" fill="#2b2523"/>
+  <text x="408" y="124" font-size="18" fill="#ffd98a" text-anchor="middle" font-weight="bold">10:02</text>
+  <text x="408" y="142" font-size="8" fill="#ffd98a" text-anchor="middle">WED 11/25/2026</text>
+  <circle cx="408" cy="209" r="4" fill="#5b4f4a"/>
+  <text x="240" y="278" font-size="15" fill="#5a3e2b" text-anchor="middle" font-weight="bold">Clinic staff: photo of the clinic clock</text>
+  <text x="240" y="295" font-size="11.5" fill="#7a6a5e" text-anchor="middle">Time AND date must be clear. Take it at the clinic, location on.</text>
+</svg>
