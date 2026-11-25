@@ -8,6 +8,7 @@ import { OnlineNow } from "./OnlineNow";
 import { ViewAsButton } from "./ViewAsButton";
 import { Avatar } from "./Avatar";
 import { photoUrls } from "@/lib/photos";
+import { NotifBell } from "./NotifBell";
 
 const ROLE_LABEL: Record<string, string> = {
   OWNER: "Owner", FINANCE: "Finance", MANAGER: "Manager", CASHIER: "Cashier", HR: "HR",
@@ -44,7 +45,7 @@ export async function TopBar({ access }: { access: Access }) {
   // Bookings (update-0040): CSRs, owners and the GM book; branch staff see their branch's visits.
   const booker = access.grants.some((g) => ["CSR", "OWNER", "MANAGER", "CLINICIAN", "CASHIER"].includes(g.role));
   const items: NavItem[] = [
-    { href: "/me", label: "Home", short: "Home", icon: "home", badge: unreadNotices || undefined },
+    { href: "/me", label: "Home", short: "Home", icon: "home" }, // notices and to-dos live in the bell (v0.44.4)
     ...(management ? [{ href: "/", label: "Sales dashboard", short: "Sales", icon: "chart" } as NavItem] : []),
     ...(filler ? [{ href: "/sales/daily", label: "Daily Sales", short: "Daily", icon: "pen" } as NavItem] : []),
     ...(logger ? [{ href: "/services", label: "Service log", short: "Services", icon: "clipboard", badge: overdue.length || undefined } as NavItem] : []),
@@ -98,6 +99,7 @@ export async function TopBar({ access }: { access: Access }) {
       <div className="online-strip">
         <OnlineNow show />
         {viewList.length > 0 && <ViewAsButton people={viewList} />}
+        <NotifBell />
       </div>
       {overdue.length > 0 && (
         <div className="alert-strip" role="status">

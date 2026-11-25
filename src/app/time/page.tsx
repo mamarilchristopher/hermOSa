@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { requireAccess, can, canApprove } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
-import { OnDutyList, type DutyRow } from "@/components/OnDuty";
+import type { DutyRow } from "@/components/OnDuty";
+import { OnDutyFaces } from "@/components/OnDutyFaces";
+import { loadFaces } from "@/lib/dutyFaces";
 import { manilaToday } from "@/lib/dates";
 import { cutoffEnd, dayLabel } from "@/lib/homeGlance";
 import { branchShort, timeLabel } from "@/lib/schedule";
@@ -46,6 +48,7 @@ export default async function TimePage() {
   const paths = rows.map((r) => r.in_photo).filter((p): p is string => !!p);
   const { data: signed } = paths.length ? await supabase.storage.from("timeclock").createSignedUrls(paths, 3600) : { data: [] };
   const photos: Record<string, string> = Object.fromEntries((signed ?? []).filter((s) => s.signedUrl && s.path).map((s) => [s.path!, s.signedUrl as string]));
+  const faces = rows.length ? await loadFaces(supabase, rows) : {};
   const attendance = (Array.isArray(att.data) ? att.data : []) as Att[];
   const locSet = new Set(((locs ?? []) as { id: string; lat: number | null }[]).filter((b) => b.lat != null).map((b) => b.id));
   const myBranches = short.filter((b) => !b.wfh && can(access, ["OWNER", "MANAGER"], b.id)).map((b) => ({ ...b, set: locSet.has(b.id) }));
@@ -92,7 +95,7 @@ export default async function TimePage() {
           <>
             <div className="card">
               <div className="card-head"><h2>On duty today, {dayLabel(today)}</h2><span className="small"><Link href="/time/photos">Time-in photos →</Link> · <Link href="/schedule">Schedule →</Link></span></div>
-              <OnDutyList rows={rows} branches={short} photos={photos} nowHm={nowHm()} tagDate={canApprove(access, null) ? today : undefined} />
+              <OnDutyFaces rows={rows} faces={faces} branches={short} photos={photos} nowHm={nowHm()} tagDate={canApprove(access, null) ? today : undefined} />
             </div>
 
             <div className="card">

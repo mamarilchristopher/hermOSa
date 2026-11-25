@@ -10,9 +10,8 @@ import { markNoticesRead } from "./actions";
 import { ManagerHome, TodoCard, type Todo } from "./ManagerHome";
 import type { DutyRow } from "@/components/OnDuty";
 import type { Ir } from "@/lib/incidents";
-import { branchShort, shortNames, timeLabel } from "@/lib/schedule";
-import { photoUrls } from "@/lib/photos";
-import type { DutyFace } from "@/components/OnDutyFaces";
+import { branchShort, timeLabel } from "@/lib/schedule";
+import { loadFaces } from "@/lib/dutyFaces";
 import { noticeButton, noticeHref } from "@/lib/noticeLink";
 import { computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
 import { addDays, sortBranches } from "@/lib/insights";
@@ -25,67 +24,18 @@ type Signoffs = { to_sign: { count: number; oldest: string | null }; mine: { cou
 type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: string }[]; days?: StatusDay[];
   corrections?: { id: string; mine: boolean }[] };
 
-/** Everything the management Home needs, in one round of queries. Missing pieces (older database) just drop out. */
-async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>>["supabase"], today: string, owner: boolean, userId: string, gm = false) {
-  const [{ data: st }, { data: overdueData }, { data: signData }, { count: uploads }, { count: details }, { count: joins }, { data: dutyData }, { count: schedReqs }, { data: irData }] = await Promise.all([
+/** The management Home: today's and yesterday's sales, the month, and who's on duty. To-dos live in the bell (src/lib/todos.ts). */
+async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>>["supabase"], today: string) {
+  const [{ data: st }, { data: dutyData }] = await Promise.all([
     supabase.rpc("daily_sales_status", { p_start: glanceFetchStart(today), p_end: today }),
-    supabase.rpc("overdue_commission_days"),
-    supabase.rpc("pending_signoffs"),
-    supabase.from("import_batches").select("id", { count: "exact", head: true }).eq("state", "STAGED"),
-    owner || gm ? supabase.from("employee_detail_submissions").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("user_id", userId) : Promise.resolve({ count: 0 }),
-    supabase.from("app_users").select("id", { count: "exact", head: true }).eq("join_status", "PENDING"), // owner, or GM after update-0027
-
     supabase.rpc("on_duty", { p_date: today }), // errors (before update-0022) mean no On Duty card
-    supabase.from("schedule_requests").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("requested_by", userId).or("kind.eq.DAY_OFF,coworker_state.eq.ACCEPTED"), // swaps count once the coworker accepted (update-0036)
-    supabase.rpc("incident_list"), // errors (before update-0023) mean no IR to-dos
   ]);
   const s = (st ?? { ok: false }) as DailyStatus;
   if (!s.ok) return null;
   const g = computeGlance(today, sortBranches(s.branches ?? []), s.days ?? []);
-  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-  const todos: Todo[] = [];
-  if (g.yesterdayMissing.length) todos.push({ text: `Yesterday's sales not entered yet: ${g.yesterdayMissing.join(", ")}`, href: "/sales/daily", urgent: true });
-  const olderEmpty = g.emptyDays - g.yesterdayMissing.length;
-  if (olderEmpty > 0) todos.push({ text: `${plural(olderEmpty, "earlier day", "earlier days")} this month with nothing entered (enter the total or mark Zero sales / Closed)`, href: "/sales/daily" });
-  const changes = (s.corrections ?? []).filter((c) => !c.mine).length;
-  if (changes) todos.push({ text: `${plural(changes, "sales change needs", "sales changes need")} a second person to confirm`, href: "/sales/daily", urgent: true });
-  const overdue = (Array.isArray(overdueData) ? overdueData : []) as { name: string; date: string; pending: number }[];
-  if (overdue.length) todos.push({ text: `Commission sign-off overdue: ${overdue.slice(0, 4).map((o) => `${o.name.replace(/ \(.*\)$/, "")} ${dayLabel(o.date).slice(5)}`).join(", ")}${overdue.length > 4 ? ", and more" : ""}`, href: "/services", urgent: true });
-  const toSign = (signData as Signoffs | null)?.to_sign;
-  if (toSign?.count) todos.push({
-    text: `Sign off ${plural(toSign.count, "commission entry", "commission entries")} (oldest ${dayLabel(toSign.oldest!)}). Anything unsigned by ${dayLabel(cutoffEnd(today))} isn't paid in this cutoff`,
-    href: `/services?date=${toSign.oldest}`, urgent: !overdue.length });
-  if (uploads) todos.push({ text: `${plural(uploads, "upload is", "uploads are")} waiting for sign-off`, href: "/imports" });
-  if (details) todos.push({ text: `${plural(details, "staff member sent", "staff members sent")} employee details to review`, href: "/admin/details" });
-  if (joins) todos.push({ text: `${plural(joins, "person is", "people are")} asking to join the app`, href: owner ? "/admin/users" : "/admin/joins" });
-  if (schedReqs) todos.push({ text: `${plural(schedReqs, "schedule change is", "schedule changes are")} waiting for approval (swaps or day-off moves)`, href: "/schedule" });
-  const irs = ((irData as { reports?: Ir[] } | null)?.reports ?? []).filter((r) => r.can_manage);
-  const irDraft = irs.filter((r) => r.state === "DRAFT").length, irExplained = irs.filter((r) => r.state === "EXPLAINED").length;
-  if (irDraft) todos.push({ text: `${plural(irDraft, "tardiness IR is", "tardiness IRs are")} ready to review and issue`, href: "/incidents", urgent: true });
-  if (irExplained) todos.push({ text: `${plural(irExplained, "IR has", "IRs have")} an explanation. Close with the action taken`, href: "/incidents" });
   const duty = Array.isArray(dutyData) ? (dutyData as DutyRow[]) : null;
-  if (duty) {
-    const hm = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" });
-    const notIn = duty.filter((r) => !r.off && r.start && !r.time_in && r.start.slice(0, 5) <= hm);
-    if (notIn.length) todos.push({ text: `Not timed in yet: ${notIn.slice(0, 5).map((r) => r.name.split(" ")[0]).join(", ")}${notIn.length > 5 ? ", and more" : ""}`, href: "/time", urgent: true });
-  }
-  // Faces for the On duty card (CHRIS Nov 25: neat view with profile pictures): nickname or first name + approved photo.
-  const faces: Record<string, DutyFace> = {};
-  if (duty?.length) {
-    const ids = [...new Set(duty.map((r) => r.employee_id))];
-    const { data: emps } = await supabase.from("employees").select("id, full_name, nickname, app_user_id").in("id", ids);
-    const list = (emps ?? []) as { id: string; full_name: string; nickname: string | null; app_user_id: string | null }[];
-    const userIds = list.map((e) => e.app_user_id).filter((x): x is string => !!x);
-    const { data: users } = userIds.length ? await supabase.from("app_users").select("id, photo_path").in("id", userIds) : { data: [] };
-    const pathOf = new Map(((users ?? []) as { id: string; photo_path: string | null }[]).map((u) => [u.id, u.photo_path]));
-    const urls = await photoUrls(supabase, [...pathOf.values()]);
-    const names = shortNames(list.map((e) => ({ id: e.id, name: e.full_name, nick: e.nickname })));
-    for (const e of list) {
-      const path = e.app_user_id ? pathOf.get(e.app_user_id) : null;
-      faces[e.id] = { short: names[e.id] ?? e.full_name, photo: path ? urls.get(path) ?? null : null };
-    }
-  }
-  return { g, todos, duty, faces };
+  const faces = duty?.length ? await loadFaces(supabase, duty) : {};
+  return { g, duty, faces };
 }
 
 type Notice = { id: string; kind?: string; title: string; body: string | null; link: string | null; created_at: string; read_at: string | null };
@@ -131,15 +81,7 @@ export default async function Me() {
   const first = (emp?.full_name || access.display_name).trim().split(/\s+/)[0];
   const management = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
   const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
-  const home = management ? await managementHome(supabase, today, isOwner, access.user_id, !isOwner && access.grants.some((g) => g.role === "MANAGER" && g.branch_id === null)) : null;
-  const staffTodos = management ? null : await staffHome();
-  const timeTodo = await timeInTodo();
-  if (emp) {
-    const { data: myIr } = await supabase.rpc("incident_list");
-    const waiting = ((myIr as { reports?: Ir[] } | null)?.reports ?? []).filter((r) => r.mine && r.state === "ISSUED");
-    for (const r of waiting) (home?.todos ?? staffTodos)?.unshift({ text: `URGENT: Incident report no. ${r.ir_no} was issued to you. Acknowledge it and write your response`, href: `/incidents/${r.id}`, urgent: true });
-  }
-  if (timeTodo) (home?.todos ?? staffTodos)?.unshift(timeTodo);
+  const home = management ? await managementHome(supabase, today) : null;
   // Late NTEs waiting for my explanation (shown as boxes at the top), and the owner/GM tardiness tracker.
   const ownerLevel = isOwner || access.grants.some((g) => g.role === "MANAGER" && g.branch_id === null);
   await supabase.rpc("run_nte_deadlines"); // issues the automatic IRs that are due (errors before update-0032 are ignored)
@@ -150,76 +92,6 @@ export default async function Me() {
   ]);
   const myNtes = (myNteData ?? []) as { id: string; nte_no: number; work_date: string; shift_start: string; time_in: string; late_minutes: number; respond_by?: string | null; ir_id?: string | null }[];
   const tardy = trackData ? tracker((trackData as NteList).ntes, (trackData as NteList).ir_minutes) : [];
-  if (missingTodo && !isOwner) (home?.todos ?? staffTodos)?.push(missingTodo);
-  // Profile pictures (update-0034): ask everyone for one; owners and the GM see how many wait for approval.
-  const [{ data: myPhotoRow, error: photoErr }, { count: photosWaiting }] = await Promise.all([
-    supabase.from("profile_photos").select("state, note").eq("user_id", access.user_id).neq("state", "SUPERSEDED").order("submitted_at", { ascending: false }).limit(1).maybeSingle(),
-    ownerLevel ? supabase.from("profile_photos").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("user_id", isOwner ? "00000000-0000-0000-0000-000000000000" : access.user_id) : Promise.resolve({ count: 0 }),
-  ]);
-  if (!photoErr) {
-    if (!myPhotoRow) (home?.todos ?? staffTodos)?.push({ text: "Add your profile picture (an owner approves it)", href: "/me/photo" });
-    else if (myPhotoRow.state === "RETURNED") (home?.todos ?? staffTodos)?.push({ text: `Your profile picture was sent back${myPhotoRow.note ? `: ${myPhotoRow.note}` : ""}. Please upload another`, href: "/me/photo", urgent: true });
-    if (photosWaiting) (home?.todos ?? staffTodos)?.push({ text: `${photosWaiting} profile picture${photosWaiting === 1 ? " is" : "s are"} waiting for your approval`, href: "/admin/photos" });
-  }
-  // Leave (update-0035): owners and the GM see how many wait; staff see a decision on their own leave.
-  const [{ count: leaveWaiting, error: leaveErr }, { data: myLeave }] = await Promise.all([
-    ownerLevel ? supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("filed_by", isOwner ? "00000000-0000-0000-0000-000000000000" : access.user_id) : Promise.resolve({ count: 0, error: null }),
-    emp ? supabase.from("leave_requests").select("kind, start_date, state").eq("employee_id", emp.id).eq("state", "DECLINED").gte("decided_at", new Date(Date.now() - 3 * 86400000).toISOString()).limit(3) : Promise.resolve({ data: [] }),
-  ]);
-  // Swaps (update-0036): a coworker asked me to swap and is waiting for my answer.
-  const { count: swapAsks } = emp ? await supabase.from("schedule_requests").select("id", { count: "exact", head: true })
-    .eq("other_employee_id", emp.id).eq("state", "PENDING").eq("coworker_state", "WAITING") : { count: 0 };
-  if (swapAsks) (home?.todos ?? staffTodos)?.unshift({ text: `${swapAsks === 1 ? "A coworker asked" : `${swapAsks} coworkers asked`} to swap schedules with you. Accept or decline`, href: "/schedule", urgent: true });
-  if (!leaveErr && leaveWaiting) (home?.todos ?? staffTodos)?.unshift({ text: `${leaveWaiting} leave request${leaveWaiting === 1 ? " is" : "s are"} waiting for your approval`, href: "/leave" });
-  for (const l of (myLeave ?? []) as { kind: string; start_date: string }[]) (home?.todos ?? staffTodos)?.push({ text: `Your ${l.kind} from ${l.start_date} was not approved. See the note`, href: "/leave" });
-  // Bookings (update-0040): CSRs confirm tomorrow's visits; branch staff see today's online bookings.
-  const csr = access.grants.some((g) => g.role === "CSR");
-  const branchStaff = access.grants.some((g) => ["MANAGER", "CLINICIAN", "CASHIER"].includes(g.role) && g.branch_id !== null);
-  if (csr || branchStaff) {
-    const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
-    const [{ count: toConfirm, error: bErr }, { count: todayVisits }] = await Promise.all([
-      csr ? supabase.from("bookings").select("id", { count: "exact", head: true }).eq("appointment_date", tomorrow).eq("status", "BOOKED") : Promise.resolve({ count: 0, error: null }),
-      branchStaff ? supabase.from("bookings").select("id", { count: "exact", head: true }).eq("appointment_date", today).in("status", ["BOOKED", "CONFIRMED"]) : Promise.resolve({ count: 0 }),
-    ]);
-    if (!bErr && toConfirm) (home?.todos ?? staffTodos)?.unshift({ text: `${toConfirm} visit${toConfirm === 1 ? "" : "s"} tomorrow still to confirm. Message them and mark Confirmed`, href: `/bookings?d=${tomorrow}`, urgent: true });
-    if (todayVisits) (home?.todos ?? staffTodos)?.push({ text: `${todayVisits} online booking${todayVisits === 1 ? "" : "s"} today not marked yet. Tap Arrived when they come in`, href: "/bookings" });
-  }
-  if (home && !isOwner && detailState !== "APPROVED" && detailState !== "PENDING") {
-    home.todos.push({ text: detailState === "RETURNED" ? "The owner sent your employee details back. Please fix them" : "Fill in your employee details (needed for payroll and government reports)", href: "/me/details" });
-  }
-
-  /** Scheduled today and not timed in yet: remind them to time in. */
-  async function timeInTodo(): Promise<Todo | null> {
-    if (!emp) return null;
-    const [{ data: sh }, { count: ins, error }] = await Promise.all([
-      supabase.from("shifts").select("is_off, start_time").eq("employee_id", emp.id).eq("work_date", today).eq("state", "PUBLISHED").maybeSingle(),
-      supabase.from("time_punches").select("id", { count: "exact", head: true }).eq("employee_id", emp.id).eq("work_date", today).eq("kind", "IN"),
-    ]);
-    if (error || !sh || sh.is_off || ins) return null;
-    return { text: `Time in when you arrive. Your shift today starts at ${timeLabel(sh.start_time)}`, href: "/time", urgent: true };
-  }
-
-  /** Staff Home to-dos: unfinished employee details, service entries sent back, commission waiting for sign-off. */
-  async function staffHome(): Promise<Todo[]> {
-    const since = addDays(today, -30);
-    const who = emp ? `created_by.eq.${access.user_id},performer_id.eq.${emp.id},assistant_id.eq.${emp.id}` : `created_by.eq.${access.user_id}`;
-    const [{ data: sentBack }, { count: loggedToday }, { data: signData }] = await Promise.all([
-      supabase.from("service_logs").select("id, service_date").eq("state", "REJECTED").gte("service_date", since).or(who).order("service_date", { ascending: false }),
-      logger ? supabase.from("service_logs").select("id", { count: "exact", head: true }).eq("service_date", today).eq("created_by", access.user_id) : Promise.resolve({ count: 1 }),
-      supabase.rpc("pending_signoffs"),
-    ]);
-    const todos: Todo[] = [];
-    if (detailState === "RETURNED") todos.push({ text: "The owner sent your employee details back. Please fix them", href: "/me/details", urgent: true });
-    else if (detailState !== "APPROVED" && detailState !== "PENDING") todos.push({ text: "Fill in your employee details (needed for payroll and government reports)", href: "/me/details", urgent: true });
-    const back = sentBack ?? [];
-    if (back.length) todos.push({ text: `${back.length} service log ${back.length === 1 ? "entry was" : "entries were"} sent back by your manager. Check the reason and log ${back.length === 1 ? "it" : "them"} again`, href: `/services?date=${back[0].service_date}`, urgent: true });
-    const mine = (signData as Signoffs | null)?.mine;
-    if (mine?.count) {
-      todos.push({ text: `${mine.count} of your commission ${mine.count === 1 ? "entry is" : "entries are"} not signed yet (oldest ${dayLabel(mine.oldest!)}). Unsigned entries won't be included in this cutoff (closes ${dayLabel(cutoffEnd(today))}), so remind your manager`, href: `/services?date=${mine.oldest}`, urgent: true });
-    }
-    if (logger && !loggedToday) todos.push({ text: "Nothing logged today yet. Log each service right after it's done", href: "/services" });
-    return todos;
-  }
 
   return (
     <>
@@ -241,8 +113,7 @@ export default async function Me() {
             ))}
           </div>
         )}
-        {staffTodos && <TodoCard todos={staffTodos} />}
-        {home && <ManagerHome g={home.g} todos={home.todos} duty={home.duty} faces={home.faces} branches={branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: branchShort(b.name) }))} />}
+                {home && <ManagerHome g={home.g} duty={home.duty} faces={home.faces} branches={branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: branchShort(b.name) }))} />}
         {ownerLevel && trackData != null && (
           <div className="card">
             <div className="card-head"><h2>Tardiness tracker, {monthLabel(today.slice(0, 7))}</h2><Link className="small" href="/nte">All Late NTEs</Link></div>
@@ -260,26 +131,6 @@ export default async function Me() {
             )}
           </div>
         )}
-        {notices.length > 0 && (
-          <div className="card">
-            <div className="card-head">
-              <h2>Notices{unread > 0 && <span className="nav-badge inline">{unread}</span>}</h2>
-              {unread > 0 && <form action={markNoticesRead}><button type="submit" className="secondary small">Mark all read</button></form>}
-            </div>
-            <ul className="plain-list notices">
-              {notices.map((n) => (
-                <li key={n.id} className={n.read_at ? "read" : "unread"}>
-                  <span>
-                    <strong>{n.title}</strong> <span className="small muted">· {when(n.created_at)}</span><br />
-                    <span className="small">{n.body}</span>
-                  </span>
-                  {n.link && <Link className="small" href={noticeHref(n.link, n.body, branches) ?? n.link}>{noticeButton(n.kind)}</Link>}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
         {emp?.commission_eligible && (
           <>
             <div className="grid">

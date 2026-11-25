@@ -42,7 +42,7 @@ export function TodoCard({ todos }: { todos: Todo[] }) {
 }
 
 /** Home for owners, finance and managers: what needs doing, yesterday per branch, and how the month is going. */
-export function ManagerHome({ g, todos, duty, faces = {}, branches }: { g: Glance; todos: Todo[]; duty: DutyRow[] | null; faces?: Record<string, DutyFace>; branches: { id: string; name: string }[] }) {
+export function ManagerHome({ g, duty, faces = {}, branches }: { g: Glance; duty: DutyRow[] | null; faces?: Record<string, DutyFace>; branches: { id: string; name: string }[] }) {
   const ym = g.today.slice(0, 7);
   const hm = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" });
   const entered = g.branches.filter((b) => b.todayCell.kind !== "empty").length;
@@ -65,7 +65,6 @@ export function ManagerHome({ g, todos, duty, faces = {}, branches }: { g: Glanc
         </div>
       </div>
 
-      <TodoCard todos={todos} />
 
       {duty && (
         <div className="card">

@@ -801,7 +801,7 @@ h1 .uid { font-size: 0.9rem; }
 .faces-branch { background: var(--cream); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
 .faces-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
 .faces-row { display: flex; flex-wrap: wrap; gap: 14px; }
-.face { display: flex; flex-direction: column; align-items: center; width: 76px; text-align: center; gap: 2px; }
+.face { display: flex; flex-direction: column; align-items: center; width: 92px; text-align: center; gap: 2px; }
 .face .avatar { border: 3px solid transparent; box-sizing: content-box; }
 .face.is-in .avatar, .face.is-out .avatar { border-color: var(--good); }
 .face.is-late .avatar { border-color: var(--bad); }
@@ -811,3 +811,36 @@ h1 .uid { font-size: 0.9rem; }
 .face-status { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .face.is-missing .face-status { color: var(--bad); font-weight: 600; }
 .face-late { font-size: 12px; color: var(--bad); font-weight: 700; white-space: nowrap; }
+
+/* Notification bell: to-dos + notices (v0.44.4) */
+.bell { position: relative; margin-left: auto; }
+.bell-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; padding: 0; }
+.bell-btn:hover, .bell-btn.on { background: var(--gold-soft); border-color: var(--gold-line); }
+.bell-count { position: absolute; top: -5px; right: -6px; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px; background: var(--gold); color: #fff; font-size: 11px; font-weight: 700; line-height: 19px; text-align: center; box-sizing: border-box; }
+.bell-count.urgent { background: var(--bad); }
+.bell-panel { position: absolute; right: 0; top: calc(100% + 8px); width: min(400px, calc(100vw - 24px)); max-height: min(70vh, 620px); overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 12px 32px rgba(47, 36, 29, .16); z-index: 60; padding: 6px 0; font-size: 0.9rem; }
+.bell-head { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 16px 4px; }
+.bell-empty { margin: 0; padding: 4px 16px 10px; }
+.bell-list { list-style: none; margin: 0; padding: 0 6px 6px; }
+.bell-list a, .bell-item { display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border-radius: 10px; color: var(--ink); text-decoration: none; line-height: 1.35; width: 100%; text-align: left; background: none; border: 0; font: inherit; cursor: pointer; }
+.bell-list a:hover, .bell-item:hover { background: var(--cream); }
+.bell-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; background: var(--gold); }
+.bell-list a.urgent .bell-dot { background: var(--bad); }
+.bell-list a.urgent { font-weight: 600; }
+.bell-list li.read .bell-dot { background: transparent; }
+.bell-list li.read a, .bell-list li.read .bell-item { color: var(--ink-2); }
+.link-like { background: none; border: 0; padding: 0; color: var(--brown); text-decoration: underline; cursor: pointer; font: inherit; }
+@media (max-width: 900px) { .bell-panel { position: fixed; left: 12px; right: 12px; top: 110px; width: auto; } }
+.face-shift { font-size: 12px; font-weight: 700; white-space: nowrap; color: var(--muted); }
+.face-shift.going { color: var(--good); }
+.face-shift.over { color: var(--ink-2); }
+.face.is-out .avatar { border-color: var(--line-strong); }
+.face.is-missing .face-shift { color: var(--bad); }
+.face { position: relative; }
+.face-link { font-size: 12px; white-space: nowrap; }
+.face .irregular-tag summary { font-size: 12px; white-space: nowrap; list-style: none; text-decoration: underline; }
+.face .irregular-tag summary::-webkit-details-marker { display: none; }
+.face .irregular-form { position: absolute; z-index: 20; top: 100%; left: 50%; transform: translateX(-50%); width: 230px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px; box-shadow: 0 10px 24px rgba(47, 36, 29, .16); justify-content: flex-start; }
+.face .irregular-form select, .face .irregular-form input { width: 100%; }
+.face .irregular-form .ok-text, .face .irregular-form .field-error { white-space: normal; }
+.face .face-status button { font-size: 11px; padding: 1px 6px; }
