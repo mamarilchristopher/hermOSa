@@ -6,7 +6,7 @@ import { AddBookingForm, CopyForGc, NoteForm, StatusForm } from "./Forms";
 
 type Booking = {
   id: string; booked_on: string; csr_employee_id: string | null; client_name: string; contact: string | null; platform: string; services: string;
-  appointment_date: string; appointment_time: string | null; branch_id: string; deposit_cents: number | null; follow_up: boolean; note: string | null;
+  expected_cents: number | null; appointment_date: string; appointment_time: string | null; branch_id: string; deposit_cents: number | null; follow_up: boolean; note: string | null;
   status: string; resched_count: number; rescheduled_from: string | null; status_note: string | null;
 };
 
@@ -33,21 +33,32 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
   const only = clinics.find((b) => b.code === sp.b);
   const shown = only ? [only] : clinics;
 
-  const [{ data, error }, { data: emps }, { data: madeToday }] = await Promise.all([
+  const [{ data, error }, { data: emps }, { data: madeToday }, { data: svcs }] = await Promise.all([
     supabase.from("bookings")
-      .select("id, booked_on, csr_employee_id, client_name, contact, platform, services, appointment_date, appointment_time, branch_id, deposit_cents, follow_up, note, status, resched_count, rescheduled_from, status_note")
+      .select("id, booked_on, csr_employee_id, client_name, contact, platform, services, appointment_date, appointment_time, branch_id, deposit_cents, expected_cents, follow_up, note, status, resched_count, rescheduled_from, status_note")
       .or(`appointment_date.eq.${day},rescheduled_from.eq.${day}`).order("appointment_time", { ascending: true, nullsFirst: false }).order("created_at").limit(500),
     supabase.from("employees").select("id, full_name"),
-    booker ? supabase.from("bookings").select("csr_employee_id").eq("booked_on", day).limit(2000) : Promise.resolve({ data: [] }),
+    booker ? supabase.from("bookings").select("csr_employee_id, expected_cents").eq("booked_on", day).limit(2000) : Promise.resolve({ data: [] }),
+    booker ? supabase.from("services").select("name, price_cents").eq("active", true).order("name") : Promise.resolve({ data: [] }),
   ]);
   const rows = (data ?? []) as Booking[];
   const name = new Map(((emps ?? []) as { id: string; full_name: string }[]).map((e) => [e.id, e.full_name]));
-  const perCsr = new Map<string, number>();
-  for (const r of (madeToday ?? []) as { csr_employee_id: string | null }[]) perCsr.set(r.csr_employee_id ?? "", (perCsr.get(r.csr_employee_id ?? "") ?? 0) + 1);
+  const perCsr = new Map<string, number>(), perCsrValue = new Map<string, number>();
+  for (const r of (madeToday ?? []) as { csr_employee_id: string | null; expected_cents: number | null }[]) {
+    const k = r.csr_employee_id ?? "";
+    perCsr.set(k, (perCsr.get(k) ?? 0) + 1);
+    perCsrValue.set(k, (perCsrValue.get(k) ?? 0) + (r.expected_cents ?? 0));
+  }
   const moved = (r: Booking) => r.appointment_date !== day;
   const byBranch = shown.map((b) => ({ b, list: rows.filter((r) => r.branch_id === b.id) }));
   const live = rows.filter((r) => !moved(r) && shown.some((b) => b.id === r.branch_id));
   const count = (s: string) => live.filter((r) => r.status === s).length;
+  // Expected value (CHRIS): owners and managers see what the day's bookings are worth, and how much of it showed up.
+  const seesValue = can(access, ["OWNER", "MANAGER"], null) || clinics.some((b) => can(access, ["MANAGER"], b.id));
+  const worth = (list: Booking[]) => list.reduce((t, r) => t + (r.expected_cents ?? 0), 0);
+  const open = (list: Booking[]) => list.filter((r) => !moved(r) && r.status !== "CANCELLED" && r.status !== "UNRESPONSIVE");
+  const came = (list: Booking[]) => list.filter((r) => !moved(r) && (r.status === "ARRIVED" || r.status === "DONE"));
+  const noValue = open(live).filter((r) => r.expected_cents == null).length;
 
   // Same layout as the CSR group chat: branch, then "number name" (dashes when there's no number), then the status.
   const gc = [mdy(day), ""].concat(byBranch.filter((x) => x.list.length).flatMap(({ b, list }) => [
@@ -86,12 +97,18 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
           <p className="small muted" style={{ margin: "8px 0 0" }}>
             {live.length} booked · {count("ARRIVED")} arrived · {count("DONE")} done · {count("UNRESPONSIVE")} unresponsive · {rows.filter(moved).length} re-sched · {count("CANCELLED")} cancelled
           </p>
+          {seesValue && live.length > 0 && (
+            <p style={{ margin: "8px 0 0" }}>
+              Expected value: <strong>{peso(worth(open(live)))}</strong> · arrived or done: <strong>{peso(worth(came(live)))}</strong>
+              {noValue > 0 && <span className="small muted"> · {noValue} booking{noValue === 1 ? "" : "s"} without a value</span>}
+            </p>
+          )}
           {rows.length > 0 && <div style={{ marginTop: 8 }}><CopyForGc text={gc} /></div>}
         </div>
 
         {byBranch.map(({ b, list }) => (
           <div className="card" key={b.id}>
-            <h2>{b.name} ({list.filter((r) => !moved(r)).length})</h2>
+            <h2>{b.name} ({list.filter((r) => !moved(r)).length}){seesValue && worth(open(list)) > 0 && <span className="small muted" style={{ fontWeight: 500 }}> · expected {peso(worth(open(list)))}</span>}</h2>
             {list.length === 0 && <p className="muted small" style={{ margin: 0 }}>No bookings.</p>}
             {list.map((r) => (
               <div key={r.id} className="booking-row">
@@ -102,6 +119,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
                 </p>
                 <p className="small" style={{ margin: "0 0 2px" }}>
                   {r.services}
+                  {seesValue && r.expected_cents ? ` · ${peso(r.expected_cents)}` : ""}
                   {r.appointment_time && ` · ${time12(r.appointment_time)}`}
                   {r.deposit_cents ? ` · DP ${peso(r.deposit_cents)}` : ""}
                   {r.follow_up && " · Follow-up session"}
@@ -122,7 +140,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
         {booker && (
           <div className="card">
             <h2>Add a booking</h2>
-            <AddBookingForm branches={clinics.map((b) => ({ id: b.id, name: b.name }))} today={day < today ? today : day} min={addDays(today, -30)} max={addDays(today, 365)} />
+            <AddBookingForm branches={clinics.map((b) => ({ id: b.id, name: b.name }))} today={day < today ? today : day} min={addDays(today, -30)} max={addDays(today, 365)} services={((svcs ?? []) as { name: string; price_cents: number | null }[]).map((x) => ({ name: x.name, price: x.price_cents }))} />
           </div>
         )}
 
@@ -130,7 +148,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
           <div className="card">
             <h2>Booked on {fmt(day)}</h2>
             {[...perCsr.entries()].sort((a, b) => b[1] - a[1]).map(([id, n]) => (
-              <p key={id} className="small" style={{ margin: "0 0 2px" }}><strong>{n}</strong> · {name.get(id) ?? "Owner / GM"}</p>
+              <p key={id} className="small" style={{ margin: "0 0 2px" }}><strong>{n}</strong> · {name.get(id) ?? "Owner / GM"}{seesValue && perCsrValue.get(id) ? ` · ${peso(perCsrValue.get(id) ?? 0)} expected` : ""}</p>
             ))}
           </div>
         )}

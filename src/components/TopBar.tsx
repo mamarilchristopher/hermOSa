@@ -54,6 +54,7 @@ export async function TopBar({ access }: { access: Access }) {
     { href: "/leave", label: "Leave", short: "Leave", icon: "calendar", badge: leaveWaiting || undefined } as NavItem,
     ...(approver ? [{ href: "/nte", label: "Late NTEs", short: "NTEs", icon: "clock" } as NavItem] : []),
     ...(approver ? [{ href: "/incidents", label: "Incident reports", short: "IRs", icon: "clipboard" } as NavItem] : []),
+    ...(owner || gm ? [{ href: "/services/prices", label: "Price list", short: "Prices", icon: "coins" } as NavItem] : []),
     ...(people ? [{ href: "/people", label: "Employees", short: "Staff", icon: "people" } as NavItem] : []),
     ...(filler ? [{ href: "/sales/missing", label: "Missing days", short: "Missing", icon: "calendar" } as NavItem] : []),
     ...(importer ? [{ href: "/imports", label: "Imports", short: "Imports", icon: "upload" } as NavItem] : []),

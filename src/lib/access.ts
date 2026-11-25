@@ -107,6 +107,7 @@ export const ERROR_TEXT: Record<string, string> = {
   UNKNOWN_EMPLOYEE: "That employee isn't active. Refresh the page.",
   UNKNOWN_SERVICE: "That service isn't available. Refresh the page.",
   NAME_REQUIRED: "Type a name.",
+  SERVICE_EXISTS: "A service with that name already exists. Edit that one instead.",
   BAD_REQUEST: "Something was missing. Try again.",
   LEVEL_REQUIRED: "Choose a staff level first.",
   OWNER_ONLY_LEVEL: "Only an owner can approve that level. Choose a staff level, or ask an owner.",

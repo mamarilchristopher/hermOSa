@@ -8,13 +8,13 @@ import { isIsoDate } from "@/lib/dates";
 export type BookingState = { ok?: string; error?: string; n?: number } | undefined;
 
 const missing = (code?: string) => code === "PGRST202" || code === "42P01";
-const NEEDS_SQL = "The owner needs to run update-0040 in Supabase first.";
+const NEEDS_SQL = "The owner needs to run update-0040 and update-0042 in Supabase first.";
 const PLATFORMS = ["FACEBOOK", "INSTAGRAM", "CALL", "SMS", "WALK_IN", "OTHER"];
 
 export async function addBooking(prev: BookingState, fd: FormData): Promise<BookingState> {
   const s = (k: string) => String(fd.get(k) ?? "").trim();
   const client = s("client"), services = s("services"), date = s("date"), branch = s("branch"), platform = s("platform") || "FACEBOOK";
-  const time = s("time"), dp = s("dp").replace(/[,₱\s]/g, "");
+  const time = s("time"), dp = s("dp").replace(/[,₱\s]/g, ""), value = s("value").replace(/[,₱\s]/g, "");
   const n = (prev?.n ?? 0) + 1;
   if (client.length < 2) return { error: "Write the client's name.", n };
   if (services.length < 2) return { error: "Write the service.", n };
@@ -23,11 +23,13 @@ export async function addBooking(prev: BookingState, fd: FormData): Promise<Book
   if (!PLATFORMS.includes(platform)) return { error: "Choose where they booked.", n };
   if (time && !/^\d{2}:\d{2}$/.test(time)) return { error: "Check the time.", n };
   if (dp && !/^\d+(\.\d{1,2})?$/.test(dp)) return { error: "Down payment should be a peso amount, like 500.", n };
+  if (value && !/^\d+(\.\d{1,2})?$/.test(value)) return { error: "Expected value should be a peso amount, like 8999.", n };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("save_booking", {
     p_id: null, p_client: client, p_contact: s("contact") || null, p_platform: platform, p_services: services,
     p_date: date, p_time: time || null, p_branch: branch, p_deposit_cents: dp ? Math.round(Number(dp) * 100) : null,
     p_deposit_date: null, p_follow_up: fd.get("follow_up") === "on", p_note: s("note") || null,
+    p_expected_cents: value ? Math.round(Number(value) * 100) : null,
   });
   if (error) return { error: missing(error.code) ? NEEDS_SQL : "Could not save. Try again.", n };
   if (!data?.ok) return { error: errorText(data?.error), n };

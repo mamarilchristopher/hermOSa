@@ -8,8 +8,8 @@ let FV: string, MK: string, id: string;
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
 const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
 const book = (p: Person, lvl: "aal1" | "aal2", over: Partial<Record<string, unknown>> = {}) => {
-  const a = { id: null, client: "DEMO Client", contact: "0917 000 0000", platform: "FACEBOOK", services: "Hiko", date: today(), time: null, branch: FV, dp: null, dpDate: null, follow: false, note: null, ...over };
-  return db.rpc(p, lvl, "save_booking", [a.id, a.client, a.contact, a.platform, a.services, a.date, a.time, a.branch, a.dp, a.dpDate, a.follow, a.note]);
+  const a = { id: null, client: "DEMO Client", contact: "0917 000 0000", platform: "FACEBOOK", services: "Hiko", date: today(), time: null, branch: FV, dp: null, dpDate: null, follow: false, note: null, value: null, ...over };
+  return db.rpc(p, lvl, "save_booking", [a.id, a.client, a.contact, a.platform, a.services, a.date, a.time, a.branch, a.dp, a.dpDate, a.follow, a.note, a.value]);
 };
 
 beforeAll(async () => {
@@ -25,15 +25,16 @@ afterAll(async () => db?.close());
 
 describe("bookings", () => {
   it("CSRs, owners and the GM book; branch staff can't", async () => {
-    const r = await book(csr, "aal1", { time: "15:00", dp: 50000 });
+    const r = await book(csr, "aal1", { time: "15:00", dp: 50000, value: 899900 });
     expect(r.ok).toBe(true);
     id = r.id;
     expect((await book(gm, "aal1", { branch: MK, contact: null, client: "DEMO Walk" })).ok).toBe(true);
     expect((await book(owner, "aal2", { date: addDays(today(), 3) })).ok).toBe(true);
     expect((await book(fvCma, "aal1")).ok).toBe(false);
     expect((await book(csr, "aal1", { date: addDays(today(), -40) })).error).toBe("BOOKING_DATE");
-    const row = (await db.sql("SELECT deposit_cents, deposit_date, status FROM public.bookings WHERE id = $1", [id])).rows[0];
+    const row = (await db.sql("SELECT deposit_cents, expected_cents, deposit_date, status FROM public.bookings WHERE id = $1", [id])).rows[0];
     expect(row.deposit_cents).toBe(50000);
+    expect(row.expected_cents).toBe(899900);
     expect(row.status).toBe("BOOKED");
   });
 

@@ -1,13 +1,19 @@
 "use client";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { pick } from "@/lib/decision";
 import { addBooking, setStatus } from "./actions";
 
-const SERVICES = ["Hiko", "Ultra V Lift", "Gluta Drips", "NovoForm", "Carbon Laser", "Kanalone Injection", "Consultation"];
 
-export function AddBookingForm({ branches, today, min, max }: { branches: { id: string; name: string }[]; today: string; min: string; max: string }) {
+export function AddBookingForm({ branches, today, min, max, services }: { branches: { id: string; name: string }[]; today: string; min: string; max: string; services: { name: string; price: number | null }[] }) {
   const [s, action, pending] = useActionState(addBooking, undefined);
   const [dp, setDp] = useState("");
+  const [value, setValue] = useState("");
+  useEffect(() => { if (s?.ok) { setValue(""); setDp(""); } }, [s]);
+  // Picking a service from the price list fills in its price as the expected value (it can still be changed).
+  const onService = (v: string) => {
+    const hit = services.find((x) => x.name.toLowerCase() === v.trim().toLowerCase());
+    if (hit?.price != null) setValue(String(hit.price / 100));
+  };
   return (
     // key resets the inputs after each saved booking, so the next one starts clean.
     <form action={action} className="field-grid" key={s?.ok ? s.n : "form"}>
@@ -15,8 +21,8 @@ export function AddBookingForm({ branches, today, min, max }: { branches: { id: 
       {s?.ok && <div className="notice ok field">{s.ok}</div>}
       <label className="field half">Client name<input name="client" required maxLength={120} autoComplete="off" /></label>
       <label className="field half">Contact number<input name="contact" type="tel" maxLength={40} placeholder="Leave blank if none" autoComplete="off" /></label>
-      <label className="field half">Service<input name="services" required maxLength={200} list="booking-services" placeholder="e.g. Hiko" /></label>
-      <datalist id="booking-services">{SERVICES.map((x) => <option key={x} value={x} />)}</datalist>
+      <label className="field half">Service<input name="services" required maxLength={200} list="booking-services" placeholder="Type to search the price list" onChange={(e) => onService(e.target.value)} /></label>
+      <datalist id="booking-services">{services.map((x) => <option key={x.name} value={x.name}>{x.price != null ? `₱${(x.price / 100).toLocaleString("en-PH")}` : ""}</option>)}</datalist>
       <label className="field half">Branch
         <select name="branch" required defaultValue="">
           <option value="" disabled>Choose…</option>
@@ -32,7 +38,8 @@ export function AddBookingForm({ branches, today, min, max }: { branches: { id: 
         </select>
       </label>
       <label className="field half">Down payment (₱, optional)<input name="dp" inputMode="decimal" value={dp} onChange={(e) => setDp(e.target.value)} placeholder="e.g. 500" /></label>
-      <label className="field">Note (optional)<input name="note" maxLength={300} placeholder="e.g. Marikina chat, call first, around 6 PM" /></label>
+      <label className="field half">Expected value (₱)<input name="value" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} placeholder="Fills in from the price list" /></label>
+      <label className="field half">Note (optional)<input name="note" maxLength={300} placeholder="e.g. Marikina chat, call first, around 6 PM" /></label>
       <label className="field check"><input type="checkbox" name="follow_up" /> Follow-up session (FFUP)</label>
       <div className="field row-buttons"><button disabled={pending}>{pending ? "Saving…" : "Add booking"}</button></div>
     </form>

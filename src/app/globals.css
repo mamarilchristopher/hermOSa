@@ -784,3 +784,6 @@ h1 .uid { font-size: 0.9rem; }
 .booking-resched { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
 .booking-resched input { width: auto; flex: 1 1 140px; }
 .time-example { display: block; width: 100%; max-width: 420px; height: auto; margin: 4px 0 8px; border-radius: 12px; border: 1px solid var(--line); }
+.price-edit { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.price-edit input, .price-edit select { width: auto; flex: 1 1 120px; }
+.price-edit input[name="name"] { flex: 2 1 220px; }

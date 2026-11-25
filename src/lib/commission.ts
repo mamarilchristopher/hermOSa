@@ -5,9 +5,10 @@ export type CommissionType = "LEAD" | "ASSIST" | "SOLO" | "NONCOMMI";
 
 const roundBp = (cents: number, bp: number) => Math.floor((cents * bp + 5000) / 10000);
 
-export function previewCommission(paidCents: number, type: CommissionType) {
+/** fixedCents: the service's set commission (update-0042); without one it's 5% of the amount paid. */
+export function previewCommission(paidCents: number, type: CommissionType, fixedCents?: number | null) {
   if (type === "NONCOMMI" || !(paidCents > 0)) return { total: 0, lead: 0, assist: 0, solo: 0 };
-  const total = roundBp(paidCents, RATE_BP);
+  const total = fixedCents != null ? fixedCents : roundBp(paidCents, RATE_BP);
   if (type === "SOLO") return { total, lead: 0, assist: 0, solo: total };
   const lead = roundBp(total, LEAD_SHARE_BP);
   return { total, lead, assist: total - lead, solo: 0 };

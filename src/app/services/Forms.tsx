@@ -5,7 +5,7 @@ import { addService, decideLog, logService, type ActionState } from "./actions";
 import { previewCommission, type CommissionType } from "@/lib/commission";
 import { centsToPhp } from "@/lib/csv";
 
-type Opt = { id: string; name: string; eligible?: boolean; here?: boolean };
+type Opt = { id: string; name: string; eligible?: boolean; here?: boolean; price?: number | null; commission?: number | null };
 
 const TYPES: { v: CommissionType; label: string; hint: string }[] = [
   { v: "LEAD", label: "Lead", hint: "You led, someone assisted (60/40)" },
@@ -57,7 +57,8 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
     if (person && person.eligible === false) setType("NONCOMMI");
   }, [person]);
   const cents = Math.round(Number(amount.replace(/[,₱\s]/g, "")) * 100) || 0;
-  const p = previewCommission(paid ? cents : 0, paid ? type : "NONCOMMI");
+  const svc = services.find((x) => x.id === service);
+  const p = previewCommission(paid ? cents : 0, paid ? type : "NONCOMMI", svc?.commission);
   const needsPartner = paid && (type === "LEAD" || type === "ASSIST");
   const people = (
     <>
@@ -88,7 +89,12 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
       </div>
       <div className="entry-grid">
         <label className="span2">Service
-          <select name="service" required value={service} onChange={(e) => setService(e.target.value)}>
+          <select name="service" required value={service} onChange={(e) => {
+            setService(e.target.value);
+            // Fill in the list price (it can still be changed, e.g. for a discount).
+            const pr = services.find((x) => x.id === e.target.value)?.price;
+            if (pr != null && !amount) setAmount(String(pr / 100));
+          }}>
             <option value="" disabled>Choose a service…</option>
             {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>

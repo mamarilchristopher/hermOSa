@@ -6,7 +6,7 @@ import { centsToPhp } from "@/lib/csv";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { addDays, WEEKDAYS, weekday } from "@/lib/insights";
 import { ROLE_TEXT, TYPE_TEXT } from "@/lib/commission";
-import { AddServiceForm, DecideButtons, EntryForm } from "./Forms";
+import { DecideButtons, EntryForm } from "./Forms";
 
 type Log = {
   id: string; service_date: string; amount_paid_cents: number; commission_type: string; performer_id: string; assistant_id: string | null;
@@ -29,7 +29,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const isManager = can(access, ["OWNER", "MANAGER"], null) || branchesFor(access, branches, ["MANAGER"]).length > 0;
 
   const [{ data: services }, { data: emps }, { data: logs }] = await Promise.all([
-    supabase.from("services").select("id, name").eq("active", true).order("name"),
+    supabase.from("services").select("id, name, price_cents, commission_cents").eq("active", true).order("name"),
     supabase.from("employees").select("id, full_name, branch_id, commission_eligible, app_user_id").eq("active", true).order("full_name"),
     supabase.from("service_logs").select("*, services(name)")
       .eq("branch_id", branch.id).eq("service_date", date).order("created_at"),
@@ -88,9 +88,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 {(services ?? []).length === 0 ? "Add your services below first." : null}
               </div>
             ) : (
-              <EntryForm branch={branch.id} date={date} services={(services ?? []).map((s) => ({ id: s.id, name: s.name }))} employees={employees} noCommission={noCommission} />
+              <EntryForm branch={branch.id} date={date} services={(services ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null }))} employees={employees} noCommission={noCommission} />
             )}
-            {isManager && <div style={{ marginTop: 12 }}><AddServiceForm /></div>}
+            {isManager && <p className="small" style={{ marginTop: 12 }}><Link href="/services/prices">Price list and commissions</Link> (add a service, set its price and commission)</p>}
           </div>
         )}
 
