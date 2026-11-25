@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { Uid } from "@/components/Uid";
-import { openPayroll, deleteHoliday } from "./actions";
+import { openPayroll, deleteHoliday, addThirteenth } from "./actions";
 import { FinalizeForm, HolidayForm, PayRateForm, RulesForm, type PaySetting } from "./Forms";
 import { peso, periodLabel, manilaToday } from "@/lib/payroll";
 
@@ -35,6 +35,10 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   const { data: slipsData } = run
     ? await supabase.from("payslips").select("id, employee_id, slip_no, gross_cents, deductions_cents, net_cents, earnings, employees(full_name, uid)").eq("run_id", run.id)
     : { data: [] };
+  const year = Number((run?.period_start ?? today).slice(0, 4));
+  const { data: thirteenthData } = await supabase.rpc("thirteenth_month", { p_year: year });
+  type T13 = { employee_id: string; name: string; uid: string | null; hire_date: string | null; monthly: number; months: number; prorated: boolean; absences: number; amount: number };
+  const thirteenth = (Array.isArray(thirteenthData) ? thirteenthData : []) as T13[];
   const slips = ((slipsData ?? []) as unknown as Slip[]).sort((a, b) => (a.employees?.full_name ?? "").localeCompare(b.employees?.full_name ?? ""));
   const setting = new Map(((settings ?? []) as (PaySetting & { employee_id: string })[]).map((s) => [s.employee_id, s]));
   const staff = (emps ?? []) as Emp[];
@@ -104,6 +108,40 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
             )}
             {run.state === "DRAFT" && slips.length > 0 && <FinalizeForm run={run.id} />}
             {run.state === "FINAL" && <p className="small muted">Finalized {run.finalized_at ? new Date(run.finalized_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""}. Staff can see their payslips under My payslips.</p>}
+          </div>
+        )}
+
+        {thirteenth.length > 0 && (
+          <div className="card">
+            <h2>13th month pay ({year})</h2>
+            <p className="muted small">
+              A month&apos;s basic pay for the whole year, prorated from the start date for anyone who started after Jan 1, less unpaid absences on final payslips,
+              divided the same way (÷ 12). Not taxed. Due by Dec 24. CSRs (contractors) aren&apos;t included. Set start dates on each employee&apos;s page.
+            </p>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Name</th><th>Started</th><th className="num">Months</th><th className="num">Absences</th><th className="num">13th month</th></tr></thead>
+                <tbody>
+                  {thirteenth.map((t) => (
+                    <tr key={t.employee_id}>
+                      <td>{t.name}<Uid v={t.uid} /></td>
+                      <td>{t.hire_date ? new Date(`${t.hire_date}T00:00:00Z`).toLocaleDateString("en-PH", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" }) : <span className="small muted">no start date (full year)</span>}</td>
+                      <td className="num">{Number(t.months).toFixed(t.prorated ? 2 : 0)}</td>
+                      <td className="num">{Number(t.absences) ? peso(t.absences) : ""}</td>
+                      <td className="num"><strong>{peso(t.amount)}</strong></td>
+                    </tr>
+                  ))}
+                  <tr className="total"><td>Total</td><td></td><td></td><td></td><td className="num"><strong>{peso(thirteenth.reduce((a, t) => a + Number(t.amount), 0))}</strong></td></tr>
+                </tbody>
+              </table>
+            </div>
+            {run && run.state === "DRAFT" && Number(run.period_start.slice(0, 4)) === year && (
+              <form action={addThirteenth} className="row-buttons">
+                <input type="hidden" name="run" value={run.id} />
+                <button className="secondary">Add 13th month to the {periodLabel(run.period_start)} payslips</button>
+                <span className="small muted">Added once per person; remove it on a payslip if needed.</span>
+              </form>
+            )}
           </div>
         )}
 

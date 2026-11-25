@@ -141,6 +141,27 @@ describe("payroll", () => {
     expect(amt(b.earnings, "Special day worked")).toBeUndefined();
   });
 
+  it("13th month: a month's pay for the full year, prorated from a start date in the year, less unpaid absences; CSRs excluded", async () => {
+    await db.sql("UPDATE public.employees SET hire_date = '2025-03-01' WHERE id = $1", [anaE]);
+    await db.sql("UPDATE public.employees SET hire_date = '2026-07-01' WHERE id = $1", [beaE]);
+    const list = await db.rpc(gm, "aal1", "thirteenth_month", [2026]);
+    const a = list.find((x: { employee_id: string }) => x.employee_id === anaE), b = list.find((x: { employee_id: string }) => x.employee_id === beaE);
+    expect(a.prorated).toBe(false);
+    expect(a.amount).toBe(Math.round((2_750_000 * 12 - Number(a.absences)) / 12));
+    expect(Number(a.absences)).toBeGreaterThan(0); // the Oct 4 absence on the final Oct 1-15 payslip
+    expect(b.prorated).toBe(true);
+    expect(Number(b.months)).toBeCloseTo((184 * 12) / 365, 1);
+    expect(await db.rpc(ana, "aal1", "thirteenth_month", [2026])).toEqual([]);
+    const dec = await db.rpc(gm, "aal1", "open_payroll", ["2026-12-01"]);
+    expect(await db.rpc(gm, "aal1", "add_thirteenth_month", [dec.id])).toMatchObject({ ok: true, added: 2 });
+    expect(await db.rpc(gm, "aal1", "add_thirteenth_month", [dec.id])).toMatchObject({ ok: true, added: 0 });
+    const s = (await db.sql("SELECT * FROM public.payslips WHERE run_id = $1 AND employee_id = $2", [dec.id, anaE])).rows[0];
+    expect(amt(s.earnings, "13th month pay 2026")).toBe(a.amount);
+    await db.sql("UPDATE public.employees SET position = 'CSR' WHERE id = $1", [beaE]);
+    expect((await db.rpc(gm, "aal1", "thirteenth_month", [2026])).find((x: { employee_id: string }) => x.employee_id === beaE)).toBeUndefined();
+    await db.sql("UPDATE public.employees SET position = 'CMA' WHERE id = $1", [beaE]);
+  });
+
   it("a cutoff that hasn't ended can't be finalized", async () => {
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
     const o = await db.rpc(gm, "aal1", "open_payroll", [today]);

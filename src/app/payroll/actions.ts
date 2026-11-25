@@ -114,3 +114,12 @@ export async function savePayrollRules(prev: PayState, fd: FormData): Promise<Pa
   revalidatePath("/payroll");
   return { ok: "Saved. Recompute a draft cutoff to apply.", n };
 }
+
+/** Puts each person's 13th month pay on the draft cutoff's payslips (once per person per year). */
+export async function addThirteenth(fd: FormData) {
+  const run = z.uuid().safeParse(String(fd.get("run") ?? ""));
+  if (!run.success) return;
+  const supabase = await createClient();
+  await supabase.rpc("add_thirteenth_month", { p_run: run.data });
+  revalidatePath("/payroll"); revalidatePath("/payslips");
+}

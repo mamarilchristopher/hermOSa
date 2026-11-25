@@ -6,6 +6,9 @@
 --     pays double, for everyone except CSRs (contractors on basic pay only: no holiday premiums).
 --   * Lates are not deducted from pay by default (NTE / IR only); the per-person switch stays.
 --   * Declared salary per person (optional): government shares and the tax on basic pay use it instead of the actual rate.
+--   * 13th month pay: a month's basic pay x months worked in the year / 12, prorated from the start date for staff hired
+--     in the year (CHRIS: from Jan 1, 2026), less unpaid absences on final payslips / 12. CSRs (contractors) excluded.
+--     Added as a non-taxable line on a draft cutoff's payslips (due by Dec 24).
 
 ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS payroll_rules jsonb NOT NULL
   DEFAULT '{"statutory_cutoff": "FIRST", "special_worked_premium": true, "daily_divisor": 26}';
@@ -200,6 +203,56 @@ BEGIN
     deductions_cents = EXCLUDED.deductions_cents, net_cents = EXCLUDED.net_cents, computed_at = now();
 END $$;
 REVOKE ALL ON FUNCTION private.compute_payslip(uuid, uuid) FROM PUBLIC, anon, authenticated;
+
+-- ---------- 13th month pay ----------
+CREATE OR REPLACE FUNCTION public.thirteenth_month(p_year integer) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
+DECLARE v_org uuid := private.current_org_id(); v_y0 date; v_y1 date;
+BEGIN
+  IF NOT private.can_payroll() THEN RETURN '[]'::jsonb; END IF;
+  v_y0 := make_date(p_year, 1, 1); v_y1 := make_date(p_year, 12, 31);
+  RETURN coalesce((SELECT jsonb_agg(x ORDER BY x ->> 'name') FROM (
+    SELECT jsonb_build_object('employee_id', e.id, 'name', e.full_name, 'uid', e.uid, 'hire_date', e.hire_date,
+      'monthly', m.monthly, 'months', round(m.months, 2), 'prorated', m.prorated, 'absences', m.absences,
+      'amount', greatest(0, round((m.monthly * m.months - m.absences) / 12.0))::bigint) AS x
+    FROM public.employees e JOIN public.pay_settings ps ON ps.employee_id = e.id
+    CROSS JOIN LATERAL (SELECT
+      CASE ps.basis WHEN 'MONTHLY' THEN ps.rate_cents ELSE ps.rate_cents * 26 END AS monthly,
+      CASE WHEN e.hire_date IS NOT NULL AND e.hire_date > v_y0 THEN greatest(0, (v_y1 - e.hire_date + 1)) * 12.0 / (v_y1 - v_y0 + 1) ELSE 12 END AS months,
+      (e.hire_date IS NOT NULL AND e.hire_date > v_y0) AS prorated,
+      coalesce((SELECT sum((d ->> 'amount')::bigint) FROM public.payslips p JOIN public.payroll_runs r ON r.id = p.run_id,
+                  jsonb_array_elements(p.deductions) d
+                WHERE p.employee_id = e.id AND r.state = 'FINAL' AND extract(year FROM r.period_start) = p_year
+                  AND d ->> 'label' LIKE 'Absences%'), 0) AS absences) m
+    WHERE e.organization_id = v_org AND e.active AND upper(coalesce(e.position, '')) <> 'CSR'
+      AND (e.hire_date IS NULL OR e.hire_date <= v_y1)) q), '[]'::jsonb);
+END $$;
+
+-- Adds each person's 13th month pay as a non-taxable line on a draft cutoff (once per person per year).
+CREATE OR REPLACE FUNCTION public.add_thirteenth_month(p_run uuid) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE v_org uuid := private.current_org_id(); v_me uuid := private.current_user_id(); r public.payroll_runs%ROWTYPE; x jsonb; v_label text; v_n integer := 0;
+BEGIN
+  IF NOT private.can_payroll() THEN RETURN private.deny(NULL, 'payroll'); END IF;
+  SELECT * INTO r FROM public.payroll_runs WHERE id = p_run AND organization_id = v_org;
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'NOT_FOUND'); END IF;
+  IF r.state = 'FINAL' THEN RETURN jsonb_build_object('ok', false, 'error', 'PAYROLL_IS_FINAL'); END IF;
+  v_label := '13th month pay ' || extract(year FROM r.period_start)::int;
+  FOR x IN SELECT * FROM jsonb_array_elements(public.thirteenth_month(extract(year FROM r.period_start)::int)) LOOP
+    CONTINUE WHEN (x ->> 'amount')::bigint <= 0;
+    CONTINUE WHEN NOT EXISTS (SELECT 1 FROM public.payslips WHERE run_id = p_run AND employee_id = (x ->> 'employee_id')::uuid);
+    CONTINUE WHEN EXISTS (SELECT 1 FROM public.payslip_adjustments a JOIN public.payroll_runs rr ON rr.id = a.run_id
+                          WHERE a.employee_id = (x ->> 'employee_id')::uuid AND a.label = v_label);
+    INSERT INTO public.payslip_adjustments (run_id, organization_id, employee_id, kind, label, amount_cents, taxable, created_by)
+    VALUES (p_run, v_org, (x ->> 'employee_id')::uuid, 'EARNING', v_label, (x ->> 'amount')::bigint, false, v_me);
+    PERFORM private.compute_payslip(p_run, (x ->> 'employee_id')::uuid);
+    v_n := v_n + 1;
+  END LOOP;
+  PERFORM private.audit(NULL, 'THIRTEENTH_MONTH_ADDED', 'payroll_run', p_run::text, NULL, jsonb_build_object('people', v_n));
+  RETURN jsonb_build_object('ok', true, 'added', v_n);
+END $$;
+REVOKE ALL ON FUNCTION public.thirteenth_month(integer), public.add_thirteenth_month(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.thirteenth_month(integer), public.add_thirteenth_month(uuid) TO authenticated;
 
 -- Recompute open (draft) payrolls with the new rules.
 DO $$ DECLARE r record; BEGIN FOR r IN SELECT id FROM public.payroll_runs WHERE state = 'DRAFT' LOOP PERFORM private.compute_run(r.id); END LOOP; END $$;
