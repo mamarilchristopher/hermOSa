@@ -32,7 +32,12 @@ export async function register(_prev: State, fd: FormData): Promise<State> {
     if (/database error/i.test(error.message)) return { error: "This invite link has expired or was turned off. Ask the owner for a new link." };
     if (/registered|exists/i.test(error.message)) return { error: "That email already has a login. Sign in instead." };
     if (/signups not allowed/i.test(error.message)) return { error: "Registration is turned off right now. Tell the owner." };
-    return { error: "Could not register. Try again." };
+    // Supabase's built-in mailer sends only a few confirmation emails an hour for the whole project.
+    if (/rate limit|too many|security purposes/i.test(error.message))
+      return { error: "Too many people registered in the last hour. Wait a few minutes, then try again, or tell the owner." };
+    if (/password/i.test(error.message)) return { error: `That password was refused: ${error.message}` };
+    console.error("signUp failed", error);
+    return { error: `Could not register. Try again. (${error.message.slice(0, 120)})` };
   }
   await supabase.auth.signOut();
   return { done: true, confirm: !data.session };
