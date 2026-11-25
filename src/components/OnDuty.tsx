@@ -1,6 +1,7 @@
 import { Uid } from "./Uid";
 import { timeLabel } from "@/lib/schedule";
-import { IrregularTagForm, IrregularUndo, irregularLabel, type IrregularTag } from "./IrregularForms";
+import { IrregularTagForm, IrregularUndo } from "./IrregularForms";
+import { irregularLabel, type IrregularTag } from "@/lib/irregular";
 
 export type DutyRow = {
   employee_id: string; name: string; uid?: string; position: string | null; branch_id: string | null; off: boolean; leave?: string | null;

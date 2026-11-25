@@ -1,6 +1,7 @@
 import { Avatar } from "./Avatar";
 import type { DutyRow } from "./OnDuty";
-import { IrregularTagForm, IrregularUndo, irregularLabel } from "./IrregularForms";
+import { IrregularTagForm, IrregularUndo } from "./IrregularForms";
+import { irregularLabel } from "@/lib/irregular";
 
 export type DutyFace = { short: string; photo: string | null };
 const clock = (ts: string) => new Date(ts).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" });

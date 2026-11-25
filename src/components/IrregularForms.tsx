@@ -2,9 +2,6 @@
 import { useActionState, useState } from "react";
 import { tagIrregular, untagIrregular } from "@/app/time/actions";
 
-export type IrregularTag = { id: string; reason: "MAINTENANCE" | "EMERGENCY" | "OTHER"; note: string | null; whole_day: boolean };
-export const irregularLabel = (t: IrregularTag) =>
-  t.reason === "MAINTENANCE" ? "Maintenance" : t.reason === "EMERGENCY" ? "Emergency" : t.note || "Other";
 
 /** Mark one person's day, or the whole day (no employee), as irregular: reason dropdown, typed reason for Other. */
 export function IrregularTagForm({ date, employee, label }: { date: string; employee?: string; label: string }) {
