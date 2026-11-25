@@ -16,13 +16,20 @@ const Log = z.object({
   type: z.enum(["LEAD", "ASSIST", "SOLO", "NONCOMMI"]),
   employee: z.uuid(),
   partner: z.union([z.uuid(), z.literal("")]).optional(),
-  receipt: z.string().trim().max(40).optional(),
   note: z.string().trim().max(300).optional(),
+  client: z.string().trim().min(2).max(120),
+  price_note: z.string().trim().max(300).optional(),
+  folder: z.uuid(),
+  photos: z.string().max(20000),
+  share: z.literal("1").optional(),
 });
+const Photos = z.array(z.object({ kind: z.enum(["WAIVER", "BEFORE", "AFTER"]), path: z.string().max(300), thumb: z.string().max(300).nullable() })).max(20);
 
 export async function logService(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "receipt", "note"].map((k) => [k, fd.get(k) ?? undefined])));
-  if (!p.success) return { error: "Fill in the service, amount paid and who did it." };
+  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share"].map((k) => [k, fd.get(k) ?? undefined])));
+  if (!p.success) return { error: "Fill in the client's name, the service, the amount paid and who did it." };
+  let photos;
+  try { photos = Photos.parse(JSON.parse(p.data.photos || "[]")); } catch { return { error: "The photos didn't attach. Remove them and add them again." }; }
   const paid = p.data.kind === "PAID";
   let cents = 0;
   if (paid) {
@@ -34,12 +41,13 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     if (cents <= 0) return { error: "Enter the amount paid. If the client didn't pay, choose Backjob, Check-up or No charge." };
   }
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("log_visit", {
+  const { data, error } = await supabase.rpc("log_client_visit", {
     p_branch: p.data.branch, p_date: p.data.date, p_service: p.data.service, p_amount_cents: cents, p_type: paid ? p.data.type : "NONCOMMI",
-    p_employee: p.data.employee, p_partner: paid ? p.data.partner || null : null, p_receipt: p.data.receipt || null, p_note: p.data.note || null,
+    p_employee: p.data.employee, p_partner: paid ? p.data.partner || null : null, p_note: p.data.note || null,
     p_kind: p.data.kind, p_confirm: fd.get("confirm") === "1",
+    p_client: p.data.client, p_price_note: p.data.price_note || null, p_folder: p.data.folder, p_photos: photos, p_share: p.data.share === "1",
   });
-  if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0020 in Supabase first." : "Could not save. Try again." };
+  if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0053 in Supabase first." : "Could not save. Try again." };
   if (!data.ok && data.error === "POSSIBLE_DUPLICATE") {
     const at = new Date(data.existing.at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
     return { duplicate: `${data.existing.by} already logged this service for the same staff and amount today at ${at}. Is this a different client?`, at: Date.now() };

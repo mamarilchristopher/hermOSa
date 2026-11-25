@@ -10,7 +10,7 @@ import { DecideButtons, EntryForm } from "./Forms";
 
 type Log = {
   id: string; service_date: string; amount_paid_cents: number; commission_type: string; performer_id: string; assistant_id: string | null;
-  receipt_no: string | null; note: string | null; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
+  receipt_no: string | null; note: string | null; client_name?: string | null; price_note?: string | null; photo_folder?: string | null; share_ok?: boolean; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
   services: { name: string } | null;
 };
 const VISIT_TEXT: Record<string, string> = { BACKJOB: "Backjob (unpaid)", CHECKUP: "Check-up (unpaid)", NO_CHARGE: "No charge" };
@@ -106,7 +106,11 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 const staff = [l.performer_id, l.assistant_id].filter(Boolean) as string[];
                 return (
                   <tr key={l.id} className={l.state === "REJECTED" ? "rejected" : undefined}>
-                    <td><strong>{l.services?.name}</strong>{l.receipt_no && <div className="small muted">Waiver / OR {l.receipt_no}</div>}{l.note && <div className="small muted">{l.note}</div>}</td>
+                    <td>{l.client_name && <div className="log-client">{l.client_name}</div>}<strong>{l.services?.name}</strong>
+                      {l.receipt_no && <div className="small muted">Waiver / OR {l.receipt_no}</div>}
+                      {l.price_note && <div className="small muted">Price: {l.price_note}</div>}
+                      {l.note && <div className="small muted">{l.note}</div>}
+                      {l.photo_folder && l.client_name && <div className="small"><Link href={`/clinic/archive?month=${l.service_date.slice(0, 7)}#${l.id}`}>Photos</Link>{l.share_ok ? <span className="muted"> · sharing OK</span> : null}</div>}</td>
                     <td className="num">{centsToPhp(l.amount_paid_cents)}</td>
                     <td>{l.visit_kind && l.visit_kind !== "PAID"
                       ? <span className="tag">{VISIT_TEXT[l.visit_kind] ?? l.visit_kind}</span>

@@ -98,4 +98,7 @@ it("commission preview: 5%, lead 60 / assist 40, rounding gives the remainder to
   expect(previewCommission(333_300, "ASSIST")).toEqual({ total: 16665, lead: 9999, assist: 6666, solo: 0 });
   expect(previewCommission(600_000, "SOLO").solo).toBe(30000);
   expect(previewCommission(600_000, "NONCOMMI").total).toBe(0);
+  // update-0053: a set commission at (or above) the list price; a discount earns 5% of what was paid
+  expect(previewCommission(899_900, "SOLO", 45_000, 899_900).total).toBe(45_000);
+  expect(previewCommission(700_000, "SOLO", 45_000, 899_900).total).toBe(35_000);
 });

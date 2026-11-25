@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { addService, decideLog, logService, type ActionState } from "./actions";
 import { previewCommission, type CommissionType } from "@/lib/commission";
 import { centsToPhp } from "@/lib/csv";
+import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
 
 type Opt = { id: string; name: string; eligible?: boolean; here?: boolean; price?: number | null; commission?: number | null };
 
@@ -39,8 +40,11 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
   // Controlled so the fields survive a "log it anyway?" round trip (React resets uncontrolled fields after an action).
   const [service, setService] = useState("");
   const [partner, setPartner] = useState("");
-  const [receipt, setReceipt] = useState("");
+  const [client, setClient] = useState("");
+  const [priceNote, setPriceNote] = useState("");
+  const [share, setShare] = useState(false);
   const [note, setNote] = useState("");
+  const photos = usePhotoSlots(branch);
   const form = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (state?.ok) {
@@ -49,7 +53,8 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
       setType(startType);
       setKind("PAID");
       setWho("");
-      setService(""); setPartner(""); setReceipt(""); setNote("");
+      setService(""); setPartner(""); setClient(""); setPriceNote(""); setShare(false); setNote("");
+      photos.reset();
     }
   }, [state]);
   const person = employees.find((e) => e.id === who);
@@ -58,7 +63,13 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
   }, [person]);
   const cents = Math.round(Number(amount.replace(/[,₱\s]/g, "")) * 100) || 0;
   const svc = services.find((x) => x.id === service);
-  const p = previewCommission(paid ? cents : 0, paid ? type : "NONCOMMI", svc?.commission);
+  const p = previewCommission(paid ? cents : 0, paid ? type : "NONCOMMI", svc?.commission, svc?.price);
+  const listPrice = svc?.price ?? null;
+  const priceDiffers = paid && listPrice != null && listPrice > 0 && cents > 0 && cents !== listPrice;
+  const needsPhotos = kind === "PAID" || kind === "BACKJOB";
+  const missing = !needsPhotos ? null
+    : photos.count("BEFORE") < 1 || photos.count("AFTER") < 1 ? "Add at least one before and one after photo."
+    : photos.count("WAIVER") < 2 ? "Add both pages of the signed waiver." : null;
   const needsPartner = paid && (type === "LEAD" || type === "ASSIST");
   const people = (
     <>
@@ -78,6 +89,8 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
       <input type="hidden" name="date" value={date} />
       <input type="hidden" name="type" value={type} />
       <input type="hidden" name="kind" value={kind} />
+      <input type="hidden" name="folder" value={photos.folder} />
+      <input type="hidden" name="photos" value={photos.json} />
       <div className="field">
         <span className="field-label">Did the client pay?</span>
         <div className="segmented choice" role="radiogroup" aria-label="Did the client pay?">
@@ -88,12 +101,15 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
         {!paid && <span className="small muted">Logged at ₱0 with no commission, so you can see every client handled.</span>}
       </div>
       <div className="entry-grid">
-        <label className="span2">Service
+        <label className="span2">Client name
+          <input name="client" required minLength={2} maxLength={120} autoComplete="off" placeholder="Full name, as on the waiver" value={client} onChange={(e) => setClient(e.target.value)} />
+        </label>
+        <label className={paid ? "" : "span2"}>Service
           <select name="service" required value={service} onChange={(e) => {
             setService(e.target.value);
             // Fill in the list price (it can still be changed, e.g. for a discount).
             const pr = services.find((x) => x.id === e.target.value)?.price;
-            if (pr != null && !amount) setAmount(String(pr / 100));
+            if (pr != null) setAmount(pr > 0 ? String(pr / 100) : "");
           }}>
             <option value="" disabled>Choose a service…</option>
             {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -104,10 +120,20 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
             <input name="amount" inputMode="decimal" placeholder="e.g. 2500" required value={amount} onChange={(e) => setAmount(e.target.value)} />
           </label>
         )}
-        <label className={paid ? "" : "span2"}><span>Waiver / OR no. <span className="muted">(stops double logging)</span></span>
-          <input name="receipt" maxLength={40} value={receipt} onChange={(e) => setReceipt(e.target.value)} />
-        </label>
+        {priceDiffers && (
+          <label className="span2"><span>Reason for the different price <span className="muted">(list price {centsToPhp(listPrice!)})</span></span>
+            <input name="price_note" required minLength={3} maxLength={300} placeholder="e.g. 10% promo, loyalty discount" value={priceNote} onChange={(e) => setPriceNote(e.target.value)} />
+          </label>
+        )}
       </div>
+      <PhotoGroup api={photos} title="Before and after photos" hint={needsPhotos ? "Full quality, at least one of each." : "Optional for this visit."}
+        kinds={[{ kind: "BEFORE", label: "Add before photo" }, { kind: "AFTER", label: "Add after photo" }]} />
+      <label className="check-row">
+        <input type="checkbox" name="share" value="1" checked={share} onChange={(e) => setShare(e.target.checked)} />
+        <span>Did the client allow sharing of their photos? <span className="muted">(adds them to Social media)</span></span>
+      </label>
+      <PhotoGroup api={photos} title="Waiver (2 pages)" hint={needsPhotos ? "A clear photo of each page of the signed waiver." : "Optional for this visit."}
+        kinds={[{ kind: "WAIVER", label: "Add waiver page" }]} />
       {paid && !noCommission && <div className="field">
         <span className="field-label">Commission type</span>
         <div className="segmented choice" role="radiogroup" aria-label="Commission type">
@@ -128,7 +154,7 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
             <select name="partner" required value={partner} onChange={(e) => setPartner(e.target.value)}>{people}</select>
           </label>
         )}
-        <label className="span2"><span>Note <span className="muted">(optional, no client names)</span></span>
+        <label className="span2"><span>Note <span className="muted">(optional)</span></span>
           <input name="note" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
       </div>
@@ -144,8 +170,11 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
             <span className="muted">{!paid ? "Unpaid visit: no commission" : type === "NONCOMMI" ? "No commission for this service" : "Enter the amount paid to see the commission"}</span>
           )}
         </div>
-        <button type="submit" disabled={pending}>{pending ? "Saving…" : "Add to today's log"}</button>
+        <button type="submit" disabled={pending || photos.uploading || !!missing} title={missing ?? undefined}>
+          {pending ? "Saving…" : photos.uploading ? "Uploading photos…" : "Add to today's log"}
+        </button>
       </div>
+      {missing && !photos.uploading && <p className="small muted entry-missing">{missing}</p>}
       {state?.duplicate && (
         <div className="notice warn dup-check">
           <span><strong>Already logged?</strong> {state.duplicate}</span>

@@ -45,6 +45,8 @@ export async function TopBar({ access }: { access: Access }) {
   const importer = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
   const filler = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER"].includes(g.role));
   const management = access.grants.some((g) => ["OWNER", "FINANCE", "AUDITOR", "MANAGER"].includes(g.role));
+  const archiver = access.grants.some((g) => ["OWNER", "MANAGER", "CLINICIAN", "CASHIER"].includes(g.role));
+  const socialTeam = owner || gm || access.grants.some((g) => ["MARKETING", "CSR"].includes(g.role));
   // Bookings (update-0040): CSRs, owners and the GM book; branch staff see their branch's visits.
   const booker = access.grants.some((g) => ["CSR", "OWNER", "MANAGER", "CLINICIAN", "CASHIER"].includes(g.role));
   // Menu grouped into hubs (v0.48, CHRIS Nov 25): related pages become tabs inside one menu item. Time clock stays its own item.
@@ -62,6 +64,9 @@ export async function TopBar({ access }: { access: Access }) {
       ...(logger ? [{ href: "/services", label: "Service log", badge: overdue.length || undefined }] : []),
       ...(booker ? [{ href: "/bookings", label: "Bookings" }] : []),
       ...(owner || gm ? [{ href: "/services/prices", label: "Price list" }] : []),
+      // Client photos (v0.53, update-0053): waivers and before/after per client; shared ones also in Social media.
+      ...(archiver ? [{ href: "/clinic/archive", label: "Client archive" }] : []),
+      ...(socialTeam ? [{ href: "/clinic/social", label: "Social media" }] : []),
     ] },
     { key: "team", label: "Team", short: "Team", icon: "week", tabs: [
       { href: "/schedule", label: "Schedule" },

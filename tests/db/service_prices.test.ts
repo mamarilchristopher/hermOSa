@@ -38,7 +38,8 @@ describe("service prices and commissions", () => {
 
   it("a set commission is paid as is (60/40 for lead/assist); no set commission means 5% of the amount", async () => {
     const solo = await db.rpc(staff, "aal1", "log_visit", [db.branches.FAIRVIEW, today(), svc, 800000, "SOLO", ana, null, null, null, "PAID", true]);
-    expect(await lines(solo.id)).toEqual([{ role: "SOLO", a: 45000 }]);
+    // update-0053: paid less than the list price (a discount), so 5% of what was paid instead of the set commission
+    expect(await lines(solo.id)).toEqual([{ role: "SOLO", a: 40000 }]);
     // bea has no login but is commission eligible
     const pair = await db.rpc(staff, "aal1", "log_visit", [db.branches.FAIRVIEW, today(), svc, 899900, "LEAD", ana, bea, null, null, "PAID", true]);
     expect(await lines(pair.id)).toEqual([{ role: "LEAD", a: 27000 }, { role: "ASSIST", a: 18000 }]);
