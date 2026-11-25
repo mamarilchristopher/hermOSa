@@ -11,6 +11,7 @@ import { byRankThenName, staffRank } from "@/lib/staffOrder";
 import { PositionCell } from "../../people/PositionCell";
 import { PinCell } from "./PinCell";
 import { Uid } from "@/components/Uid";
+import { sameNameAccounts } from "@/lib/nameKey";
 import { Avatar } from "@/components/Avatar";
 import { photoUrls } from "@/lib/photos";
 
@@ -98,6 +99,12 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                 <span className="small muted">{u.email} · registered {new Date(u.joined_at).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" })}
                   {u.requested_branch_id && ` · says ${branchName[u.requested_branch_id] ?? "a branch"}`}{u.requested_level && ` · as ${ROLE_CHOICES.find(([k]) => k === u.requested_level)?.[1] ?? u.requested_level}`}</span>
               </div>
+              {sameNameAccounts(u, all ?? []).length > 0 && (
+                <p className="small join-dupe">
+                  Already has an account? {sameNameAccounts(u, all ?? []).map((x) => `${x.display_name} (${x.uid}${x.active === false ? ", turned off" : ""})`).join(", ")}.
+                  If it&apos;s the same person, Reject this one and have them sign in with that account instead.
+                </p>
+              )}
               <ApproveForm user={u.id} branchId={u.requested_branch_id} branches={clinics} asked={u.requested_level} />
               <form action={rejectJoin}>
                 <input type="hidden" name="user" value={u.id} />
