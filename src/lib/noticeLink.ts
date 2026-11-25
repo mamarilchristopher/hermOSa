@@ -6,6 +6,8 @@ export function noticeButton(kind: string | null | undefined): string {
   if (kind === "LEAVE_APPROVED") return "See the schedule";
   if (kind === "LEAVE_FILED") return "Review leave";
   if (kind === "LEAVE_DECLINED") return "See my leave";
+  if (kind === "SWAP_ASKED") return "Accept or decline";
+  if (kind === "SWAP_TO_APPROVE") return "Review swap";
   return "Open";
 }
 

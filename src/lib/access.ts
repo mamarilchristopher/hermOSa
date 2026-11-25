@@ -69,6 +69,7 @@ export const ERROR_TEXT: Record<string, string> = {
   BAD_START_DATE: "That start date doesn't look right. Check the year.",
   NOT_SCHEDULED: "That day isn't on the published schedule yet.",
   SAME_SHIFT: "You both have the same schedule that day, so there's nothing to swap.",
+  ON_LEAVE: "One of you is on leave that day, so it can't be swapped.",
   NOT_A_DAY_OFF: "Pick one of your days off as the day you'll work.",
   NO_EMPLOYEE_RECORD: "You don't have an employee record yet. Ask the owner to add you on Employees.",
   PHOTO_REQUIRED: "Take a photo of the clinic clock to time in or out.",
@@ -114,5 +115,8 @@ export const ERROR_TEXT: Record<string, string> = {
   LEAVE_DATES: "Those dates can't be filed: vacation leave is filed ahead, sick leave up to 14 days after, and up to 6 months ahead.",
   LEAVE_OVERLAP: "You already filed leave on some of those days.",
   PAY_CHOICE_REQUIRED: "Choose with pay or without pay.",
+  COWORKER_PENDING: "Your coworker hasn't accepted this swap yet.",
+  SWAP_ALREADY_ASKED: "A swap for one of those days is already waiting. Cancel it first or pick other days.",
+  SCHEDULE_CHANGED_SINCE: "The schedule changed since this was asked. Ask them to send a new request.",
 };
 export const errorText = (code: string | undefined) => (code && ERROR_TEXT[code]) || "Something went wrong.";

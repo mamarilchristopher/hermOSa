@@ -6,13 +6,13 @@ import { addDays, weekday } from "@/lib/insights";
 import { DOW, LEAVE_TEXT, mondayOf, shortDate, timeLabel, weekDates, weekLabel, branchShort } from "@/lib/schedule";
 import { normalizeRules, checkWeek } from "@/lib/scheduleAuto";
 import { RulesForm } from "./Forms";
-import { BranchWeek, WeekGrid, WeekButtons, PatternForm, RequestForm, DecideForm, CancelForm } from "./Forms";
+import { BranchWeek, WeekGrid, WeekButtons, PatternForm, RequestForm, DecideForm, CancelForm, RespondSwapForm } from "./Forms";
 
 export type Person = { id: string; name: string; position: string | null; branch_id: string | null; can_edit: boolean;
   pattern: { branch_id: string; days_off: number[]; start: string; end: string } | null };
 export type Shift = { employee_id: string; date: string; off: boolean; branch_id: string | null; start: string | null; end: string | null; state: "DRAFT" | "PUBLISHED"; note: string | null; leave: "VL" | "SL" | "ABSENT" | null };
 type Req = { id: string; kind: "SWAP" | "DAY_OFF"; employee_id: string; name: string; date: string; other_employee_id: string | null; other_name: string | null;
-  other_date: string | null; reason: string | null; mine: boolean; can_decide: boolean };
+  other_date: string | null; reason: string | null; mine: boolean; can_decide: boolean; can_respond?: boolean; coworker_state?: "WAITING" | "ACCEPTED" | "DECLINED" | null };
 type Week = { me: string | null; people: Person[]; shifts: Shift[]; requests: Req[] };
 
 const dayName = (d: string) => `${DOW[weekday(d)]}, ${shortDate(d)}`;
@@ -55,9 +55,12 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
     days: Object.fromEntries(w.shifts.filter((s) => s.employee_id === p.id && s.state === "PUBLISHED").map((s) => [s.date, s.off ? "Off" : `${bname(s.branch_id)} ${timeLabel(s.start)}`])) }));
 
   const decide = w.requests.filter((r) => r.can_decide);
-  const mine = w.requests.filter((r) => !r.can_decide);
+  const answer = w.requests.filter((r) => r.can_respond);
+  const mine = w.requests.filter((r) => !r.can_decide && !r.can_respond);
   const reqText = (r: Req) => r.kind === "SWAP"
-    ? `${r.name} wants to swap ${dayName(r.date)} with ${r.other_name}`
+    ? r.other_date
+      ? `${r.name} wants to trade days off with ${r.other_name}: ${r.name.split(" ")[0]} works ${dayName(r.date)} and takes ${dayName(r.other_date)} off`
+      : `${r.name} wants to swap ${dayName(r.date)} with ${r.other_name}`
     : `${r.name} wants to work ${dayName(r.date)} and take ${r.other_date ? dayName(r.other_date) : ""} off instead`;
 
   return (
@@ -67,7 +70,22 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
         <h1>Schedule</h1>
         <p className="muted small">{scheduler
           ? "Fill the week from everyone's usual schedule, adjust any day, then publish. Staff see the week once it's published."
-          : "Your week and your branch's. Ask here to swap a day or move your day off; a manager approves it."}</p>
+          : "Your week and your branch's. Ask here to trade days off or swap a day with a coworker (they accept, then an owner approves), or to move your day off."}</p>
+
+        {answer.length > 0 && (
+          <div className="card">
+            <h2>A coworker asked you to swap</h2>
+            <ul className="plain-list req-list">
+              {answer.map((r) => (
+                <li key={r.id}>
+                  <div><strong>{reqText(r)}</strong>{r.reason && <div className="small muted">“{r.reason}”</div>}
+                    <div className="small muted">If you accept, an owner or the General Manager approves it next.</div></div>
+                  <RespondSwapForm id={r.id} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {decide.length > 0 && (
           <div className="card">
@@ -143,11 +161,14 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
 
         {mine.length > 0 && (
           <div className="card">
-            <h2>Waiting for a manager</h2>
+            <h2>Requests in progress</h2>
             <ul className="plain-list req-list">
               {mine.map((r) => (
                 <li key={r.id}>
-                  <div><strong>{reqText(r)}</strong>{r.reason && <div className="small muted">“{r.reason}”</div>}</div>
+                  <div><strong>{reqText(r)}</strong>{r.reason && <div className="small muted">“{r.reason}”</div>}
+                    <div className="small muted">{r.kind !== "SWAP" ? "Waiting for a manager"
+                      : r.coworker_state === "ACCEPTED" ? `${r.other_name?.split(" ")[0] ?? "Your coworker"} accepted. Waiting for an owner or the General Manager`
+                      : `Waiting for ${r.other_name?.split(" ")[0] ?? "your coworker"} to accept`}</div></div>
                   {r.mine && <CancelForm id={r.id} />}
                 </li>
               ))}

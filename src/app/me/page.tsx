@@ -34,7 +34,7 @@ async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>
     supabase.from("app_users").select("id", { count: "exact", head: true }).eq("join_status", "PENDING"), // owner, or GM after update-0027
 
     supabase.rpc("on_duty", { p_date: today }), // errors (before update-0022) mean no On Duty card
-    supabase.from("schedule_requests").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("requested_by", userId),
+    supabase.from("schedule_requests").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("requested_by", userId).or("kind.eq.DAY_OFF,coworker_state.eq.ACCEPTED"), // swaps count once the coworker accepted (update-0036)
     supabase.rpc("incident_list"), // errors (before update-0023) mean no IR to-dos
   ]);
   const s = (st ?? { ok: false }) as DailyStatus;
@@ -148,6 +148,10 @@ export default async function Me() {
     ownerLevel ? supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("filed_by", isOwner ? "00000000-0000-0000-0000-000000000000" : access.user_id) : Promise.resolve({ count: 0, error: null }),
     emp ? supabase.from("leave_requests").select("kind, start_date, state").eq("employee_id", emp.id).eq("state", "DECLINED").gte("decided_at", new Date(Date.now() - 3 * 86400000).toISOString()).limit(3) : Promise.resolve({ data: [] }),
   ]);
+  // Swaps (update-0036): a coworker asked me to swap and is waiting for my answer.
+  const { count: swapAsks } = emp ? await supabase.from("schedule_requests").select("id", { count: "exact", head: true })
+    .eq("other_employee_id", emp.id).eq("state", "PENDING").eq("coworker_state", "WAITING") : { count: 0 };
+  if (swapAsks) (home?.todos ?? staffTodos)?.unshift({ text: `${swapAsks === 1 ? "A coworker asked" : `${swapAsks} coworkers asked`} to swap schedules with you. Accept or decline`, href: "/schedule", urgent: true });
   if (!leaveErr && leaveWaiting) (home?.todos ?? staffTodos)?.unshift({ text: `${leaveWaiting} leave request${leaveWaiting === 1 ? " is" : "s are"} waiting for your approval`, href: "/leave" });
   for (const l of (myLeave ?? []) as { kind: string; start_date: string }[]) (home?.todos ?? staffTodos)?.push({ text: `Your ${l.kind} from ${l.start_date} was not approved. See the note`, href: "/leave" });
   if (home && !isOwner && detailState !== "APPROVED" && detailState !== "PENDING") {

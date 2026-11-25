@@ -2,7 +2,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { saveRules, suggestWeekAction } from "./actions";
 import type { Rules } from "@/lib/scheduleAuto";
-import { cancelRequest, copyLastWeek, decideRequest, generateWeek, publishWeek, requestChange, saveDay, saveShift, savePattern, type ActionState } from "./actions";
+import { cancelRequest, copyLastWeek, decideRequest, respondSwap, generateWeek, publishWeek, requestChange, saveDay, saveShift, savePattern, type ActionState } from "./actions";
 import { DOW, LEAVE_TEXT, shortDate, shortNames, timeLabel } from "@/lib/schedule";
 import type { Person, Shift } from "./page";
 
@@ -177,23 +177,49 @@ export function PatternForm({ employee, pattern, homeBranch, branches }: { emplo
 type Day = { date: string; label: string };
 export function RequestForm({ workDays, offDays, others }: { workDays: Day[]; offDays: Day[]; others: { id: string; name: string; days: Record<string, string> }[] }) {
   const [state, action, pending] = useActionState(requestChange, undefined);
-  const [kind, setKind] = useState<"SWAP" | "DAY_OFF">(workDays.length ? "SWAP" : "DAY_OFF");
+  const [kind, setKind] = useState<"SWAP" | "TRADE" | "DAY_OFF">(offDays.length && workDays.length ? "TRADE" : workDays.length ? "SWAP" : "DAY_OFF");
   const [date, setDate] = useState("");
   const [other, setOther] = useState("");
   const [otherDate, setOtherDate] = useState("");
   const [reason, setReason] = useState("");
   useEffect(() => { if (state?.ok) { setDate(""); setOther(""); setOtherDate(""); setReason(""); } }, [state]);
+  const pick = (k: typeof kind) => { setKind(k); setDate(""); setOther(""); setOtherDate(""); };
+  const working = (o: { days: Record<string, string> }, d: string) => !!o.days[d] && o.days[d] !== "Off";
+  const coworker = others.find((o) => o.id === other);
   return (
     <form action={action} className="field-grid">
       <Msg s={state} />
       <input type="hidden" name="kind" value={kind} />
       <div className="field">
         <div className="segmented choice" role="radiogroup" aria-label="What do you need?">
-          <button type="button" className={kind === "SWAP" ? "on" : ""} onClick={() => setKind("SWAP")}>Swap a day with someone</button>
-          <button type="button" className={kind === "DAY_OFF" ? "on" : ""} onClick={() => setKind("DAY_OFF")}>Move my day off</button>
+          <button type="button" className={kind === "TRADE" ? "on" : ""} onClick={() => pick("TRADE")}>Trade days off with someone</button>
+          <button type="button" className={kind === "SWAP" ? "on" : ""} onClick={() => pick("SWAP")}>Swap one day with someone</button>
+          <button type="button" className={kind === "DAY_OFF" ? "on" : ""} onClick={() => pick("DAY_OFF")}>Move my day off</button>
         </div>
       </div>
-      {kind === "SWAP" ? (
+      {kind === "TRADE" ? (
+        <>
+          <label className="field half">My day off (I&apos;ll work it)
+            <select name="date" value={date} onChange={(e) => { setDate(e.target.value); setOther(""); setOtherDate(""); }}>
+              <option value="">Choose…</option>
+              {offDays.map((d) => <option key={d.date} value={d.date}>{d.label}</option>)}
+            </select>
+          </label>
+          <label className="field half">Trade with
+            <select name="other" value={other} onChange={(e) => { setOther(e.target.value); setOtherDate(""); }}>
+              <option value="">Choose…</option>
+              {others.filter((o) => !date || working(o, date)).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </select>
+          </label>
+          <label className="field">Their day off (I&apos;ll take it)
+            <select name="other_date" value={otherDate} onChange={(e) => setOtherDate(e.target.value)}>
+              <option value="">Choose…</option>
+              {workDays.filter((d) => !coworker || coworker.days[d.date] === "Off").map((d) => <option key={d.date} value={d.date}>{d.label}</option>)}
+            </select>
+          </label>
+          <p className="field small muted" style={{ margin: 0 }}>Your coworker accepts first, then an owner or the General Manager approves. Both schedules change by themselves.</p>
+        </>
+      ) : kind === "SWAP" ? (
         <>
           <label className="field half">My day
             <select name="date" value={date} onChange={(e) => setDate(e.target.value)}>
@@ -207,6 +233,7 @@ export function RequestForm({ workDays, offDays, others }: { workDays: Day[]; of
               {others.filter((o) => !date || o.days[date]).map((o) => <option key={o.id} value={o.id}>{o.name}{date && o.days[date] ? ` (${o.days[date]})` : ""}</option>)}
             </select>
           </label>
+          <p className="field small muted" style={{ margin: 0 }}>Your coworker accepts first, then an owner or the General Manager approves.</p>
         </>
       ) : (
         <>
@@ -225,7 +252,31 @@ export function RequestForm({ workDays, offDays, others }: { workDays: Day[]; of
         </>
       )}
       <label className="field">Reason (optional)<input name="reason" value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} /></label>
-      <div className="field"><button disabled={pending}>{pending ? "Sending…" : "Send to manager"}</button></div>
+      <div className="field"><button disabled={pending}>{pending ? "Sending…" : kind === "DAY_OFF" ? "Send to manager" : "Send to my coworker"}</button></div>
+    </form>
+  );
+}
+
+export function RespondSwapForm({ id }: { id: string }) {
+  const [state, action, pending] = useActionState(respondSwap, undefined);
+  const [no, setNo] = useState(false);
+  if (state?.ok) return <span className="small muted">{state.ok}</span>;
+  return (
+    <form action={action} className="row-buttons">
+      <input type="hidden" name="id" value={id} />
+      {no ? (
+        <>
+          <input name="note" placeholder="Why not? (optional)" maxLength={300} />
+          <button name="decision" value="decline" className="danger small" disabled={pending}>Decline</button>
+          <button type="button" className="secondary small" onClick={() => setNo(false)}>Back</button>
+        </>
+      ) : (
+        <>
+          <button name="decision" value="accept" className="small" disabled={pending}>Accept</button>
+          <button type="button" className="secondary small" onClick={() => setNo(true)}>Decline</button>
+        </>
+      )}
+      {state?.error && <span className="field-error">{state.error}</span>}
     </form>
   );
 }

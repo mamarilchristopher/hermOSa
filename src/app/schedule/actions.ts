@@ -15,7 +15,7 @@ const time = z.string().regex(/^\d{2}:\d{2}$/);
 async function call(fn: string, args: Record<string, unknown>, okText: string): Promise<ActionState> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc(fn, args);
-  if (error) return { error: error.code === "PGRST202" ? `The owner needs to run update-${["save_day", "copy_last_week"].includes(fn) ? "0024" : fn.includes("schedule_rules") ? "0025" : "0022"} in Supabase first.` : "Could not save. Try again." };
+  if (error) return { error: error.code === "PGRST202" ? `The owner needs to run update-${["save_day", "copy_last_week"].includes(fn) ? "0024" : fn.includes("schedule_rules") ? "0025" : fn === "respond_schedule_swap" ? "0036" : "0022"} in Supabase first.` : "Could not save. Try again." };
   if (!data?.ok) return { error: errorText(data?.error ?? "UNKNOWN") };
   revalidatePath("/schedule");
   revalidatePath("/me");
@@ -69,14 +69,16 @@ export async function savePattern(_p: ActionState, fd: FormData): Promise<Action
   return call("save_schedule_pattern", { p_employee: p.data.employee, p_branch: p.data.branch, p_days_off: off, p_start: p.data.start, p_end: p.data.end }, "Saved.");
 }
 
-const Req = z.object({ kind: z.enum(["SWAP", "DAY_OFF"]), date, other: z.union([z.uuid(), z.literal("")]).optional(), other_date: z.union([date, z.literal("")]).optional(), reason: z.string().max(300).optional() });
+const Req = z.object({ kind: z.enum(["SWAP", "TRADE", "DAY_OFF"]), date, other: z.union([z.uuid(), z.literal("")]).optional(), other_date: z.union([date, z.literal("")]).optional(), reason: z.string().max(300).optional() });
 export async function requestChange(_p: ActionState, fd: FormData): Promise<ActionState> {
   const p = Req.safeParse(Object.fromEntries(["kind", "date", "other", "other_date", "reason"].map((k) => [k, fd.get(k) ?? undefined])));
   if (!p.success) return { error: "Fill in the days." };
-  if (p.data.kind === "SWAP" && !p.data.other) return { error: "Pick who you're swapping with." };
-  if (p.data.kind === "DAY_OFF" && !p.data.other_date) return { error: "Pick your new day off." };
-  return call("request_schedule_change", { p_kind: p.data.kind, p_date: p.data.date, p_other_employee: p.data.other || null,
-    p_other_date: p.data.other_date || null, p_reason: p.data.reason || null }, "Sent. A manager will approve it.");
+  if (p.data.kind !== "DAY_OFF" && !p.data.other) return { error: "Pick who you're swapping with." };
+  if (p.data.kind !== "SWAP" && !p.data.other_date) return { error: p.data.kind === "TRADE" ? "Pick their day off that you'll take." : "Pick your new day off." };
+  const swap = p.data.kind !== "DAY_OFF";
+  return call("request_schedule_change", { p_kind: swap ? "SWAP" : "DAY_OFF", p_date: p.data.date, p_other_employee: swap ? p.data.other || null : null,
+    p_other_date: p.data.kind === "SWAP" ? null : p.data.other_date || null, p_reason: p.data.reason || null },
+    swap ? "Sent. Your coworker accepts first, then an owner or the General Manager approves." : "Sent. A manager will approve it.");
 }
 
 export async function decideRequest(_p: ActionState, fd: FormData): Promise<ActionState> {
@@ -84,6 +86,16 @@ export async function decideRequest(_p: ActionState, fd: FormData): Promise<Acti
   if (!id.success) return { error: "Try again." };
   const approve = fd.get("decision") === "approve";
   return call("decide_schedule_request", { p_id: id.data, p_approve: approve, p_note: String(fd.get("note") ?? "") || null }, approve ? "Approved" : "Not approved");
+}
+
+export async function respondSwap(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const id = z.uuid().safeParse(fd.get("id"));
+  if (!id.success) return { error: "Try again." };
+  const accept = fd.get("decision") === "accept";
+  const res = await call("respond_schedule_swap", { p_id: id.data, p_accept: accept, p_note: String(fd.get("note") ?? "") || null },
+    accept ? "Accepted. An owner or the General Manager will approve it." : "Declined. They were told.");
+  revalidatePath("/me");
+  return res;
 }
 
 export async function cancelRequest(_p: ActionState, fd: FormData): Promise<ActionState> {

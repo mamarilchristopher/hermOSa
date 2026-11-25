@@ -53,10 +53,11 @@ describe("weekly schedule", () => {
     expect((await db.sql("SELECT count(*)::int n FROM public.notifications WHERE kind = 'SCHEDULE_CHANGED' AND user_id = $1", [bea.appUserId])).rows[0].n).toBe(1);
   });
 
-  it("a swap request, approved by a manager, exchanges the two days", async () => {
+  it("a swap request, accepted by the coworker and approved by the GM, exchanges the two days", async () => {
     const r = await db.rpc(ana, "aal1", "request_schedule_change", ["SWAP", monday, beaE, null, "family event"]);
     expect(r).toMatchObject({ ok: true, state: "PENDING" });
     expect((await db.rpc(ana, "aal1", "decide_schedule_request", [r.id, true, null])).ok).toBe(false);
+    expect((await db.rpc(bea, "aal1", "respond_schedule_swap", [r.id, true, null])).ok).toBe(true);
     expect((await db.rpc(gm, "aal1", "decide_schedule_request", [r.id, true, null])).state).toBe("APPROVED");
     expect(await shift(anaE, monday)).toMatchObject({ is_off: false, branch_id: FV, note: "Swapped" });
     expect(await shift(beaE, monday)).toMatchObject({ is_off: true });
