@@ -47,8 +47,8 @@ async function shrink(file: File): Promise<Blob> {
   } finally { URL.revokeObjectURL(url); }
 }
 
-export function ChatApp({ me, initialRooms, people, initialRoom }: {
-  me: { id: string; name: string; photo_url: string | null }; initialRooms: ChatRoomRow[]; people: ChatPerson[]; initialRoom: string | null;
+export function ChatApp({ me, initialRooms, people, initialRoom, management = false }: {
+  me: { id: string; name: string; photo_url: string | null }; management?: boolean; initialRooms: ChatRoomRow[]; people: ChatPerson[]; initialRoom: string | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [rooms, setRooms] = useState(initialRooms);
@@ -267,7 +267,7 @@ export function ChatApp({ me, initialRooms, people, initialRoom }: {
               <span className="chat-head-text"><strong>{info?.name ?? room?.name ?? "Chat"}</strong>{group && <span className="small muted">{info?.members.length} people</span>}</span>
               {group && <button type="button" className="icon-btn" aria-label="Group details" title="Group details" onClick={() => setPanel(panel === "info" ? null : "info")}><IconInfo /></button>}
             </header>
-            {panel === "info" && info && <GroupInfo info={info} me={me.id} people={people} supabase={supabase}
+            {panel === "info" && info && <GroupInfo info={info} me={me.id} canAdd={!info.auto || management} people={people} supabase={supabase}
               onChanged={async (left) => { if (left) { await refreshList(); open(null); return; } const { data } = await supabase.rpc("chat_room", { p_room: info.id }); if (data?.ok) setInfo(data as RoomInfo); void refreshList(); }} />}
             <div className="chat-scroll" ref={scroller} onClick={() => setPicked(null)}>
               {more && <p className="chat-older"><button type="button" className="link-like small" onClick={older}>Load older messages</button></p>}
@@ -388,7 +388,7 @@ function NewChat({ people, supabase, onDone, onClose }: { people: ChatPerson[]; 
   );
 }
 
-function GroupInfo({ info, me, people, supabase, onChanged }: { info: RoomInfo; me: string; people: ChatPerson[]; supabase: Sb; onChanged: (left: boolean) => void }) {
+function GroupInfo({ info, me, canAdd, people, supabase, onChanged }: { info: RoomInfo; me: string; canAdd: boolean; people: ChatPerson[]; supabase: Sb; onChanged: (left: boolean) => void }) {
   const [name, setName] = useState(info.name);
   const [adding, setAdding] = useState(false);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
@@ -400,7 +400,7 @@ function GroupInfo({ info, me, people, supabase, onChanged }: { info: RoomInfo; 
   };
   return (
     <div className="chat-panel chat-info">
-      {info.auto ? <p className="small muted">This group updates itself: staff join and leave it with their branch.</p> : (
+      {info.auto ? <p className="small muted">Everyone is in this group automatically: staff join and leave it with their home branch. Messages wait here for people who are offline.</p> : (
         <form className="chat-rename" onSubmit={(e) => { e.preventDefault(); void call("chat_rename", { p_room: info.id, p_name: name }); }}>
           <input value={name} maxLength={60} aria-label="Group name" onChange={(e) => setName(e.target.value)} />
           <button type="submit" className="secondary" disabled={!name.trim() || name.trim() === info.name}>Rename</button>
@@ -409,7 +409,7 @@ function GroupInfo({ info, me, people, supabase, onChanged }: { info: RoomInfo; 
       <ul className="chat-people">
         {info.members.map((m) => <li key={m.id}><span><Avatar name={m.name} url={people.find((p) => p.id === m.id)?.photo_url ?? null} size={28} /> {m.name}{m.id === me ? " (you)" : ""}</span></li>)}
       </ul>
-      {!info.auto && (adding ? (
+      {canAdd && adding && (
         <>
           <PeoplePicker people={people.filter((p) => !inGroup.has(p.id))} chosen={chosen} toggle={(id) => setChosen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; })} filter="" />
           <div className="chat-panel-actions">
@@ -417,12 +417,13 @@ function GroupInfo({ info, me, people, supabase, onChanged }: { info: RoomInfo; 
             <button type="button" disabled={!chosen.size} onClick={() => void call("chat_add_members", { p_room: info.id, p_members: [...chosen] })}>Add {chosen.size || ""}</button>
           </div>
         </>
-      ) : (
+      )}
+      {!adding && (canAdd || !info.auto) && (
         <div className="chat-panel-actions">
-          <button type="button" className="secondary" onClick={() => { if (confirm("Leave this group? You won't see its messages anymore.")) void call("chat_leave", { p_room: info.id }, true); }}>Leave group</button>
-          <button type="button" onClick={() => setAdding(true)}>Add people</button>
+          {!info.auto && <button type="button" className="secondary" onClick={() => { if (confirm("Leave this group? You won't see its messages anymore.")) void call("chat_leave", { p_room: info.id }, true); }}>Leave group</button>}
+          {canAdd && <button type="button" onClick={() => setAdding(true)}>Add people</button>}
         </div>
-      ))}
+      )}
       {err && <p className="chat-error small">{err}</p>}
     </div>
   );

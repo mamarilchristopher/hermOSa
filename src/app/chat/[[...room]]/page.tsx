@@ -1,4 +1,4 @@
-import { requireAccess } from "@/lib/access";
+import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { photoUrls } from "@/lib/photos";
 import { ChatApp, type ChatPerson, type ChatRoomRow } from "../ChatApp";
@@ -29,6 +29,7 @@ export default async function ChatPage({ params }: { params: Promise<{ room?: st
             initialRooms={rooms.map(withUrl)}
             people={people.map(withUrl)}
             initialRoom={room?.[0] ?? null}
+            management={can(access, ["OWNER"], null) || can(access, ["MANAGER"], null)}
           />
         )}
       </main>

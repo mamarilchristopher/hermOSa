@@ -102,3 +102,24 @@ describe("messages from management", () => {
     expect(await db.rpc(owner, "aal2", "chat_mgmt_unread", [])).toEqual([]);
   });
 });
+
+describe("update-0050: everyone in from the start", () => {
+  it("All staff and branch teams include people who never opened Chat; owners and the GM can add anyone, and it sticks", async () => {
+    const newbie = await db.person("Dee", [["CLINICIAN", "FAIRVIEW"]]);
+    await db.rpc(owner, "aal2", "save_employee", [null, db.branches.FAIRVIEW, newbie.name, "CMA", true, newbie.appUserId, true]);
+    const rooms = (await db.rpc(owner, "aal2", "chat_list", [])) as { id: string; name: string; auto: boolean }[];
+    const all = rooms.find((r) => r.name === "All staff")!;
+    const members = (await db.rpc(owner, "aal2", "chat_room", [all.id])).members.map((m: { id: string }) => m.id);
+    expect(members).toContain(newbie.appUserId); // Dee never opened Chat
+    await db.rpc(owner, "aal2", "chat_send", [all.id, "DEMO welcome everyone", null, null]);
+    expect(await db.rpc(newbie, "aal1", "chat_unread", [])).toBe(1);
+    // add Cy (Main) to the Fairview team by hand
+    const fv = rooms.find((r) => r.auto && r.name !== "All staff" && r.name.toLowerCase().includes("fairview"))!;
+    expect((await db.rpc(ana, "aal1", "chat_add_members", [fv.id, [cy.appUserId]])).error).toBe("FORBIDDEN");
+    expect((await db.rpc(owner, "aal2", "chat_can_add", [fv.id]))).toBe(true);
+    expect((await db.rpc(ana, "aal1", "chat_can_add", [fv.id]))).toBe(false);
+    expect((await db.rpc(owner, "aal2", "chat_add_members", [fv.id, [cy.appUserId]])).ok).toBe(true);
+    await db.rpc(cy, "aal1", "chat_list", []); // a sync runs
+    expect((await db.rpc(cy, "aal1", "chat_room", [fv.id])).ok).toBe(true);
+  });
+});
