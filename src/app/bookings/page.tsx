@@ -1,3 +1,4 @@
+import { sortServices } from "@/lib/serviceOrder";
 import Link from "next/link";
 import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
@@ -110,7 +111,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
           // At the top (CHRIS Nov 25): management also books calls, walk-ins and texts, not only CSRs' online bookings.
           <details className="card add-booking">
             <summary><strong>+ Add a booking</strong> <span className="small muted">online, call, text or walk-in</span></summary>
-            <AddBookingForm branches={clinics.map((b) => ({ id: b.id, name: b.name }))} today={day < today ? today : day} min={addDays(today, -30)} max={addDays(today, 365)} services={((svcs ?? []) as { name: string; price_cents: number | null }[]).map((x) => ({ name: x.name, price: x.price_cents }))} />
+            <AddBookingForm branches={clinics.map((b) => ({ id: b.id, name: b.name }))} today={day < today ? today : day} min={addDays(today, -30)} max={addDays(today, 365)} services={sortServices((svcs ?? []) as { name: string; price_cents: number | null }[]).map((x) => ({ name: x.name, price: x.price_cents }))} />
           </details>
         )}
 
