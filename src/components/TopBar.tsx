@@ -61,8 +61,9 @@ export async function TopBar({ access }: { access: Access }) {
           <img src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
           <span className="brand-tag">OS</span>
         </div>
-        <NavLinks items={items} variant="side" />
+        {/* View as sits above the menu so a long menu on a short laptop screen never pushes it out of sight. */}
         {viewList.length > 0 && <ViewAsButton people={viewList} variant="side" />}
+        <NavLinks items={items} variant="side" />
         <div className="me">
           <span className="avatar" aria-hidden>{initials}</span>
           <span className="me-text">

@@ -63,7 +63,7 @@ code { font-size: 0.85em; background: var(--cream); padding: 1px 6px; border-rad
   font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; color: var(--gold);
   border: 1px solid var(--gold-line); background: var(--gold-soft); padding: 2px 7px; border-radius: 999px;
 }
-.side-nav { display: grid; gap: 2px; flex: 1; align-content: start; }
+.side-nav { display: grid; gap: 2px; flex: 1; align-content: start; min-height: 0; overflow-y: auto; }
 .side-nav a {
   display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px;
   color: var(--ink-2); text-decoration: none; font-weight: 600; font-size: 0.93rem; position: relative;
@@ -498,8 +498,7 @@ button.view-as-side { all: unset; box-sizing: border-box; width: 100%; display: 
 button.view-as-side svg { color: var(--gold); }
 button.view-as-side:hover, button.view-as-side[aria-expanded="true"] { background: #fff; color: var(--ink); }
 @media (min-width: 901px) { .online-strip .view-as-btn.top { display: none; } }
-.sidebar:has(.view-as-btn.side) .side-nav { flex: 0 0 auto; }
-.view-as-btn.side { margin-top: 6px; }
+.view-as-btn.side { margin: 0 0 4px; flex: none; }
 
 /* Schedule */
 .week-nav { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
