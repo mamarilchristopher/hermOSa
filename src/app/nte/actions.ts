@@ -1,0 +1,54 @@
+"use server";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
+import { errorText } from "@/lib/access";
+
+export type ActionState = { error?: string; ok?: string; at?: number } | undefined;
+
+const MORE: Record<string, string> = {
+  REASON_REQUIRED: "Write a few words first.",
+  NOT_PENDING: "This was already answered or changed. Refresh the page.",
+  NOTHING_TO_ISSUE: "There are no Late NTEs this month that aren't in an IR yet.",
+};
+const text = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
+const msg = (code: string | undefined) => (code && MORE[code]) || errorText(code);
+const NEEDS_SQL = "The owner needs to run update-0029 in Supabase first.";
+
+function refresh() { revalidatePath("/nte"); revalidatePath("/me"); revalidatePath("/time"); revalidatePath("/incidents"); }
+
+export async function explainNte(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const id = z.uuid().safeParse(fd.get("id"));
+  const t = text(fd, "explanation").slice(0, 2000);
+  if (!id.success) return { error: "Refresh the page and try again." };
+  if (t.length < 3) return { error: "Write why you were late." };
+  const { data, error } = await (await createClient()).rpc("explain_nte", { p_id: id.data, p_text: t });
+  if (error) return { error: error.code === "PGRST202" ? NEEDS_SQL : "Could not send. Try again." };
+  if (!data?.ok) return { error: msg(data?.error) };
+  refresh();
+  return { ok: "Sent. Thank you.", at: Date.now() };
+}
+
+export async function voidNte(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const id = z.uuid().safeParse(fd.get("id"));
+  const r = text(fd, "reason").slice(0, 500);
+  if (!id.success) return { error: "Refresh the page and try again." };
+  if (r.length < 3) return { error: "Say why it doesn't count." };
+  const { data, error } = await (await createClient()).rpc("void_nte", { p_id: id.data, p_reason: r });
+  if (error) return { error: error.code === "PGRST202" ? NEEDS_SQL : "Could not save. Try again." };
+  if (!data?.ok) return { error: msg(data?.error) };
+  refresh();
+  return { ok: "Cancelled. It no longer counts.", at: Date.now() };
+}
+
+export async function issueLateIr(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const emp = z.uuid().safeParse(fd.get("employee"));
+  const month = z.string().regex(/^\d{4}-\d{2}-01$/).safeParse(fd.get("month"));
+  if (!emp.success || !month.success) return { error: "Refresh the page and try again." };
+  const { data, error } = await (await createClient()).rpc("issue_late_ir", { p_employee: emp.data, p_month: month.data, p_note: text(fd, "note").slice(0, 1000) || null });
+  if (error) return { error: error.code === "PGRST202" ? NEEDS_SQL : "Could not issue. Try again." };
+  if (!data?.ok) return { error: msg(data?.error) };
+  refresh();
+  redirect(`/incidents/${data.id}?issued=1`);
+}

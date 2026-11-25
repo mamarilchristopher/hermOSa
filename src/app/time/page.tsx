@@ -6,6 +6,7 @@ import { manilaToday } from "@/lib/dates";
 import { cutoffEnd, dayLabel } from "@/lib/homeGlance";
 import { branchShort, timeLabel } from "@/lib/schedule";
 import { BranchLocation, TimeClock } from "./Clock";
+import { NteExplainForm } from "../nte/Forms";
 
 type Punch = { kind: "IN" | "OUT"; punched_at: string; branch_id: string };
 type Att = { employee_id: string; name: string; scheduled: number; present: number; absent: number; late_days: number; late_min: number };
@@ -48,11 +49,22 @@ export default async function TimePage() {
   const locSet = new Set(((locs ?? []) as { id: string; lat: number | null }[]).filter((b) => b.lat != null).map((b) => b.id));
   const myBranches = short.filter((b) => can(access, ["OWNER", "MANAGER"], b.id)).map((b) => ({ ...b, set: locSet.has(b.id) }));
 
+  // A late time-in today makes a Late NTE: ask for the explanation right here.
+  const { data: nteToday } = me
+    ? await supabase.from("late_ntes").select("id, late_minutes").eq("employee_id", me.id).eq("work_date", today).eq("state", "OPEN").maybeSingle()
+    : { data: null };
   return (
     <>
       <TopBar access={access} />
       <main>
         <h1>Time clock</h1>
+        {nteToday && (
+          <div className="card nte-urgent">
+            <h2>Late NTE: please explain</h2>
+            <p className="small" style={{ margin: 0 }}>You timed in {nteToday.late_minutes} minutes after your shift started. This is required.</p>
+            <NteExplainForm id={nteToday.id} prompt="Why were you late today?" />
+          </div>
+        )}
         <p className="muted small">Time in when you arrive and time out when you leave by taking a photo of the clinic clock. No more posting it in the group chat.</p>
 
         {me ? (

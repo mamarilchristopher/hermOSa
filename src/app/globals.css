@@ -729,3 +729,15 @@ table.sheet .none { color: #d6cabd; }
 /* Version note: which deploy is live */
 .build-note { text-align: center; font-size: 0.72rem; color: var(--muted); padding: 18px 16px 28px; }
 @media print { .build-note { display: none; } }
+
+/* Late NTEs (update-0029) */
+.nte-urgent { border: 1px solid var(--bad); box-shadow: 0 0 0 3px var(--bad-bg), var(--shadow); }
+.nte-urgent h2 { color: var(--bad); display: flex; align-items: center; gap: 8px; }
+.nte-box { display: grid; gap: 10px; padding-top: 12px; }
+.nte-box + .nte-box { border-top: 1px dashed var(--line); margin-top: 12px; }
+.nte-list li { align-items: flex-start; }
+.nte-list li.urgent { background: var(--bad-bg); border-radius: var(--radius-sm); padding: 10px 12px; }
+.nte-body { display: grid; gap: 8px; flex: 1; min-width: 0; }
+.nte-reminder { border: 1px solid var(--gold-line); background: var(--gold-soft); }
+.nte-ask p { margin: 0 0 12px; }
+.ir-days tr.ir-nte-why td { font-size: 0.82rem; color: var(--ink-2); font-style: italic; border-top: 0; }

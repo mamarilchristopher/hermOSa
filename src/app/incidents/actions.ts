@@ -25,12 +25,27 @@ export async function issueIr(_p: ActionState, fd: FormData): Promise<ActionStat
   return call("issue_ir", { p_id: id.data, p_issue: issue, p_note: note || null }, issue ? "Issued. They were notified to explain." : "Dismissed.", id.data);
 }
 
-export async function explainIr(_p: ActionState, fd: FormData): Promise<ActionState> {
+
+export async function acknowledgeIr(_p: ActionState, fd: FormData): Promise<ActionState> {
   const id = z.uuid().safeParse(fd.get("id"));
   if (!id.success) return { error: "Try again." };
-  const t = text(fd, "explanation").slice(0, 2000);
-  if (t.length < 3) return { error: "Write your explanation first." };
-  return call("explain_ir", { p_id: id.data, p_text: t }, "Sent. Your manager will review it.", id.data);
+  if (fd.get("ack") !== "yes") return { error: "Tick the box to acknowledge that you received this IR." };
+  const t = text(fd, "response").slice(0, 2000);
+  if (t.length < 3) return { error: "Write your response first." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("acknowledge_ir", { p_id: id.data, p_text: t });
+  if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0029 in Supabase first." : "Could not send. Try again." };
+  if (!data?.ok) return { error: errorText(data?.error) };
+  revalidatePath("/incidents"); revalidatePath(`/incidents/${id.data}`); revalidatePath("/me");
+  return { ok: "Acknowledged. Your manager will review your response.", at: Date.now() };
+}
+
+/** The browser saved the IR's PDF to storage; record it. */
+export async function markIrPdf(id: string): Promise<boolean> {
+  if (!z.uuid().safeParse(id).success) return false;
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("mark_ir_pdf", { p_id: id });
+  return !!data?.ok;
 }
 
 export async function closeIr(_p: ActionState, fd: FormData): Promise<ActionState> {
@@ -41,8 +56,3 @@ export async function closeIr(_p: ActionState, fd: FormData): Promise<ActionStat
   return call("close_ir", { p_id: id.data, p_action: a }, "Closed.", id.data);
 }
 
-export async function setLimit(_p: ActionState, fd: FormData): Promise<ActionState> {
-  const m = z.coerce.number().int().min(1).max(1440).safeParse(fd.get("minutes"));
-  if (!m.success) return { error: "Enter minutes from 1 to 1440." };
-  return call("set_ir_late_limit", { p_minutes: m.data }, `Saved. An IR is drafted at ${m.data} late minutes per cutoff.`);
-}

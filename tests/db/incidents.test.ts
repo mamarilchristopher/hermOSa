@@ -1,4 +1,4 @@
-// Tardiness incident reports (0023). All people are DEMO fixtures.
+// Tardiness: Late NTEs (0029) and the IRs issued from them. All people are DEMO fixtures.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Person, TestDb } from "./harness";
 
@@ -7,7 +7,7 @@ let owner: Person, gm: Person, ana: Person, bea: Person;
 let anaE: string, FV: string;
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
 const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
-const cutStart = (d: string) => (Number(d.slice(8)) <= 15 ? `${d.slice(0, 8)}01` : `${d.slice(0, 8)}16`);
+const monthStart = (d: string) => `${d.slice(0, 8)}01`;
 
 beforeAll(async () => {
   db = await TestDb.create();
@@ -31,40 +31,60 @@ async function lateDay(d: string, start: string, inAt: string) {
     [anaE, ana.appUserId, FV, d, inAt]);
 }
 
-describe("tardiness IR", () => {
-  it("drafts an IR when late minutes in the cutoff reach the limit, hidden from the employee until issued", async () => {
-    const s = cutStart(today());
-    await lateDay(s, "10:00", "10:25");
-    expect((await db.sql("SELECT count(*)::int n FROM public.incident_reports")).rows[0].n).toBe(0);
-    await lateDay(addDays(s, 1), "10:00", "10:40"); // 65 minutes total, limit 60
-    const ir = (await db.sql("SELECT * FROM public.incident_reports")).rows[0];
-    expect(ir).toMatchObject({ late_minutes: 65, late_days: 2, state: "DRAFT", ir_no: 1, limit_minutes: 60 });
-    expect((await db.sql("SELECT count(*)::int n FROM public.notifications WHERE kind = 'IR_DRAFT'")).rows[0].n).toBeGreaterThan(0);
-    expect((await db.as(ana, "aal1", "SELECT count(*)::int n FROM public.incident_reports")).rows[0].n).toBe(0);
-    // A later late day updates the draft.
-    await lateDay(addDays(s, 2), "10:00", "10:05");
-    expect((await db.sql("SELECT late_minutes FROM public.incident_reports")).rows[0].late_minutes).toBe(70);
-    const list = await db.rpc(gm, "aal1", "incident_list", []);
-    expect(list.reports[0]).toMatchObject({ name: "DEMO Ana", can_manage: true, late_days: 3 });
+describe("Late NTEs and IRs", () => {
+  let ntes: string[] = [];
+  it("a time-in more than 15 minutes late makes a Late NTE; 15 minutes or less doesn't", async () => {
+    const m = monthStart(today());
+    await lateDay(m, "10:00", "10:15");
+    expect((await db.sql("SELECT count(*)::int n FROM public.late_ntes")).rows[0].n).toBe(0);
+    await lateDay(addDays(m, 1), "10:00", "10:16");
+    await lateDay(addDays(m, 2), "10:00", "10:40");
+    const rows = (await db.sql("SELECT id, late_minutes, state, nte_no FROM public.late_ntes ORDER BY work_date")).rows;
+    expect(rows.map((r) => [r.late_minutes, r.state, r.nte_no])).toEqual([[16, "OPEN", 1], [40, "OPEN", 2]]);
+    ntes = rows.map((r) => r.id);
+    expect((await db.sql("SELECT count(*)::int n FROM public.notifications WHERE kind = 'NTE_LATE'")).rows[0].n).toBe(2);
+    expect((await db.sql("SELECT count(*)::int n FROM public.incident_reports")).rows[0].n).toBe(0); // no automatic IR drafts any more
   });
 
-  it("issue, explain, close; only the right people at each step", async () => {
-    const id = (await db.sql("SELECT id FROM public.incident_reports")).rows[0].id;
-    expect((await db.rpc(bea, "aal1", "issue_ir", [id, true, null])).ok).toBe(false);
-    expect((await db.rpc(ana, "aal1", "explain_ir", [id, "Traffic"])).ok).toBe(false); // not issued yet
-    expect((await db.rpc(gm, "aal1", "issue_ir", [id, true, "Please explain"])).ok).toBe(true);
-    expect((await db.as(ana, "aal1", "SELECT count(*)::int n FROM public.incident_reports")).rows[0].n).toBe(1);
-    expect((await db.as(bea, "aal1", "SELECT count(*)::int n FROM public.incident_reports")).rows[0].n).toBe(0);
-    expect((await db.rpc(ana, "aal1", "incident_list", [])).reports[0]).toMatchObject({ mine: true, can_manage: false });
-    expect((await db.rpc(ana, "aal1", "explain_ir", [id, "Heavy traffic on EDSA"])).ok).toBe(true);
-    expect((await db.rpc(ana, "aal1", "close_ir", [id, "Verbal warning"])).ok).toBe(false);
-    expect((await db.rpc(gm, "aal1", "close_ir", [id, "Verbal warning"])).ok).toBe(true);
-    expect((await db.sql("SELECT state, action_taken FROM public.incident_reports WHERE id = $1", [id])).rows[0]).toMatchObject({ state: "CLOSED", action_taken: "Verbal warning" });
+  it("the employee sees and explains their own; coworkers see nothing", async () => {
+    expect((await db.as(ana, "aal1", "SELECT count(*)::int n FROM public.late_ntes")).rows[0].n).toBe(2);
+    expect((await db.as(bea, "aal1", "SELECT count(*)::int n FROM public.late_ntes")).rows[0].n).toBe(0);
+    expect((await db.rpc(bea, "aal1", "explain_nte", [ntes[0], "Not mine"])).ok).toBe(false);
+    expect((await db.rpc(ana, "aal1", "explain_nte", [ntes[0], ""])).error).toBe("REASON_REQUIRED");
+    expect((await db.rpc(ana, "aal1", "explain_nte", [ntes[0], "Heavy traffic on EDSA"])).ok).toBe(true);
+    expect((await db.rpc(ana, "aal1", "explain_nte", [ntes[0], "Again"])).error).toBe("NOT_PENDING");
   });
 
-  it("only owners change the limit", async () => {
-    expect((await db.rpc(gm, "aal1", "set_ir_late_limit", [30])).ok).toBe(false);
-    expect((await db.rpc(owner, "aal2", "set_ir_late_limit", [30])).ok).toBe(true);
-    expect((await db.sql("SELECT ir_late_minutes FROM public.organizations")).rows[0].ir_late_minutes).toBe(30);
+  it("the tracker counts this month's NTEs per person for management", async () => {
+    const list = await db.rpc(gm, "aal1", "late_nte_list", [today(), null]);
+    expect(list.grace).toBe(15);
+    expect(list.ntes).toHaveLength(2);
+    expect(list.ntes[0]).toMatchObject({ name: "DEMO Ana", can_manage: true });
+    expect((await db.rpc(bea, "aal1", "late_nte_list", [today(), null])).ntes).toHaveLength(0);
+  });
+
+  it("management voids a mistaken NTE with a reason", async () => {
+    expect((await db.rpc(bea, "aal1", "void_nte", [ntes[1], "Wrong schedule"])).ok).toBe(false);
+    expect((await db.rpc(gm, "aal1", "void_nte", [ntes[1], ""])).error).toBe("REASON_REQUIRED");
+    await lateDay(addDays(monthStart(today()), 3), "10:00", "10:30");
+    const third = (await db.sql("SELECT id FROM public.late_ntes WHERE state = 'OPEN' ORDER BY work_date DESC LIMIT 1")).rows[0].id;
+    expect((await db.rpc(gm, "aal1", "void_nte", [third, "Approved errand"])).ok).toBe(true);
+  });
+
+  it("an IR is issued from the NTEs, acknowledged with a response, then closed", async () => {
+    expect((await db.rpc(bea, "aal1", "issue_late_ir", [anaE, today(), null])).ok).toBe(false);
+    const r = await db.rpc(gm, "aal1", "issue_late_ir", [anaE, today(), "Please improve"]);
+    expect(r.ok).toBe(true);
+    const ir = (await db.sql("SELECT * FROM public.incident_reports WHERE id = $1", [r.id])).rows[0];
+    expect(ir).toMatchObject({ state: "ISSUED", basis: "LATE_NTE", late_days: 2, late_minutes: 56 });
+    expect((await db.sql("SELECT count(*)::int n FROM public.late_ntes WHERE ir_id = $1", [r.id])).rows[0].n).toBe(2);
+    expect((await db.rpc(gm, "aal1", "issue_late_ir", [anaE, today(), null])).error).toBe("NOTHING_TO_ISSUE");
+    expect((await db.rpc(bea, "aal1", "acknowledge_ir", [r.id, "Ok"])).ok).toBe(false);
+    expect((await db.rpc(ana, "aal1", "acknowledge_ir", [r.id, "I understand and will leave earlier."])).ok).toBe(true);
+    expect((await db.sql("SELECT state, acknowledged_at IS NOT NULL AS ack FROM public.incident_reports WHERE id = $1", [r.id])).rows[0]).toEqual({ state: "EXPLAINED", ack: true });
+    expect((await db.rpc(ana, "aal1", "close_ir", [r.id, "Verbal warning"])).ok).toBe(false);
+    expect((await db.rpc(gm, "aal1", "close_ir", [r.id, "Verbal warning"])).ok).toBe(true);
+    expect((await db.rpc(bea, "aal1", "mark_ir_pdf", [r.id])).ok).toBe(false);
+    expect((await db.rpc(gm, "aal1", "mark_ir_pdf", [r.id])).ok).toBe(true);
   });
 });

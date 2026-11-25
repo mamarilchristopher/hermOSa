@@ -15,6 +15,8 @@ import { noticeHref } from "@/lib/noticeLink";
 import { computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
 import { addDays, sortBranches } from "@/lib/insights";
 import { missingRequired, type Details } from "@/lib/employeeDetails";
+import { firstName, times, tracker, type NteList } from "@/lib/nte";
+import { NteExplainForm } from "../nte/Forms";
 
 type Signoffs = { to_sign: { count: number; oldest: string | null }; mine: { count: number; oldest: string | null } };
 type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: string }[]; days?: StatusDay[];
@@ -116,9 +118,18 @@ export default async function Me() {
   if (emp) {
     const { data: myIr } = await supabase.rpc("incident_list");
     const waiting = ((myIr as { reports?: Ir[] } | null)?.reports ?? []).filter((r) => r.mine && r.state === "ISSUED");
-    for (const r of waiting) (home?.todos ?? staffTodos)?.unshift({ text: `Incident report no. ${r.ir_no} (tardiness) needs your explanation`, href: `/incidents/${r.id}`, urgent: true });
+    for (const r of waiting) (home?.todos ?? staffTodos)?.unshift({ text: `URGENT: Incident report no. ${r.ir_no} was issued to you. Acknowledge it and write your response`, href: `/incidents/${r.id}`, urgent: true });
   }
   if (timeTodo) (home?.todos ?? staffTodos)?.unshift(timeTodo);
+  // Late NTEs waiting for my explanation (shown as boxes at the top), and the owner/GM tardiness tracker.
+  const ownerLevel = isOwner || access.grants.some((g) => g.role === "MANAGER" && g.branch_id === null);
+  const [{ data: myNteData }, { data: trackData }] = await Promise.all([
+    emp ? supabase.from("late_ntes").select("id, nte_no, work_date, shift_start, time_in, late_minutes").eq("employee_id", emp.id).eq("state", "OPEN").order("work_date")
+      : Promise.resolve({ data: [] }),
+    ownerLevel ? supabase.rpc("late_nte_list", { p_month: `${today.slice(0, 7)}-01`, p_employee: null }) : Promise.resolve({ data: null }),
+  ]);
+  const myNtes = (myNteData ?? []) as { id: string; nte_no: number; work_date: string; shift_start: string; time_in: string; late_minutes: number }[];
+  const tardy = trackData ? tracker((trackData as NteList).ntes) : [];
   if (missingTodo && !isOwner) (home?.todos ?? staffTodos)?.push(missingTodo);
   if (home && !isOwner && detailState !== "APPROVED" && detailState !== "PENDING") {
     home.todos.push({ text: detailState === "RETURNED" ? "The owner sent your employee details back. Please fix them" : "Fill in your employee details (needed for payroll and government reports)", href: "/me/details" });
@@ -164,8 +175,36 @@ export default async function Me() {
         <h1>Hi, {first}</h1>
         <p className="muted small">{emp?.position ?? (isOwner ? "Owner" : "Staff")}{emp && ` · ${branchName[emp.branch_id]}`} · {dayLabel(today)}</p>
 
+        {myNtes.length > 0 && (
+          <div className="card nte-urgent">
+            <h2>Late NTE: please explain<span className="nav-badge inline">{myNtes.length}</span></h2>
+            {myNtes.map((n) => (
+              <div key={n.id} className="nte-box">
+                <p className="small" style={{ margin: 0 }}><strong>NTE no. {n.nte_no} · {dayLabel(n.work_date)}</strong>: your shift started {timeLabel(n.shift_start)} and you timed in{" "}
+                  {new Date(n.time_in).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })} ({n.late_minutes} minutes late).</p>
+                <NteExplainForm id={n.id} prompt={`Why were you late, ${first}?`} />
+              </div>
+            ))}
+          </div>
+        )}
         {staffTodos && <TodoCard todos={staffTodos} />}
         {home && <ManagerHome g={home.g} todos={home.todos} duty={home.duty} branches={branches.filter((b) => b.kind === "CLINIC").map((b) => ({ id: b.id, name: branchShort(b.name) }))} />}
+        {ownerLevel && trackData != null && (
+          <div className="card">
+            <div className="card-head"><h2>Tardiness tracker, {monthLabel(today.slice(0, 7))}</h2><Link className="small" href="/nte">All Late NTEs</Link></div>
+            {tardy.length === 0 ? <p className="muted" style={{ margin: 0 }}>No Late NTEs this month.</p> : (
+              <ul className="plain-list">
+                {tardy.slice(0, 8).map((r) => (
+                  <li key={r.employee_id}>
+                    <span><strong>{firstName(r.name)}</strong> has been issued Late NTEs <strong>{times(r.count)}</strong> this month
+                      {r.open > 0 && <span className="small muted"> · {r.open} not explained yet</span>}</span>
+                    <Link className="button secondary small" href={`/nte/staff/${r.employee_id}`}>Open</Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
         {notices.length > 0 && (
           <div className="card">
             <div className="card-head">
