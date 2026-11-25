@@ -3,7 +3,8 @@ import type { Access } from "@/lib/access";
 import { createClient } from "@/lib/supabase/server";
 import { can } from "@/lib/access";
 import { IconLogout, IconShield } from "./Icons";
-import { NavLinks, type NavItem } from "./NavLinks";
+import { HubTabs, NavLinks, type Hub } from "./NavLinks";
+import { ThemeToggle } from "./ThemeToggle";
 import { OnlineNow } from "./OnlineNow";
 import { ViewAsButton } from "./ViewAsButton";
 import { Avatar } from "./Avatar";
@@ -44,28 +45,39 @@ export async function TopBar({ access }: { access: Access }) {
   const management = access.grants.some((g) => ["OWNER", "FINANCE", "AUDITOR", "MANAGER"].includes(g.role));
   // Bookings (update-0040): CSRs, owners and the GM book; branch staff see their branch's visits.
   const booker = access.grants.some((g) => ["CSR", "OWNER", "MANAGER", "CLINICIAN", "CASHIER"].includes(g.role));
-  const items: NavItem[] = [
-    { href: "/me", label: "Home", short: "Home", icon: "home" }, // notices and to-dos live in the bell (v0.44.4)
-    ...(management ? [{ href: "/", label: "Sales dashboard", short: "Sales", icon: "chart" } as NavItem] : []),
-    ...(filler ? [{ href: "/sales/daily", label: "Daily Sales", short: "Daily", icon: "pen" } as NavItem] : []),
-    ...(logger ? [{ href: "/services", label: "Service log", short: "Services", icon: "clipboard", badge: overdue.length || undefined } as NavItem] : []),
-    ...(booker ? [{ href: "/bookings", label: "Bookings", short: "Bookings", icon: "calendar" } as NavItem] : []),
-    { href: "/schedule", label: "Schedule", short: "Schedule", icon: "week" } as NavItem,
-    { href: "/time", label: "Time clock", short: "Clock", icon: "clock" } as NavItem,
-    { href: "/leave", label: "Leave", short: "Leave", icon: "calendar", badge: leaveWaiting || undefined } as NavItem,
-    ...(approver ? [{ href: "/nte", label: "Late NTEs", short: "NTEs", icon: "clock" } as NavItem] : []),
-    ...(approver ? [{ href: "/incidents", label: "Incident reports", short: "IRs", icon: "clipboard" } as NavItem] : []),
-    ...(owner || gm ? [{ href: "/payroll", label: "Payroll", short: "Payroll", icon: "coins" } as NavItem] : []),
-    { href: "/payslips", label: "My payslips", short: "Payslips", icon: "idcard" } as NavItem,
-    ...(owner || gm ? [{ href: "/services/prices", label: "Price list", short: "Prices", icon: "coins" } as NavItem] : []),
-    ...(people ? [{ href: "/people", label: "Employees", short: "Staff", icon: "people" } as NavItem] : []),
-    ...(filler ? [{ href: "/sales/missing", label: "Missing days", short: "Missing", icon: "calendar" } as NavItem] : []),
-    ...(importer ? [{ href: "/imports", label: "Imports", short: "Imports", icon: "upload" } as NavItem] : []),
-    ...(detailsApprover ? [{ href: "/admin/details", label: "Staff details", short: "Details", icon: "idcard", badge: detailsWaiting || undefined } as NavItem] : []),
-    ...(detailsApprover ? [{ href: "/admin/photos", label: "Profile pictures", short: "Photos", icon: "people", badge: photosWaiting || undefined } as NavItem] : []),
-    ...(owner ? [{ href: "/admin/users", label: "Users and roles", short: "Users", icon: "users" } as NavItem] : []),
-    ...(gm ? [{ href: "/admin/joins", label: "Join requests", short: "Joins", icon: "users", badge: joinsWaiting || undefined } as NavItem] : []),
-  ];
+  // Menu grouped into hubs (v0.48, CHRIS Nov 25): related pages become tabs inside one menu item. Time clock stays its own item.
+  const hubs: Hub[] = ([
+    { key: "home", label: "Home", short: "Home", icon: "home", tabs: [{ href: "/me", label: "Home" }] },
+    { key: "time", label: "Time clock", short: "Clock", icon: "clock", tabs: [{ href: "/time", label: "Time clock" }] },
+    { key: "sales", label: "Sales", short: "Sales", icon: "chart", tabs: [
+      ...(management ? [{ href: "/", label: "Dashboard" }] : []),
+      ...(filler ? [{ href: "/sales/daily", label: "Daily sales" }, { href: "/sales/missing", label: "Missing days" }] : []),
+      ...(importer ? [{ href: "/imports", label: "Imports" }] : []),
+    ] },
+    { key: "clinic", label: "Clinic", short: "Clinic", icon: "clipboard", tabs: [
+      ...(logger ? [{ href: "/services", label: "Service log", badge: overdue.length || undefined }] : []),
+      ...(booker ? [{ href: "/bookings", label: "Bookings" }] : []),
+      ...(owner || gm ? [{ href: "/services/prices", label: "Price list" }] : []),
+    ] },
+    { key: "team", label: "Team", short: "Team", icon: "week", tabs: [
+      { href: "/schedule", label: "Schedule" },
+      { href: "/leave", label: "Leave", badge: leaveWaiting || undefined },
+      ...(approver ? [{ href: "/nte", label: "Late NTEs" }, { href: "/incidents", label: "Incident reports" }] : []),
+    ] },
+    { key: "pay", label: "Pay", short: "Pay", icon: "coins", tabs: [
+      ...(owner || gm ? [{ href: "/payroll", label: "Payroll" }] : []),
+      { href: "/payslips", label: "My payslips" },
+    ] },
+    { key: "people", label: "People", short: "People", icon: "people", tabs: [
+      ...(people ? [{ href: "/people", label: "Employees" }] : []),
+      ...(detailsApprover ? [{ href: "/admin/details", label: "Staff details", badge: detailsWaiting || undefined },
+                             { href: "/admin/photos", label: "Profile pictures", badge: photosWaiting || undefined }] : []),
+      ...(gm ? [{ href: "/admin/joins", label: "Join requests", badge: joinsWaiting || undefined }] : []),
+    ] },
+    { key: "settings", label: "Settings", short: "Settings", icon: "settings", tabs: [
+      ...(owner ? [{ href: "/admin/users", label: "Users and roles" }] : []),
+    ] },
+  ] as Hub[]).filter((h) => h.tabs.length > 0);
   const role = [...new Set(access.grants.map((g) => ROLE_LABEL[g.role] ?? g.role))].join(", ") || "No role yet";
 
   return (
@@ -78,13 +90,14 @@ export async function TopBar({ access }: { access: Access }) {
         </div>
         {/* View as sits above the menu so a long menu on a short laptop screen never pushes it out of sight. */}
         {viewList.length > 0 && <ViewAsButton people={viewList} variant="side" />}
-        <NavLinks items={items} variant="side" />
+        <NavLinks hubs={hubs} variant="side" />
         <div className="me">
           <Avatar name={access.display_name} url={myPhotoUrl} />
           <span className="me-text">
             <strong>{access.display_name}</strong>
             <span>{role}{access.mfa && <span className="mfa" title="Signed in with 2-step verification"><IconShield /> 2FA</span>}</span>
           </span>
+          <ThemeToggle />
           <form action="/auth/signout" method="post">
             <button className="icon-btn" type="submit" title="Sign out" aria-label="Sign out"><IconLogout /></button>
           </form>
@@ -92,12 +105,13 @@ export async function TopBar({ access }: { access: Access }) {
       </aside>
       <header className="mobile-bar">
         <img src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
+        <ThemeToggle />
         <a href="/me/photo" title={`${access.display_name} · ${role} · change your picture`}><Avatar name={access.display_name} url={myPhotoUrl} size={32} /></a>
         <form action="/auth/signout" method="post">
           <button className="icon-btn" type="submit" aria-label="Sign out"><IconLogout /></button>
         </form>
       </header>
-      <NavLinks items={items} variant="tabs" />
+      <NavLinks hubs={hubs} variant="tabs" />
       <div className="online-strip">
         <OnlineNow show />
         {viewList.length > 0 && <ViewAsButton people={viewList} />}
@@ -114,6 +128,7 @@ export async function TopBar({ access }: { access: Access }) {
           {overdue.length > 6 && <span>+{overdue.length - 6} more days</span>}
         </div>
       )}
+      <HubTabs hubs={hubs} />
     </>
   );
 }

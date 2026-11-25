@@ -964,3 +964,25 @@ button.link { background: none; border: 0; padding: 0; color: var(--bad); text-d
   .comm-line > span:nth-child(4) { grid-area: p; font-size: 0.78rem; color: var(--muted); }
   .comm-line > span:nth-child(5) { grid-area: c; }
 }
+
+/* Hub tabs and phone "More" (v0.48) */
+.hub-bar { padding: 18px 32px 0; }
+.sidebar ~ .hub-bar { margin-left: var(--side); padding-left: max(32px, calc((100vw - var(--side) - 1180px) / 2)); padding-right: max(32px, calc((100vw - var(--side) - 1180px) / 2)); }
+.sidebar ~ .hub-bar + main { padding-top: 18px; }
+.hub-tabs { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.hub-tabs::-webkit-scrollbar { display: none; }
+.hub-tabs a { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.tab-badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--bad); color: #fff; font-size: 0.68rem; font-weight: 800; display: inline-grid; place-items: center; }
+.tab-nav button.tab-more { all: unset; box-sizing: border-box; position: relative; display: grid; justify-items: center; gap: 2px; padding: 6px 4px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; color: var(--muted); cursor: pointer; }
+.tab-nav button.tab-more.active { color: var(--brown-dark); background: var(--gold-soft); }
+.more-sheet { display: none; }
+@media (max-width: 900px) {
+  .sidebar ~ .hub-bar { margin-left: 0; padding: 14px 16px 0; }
+  .sidebar ~ .hub-bar + main { padding-top: 14px; }
+  .more-sheet { display: grid; gap: 2px; position: fixed; z-index: 21; right: 10px; bottom: calc(76px + env(safe-area-inset-bottom)); min-width: 200px; padding: 8px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-lift); }
+  .more-sheet a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; color: var(--ink); text-decoration: none; font-weight: 600; }
+  .more-sheet a.active { background: var(--gold-soft); }
+  .more-sheet a svg { color: var(--muted); }
+  .more-sheet .nav-badge { margin-left: auto; }
+}

@@ -1,26 +1,97 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconCalendar, IconChart, IconClipboard, IconCoins, IconHome, IconIdCard, IconPen, IconPeople, IconUpload, IconUsers, IconWeek, IconClock } from "./Icons";
+import { useEffect, useState } from "react";
+import { IconCalendar, IconChart, IconClipboard, IconCoins, IconHome, IconIdCard, IconPen, IconPeople, IconUpload, IconUsers, IconWeek, IconClock, IconMore, IconSettings } from "./Icons";
 
-const ICONS = { chart: IconChart, calendar: IconCalendar, upload: IconUpload, users: IconUsers, clipboard: IconClipboard, people: IconPeople, coins: IconCoins, home: IconHome, idcard: IconIdCard, pen: IconPen, week: IconWeek, clock: IconClock };
-export type NavItem = { href: string; label: string; short: string; icon: keyof typeof ICONS; badge?: number };
+const ICONS = { chart: IconChart, calendar: IconCalendar, upload: IconUpload, users: IconUsers, clipboard: IconClipboard, people: IconPeople, coins: IconCoins, home: IconHome, idcard: IconIdCard, pen: IconPen, week: IconWeek, clock: IconClock, settings: IconSettings };
 
-export function NavLinks({ items, variant }: { items: NavItem[]; variant: "side" | "tabs" }) {
+/** One page inside a hub (shown as a tab across the top of the page). */
+export type HubTab = { href: string; label: string; badge?: number };
+/** A menu item: a group of related pages (v0.48: Home, Time clock, Sales, Clinic, Team, Pay, People, Settings). */
+export type Hub = { key: string; label: string; short: string; icon: keyof typeof ICONS; tabs: HubTab[] };
+
+const matches = (path: string, href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`));
+
+/** The hub and tab the current page belongs to: the longest matching tab link wins (/services/prices over /services). */
+export function activeOf(hubs: Hub[], path: string): { hub: string | null; tab: string | null } {
+  let best: { hub: string; tab: string; len: number } | null = null;
+  for (const h of hubs) for (const t of h.tabs) {
+    if (matches(path, t.href) && (!best || t.href.length > best.len)) best = { hub: h.key, tab: t.href, len: t.href.length };
+  }
+  return { hub: best?.hub ?? null, tab: best?.tab ?? null };
+}
+const badgeOf = (h: Hub) => h.tabs.reduce((n, t) => n + (t.badge ?? 0), 0);
+
+// Phone bottom bar: Home and Time clock always, then these hubs in this order; the rest go under More.
+const PHONE_ORDER = ["clinic", "team", "sales", "pay", "people", "settings"];
+
+export function NavLinks({ hubs, variant }: { hubs: Hub[]; variant: "side" | "tabs" }) {
   const path = usePathname();
+  const [more, setMore] = useState(false);
+  useEffect(() => setMore(false), [path]);
+  const { hub: active } = activeOf(hubs, path);
+
+  const link = (h: Hub, short: boolean) => {
+    const Icon = ICONS[h.icon];
+    const on = h.key === active;
+    const badge = badgeOf(h);
+    return (
+      <Link key={h.key} href={h.tabs[0].href} className={on ? "active" : undefined} aria-current={on ? "page" : undefined}>
+        <Icon />
+        <span>{short ? h.short : h.label}</span>
+        {badge ? <span className="nav-badge" aria-label={`${badge} waiting`}>{badge}</span> : null}
+      </Link>
+    );
+  };
+
+  if (variant === "side") return <nav className="side-nav" aria-label="Main">{hubs.map((h) => link(h, false))}</nav>;
+
+  const fixed = hubs.filter((h) => h.key === "home" || h.key === "time");
+  const rest = PHONE_ORDER.map((k) => hubs.find((h) => h.key === k)).filter((h): h is Hub => !!h);
+  const fitsAll = fixed.length + rest.length <= 5;
+  const shown = fitsAll ? rest : rest.slice(0, 2);
+  const hidden = fitsAll ? [] : rest.slice(2);
+  const moreOn = hidden.some((h) => h.key === active);
+  const moreBadge = hidden.reduce((n, h) => n + badgeOf(h), 0);
   return (
-    <nav className={variant === "side" ? "side-nav" : "tab-nav"} aria-label="Main">
-      {items.map((it) => {
-        const Icon = ICONS[it.icon];
-        const active = it.href === "/" ? path === "/" : path.startsWith(it.href);
-        return (
-          <Link key={it.href} href={it.href} className={active ? "active" : undefined} aria-current={active ? "page" : undefined}>
-            <Icon />
-            <span>{variant === "side" ? it.label : it.short}</span>
-            {it.badge ? <span className="nav-badge" aria-label={`${it.badge} waiting`}>{it.badge}</span> : null}
+    <>
+      {more && hidden.length > 0 && (
+        <div className="more-sheet" role="menu">
+          {hidden.map((h) => link(h, false))}
+        </div>
+      )}
+      <nav className="tab-nav" aria-label="Main">
+        {fixed.map((h) => link(h, true))}
+        {shown.map((h) => link(h, true))}
+        {hidden.length > 0 && (
+          <button type="button" className={`tab-more${moreOn || more ? " active" : ""}`} aria-expanded={more} onClick={() => setMore((v) => !v)}>
+            <IconMore />
+            <span>More</span>
+            {moreBadge ? <span className="nav-badge" aria-label={`${moreBadge} waiting`}>{moreBadge}</span> : null}
+          </button>
+        )}
+      </nav>
+    </>
+  );
+}
+
+/** Tabs across the top of the page for the pages in the current hub (hidden when the hub has one page). */
+export function HubTabs({ hubs }: { hubs: Hub[] }) {
+  const path = usePathname();
+  const { hub, tab } = activeOf(hubs, path);
+  const h = hubs.find((x) => x.key === hub);
+  if (!h || h.tabs.length < 2) return null;
+  return (
+    <div className="hub-bar">
+      <nav className="segmented hub-tabs" aria-label={h.label}>
+        {h.tabs.map((t) => (
+          <Link key={t.href} href={t.href} className={t.href === tab ? "on" : undefined} aria-current={t.href === tab ? "page" : undefined}>
+            {t.label}
+            {t.badge ? <span className="tab-badge">{t.badge}</span> : null}
           </Link>
-        );
-      })}
-    </nav>
+        ))}
+      </nav>
+    </div>
   );
 }

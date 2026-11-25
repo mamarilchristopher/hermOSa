@@ -1,0 +1,55 @@
+/* Dark mode (v0.48): <html data-mode="dark">. Same brand: warm browns and gold, dark surfaces. Logo untouched. */
+[data-mode="dark"] {
+  --brown: #d4ab78; --brown-dark: #ecd2ae; --ink: #f3eadf; --ink-2: #d8c9b9; --muted: #a6958a;
+  --gold: #d2aa5e; --gold-soft: #3a2f22; --gold-line: #5c4a2d; --cream: #2b231d; --pearl: #15110e; --surface: #201a16;
+  --line: #342a23; --line-strong: #4a3d33;
+  --good: #79c995; --good-bg: #1c3125; --bad: #f2948a; --bad-bg: #3b201c; --warn: #f0c46c; --warn-bg: #362a13;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4); --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px -14px rgba(0, 0, 0, 0.7);
+  --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.4), 0 16px 32px -16px rgba(0, 0, 0, 0.8);
+  --chart-fill: #d2aa5e; --chart-fill-soft: #4a3d33;
+  color-scheme: dark;
+}
+[data-mode="dark"] body { background: var(--pearl); }
+[data-mode="dark"] .sidebar { background: #1a1512; }
+[data-mode="dark"] .brand, [data-mode="dark"] .me { border-color: var(--line); }
+[data-mode="dark"] .brand img, [data-mode="dark"] .mobile-bar img { background: #f6eedf; border-radius: 12px; padding: 4px 8px; }
+[data-mode="dark"] .side-nav a.active, [data-mode="dark"] .side-nav a:hover { background: var(--surface); box-shadow: none; }
+[data-mode="dark"] .mobile-bar { background: rgba(26, 21, 18, 0.94); }
+[data-mode="dark"] .tab-nav { background: rgba(26, 21, 18, 0.97); }
+[data-mode="dark"] button, [data-mode="dark"] .button { background: var(--brown); border-color: var(--brown); color: #1b1511; }
+[data-mode="dark"] button.secondary, [data-mode="dark"] .button.secondary { background: var(--surface); color: var(--brown-dark); border-color: var(--line-strong); }
+[data-mode="dark"] .icon-btn, [data-mode="dark"] .tab-nav button.tab-more { background: transparent; border-color: transparent; color: var(--muted); }
+[data-mode="dark"] .icon-btn:hover { background: var(--cream); color: var(--ink); }
+[data-mode="dark"] input, [data-mode="dark"] select, [data-mode="dark"] textarea { background: #181310; color: var(--ink); border-color: var(--line-strong); }
+[data-mode="dark"] th, [data-mode="dark"] .slip-head, [data-mode="dark"] table.tracker th[scope="row"] { background: var(--surface); }
+[data-mode="dark"] tbody tr:hover, [data-mode="dark"] .slip-row:hover { background: #2a221c; }
+[data-mode="dark"] .segmented a:hover, [data-mode="dark"] .segmented button:hover { background: var(--cream); }
+[data-mode="dark"] .notice.error { border-color: #5a2c26; } [data-mode="dark"] .notice.ok { border-color: #2d4a37; }
+[data-mode="dark"] .notice.warn, [data-mode="dark"] .alert-strip, [data-mode="dark"] .missing-link { border-color: #54421c; }
+[data-mode="dark"] .alert-strip a { background: var(--surface); border-color: #54421c; }
+[data-mode="dark"] .tag.ASSIST { background: #1f2733; color: #a9bdd6; border-color: #2e3a4a; }
+[data-mode="dark"] .join-dupe { background: #35261a; color: #f0c08a; }
+[data-mode="dark"] .view-as-menu, [data-mode="dark"] button.view-as-side:hover, [data-mode="dark"] button.view-as-side[aria-expanded="true"] { background: var(--surface); }
+[data-mode="dark"] .week-grid thead th.today, [data-mode="dark"] .week-grid td.today, [data-mode="dark"] .branch-week tr.today th,
+[data-mode="dark"] .branch-week tr.today td, [data-mode="dark"] table.sheet tr.today td, [data-mode="dark"] .sheet-day.today { background: #2a2117; }
+[data-mode="dark"] .week-grid td.draft .cell-btn, [data-mode="dark"] .week-grid td.draft .cell, [data-mode="dark"] .name-chip.draft { background: #241d15; }
+[data-mode="dark"] .my-day, [data-mode="dark"] .name-chip, [data-mode="dark"] [data-theme="ivory"] .glance-branch:not(.missing),
+[data-mode="dark"] .glance-branch:not(.missing), [data-mode="dark"] .glance-stats .stat { background: #2a221c; }
+[data-mode="dark"] .my-day.today { background: var(--surface); }
+[data-mode="dark"] .away { color: #a9bdd6; }
+[data-mode="dark"] .status-pick button.on.st-OFF { background: #3a322b; border-color: #5a4d41; color: var(--ink); }
+[data-mode="dark"] table.sheet thead th.b0, [data-mode="dark"] .sheet-day .b0 dt { background: #1f2a1d; }
+[data-mode="dark"] table.sheet thead th.b1, [data-mode="dark"] .sheet-day .b1 dt { background: #24212e; }
+[data-mode="dark"] table.sheet thead th.b2, [data-mode="dark"] .sheet-day .b2 dt { background: #2e2120; }
+[data-mode="dark"] table.sheet thead th.b3, [data-mode="dark"] .sheet-day .b3 dt { background: #2e2619; }
+[data-mode="dark"] table.sheet .muted-col, [data-mode="dark"] table.sheet thead th.muted-col, [data-mode="dark"] .sheet-day .muted-col dt { background: #1c1714; }
+[data-mode="dark"] table.sheet tr.editable:hover td, [data-mode="dark"] table.sheet tr.editable:hover th { background: #2a221c; }
+[data-mode="dark"] table.sheet .none { color: #5a4d41; }
+[data-mode="dark"] .online-name.owner { background: var(--gold); border-color: var(--gold); color: #1b1511; }
+[data-mode="dark"] .bell-count { color: #1b1511; }
+[data-mode="dark"] dialog.sheet { background: var(--surface); color: var(--ink); }
+[data-mode="dark"] .center { background: var(--pearl); }
+/* Paper-like documents stay light so they print and read like the paper forms. */
+[data-mode="dark"] .ir-doc, [data-mode="dark"] .payslip { color-scheme: light; }
+[data-mode="dark"] .avatar { color: #563c2f; }
+[data-mode="dark"] .nav-badge, [data-mode="dark"] .tab-badge { background: #c4473b; color: #fff; }
