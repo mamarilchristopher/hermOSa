@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.44.3 | Nov 25, 2026 | none | Work-from-home time in/out: besides taking a photo, WFH staff can tap "Time in with a screenshot" (or Time out) and upload a screenshot of their screen showing the clock and date. Screenshots keep more detail so the clock stays readable; the file's saved time is kept so the Time-in photos page flags an old screenshot |
 | 0.44.2 | Nov 25, 2026 | none | Management Home "On duty today" is now a neat view: one box per branch with each person's profile picture (initials until approved), nickname or first name, and one short status (In / Out time, Not in, and how late in red; ring is green on time, red late). No UIDs or shift hours; full details stay on the Time clock page |
 | 0.44.1 | Nov 25, 2026 | none | Management Home: "Today so far" is now the top card, with today's total sales entered and each branch's amount (or "Not entered yet", Zero sales, Closed) |
 | 0.44.0 | Nov 25, 2026 | update-0044 | Irregular days: on the Time clock's On duty card, owners and the GM can mark one person's day, or the whole day for everyone, as irregular (Maintenance, Emergency, or Other with a typed reason). That day's lateness is ignored: no late minutes on On duty, not counted in cutoff lateness or IR counts, no new Late NTE, and open Late NTEs for it are cancelled (ones already turned into an IR stay). Undo puts the lateness back (cancelled NTEs stay cancelled) |

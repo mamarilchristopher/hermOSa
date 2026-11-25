@@ -19,16 +19,20 @@ function newId(): string {
 /** A short reason from any error, for the on-screen message. */
 const why = (e: unknown) => (e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : String(e)).slice(0, 120) || "unknown";
 
-/** Shrinks the time-in photo to about 1024 px JPEG (clock still readable, well under the 1 MB limit) before upload. */
-async function shrink(file: File): Promise<Blob> {
+/** Shrinks the time-in photo to about 1024 px JPEG (clock still readable, well under the 1 MB limit) before upload.
+ *  Screenshots (WFH) keep more pixels so the small clock corner stays readable; quality steps down to stay under 1 MB. */
+async function shrink(file: File, max = 1024): Promise<Blob> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = url; });
-    const scale = Math.min(1, 1024 / Math.max(img.width, img.height));
+    const scale = Math.min(1, max / Math.max(img.width, img.height));
     const c = document.createElement("canvas");
     c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
     c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-    return await new Promise<Blob>((ok, bad) => c.toBlob((b) => (b ? ok(b) : bad(new Error("photo"))), "image/jpeg", 0.8));
+    const jpeg = (q: number) => new Promise<Blob>((ok, bad) => c.toBlob((b) => (b ? ok(b) : bad(new Error("photo"))), "image/jpeg", q));
+    let out = await jpeg(0.8);
+    for (const q of [0.65, 0.5]) if (out.size > 950_000) out = await jpeg(q);
+    return out;
   } finally { URL.revokeObjectURL(url); }
 }
 
@@ -67,6 +71,7 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
   const [noLoc, setNoLoc] = useState(false);
   const [reload, setReload] = useState(false);
   const file = useRef<HTMLInputElement>(null);
+  const shot = useRef<HTMLInputElement>(null); // WFH: pick a screenshot instead of taking a photo (CHRIS Nov 25)
   const kind = isIn ? "OUT" : "IN";
   /** Working from home (CSRs, update-0038): the photo is of the PC's clock, and no location is asked for. */
   const online = !!branches.find((b) => b.id === branch)?.wfh;
@@ -98,13 +103,13 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function onPhoto(f: File | undefined) {
+  async function onPhoto(f: File | undefined, screenshot = false) {
     if (!f) return;
     setRes(undefined); setNoLoc(false); setReload(false);
     let step = "photo";
     try {
       setBusy(online ? "Preparing your photo…" : "Getting your location…");
-      const [blob, pos, taken] = await Promise.all([shrink(f).catch(() => null), online ? Promise.resolve(null) : locate(), f.slice(0, 262144).arrayBuffer().then((b) => photoTakenAt(b), () => null)]);
+      const [blob, pos, taken] = await Promise.all([shrink(f, screenshot ? 2000 : 1024).catch(() => null), online ? Promise.resolve(null) : locate(), f.slice(0, 262144).arrayBuffer().then((b) => photoTakenAt(b), () => null)]);
       if (!blob) { setRes({ error: "This photo couldn't be read. Take the photo again with the phone's camera." }); return; }
       setBusy("Saving your photo…"); step = "upload";
       const path = `${userId}/${newId()}.jpg`;
@@ -114,7 +119,9 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
       step = "save";
       setBusy(kind === "IN" ? "Timing in…" : "Timing out…");
       await send({ kind, branch, photo: path, lat: pos?.coords.latitude, lng: pos?.coords.longitude,
-        acc: pos ? Math.round(pos.coords.accuracy) : undefined, taken: taken ?? undefined });
+        acc: pos ? Math.round(pos.coords.accuracy) : undefined,
+        // Screenshots have no camera time: use the file's saved time, so the photos page can flag an old screenshot.
+        taken: taken ?? (screenshot && f.lastModified ? new Date(f.lastModified).toISOString() : undefined) });
     } catch (e) {
       // Shown in full so a screenshot tells us exactly which step failed.
       setRes({ error: step === "upload" ? `Could not upload the photo. Check your internet and try again. (${why(e)})`
@@ -122,6 +129,7 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
     } finally {
       setBusy(null);
       if (file.current) file.current.value = "";
+      if (shot.current) shot.current.value = "";
     }
   }
 
@@ -138,10 +146,16 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
       <button className={`clock-btn ${isIn ? "out" : ""}`} disabled={!!busy || !branch} onClick={() => file.current?.click()}>
         {busy ?? (isIn ? "Time out" : "Time in")}
       </button>
+      {online && <>
+        <input ref={shot} type="file" accept="image/*" hidden onChange={(e) => onPhoto(e.target.files?.[0], true)} />
+        <button type="button" className="secondary" disabled={!!busy || !branch} onClick={() => shot.current?.click()}>
+          {isIn ? "Time out" : "Time in"} with a screenshot
+        </button>
+      </>}
       {/* Example photo (CHRIS, Nov 25): one for CSRs working from home, one for everyone at a clinic. */}
       <img className="time-example" src={online ? "/time-in-csr.svg" : "/time-in-clinic.svg"} alt={online ? "Example: phone photo of the PC clock corner showing time and date" : "Example: phone photo of the clinic clock showing time and date"} />
       <p className="small muted" style={{ margin: 0 }}>{online
-        ? "Working from home: take a photo of your PC's clock showing the date and time (bottom corner of the screen). The server time is saved with it."
+        ? "Working from home: take a photo of your PC's clock showing the date and time (bottom corner of the screen), or upload a screenshot of your screen where the clock and date show. The server time is saved with it."
         : "Take a photo of the clinic clock showing the date and time. The server time and your location are saved with it."}</p>
       {busy === "Getting your location…" && <div className="notice info">If your phone asks, tap Allow for location. This takes up to 15 seconds.</div>}
       {res?.error && <div className="notice error">{res.error}{reload && <> <button className="secondary small" onClick={() => window.location.reload()}>Reload</button></>}</div>}
