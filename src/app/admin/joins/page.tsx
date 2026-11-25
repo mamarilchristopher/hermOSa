@@ -3,6 +3,7 @@ import { requireAccess, can } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { rejectJoin } from "../users/actions";
 import { ApproveForm, GM_LEVELS } from "../users/JoinForms";
+import { Uid } from "@/components/Uid";
 
 /** Join requests for the General Manager (company-wide manager). Owners use Users and roles. */
 export default async function JoinsPage() {
@@ -10,7 +11,7 @@ export default async function JoinsPage() {
   const owner = can(access, ["OWNER"], null);
   if (owner) redirect("/admin/users");
   if (!can(access, ["MANAGER"], null)) redirect("/");
-  const { data } = await supabase.from("app_users").select("id, display_name, email, requested_branch_id, joined_at")
+  const { data } = await supabase.from("app_users").select("id, uid, display_name, email, requested_branch_id, joined_at")
     .eq("join_status", "PENDING").order("joined_at");
   const waiting = data ?? [];
   const clinics = branches.filter((b) => b.kind === "CLINIC").map((b) => ({ id: b.id, name: b.name }));
@@ -31,7 +32,7 @@ export default async function JoinsPage() {
           {waiting.map((u) => (
             <div key={u.id} className="join-request">
               <div className="join-who">
-                <strong>{u.display_name}</strong>
+                <strong>{u.display_name}<Uid v={u.uid} /></strong>
                 <span className="small muted">{u.email} · registered {new Date(u.joined_at).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" })}
                   {u.requested_branch_id && ` · says ${branchName[u.requested_branch_id] ?? "a branch"}`}</span>
               </div>

@@ -17,6 +17,7 @@ import { addDays, sortBranches } from "@/lib/insights";
 import { missingRequired, type Details } from "@/lib/employeeDetails";
 import { firstName, times, tracker, type NteList } from "@/lib/nte";
 import { NteExplainForm } from "../nte/Forms";
+import { Uid } from "@/components/Uid";
 
 type Signoffs = { to_sign: { count: number; oldest: string | null }; mine: { count: number; oldest: string | null } };
 type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: string }[]; days?: StatusDay[];
@@ -85,8 +86,8 @@ export default async function Me() {
   const today = manilaToday();
   const start = monthStart(today), ym = today.slice(0, 7);
   const [{ data: emp }, { data: user }, { data: subs }, { data: noticeData }] = await Promise.all([
-    supabase.from("employees").select("id, full_name, branch_id, position, commission_eligible, active").eq("app_user_id", access.user_id).maybeSingle(),
-    supabase.from("app_users").select("email, joined_at").eq("id", access.user_id).maybeSingle(),
+    supabase.from("employees").select("id, uid, full_name, branch_id, position, commission_eligible, active").eq("app_user_id", access.user_id).maybeSingle(),
+    supabase.from("app_users").select("uid, email, joined_at").eq("id", access.user_id).maybeSingle(),
     supabase.from("employee_detail_submissions").select("state, note, data").eq("user_id", access.user_id).neq("state", "SUPERSEDED")
       .order("submitted_at", { ascending: false }).limit(1),
     supabase.from("notifications").select("id, title, body, link, created_at, read_at").order("created_at", { ascending: false }).limit(15),
@@ -196,7 +197,7 @@ export default async function Me() {
               <ul className="plain-list">
                 {tardy.slice(0, 8).map((r) => (
                   <li key={r.employee_id} className={r.due ? "ir-due" : undefined}>
-                    <span><strong>{firstName(r.name)}</strong> has been issued Late NTEs <strong>{times(r.count)}</strong> this month
+                    <span><strong>{firstName(r.name)}</strong><Uid v={r.uid} /> has been issued Late NTEs <strong>{times(r.count)}</strong> this month
                       {r.open > 0 && <span className="small muted"> · {r.open} not explained yet</span>}
                       {r.due && <><br /><span className="small ir-due-tag">IR suggested: {r.due}</span></>}</span>
                     <Link className="button secondary small" href={`/nte/staff/${r.employee_id}`}>Open</Link>
@@ -264,6 +265,7 @@ export default async function Me() {
             <dt>Commission</dt><dd>{emp ? (emp.commission_eligible ? "Yes, 5% of amount paid" : "No") : isOwner ? "No" : "Not set yet"}</dd>
             <dt>App access</dt><dd>{scope.join("; ") || "None yet"}</dd>
             <dt>Login email</dt><dd>{user?.email ?? ""}</dd>
+            <dt>UID</dt><dd>{emp?.uid ? <>Staff record <code className="uid" style={{ marginLeft: 0 }}>{emp.uid}</code> · </> : ""}Login account <code className="uid" style={{ marginLeft: 0 }}>{user?.uid ?? ""}</code></dd>
             {user?.joined_at && <><dt>Joined the app</dt><dd>{user.joined_at.slice(0, 10)}</dd></>}
           </dl>
           <p className="small muted" style={{ marginBottom: 0 }}>

@@ -7,9 +7,10 @@ import { cutoffEnd, dayLabel } from "@/lib/homeGlance";
 import { branchShort, timeLabel } from "@/lib/schedule";
 import { BranchLocation, TimeClock } from "./Clock";
 import { NteExplainForm } from "../nte/Forms";
+import { Uid } from "@/components/Uid";
 
 type Punch = { kind: "IN" | "OUT"; punched_at: string; branch_id: string };
-type Att = { employee_id: string; name: string; scheduled: number; present: number; absent: number; late_days: number; late_min: number };
+type Att = { employee_id: string; name: string; uid?: string; scheduled: number; present: number; absent: number; late_days: number; late_min: number };
 const clock = (ts: string) => new Date(ts).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" });
 const nowHm = () => new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" });
 
@@ -103,7 +104,7 @@ export default async function TimePage() {
                     <tbody>
                       {attendance.map((a) => (
                         <tr key={a.employee_id}>
-                          <td>{a.name}</td><td>{a.scheduled}</td><td>{a.present}</td>
+                          <td>{a.name}<Uid v={a.uid} /></td><td>{a.scheduled}</td><td>{a.present}</td>
                           <td className={a.absent ? "late" : ""}>{a.absent}</td>
                           <td className={a.late_days ? "late" : ""}>{a.late_days}</td>
                           <td>{a.late_min ? `${a.late_min} min` : "–"}</td>

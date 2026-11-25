@@ -1,6 +1,6 @@
-/** Late NTE (Notice to Explain): one per late time-in, past the grace period (update-0029). */
+/** Late NTE (Notice to Explain): one per late time-in, past the grace period (update-0030). */
 export type Nte = {
-  id: string; nte_no: number; employee_id: string; name: string; position: string | null; branch: string | null;
+  id: string; nte_no: number; employee_id: string; name: string; uid?: string; position: string | null; branch: string | null;
   work_date: string; shift_start: string; time_in: string; late_minutes: number;
   state: "OPEN" | "EXPLAINED" | "VOID"; explanation: string | null; explained_at: string | null; void_reason: string | null;
   ir_id: string | null; mine: boolean; can_manage: boolean;
@@ -17,14 +17,14 @@ export function irReason(count: number, minutes: number, limit = IR_MINUTES_DEFA
   return null;
 }
 
-export type TrackerRow = { employee_id: string; name: string; position: string | null; count: number; minutes: number; open: number; notInIr: number; due: string | null };
+export type TrackerRow = { employee_id: string; name: string; uid?: string; position: string | null; count: number; minutes: number; open: number; notInIr: number; due: string | null };
 
 /** Per person for the month: Late NTEs (voided ones don't count), most first; `due` says why an IR is suggested. */
 export function tracker(ntes: Nte[], limit = IR_MINUTES_DEFAULT): TrackerRow[] {
   const by = new Map<string, TrackerRow>();
   for (const n of ntes) {
     if (n.state === "VOID" || !n.can_manage) continue;
-    const r = by.get(n.employee_id) ?? { employee_id: n.employee_id, name: n.name, position: n.position, count: 0, minutes: 0, open: 0, notInIr: 0, due: null };
+    const r = by.get(n.employee_id) ?? { employee_id: n.employee_id, name: n.name, uid: n.uid, position: n.position, count: 0, minutes: 0, open: 0, notInIr: 0, due: null };
     r.count += 1; r.minutes += n.late_minutes;
     if (n.state === "OPEN") r.open += 1;
     if (!n.ir_id) r.notInIr += 1;

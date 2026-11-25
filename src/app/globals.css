@@ -730,7 +730,7 @@ table.sheet .none { color: #d6cabd; }
 .build-note { text-align: center; font-size: 0.72rem; color: var(--muted); padding: 18px 16px 28px; }
 @media print { .build-note { display: none; } }
 
-/* Late NTEs (update-0029) */
+/* Late NTEs (update-0030) */
 .nte-urgent { border: 1px solid var(--bad); box-shadow: 0 0 0 3px var(--bad-bg), var(--shadow); }
 .nte-urgent h2 { color: var(--bad); display: flex; align-items: center; gap: 8px; }
 .nte-box { display: grid; gap: 10px; padding-top: 12px; }
@@ -743,3 +743,8 @@ table.sheet .none { color: #d6cabd; }
 .plain-list li.ir-due { background: var(--gold-soft); border-radius: var(--radius-sm); padding: 10px 12px; }
 .ir-due-tag { font-weight: 700; color: var(--ink); }
 .ir-days tr.ir-nte-why td { font-size: 0.82rem; color: var(--ink-2); font-style: italic; border-top: 0; }
+
+/* Record UIDs (update-0029) */
+.uid { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.74rem; font-weight: 600; letter-spacing: 0.02em;
+  color: var(--ink-2); background: var(--pearl); border: 1px solid var(--line-strong); border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; user-select: all; white-space: nowrap; }
+h1 .uid { font-size: 0.9rem; }

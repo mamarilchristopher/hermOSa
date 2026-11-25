@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireAccess, can, canApprove } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
+import { Uid } from "@/components/Uid";
 
 /** Owner or GM: employee details waiting for approval. */
 export default async function DetailsQueue({ searchParams }: { searchParams: Promise<{ done?: string; returned?: string }> }) {
@@ -12,7 +13,7 @@ export default async function DetailsQueue({ searchParams }: { searchParams: Pro
   const [{ data: subs }, { data: users }, { data: emps }] = await Promise.all([
     supabase.from("employee_detail_submissions").select("id, user_id, state, submitted_at, decided_at").neq("state", "SUPERSEDED")
       .order("submitted_at", { ascending: false }).limit(200),
-    supabase.from("app_users").select("id, display_name, email, join_status, active"),
+    supabase.from("app_users").select("id, uid, display_name, email, join_status, active"),
     supabase.from("employees").select("id, app_user_id, active, employee_details(approved_at)"),
   ]);
   const name = Object.fromEntries((users ?? []).map((u) => [u.id, u]));
@@ -48,7 +49,7 @@ export default async function DetailsQueue({ searchParams }: { searchParams: Pro
         {dupes > 0 && (
           <div className="notice error">
             {dupes === 1 ? "One name appears" : `${dupes} names appear`} more than once below. That usually means the person registered twice with different emails.
-            Check the emails, then turn off the extra account on {owner ? <Link href="/admin/users">Users and roles</Link> : "Users and roles (ask an owner)"}.
+            Check the emails and UIDs, then turn off the extra account on {owner ? <Link href="/admin/users">Users and roles</Link> : "Users and roles (ask an owner)"}.
           </div>
         )}
         <div className="card">
@@ -57,7 +58,7 @@ export default async function DetailsQueue({ searchParams }: { searchParams: Pro
           <ul className="plain-list">
             {waiting.map((s) => (
               <li key={s.id}>
-                <span><strong>{name[s.user_id]?.display_name ?? "Someone"}</strong> <span className="small muted">sent {day(s.submitted_at)}{dupe(s.user_id) && ` · ${name[s.user_id]?.email}`}{name[s.user_id]?.join_status === "PENDING" && " · join request not approved yet"}</span></span>
+                <span><strong>{name[s.user_id]?.display_name ?? "Someone"}</strong><Uid v={name[s.user_id]?.uid} /> <span className="small muted">sent {day(s.submitted_at)}{dupe(s.user_id) && ` · ${name[s.user_id]?.email}`}{name[s.user_id]?.join_status === "PENDING" && " · join request not approved yet"}</span></span>
                 {s.user_id === access.user_id && !owner
                   ? <span className="small muted">Yours: an owner approves it</span>
                   : <Link className="button small" href={`/admin/details/${s.id}`}>Review</Link>}
@@ -69,7 +70,7 @@ export default async function DetailsQueue({ searchParams }: { searchParams: Pro
           <div className="card">
             <h2>Haven't sent details yet ({missing.length})</h2>
             <p className="small muted">Remind them to open Home, then "My employee details".</p>
-            <ul className="plain-list">{missing.map((e) => <li key={e.id}><span>{name[e.app_user_id!]?.display_name ?? "Staff"}{dupe(e.app_user_id!) && <span className="small muted"> · {name[e.app_user_id!]?.email}</span>}</span></li>)}</ul>
+            <ul className="plain-list">{missing.map((e) => <li key={e.id}><span>{name[e.app_user_id!]?.display_name ?? "Staff"}<Uid v={name[e.app_user_id!]?.uid} />{dupe(e.app_user_id!) && <span className="small muted"> · {name[e.app_user_id!]?.email}</span>}</span></li>)}</ul>
           </div>
         )}
         {latestDone.size > 0 && (
@@ -77,7 +78,7 @@ export default async function DetailsQueue({ searchParams }: { searchParams: Pro
             <h2>Recently decided</h2>
             <ul className="plain-list">
               {[...latestDone.entries()].slice(0, 20).map(([u, s]) => (
-                <li key={u}><span>{name[u]?.display_name ?? "Staff"}</span>
+                <li key={u}><span>{name[u]?.display_name ?? "Staff"}<Uid v={name[u]?.uid} /></span>
                   <span className={`pill ${s.state === "APPROVED" ? "PUBLISHED" : "REVERSED"}`}>{s.state === "APPROVED" ? "Approved" : "Sent back"}</span>
                   {s.decided_at && <span className="small muted">{day(s.decided_at)}</span>}</li>
               ))}

@@ -7,6 +7,7 @@ import { dayLabel } from "@/lib/homeGlance";
 import { timeLabel } from "@/lib/schedule";
 import { firstName, times, tracker, type NteList } from "@/lib/nte";
 import { NteExplainForm } from "./Forms";
+import { Uid } from "@/components/Uid";
 
 const shiftMonth = (ym: string, n: number) => {
   const d = new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1 + n, 1));
@@ -22,7 +23,7 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
   const { data, error } = await supabase.rpc("late_nte_list", { p_month: `${ym}-01`, p_employee: null });
   if (error) {
     return (<><TopBar access={access} /><main><h1>Late NTEs</h1>
-      <div className="notice info">{error.code === "PGRST202" ? "The owner needs to run update-0029 in Supabase first." : "Could not load. Try again."}</div></main></>);
+      <div className="notice info">{error.code === "PGRST202" ? "The owner needs to run update-0030 in Supabase first." : "Could not load. Try again."}</div></main></>);
   }
   const list = data as NteList;
   const mine = list.ntes.filter((n) => n.mine);
@@ -50,7 +51,7 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
               <ul className="plain-list">
                 {rows.map((r) => (
                   <li key={r.employee_id} className={r.due ? "ir-due" : undefined}>
-                    <span><strong>{r.name}</strong> has been issued Late NTEs <strong>{times(r.count)}</strong> this month
+                    <span><strong>{r.name}</strong><Uid v={r.uid} /> has been issued Late NTEs <strong>{times(r.count)}</strong> this month
                       <br /><span className="small muted">{r.minutes} minutes late in total{r.open ? ` · ${r.open} not explained yet` : ""}{r.notInIr && r.notInIr < r.count ? ` · ${r.count - r.notInIr} already in an IR` : r.notInIr === 0 ? " · all in an IR" : ""}</span>
                       {r.due && <><br /><span className="small ir-due-tag">IR suggested: {r.due}</span></>}</span>
                     <Link className="button secondary small" href={`/nte/staff/${r.employee_id}?month=${ym}`}>Open</Link>

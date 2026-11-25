@@ -1,4 +1,4 @@
--- HERMOSA OS 0029: Late NTEs (Notice to Explain) and IRs issued from them (owner request 2026-11-25). Safe to run more than once.
+-- HERMOSA OS 0030: Late NTEs (Notice to Explain) and IRs issued from them (owner request 2026-11-25). Safe to run more than once.
 -- * Grace period 15 minutes: a time-in more than 15 minutes after the shift start is late.
 -- * Every late time-in creates a Late NTE right away. The employee must type their explanation (urgent on their Home).
 -- * Owners and the GM see a tardiness tracker: Late NTEs per person this month.
@@ -117,7 +117,7 @@ CREATE OR REPLACE FUNCTION public.late_nte_list(p_month date, p_employee uuid) R
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
   WITH m AS (SELECT date_trunc('month', coalesce(p_month, (now() AT TIME ZONE 'Asia/Manila')::date))::date AS s),
   n AS (
-    SELECT x.*, e.full_name, e.position, b.name AS branch,
+    SELECT x.*, e.full_name, e.uid, e.position, b.name AS branch,
            x.employee_id = private.my_employee_id() AS mine,
            private.can_schedule(x.employee_id) AND x.employee_id IS DISTINCT FROM private.my_employee_id() AS can_manage
     FROM public.late_ntes x JOIN public.employees e ON e.id = x.employee_id LEFT JOIN public.branches b ON b.id = x.branch_id, m
@@ -129,7 +129,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
   SELECT jsonb_build_object('month', (SELECT s FROM m),
     'grace', (SELECT late_grace_minutes FROM public.organizations WHERE id = private.current_org_id()),
     'ir_minutes', (SELECT ir_late_minutes FROM public.organizations WHERE id = private.current_org_id()),
-    'ntes', coalesce((SELECT jsonb_agg(jsonb_build_object('id', id, 'nte_no', nte_no, 'employee_id', employee_id, 'name', full_name, 'position', position,
+    'ntes', coalesce((SELECT jsonb_agg(jsonb_build_object('id', id, 'nte_no', nte_no, 'employee_id', employee_id, 'name', full_name, 'uid', uid, 'position', position,
       'branch', branch, 'work_date', work_date, 'shift_start', to_char(shift_start, 'HH24:MI'), 'time_in', to_char(time_in AT TIME ZONE 'Asia/Manila', 'HH24:MI'),
       'late_minutes', late_minutes, 'state', state, 'explanation', explanation, 'explained_at', explained_at, 'void_reason', void_reason,
       'ir_id', ir_id, 'mine', mine, 'can_manage', can_manage) ORDER BY work_date DESC, nte_no DESC) FROM n), '[]'::jsonb))

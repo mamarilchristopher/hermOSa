@@ -9,6 +9,7 @@ import { dayLabel } from "@/lib/homeGlance";
 import { timeLabel } from "@/lib/schedule";
 import { firstName, irReason, IR_MINUTES_DEFAULT, IR_NTE_COUNT, nteCount, type NteList } from "@/lib/nte";
 import { IssueLateIrForm, VoidNteForm } from "../../Forms";
+import { Uid } from "@/components/Uid";
 
 const STATE: Record<string, { label: string; cls: string }> = {
   OPEN: { label: "Waiting for explanation", cls: "STAGED" },
@@ -26,7 +27,7 @@ export default async function StaffNtePage({ params, searchParams }: { params: P
   const ym = /^\d{4}-\d{2}$/.test(sp.month ?? "") && sp.month! <= thisMonth ? sp.month! : thisMonth;
   const [{ data }, { data: emp }] = await Promise.all([
     supabase.rpc("late_nte_list", { p_month: `${ym}-01`, p_employee: id }),
-    supabase.from("employees").select("full_name, position").eq("id", id).maybeSingle(),
+    supabase.from("employees").select("uid, full_name, position").eq("id", id).maybeSingle(),
   ]);
   const list = data as NteList | null;
   if (!list || !emp) notFound();
@@ -46,7 +47,7 @@ export default async function StaffNtePage({ params, searchParams }: { params: P
       <TopBar access={access} />
       <main>
         <p><Link href={`/nte?month=${ym}`} className="small">← Tardiness tracker</Link></p>
-        <h1>{emp.full_name}</h1>
+        <h1>{emp.full_name} <Uid v={emp.uid} /></h1>
         <p className="muted small">{emp.position ?? "Staff"} · Late NTEs, {monthLabel(ym)}</p>
 
         {counted.length > 0 && (

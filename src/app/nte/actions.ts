@@ -14,7 +14,7 @@ const MORE: Record<string, string> = {
 };
 const text = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 const msg = (code: string | undefined) => (code && MORE[code]) || errorText(code);
-const NEEDS_SQL = "The owner needs to run update-0029 in Supabase first.";
+const NEEDS_SQL = "The owner needs to run update-0030 in Supabase first.";
 
 function refresh() { revalidatePath("/nte"); revalidatePath("/me"); revalidatePath("/time"); revalidatePath("/incidents"); }
 

@@ -1,7 +1,8 @@
+import { Uid } from "./Uid";
 import { timeLabel } from "@/lib/schedule";
 
 export type DutyRow = {
-  employee_id: string; name: string; position: string | null; branch_id: string | null; off: boolean; leave?: string | null;
+  employee_id: string; name: string; uid?: string; position: string | null; branch_id: string | null; off: boolean; leave?: string | null;
   start: string | null; end: string | null; note: string | null;
   time_in: string | null; time_out: string | null; in_photo: string | null; in_distance_m: number | null; late_min: number | null;
 };
@@ -31,7 +32,7 @@ export function OnDutyList({ rows, branches, photos, nowHm, compact }: {
                   <li key={r.employee_id}>
                     {photo ? <a href={photo} target="_blank" rel="noreferrer"><img className="duty-photo" src={photo} alt={`${r.name} time-in photo`} /></a>
                       : <span className="duty-photo none">{r.time_in ? "" : "–"}</span>}
-                    <span><strong>{r.name}</strong>
+                    <span><strong>{r.name}</strong><Uid v={r.uid} />
                       <span className="small muted"> · {r.start ? `${timeLabel(r.start)}–${timeLabel(r.end)}` : r.note}</span>
                       {!compact && r.in_distance_m != null && r.in_distance_m > 300 && <span className="small late"> · {r.in_distance_m >= 1000 ? `${(r.in_distance_m / 1000).toFixed(1)} km` : `${r.in_distance_m} m`} from branch</span>}
                     </span>

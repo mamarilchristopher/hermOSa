@@ -34,7 +34,7 @@ export async function acknowledgeIr(_p: ActionState, fd: FormData): Promise<Acti
   if (t.length < 3) return { error: "Write your response first." };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("acknowledge_ir", { p_id: id.data, p_text: t });
-  if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0029 in Supabase first." : "Could not send. Try again." };
+  if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0030 in Supabase first." : "Could not send. Try again." };
   if (!data?.ok) return { error: errorText(data?.error) };
   revalidatePath("/incidents"); revalidatePath(`/incidents/${id.data}`); revalidatePath("/me");
   return { ok: "Acknowledged. Your manager will review your response.", at: Date.now() };
