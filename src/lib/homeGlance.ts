@@ -20,6 +20,8 @@ export type BranchGlance = {
   /** Yesterday vs this branch's daily average this month (before yesterday), as a fraction. null when not comparable. */
   vsAvg: number | null;
   today: number | null;
+  /** Today's cell as entered so far (sales, zero, closed, waiting or empty). */
+  todayCell: DayCell;
   mtd: number;
   /** Same days last month (1st to the same day number). */
   lastSame: number;
@@ -89,7 +91,7 @@ export function computeGlance(today: string, branches: GlanceBranch[], days: Sta
     return {
       id: b.id, name: b.name, yesterday: y,
       vsAvg: yv !== null && before ? pct(yv, before) : null,
-      today: t.kind === "sales" ? t.cents : null,
+      today: t.kind === "sales" ? t.cents : null, todayCell: t,
       mtd, lastSame, change: pct(mtd, lastSame), avg: counted ? Math.round(mtd / counted) : null,
       emptyDays,
     };

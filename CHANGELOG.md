@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.44.1 | Nov 25, 2026 | none | Management Home: "Today so far" is now the top card, with today's total sales entered and each branch's amount (or "Not entered yet", Zero sales, Closed) |
 | 0.44.0 | Nov 25, 2026 | update-0044 | Irregular days: on the Time clock's On duty card, owners and the GM can mark one person's day, or the whole day for everyone, as irregular (Maintenance, Emergency, or Other with a typed reason). That day's lateness is ignored: no late minutes on On duty, not counted in cutoff lateness or IR counts, no new Late NTE, and open Late NTEs for it are cancelled (ones already turned into an IR stay). Undo puts the lateness back (cancelled NTEs stay cancelled) |
 | 0.43.0 | Nov 25, 2026 | update-0043 | Schedule shows nicknames (or first names, skipping "Ma."), set per person on their Employees page; current staff nicknames from the owner's sheet loaded by the setup file; the schedule is for CMAs only (Senior CMA, CMA, Trainee; no CSRs, GM or owners); WFH and switched-off branches are no longer columns; the Test branch is switched off |
 | 0.42.1 | Nov 25, 2026 | none | Schedule check: when someone has fewer working days than usual it now says "<name> only has 5 working days this week. Confirm?" (absences and leave count as scheduled days), instead of assuming a mistake |

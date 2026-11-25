@@ -44,8 +44,26 @@ export function TodoCard({ todos }: { todos: Todo[] }) {
 export function ManagerHome({ g, todos, duty, branches }: { g: Glance; todos: Todo[]; duty: DutyRow[] | null; branches: { id: string; name: string }[] }) {
   const ym = g.today.slice(0, 7);
   const hm = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" });
+  const entered = g.branches.filter((b) => b.todayCell.kind !== "empty").length;
   return (
     <>
+      {/* CHRIS (Nov 25): today's sales logged so far is the top view for management. */}
+      <div className="card">
+        <div className="card-head">
+          <h2>Today so far, {dayLabel(g.today)}</h2>
+          <Link className="small" href="/sales/daily">Daily Sales →</Link>
+        </div>
+        <div className="glance-total"><strong>{php(g.todaySoFar)}</strong><span className="muted small">{entered} of {g.branches.length} branches entered</span></div>
+        <div className="glance-branches">
+          {g.branches.map((b) => (
+            <div key={b.id} className={`glance-branch ${b.todayCell.kind === "empty" ? "missing" : ""}`}>
+              <span className="small muted">{b.name}</span>
+              <strong>{b.todayCell.kind === "empty" ? <span className="muted">Not entered yet</span> : <Cell c={b.todayCell} />}</strong>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <TodoCard todos={todos} />
 
       {duty && (
@@ -74,7 +92,6 @@ export function ManagerHome({ g, todos, duty, branches }: { g: Glance; todos: To
               </div>
             ))}
           </div>
-          {g.todaySoFar > 0 && <p className="small muted" style={{ marginBottom: 0 }}>Today so far: {php(g.todaySoFar)} entered.</p>}
         </div>
       )}
 
