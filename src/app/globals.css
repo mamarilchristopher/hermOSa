@@ -1145,10 +1145,20 @@ main.chat-main { --page: 1280px; padding-top: 20px; padding-bottom: 20px; }
 .chat-emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; max-height: 220px; overflow-y: auto; }
 .chat-emoji-grid button { min-height: 0; margin: 0; padding: 5px 0; border: 0; background: transparent; box-shadow: none; font-size: 1.35rem; line-height: 1.2; border-radius: 8px; }
 .chat-emoji-grid button:hover { background: var(--gold-soft); }
-.chat-gifs { width: min(420px, calc(100vw - 24px)); }
-.chat-gif-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; max-height: 300px; overflow-y: auto; }
-.chat-gif-grid button { min-height: 0; margin: 0; padding: 0; border: 0; background: var(--pearl); box-shadow: none; border-radius: 8px; overflow: hidden; aspect-ratio: 1; }
-.chat-gif-grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* GIF sheet (v0.54.1, Messenger-style): search + Done, trending first, 3 masonry columns keeping each GIF's shape. */
+.chat-gifs { width: min(440px, calc(100vw - 24px)); padding: 0; display: flex; flex-direction: column; height: min(460px, 70vh); overflow: hidden; }
+.chat-gif-backdrop { display: none; }
+.chat-gif-handle { display: none; }
+.chat-gif-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px 8px; }
+.chat-gif-search { flex: 1; display: flex; align-items: center; gap: 6px; background: var(--cream); border-radius: 999px; padding: 0 12px; min-height: 38px; }
+.chat-gif-search input { flex: 1; min-width: 0; border: 0; background: transparent; box-shadow: none; padding: 6px 0; min-height: 0; outline: none; }
+.chat-gif-done { min-height: 0; padding: 6px 4px; border: 0; background: none; box-shadow: none; color: var(--brown); font-weight: 700; }
+.chat-gif-scroll { flex: 1; overflow-y: auto; padding: 0 8px 8px; overscroll-behavior: contain; }
+.chat-gif-masonry { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; align-items: start; }
+.chat-gif-col { display: grid; gap: 4px; }
+.chat-gif-col button { min-height: 0; margin: 0; padding: 0; border: 0; background: var(--cream); box-shadow: none; border-radius: 6px; overflow: hidden; display: block; width: 100%; }
+.chat-gif-col img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.chat-gif-wait { text-align: center; padding: 20px 0; }
 .chat-giphy { margin: 6px 0 0; text-align: right; font-size: 0.68rem; }
 .chat-compose .chat-gif-btn { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; }
 .chat-compose .chat-emoji-btn { font-size: 1.2rem; }
@@ -1159,7 +1169,11 @@ main.chat-main { --page: 1280px; padding-top: 20px; padding-bottom: 20px; }
 .chat-deleted-label { font-size: 0.68rem; font-style: normal; font-weight: 700; color: #a3412f; text-transform: uppercase; letter-spacing: 0.04em; }
 @media (max-width: 900px) {
   .chat-compose .icon-btn { width: 36px; }
-  .chat-emoji.composer, .chat-gifs { left: 8px; right: 8px; width: auto; }
+  .chat-emoji.composer { left: 8px; right: 8px; width: auto; }
+  .chat-gif-backdrop { display: block; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 60; }
+  .chat-gifs { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: auto; height: 72vh; z-index: 61; border-radius: 16px 16px 0 0; border-bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom); }
+  .chat-gif-handle { display: block; width: 40px; height: 4px; border-radius: 999px; background: var(--line-strong); margin: 8px auto 0; }
 }
 .view-notices { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .view-notices li { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 0; border-top: 1px solid var(--line); }

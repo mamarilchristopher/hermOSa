@@ -18,7 +18,7 @@ type RoomInfo = { id: string; kind: "DM" | "GROUP"; auto: boolean; name: string;
 type Msg = { id: string; room_id: string; sender_id: string; body: string | null; photo_path: string | null; gif_url: string | null; from_management?: boolean; mentions?: string[]; mention_all?: boolean; created_at: string; deleted_at: string | null };
 type Reaction = { message_id: string; user_id: string; emoji: string };
 type Deleted = { message_id: string; body: string | null; photo_path: string | null; gif_url: string | null };
-type Gif = { id: string; title: string; preview: string; url: string };
+type Gif = { id: string; title: string; preview: string; url: string; w?: number; h?: number };
 
 /** Quick reactions, and the emoji picker (v0.52). */
 const QUICK = ["❤️", "👍", "😂", "😮", "😢", "🙏"];
@@ -522,37 +522,75 @@ function EmojiGrid({ onPick, onClose, composer = false }: { onPick: (e: string) 
   );
 }
 
-function GifPicker({ onPick, onClose }: { onPick: (url: string) => void; onClose: () => void }) {
+export function GifPicker({ onPick, onClose }: { onPick: (url: string) => void; onClose: () => void }) {
+  // Messenger-style sheet (CHRIS Nov 26): search + Done on top, trending first, 3 masonry columns in each GIF's own shape.
   const [q, setQ] = useState("");
   const [gifs, setGifs] = useState<Gif[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [more, setMore] = useState(true);
+  const loading = useRef(false);
+  const load = async (query: string, offset: number) => {
+    if (loading.current) return;
+    loading.current = true;
+    try {
+      const res = await fetch(`/api/gif?q=${encodeURIComponent(query.trim())}&offset=${offset}`);
+      const body = (await res.json()) as { ok: boolean; error?: string; gifs?: Gif[] };
+      if (!body.ok) { setErr(body.error === "NO_KEY" ? "GIFs turn on once the owner adds the GIPHY key." : "GIFs aren't loading right now. Try again."); setGifs((g) => g ?? []); return; }
+      const got = body.gifs ?? [];
+      setErr(null); setMore(got.length > 0);
+      setGifs((g) => { const list = offset ? [...(g ?? []), ...got] : got; return list.filter((x, k) => list.findIndex((y) => y.id === x.id) === k); });
+    } catch { setErr("GIFs aren't loading right now. Try again."); setGifs((g) => g ?? []); }
+    finally { loading.current = false; }
+  };
   useEffect(() => {
     let gone = false;
-    const t = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/gif?q=${encodeURIComponent(q.trim())}`);
-        const body = (await res.json()) as { ok: boolean; error?: string; gifs?: Gif[] };
-        if (gone) return;
-        if (!body.ok) { setErr(body.error === "NO_KEY" ? "GIFs turn on once the owner adds the GIPHY key." : "GIFs aren't loading right now. Try again."); setGifs([]); return; }
-        setErr(null); setGifs(body.gifs ?? []);
-      } catch { if (!gone) { setErr("GIFs aren't loading right now. Try again."); setGifs([]); } }
-    }, q ? 350 : 0);
+    const t = setTimeout(() => { if (!gone) { setGifs(null); void load(q, 0); } }, q ? 350 : 0);
     return () => { gone = true; clearTimeout(t); };
   }, [q]);
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [onClose]);
+  // Three columns, each GIF added to the shortest one so the grid stays even.
+  const cols: Gif[][] = [[], [], []];
+  const heights = [0, 0, 0];
+  for (const g of gifs ?? []) { const c = heights.indexOf(Math.min(...heights)); cols[c].push(g); heights[c] += (g.h || 200) / (g.w || 200); }
   return (
-    <div className="chat-pop chat-gifs" role="dialog" aria-label="GIFs">
-      <div className="chat-pop-head">
-        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search GIFs" aria-label="Search GIFs" autoFocus />
-        <button type="button" className="link-like small" onClick={onClose}>Close</button>
+    <>
+      <div className="chat-gif-backdrop" onClick={onClose} aria-hidden />
+      <div className="chat-pop chat-gifs" role="dialog" aria-label="GIFs">
+        <div className="chat-gif-handle" aria-hidden />
+        <div className="chat-gif-head">
+          <label className="chat-gif-search">
+            <span aria-hidden>🔍</span>
+            <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search GIPHY" aria-label="Search GIFs" autoFocus={typeof window !== "undefined" && window.innerWidth > 900} />
+          </label>
+          <button type="button" className="chat-gif-done" onClick={onClose}>Done</button>
+        </div>
+        <div className="chat-gif-scroll" onScroll={(e) => {
+          const el = e.currentTarget;
+          if (more && gifs?.length && el.scrollTop + el.clientHeight > el.scrollHeight - 300) void load(q, gifs.length);
+        }}>
+          {err && <p className="small muted">{err}</p>}
+          {gifs === null && <p className="small muted chat-gif-wait">Loading…</p>}
+          {gifs && gifs.length === 0 && !err && <p className="small muted chat-gif-wait">No GIFs found. Try another word.</p>}
+          <div className="chat-gif-masonry">
+            {cols.map((col, c) => (
+              <div key={c} className="chat-gif-col">
+                {col.map((g) => (
+                  <button key={g.id} type="button" onClick={() => onPick(g.url)} title={g.title} style={{ aspectRatio: `${g.w || 200} / ${g.h || 200}` }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={g.preview} alt={g.title} loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+          <p className="chat-giphy small muted">Powered by GIPHY</p>
+        </div>
       </div>
-      {err && <p className="small muted">{err}</p>}
-      {gifs === null && <p className="small muted">Loading…</p>}
-      <div className="chat-gif-grid">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {(gifs ?? []).map((g) => <button key={g.id} type="button" onClick={() => onPick(g.url)} title={g.title}><img src={g.preview} alt={g.title} loading="lazy" /></button>)}
-      </div>
-      <p className="chat-giphy small muted">Powered by GIPHY</p>
-    </div>
+    </>
   );
 }
 
