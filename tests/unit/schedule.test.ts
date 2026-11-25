@@ -24,6 +24,10 @@ describe("short names", () => {
     expect(shortNames([{ id: "a", name: "Ana Cruz" }, { id: "b", name: "Bea Reyes" }, { id: "c", name: "Ana Lopez" }]))
       .toEqual({ a: "Ana C.", b: "Bea", c: "Ana L." });
   });
+  it("prefers the nickname and skips a Ma. prefix", () => {
+    expect(shortNames([{ id: "a", name: "Ma. Demo Cruz" }, { id: "b", name: "Demoina Reyes", nick: "Dem" }, { id: "c", name: "Ma. Lyn Lopez", nick: "" }]))
+      .toEqual({ a: "Demo", b: "Dem", c: "Lyn" });
+  });
 });
 
 import { parseCoords } from "../../src/lib/schedule";

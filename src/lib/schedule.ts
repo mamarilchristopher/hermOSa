@@ -18,14 +18,16 @@ export function timeLabel(t: string | null | undefined): string {
 /** Short branch tag for grid cells: "QC Main" -> "QC Main", "Sta. Maria Bulacan" -> "Sta. Maria". */
 export const branchShort = (name: string) => name.replace(/\s*\(.*\)$/, "").replace(/ Bulacan$/, "").replace(/^Quezon City /, "QC ");
 
-/** Short names for the by-branch grid, like the owner's sheet: first name, plus a last initial when two share it. */
-export function shortNames(people: { id: string; name: string }[]): Record<string, string> {
-  const first = (n: string) => n.trim().split(/\s+/)[0] ?? n;
+/** Short names for the by-branch grid, like the owner's sheet: the nickname when one is set (update-0043), else the first name
+ *  (skipping "Ma."-style prefixes), plus a last initial when two share it. */
+export function shortNames(people: { id: string; name: string; nick?: string | null }[]): Record<string, string> {
+  const words = (n: string) => n.trim().split(/\s+/).filter((w, i, all) => !(i === 0 && all.length > 1 && /^(ma\.?|ma)$/i.test(w)));
+  const base = (p: { name: string; nick?: string | null }) => (p.nick?.trim() || words(p.name)[0] || p.name);
   const count = new Map<string, number>();
-  for (const p of people) count.set(first(p.name).toLowerCase(), (count.get(first(p.name).toLowerCase()) ?? 0) + 1);
+  for (const p of people) count.set(base(p).toLowerCase(), (count.get(base(p).toLowerCase()) ?? 0) + 1);
   return Object.fromEntries(people.map((p) => {
-    const parts = p.name.trim().split(/\s+/);
-    const f = parts[0] ?? p.name;
+    const parts = words(p.name);
+    const f = base(p);
     return [p.id, (count.get(f.toLowerCase()) ?? 0) > 1 && parts.length > 1 ? `${f} ${parts[parts.length - 1][0]}.` : f];
   }));
 }

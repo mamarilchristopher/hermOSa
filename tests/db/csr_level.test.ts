@@ -49,14 +49,15 @@ describe("CSR level", () => {
     expect(e).toEqual({ branch_id: WFH, position: "CSR", commission_eligible: false });
   });
 
-  it("CSRs are scheduled at WFH, flagged on the schedule, and time in there without a location", async () => {
+  it("CSRs time in at WFH without a location; the schedule is for CMAs only (update-0043)", async () => {
     const emp = (await db.sql("SELECT id FROM public.employees WHERE app_user_id = $1", [csr.appUserId])).rows[0].id;
     const d = today();
     expect((await db.rpc(gm, "aal1", "save_shift", [emp, d, false, WFH, "00:00", "23:59", null])).ok).toBe(true);
     await db.sql("UPDATE public.shifts SET state = 'PUBLISHED' WHERE employee_id = $1 AND work_date = $2", [emp, d]);
     const monday = (await db.sql("SELECT date_trunc('week', $1::date)::date::text AS m", [d])).rows[0].m;
     const w = await db.rpc(gm, "aal1", "week_schedule", [monday]);
-    expect(w.people.find((p: { id: string }) => p.id === emp)).toMatchObject({ csr: true });
+    expect(w.people.find((p: { id: string }) => p.id === emp)).toBeUndefined();
+    expect(w.shifts.find((s: { employee_id: string }) => s.employee_id === emp)).toBeUndefined();
     const photo = `${csr.appUserId}/11111111-1111-4111-8111-111111111111.jpg`;
     const r = await db.rpc(csr, "aal1", "clock_punch", ["IN", WFH, photo, null, null, null]);
     expect(r.ok).toBe(true);

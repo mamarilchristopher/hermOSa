@@ -12,7 +12,7 @@ export type Access = {
   join_status?: "PENDING" | "APPROVED" | "REJECTED";
   grants: { role: Role; branch_id: string | null }[];
 };
-export type Branch = { id: string; code: string; name: string; kind: "CLINIC" | "HQ" | "WFH" };
+export type Branch = { id: string; code: string; name: string; kind: "CLINIC" | "HQ" | "WFH"; active?: boolean };
 
 /**
  * Loads the signed-in user's access for building the UI. Redirects to /login when signed out,
@@ -28,7 +28,7 @@ export async function requireAccess(opts: { allowWithoutMfa?: boolean; allowPend
   // Both reads go out together: each trip to the database counts on every page load.
   const [{ data, error }, { data: branches }, { data: pin }] = await Promise.all([
     supabase.rpc("my_access"),
-    supabase.from("branches").select("id, code, name, kind").order("name"),
+    supabase.from("branches").select("id, code, name, kind, active").order("name"),
     supabase.rpc("my_pin_status"), // errors (before update-0018) mean no PIN step
   ]);
   if (error) throw new Error("Could not load access");

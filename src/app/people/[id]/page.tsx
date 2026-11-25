@@ -9,6 +9,7 @@ import { addMonths, monthEnd, monthLabel } from "@/lib/insights";
 import { ROLE_TEXT } from "@/lib/commission";
 import { EmployeeForm } from "../EmployeeForm";
 import { StartDateForm } from "../StartDateForm";
+import { NicknameForm } from "../NicknameForm";
 import { Reveal } from "@/components/Reveal";
 import { DetailsView } from "@/components/DetailsView";
 import type { Details } from "@/lib/employeeDetails";
@@ -20,7 +21,7 @@ export default async function Employee({ params, searchParams }: { params: Promi
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) notFound();
   const { supabase, access, branches } = await requireAccess();
-  const { data: e } = await supabase.from("employees").select("id, uid, full_name, branch_id, position, commission_eligible, app_user_id, active, hire_date").eq("id", id).maybeSingle();
+  const { data: e } = await supabase.from("employees").select("*").eq("id", id).maybeSingle();
   if (!e) notFound();
   const sp = await searchParams;
   const thisMonth = manilaToday().slice(0, 7);
@@ -108,6 +109,12 @@ export default async function Employee({ params, searchParams }: { params: Promi
               {det ? `approved ${String(det.approved_at).slice(0, 10)} · owners only` : "not sent or not approved yet"}</span></summary>
             {det ? <DetailsView data={det.data as Details} /> : <p className="small muted">They fill these in from their Home page. Review them under Staff details.</p>}
           </details>
+        )}
+        {canEdit && (
+          <div className="card">
+            <h2>Nickname</h2>
+            <NicknameForm id={e.id} nickname={(e as { nickname?: string | null }).nickname ?? null} />
+          </div>
         )}
         {ownerLevel && (
           <div className="card">

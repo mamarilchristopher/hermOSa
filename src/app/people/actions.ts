@@ -60,3 +60,14 @@ export async function setStartDate(_prev: EmpState, fd: FormData): Promise<EmpSt
   revalidatePath("/people");
   return { ok: data.changed ? "Start date saved." : "No change." };
 }
+
+export async function setNickname(_prev: EmpState, fd: FormData): Promise<EmpState> {
+  const p = z.object({ id: z.uuid(), nickname: z.string().trim().max(40) }).safeParse({ id: fd.get("id"), nickname: fd.get("nickname") ?? "" });
+  if (!p.success) return { error: "Keep it under 40 letters." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_employee_nickname", { p_employee: p.data.id, p_nickname: p.data.nickname || null });
+  if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0043 in Supabase first." : "Could not save. Try again." };
+  if (!data?.ok) return { error: errorText(data?.error) };
+  revalidatePath(`/people/${p.data.id}`); revalidatePath("/schedule");
+  return { ok: "Saved." };
+}

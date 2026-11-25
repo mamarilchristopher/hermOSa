@@ -8,7 +8,7 @@ import { normalizeRules, checkWeek } from "@/lib/scheduleAuto";
 import { RulesForm } from "./Forms";
 import { BranchWeek, WeekGrid, WeekButtons, PatternForm, RequestForm, DecideForm, CancelForm, RespondSwapForm } from "./Forms";
 
-export type Person = { id: string; name: string; position: string | null; branch_id: string | null; can_edit: boolean; csr?: boolean;
+export type Person = { id: string; name: string; position: string | null; branch_id: string | null; can_edit: boolean; csr?: boolean; nick?: string | null;
   pattern: { branch_id: string; days_off: number[]; start: string; end: string } | null };
 export type Shift = { employee_id: string; date: string; off: boolean; branch_id: string | null; start: string | null; end: string | null; state: "DRAFT" | "PUBLISHED"; note: string | null; leave: "VL" | "SL" | "ABSENT" | null };
 type Req = { id: string; kind: "SWAP" | "DAY_OFF"; employee_id: string; name: string; date: string; other_employee_id: string | null; other_name: string | null;
@@ -27,9 +27,9 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
     supabase.rpc("week_schedule", { p_monday: monday }),
     supabase.rpc("schedule_rules"), // errors (before update-0025) mean the default rules
   ]);
-  const clinics = branches.filter((b) => b.kind === "CLINIC").map((b) => ({ id: b.id, name: branchShort(b.name) }));
-  // Work locations shown on the schedule: the clinics plus WFH for CSRs (update-0038). Minimum-staff rules are clinics only.
-  const places = branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: branchShort(b.name) }));
+  // The schedule is for CMAs at the clinics only (CHRIS, Nov 25): no WFH, no switched-off branches like Test.
+  const clinics = branches.filter((b) => b.kind === "CLINIC" && b.active !== false).map((b) => ({ id: b.id, name: branchShort(b.name) }));
+  const places = clinics;
 
   if (error) {
     return (<><TopBar access={access} /><main><h1>Schedule</h1>
@@ -39,7 +39,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const scheduler = w.people.some((p) => p.can_edit);
   const rules = normalizeRules(rulesRaw, clinics.map((b) => b.id));
   const editable = w.people.filter((p) => p.can_edit && !p.csr); // CSRs (WFH) don't count toward clinic staffing
-  const warnings = scheduler ? checkWeek({ dates, people: editable.map((p) => ({ id: p.id, name: p.name.split(" ")[0] })), branches: clinics,
+  const warnings = scheduler ? checkWeek({ dates, people: editable.map((p) => ({ id: p.id, name: p.nick || p.name.split(" ")[0] })), branches: clinics,
     shifts: w.shifts.filter((s) => editable.some((p) => p.id === s.employee_id)), rules, dayLabel: dayName }) : [];
   const drafts = w.shifts.filter((s) => s.state === "DRAFT").length;
   const published = w.shifts.filter((s) => s.state === "PUBLISHED").length;
