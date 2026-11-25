@@ -8,12 +8,6 @@ import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
 
 type Opt = { id: string; name: string; eligible?: boolean; here?: boolean; price?: number | null; commission?: number | null };
 
-const TYPES: { v: CommissionType; label: string; hint: string }[] = [
-  { v: "LEAD", label: "Lead", hint: "You led. Choose an assistant to split 60/40, or leave None for 100%" },
-  { v: "ASSIST", label: "Assist", hint: "You assisted someone (40%)" },
-  { v: "SOLO", label: "Solo", hint: "Done alone (100% of 5%)" },
-  { v: "NONCOMMI", label: "No commission", hint: "Not commission-based" },
-];
 
 const KINDS = [
   { v: "PAID", label: "Paid" },
@@ -51,9 +45,7 @@ function Msg({ s }: { s: ActionState }) {
 
 export function EntryForm({ branch, date, services, employees, noCommission = false, photosOptional = false }: { branch: string; date: string; services: Opt[]; employees: Opt[]; noCommission?: boolean; photosOptional?: boolean }) {
   const [state, action, pending] = useActionState(logService, undefined);
-  // CHRIS Nov 26: staff not on commission still pick who assisted, so a commissioned assistant gets her 40%.
-  const startType: CommissionType = "LEAD";
-  const [type, setType] = useState<CommissionType>(startType);
+  // CHRIS Nov 26: no Lead/Assist/Solo choice. "Done by" is the lead; a commission-based lead may add an assistant (default None).
   const [kind, setKind] = useState<Kind>("PAID");
   const paid = kind === "PAID";
   const [amount, setAmount] = useState("");
@@ -71,7 +63,6 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
     if (state?.ok) {
       form.current?.reset();
       setAmount("");
-      setType(startType);
       setKind("PAID");
       setWho("");
       setService(""); setPartner(""); setClient(""); setPriceNote(""); setShare(false); setNote("");
@@ -83,10 +74,10 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
   const cents = Math.round(Number(amount.replace(/[,₱\s]/g, "")) * 100) || 0;
   const svc = services.find((x) => x.id === service);
   // Lead with "Assisted by: None" is saved as Solo; the 60/40 split applies only once an assistant is chosen (CHRIS Nov 26).
-  const effType: CommissionType = type === "LEAD" && !partner ? "SOLO" : type;
+  const effType: CommissionType = person?.eligible === false ? "NONCOMMI" : partner ? "LEAD" : "SOLO";
   const raw = previewCommission(paid ? cents : 0, paid ? effType : "NONCOMMI", svc?.commission, svc?.price);
   // Only commission-based people get a share; someone not on commission is never mentioned (CHRIS Nov 26).
-  const leadEmp = type === "ASSIST" ? partnerEmp : person, assistEmp = type === "ASSIST" ? person : partnerEmp;
+  const leadEmp = person, assistEmp = partnerEmp;
   const shown = {
     lead: leadEmp?.eligible === false ? 0 : raw.lead,
     assist: assistEmp?.eligible === false ? 0 : raw.assist,
@@ -101,7 +92,7 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
     : photos.count("WAIVER") < 2 ? "Add both pages of the signed waiver." : null;
   // update-0054: owners and the GM may save without photos; the lead and assist are then asked to add them.
   const missing = photosOptional ? null : missingPhotos;
-  const needsPartner = paid && (type === "LEAD" || type === "ASSIST");
+  const needsPartner = paid && !!person && person.eligible !== false;
   const people = (
     <>
       <option value="">Choose…</option>
@@ -165,24 +156,12 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
       </label>
       <PhotoGroup api={photos} title="Waiver (2 pages)" hint={needsPhotos ? "A clear photo of each page of the signed waiver." : "Optional for this visit."}
         kinds={[{ kind: "WAIVER", label: "Add waiver page" }]} />
-      {paid && !noCommission && <div className="field">
-        <span className="field-label">Commission type</span>
-        <div className="segmented choice" role="radiogroup" aria-label="Commission type">
-          {TYPES.map((t) => (
-            <button type="button" key={t.v} role="radio" aria-checked={type === t.v} className={type === t.v ? "on" : ""} onClick={() => setType(t.v)} title={t.hint}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <span className="small muted">{TYPES.find((t) => t.v === type)?.hint}</span>
-      </div>}
       <div className="entry-grid">
-        <label className={needsPartner ? "" : "span2"}>{!paid ? "Handled by" : type === "ASSIST" ? "Assisted by (you)" : type === "LEAD" ? "Lead (done by)" : "Done by"}
-          <select name="employee" required value={who} onChange={(e) => { setWho(e.target.value); if (e.target.value === partner) setPartner(""); }}>{people}</select>
+        <label className={needsPartner ? "" : "span2"}>{!paid ? "Handled by" : "Done by"}
+          <select name="employee" required value={who} onChange={(e) => { setWho(e.target.value); if (e.target.value === partner || employees.find((x) => x.id === e.target.value)?.eligible === false) setPartner(""); }}>{people}</select>
         </label>
         {needsPartner && (
-          <label>{type === "ASSIST" ? "Lead (who led it)" : "Assisted by"}
-            {type === "LEAD" ? (
+          <label><span>Assisted by <span className="muted">(optional)</span></span>
               <select name="partner" value={partner} onChange={(e) => setPartner(e.target.value)}>
                 <option value="">None</option>
                 {employees.filter((e) => e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
@@ -190,15 +169,6 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
                   <optgroup label="Other branches">{employees.filter((e) => !e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</optgroup>
                 )}
               </select>
-            ) : (
-              <select name="partner" required value={partner} onChange={(e) => setPartner(e.target.value)}>
-                <option value="">Choose…</option>
-                {employees.filter((e) => e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-                {employees.some((e) => !e.here && e.id !== who) && (
-                  <optgroup label="Other branches">{employees.filter((e) => !e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</optgroup>
-                )}
-              </select>
-            )}
           </label>
         )}
         <label className="span2"><span>Note <span className="muted">(optional)</span></span>
@@ -210,13 +180,13 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
           {noCommission ? null : p.total > 0 ? (
             <>
               <span>Commission {centsToPhp(p.total)}</span>
-              {effType === "SOLO" && <span className="muted">all to the performer{type === "LEAD" ? " (no assistant)" : ""}</span>}
+              {effType === "SOLO" && <span className="muted">all to the performer (no assistant)</span>}
               {needsPartner && effType !== "SOLO" && shown.lead > 0 && shown.assist === 0 && <span className="muted">lead {centsToPhp(shown.lead)}</span>}
               {needsPartner && effType !== "SOLO" && shown.lead === 0 && shown.assist > 0 && <span className="muted">assist {centsToPhp(shown.assist)}</span>}
               {needsPartner && effType !== "SOLO" && shown.lead > 0 && shown.assist > 0 && <span className="muted">lead {centsToPhp(p.lead)} · assist {centsToPhp(p.assist)}</span>}
             </>
           ) : (
-            <span className="muted">{!paid ? "Unpaid visit: no commission" : type === "NONCOMMI" ? "No commission for this service" : cents > 0 ? "" : "Enter the amount paid to see the commission"}</span>
+            <span className="muted">{!paid ? "Unpaid visit: no commission" : effType === "NONCOMMI" ? "" : cents > 0 ? "" : "Enter the amount paid to see the commission"}</span>
           )}
         </div>
         <button type="submit" disabled={pending || photos.uploading || !!missing} title={missing ?? undefined}>
