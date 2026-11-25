@@ -1,4 +1,4 @@
-// "Online now" for owners and managers. All data is DEMO.
+// "Online now" for everyone (update-0037), owners first, with photo paths. All data is DEMO.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Person, TestDb } from "./harness";
 
@@ -15,15 +15,19 @@ beforeAll(async () => {
 afterAll(async () => db?.close());
 
 describe("online now", () => {
-  it("shows others who checked in during the last 2 minutes, to owners and managers only", async () => {
+  it("shows others who checked in during the last 2 minutes, to everyone, owners first", async () => {
     expect(await db.rpc(owner, "aal2", "online_now", [])).toEqual([]);
     await db.rpc(cma, "aal1", "touch_presence", []);
     await db.rpc(gm, "aal1", "touch_presence", []);
     await db.rpc(owner, "aal2", "touch_presence", []);
     const names = (r: any[]) => r.map((x) => x.name);
     expect(names(await db.rpc(owner, "aal2", "online_now", []))).toEqual(["DEMO General Manager", "DEMO Jesel"]);
-    expect(names(await db.rpc(fvManager, "aal1", "online_now", []))).toEqual(["DEMO General Manager", "DEMO Jesel", "DEMO Owner"]);
-    expect(await db.rpc(cma, "aal1", "online_now", [])).toEqual([]);
+    expect(names(await db.rpc(fvManager, "aal1", "online_now", []))).toEqual(["DEMO Owner", "DEMO General Manager", "DEMO Jesel"]);
+    await db.sql("UPDATE public.app_users SET photo_path = $2 WHERE id = $1", [owner.appUserId, `${owner.appUserId}/00000000-0000-4000-8000-000000000001.jpg`]);
+    const seen = await db.rpc(cma, "aal1", "online_now", []);
+    expect(names(seen)).toEqual(["DEMO Owner", "DEMO General Manager"]);
+    expect(seen[0]).toMatchObject({ owner: true, photo: `${owner.appUserId}/00000000-0000-4000-8000-000000000001.jpg` });
+    expect(seen[1]).toMatchObject({ owner: false, photo: null });
   });
 
   it("drops people after 2 minutes without a check-in", async () => {

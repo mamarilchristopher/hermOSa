@@ -91,12 +91,10 @@ export async function TopBar({ access }: { access: Access }) {
         </form>
       </header>
       <NavLinks items={items} variant="tabs" />
-      {approver || viewList.length ? (
-        <div className="online-strip">
-          <OnlineNow show={approver} />
-          {viewList.length > 0 && <ViewAsButton people={viewList} />}
-        </div>
-      ) : <OnlineNow show={false} />}
+      <div className="online-strip">
+        <OnlineNow show />
+        {viewList.length > 0 && <ViewAsButton people={viewList} />}
+      </div>
       {overdue.length > 0 && (
         <div className="alert-strip" role="status">
           <strong>Commission sign-off overdue:</strong>

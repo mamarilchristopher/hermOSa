@@ -1,25 +1,37 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
+import { Avatar } from "./Avatar";
 
-type Person = { name: string; last_seen: string };
+type Person = { name: string; last_seen: string; photo?: string | null; owner?: boolean };
 
 /**
- * Checks this person in every 45 seconds while the app is open in a tab (even a background tab). For owners and managers it
- * also shows a strip on every page: "Online now: Geraldine, Jesel" (or "none"), refreshed every 30 seconds.
+ * Checks this person in every 45 seconds while the app is open in a tab (even a background tab). Everyone sees a strip on every
+ * page: "Online now" with each person's profile picture, owners first (update-0037), refreshed every 30 seconds.
  */
 export function OnlineNow({ show }: { show: boolean }) {
   const supabase = useMemo(() => createClient(), []);
   const [people, setPeople] = useState<Person[] | null>(null);
+  const [urls, setUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let stop = false;
+    const signed = new Map<string, string>();
     const visible = () => document.visibilityState === "visible";
     const touch = () => { supabase.rpc("touch_presence").then(() => undefined, () => undefined); };
     const load = async () => {
       if (!show || !visible()) return;
       const { data, error } = await supabase.rpc("online_now");
-      if (!stop && !error && Array.isArray(data)) setPeople(data as Person[]);
+      if (stop || error || !Array.isArray(data)) return;
+      const list = data as Person[];
+      setPeople(list);
+      // Signed photo links last an hour; fetch only the ones not loaded yet.
+      const need = [...new Set(list.map((p) => p.photo).filter((x): x is string => !!x && !signed.has(x)))];
+      if (need.length) {
+        const { data: s } = await supabase.storage.from("profile-photos").createSignedUrls(need, 3600);
+        for (const r of s ?? []) if (r.path && r.signedUrl) signed.set(r.path, r.signedUrl);
+        if (!stop) setUrls(Object.fromEntries(signed));
+      }
     };
     touch(); load();
     const a = setInterval(touch, 45_000);
@@ -35,7 +47,11 @@ export function OnlineNow({ show }: { show: boolean }) {
     <span className="online-now" role="status" aria-live="polite">
       <span className={`online-dot ${people.length ? "on" : ""}`} aria-hidden />
       <strong>Online now:</strong>
-      {people.length === 0 ? <span className="muted">none</span> : people.map((p) => <span key={p.name} className="online-name">{p.name}</span>)}
+      {people.length === 0 ? <span className="muted">none</span> : people.map((p, i) => (
+        <span key={`${p.name}-${i}`} className={`online-name ${p.owner ? "owner" : ""}`} title={p.owner ? `${p.name} (owner)` : p.name}>
+          <Avatar name={p.name} url={p.photo ? urls[p.photo] : null} size={22} />{p.name}
+        </span>
+      ))}
     </span>
   );
 }
