@@ -1,3 +1,11 @@
+/** The button on a notice: some kinds get a clearer label than "Open" (update-0031). */
+export function noticeButton(kind: string | null | undefined): string {
+  if (kind === "COMMISSION_APPROVED") return "Check your current commission total";
+  if (kind === "COMMISSION_REJECTED") return "See my commissions";
+  if (kind === "DETAILS_APPROVED" || kind === "DETAILS_RETURNED") return "Open my details";
+  return "Open";
+}
+
 // Turn a notice into a link that lands on the exact Daily Sales cells it is about (highlighted).
 // Notices name the branch first ("Marikina: Nov 24 ₱9,800.00, ..." or "Marikina, Nov 24, 2026: ...") and the days as "Mon D".
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

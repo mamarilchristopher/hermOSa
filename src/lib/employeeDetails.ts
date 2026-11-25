@@ -83,9 +83,9 @@ export const SECTIONS: Section[] = [
   {
     id: "payroll",
     title: "Salary payout",
-    note: "Where your salary goes. Only you and the owners can see this.",
+    note: "All salaries are still paid out in cash by default. Bank account and GCash details are kept for records only. Only you and the owners can see this.",
     fields: [
-      { key: "payout_method", label: "How do you want to be paid?", type: "select", required: true, options: ["Bank account", "GCash", "Cash"] },
+      { key: "payout_method", label: "Preferred payout method (for records)", type: "select", required: true, options: ["Bank account", "GCash", "Cash"] },
       { key: "bank_name", label: "Bank", type: "text", max: 80, sensitive: true, when: ["payout_method", "Bank account"], half: true },
       { key: "bank_account_name", label: "Account name", type: "text", max: 120, sensitive: true, when: ["payout_method", "Bank account"], half: true },
       { key: "bank_account_number", label: "Account number", type: "text", digits: [6, 20], sensitive: true, when: ["payout_method", "Bank account"], half: true },

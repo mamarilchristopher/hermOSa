@@ -11,7 +11,7 @@ import { ManagerHome, TodoCard, type Todo } from "./ManagerHome";
 import type { DutyRow } from "@/components/OnDuty";
 import type { Ir } from "@/lib/incidents";
 import { branchShort, timeLabel } from "@/lib/schedule";
-import { noticeHref } from "@/lib/noticeLink";
+import { noticeButton, noticeHref } from "@/lib/noticeLink";
 import { computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
 import { addDays, sortBranches } from "@/lib/insights";
 import { missingRequired, type Details } from "@/lib/employeeDetails";
@@ -70,7 +70,7 @@ async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>
   return { g, todos, duty };
 }
 
-type Notice = { id: string; title: string; body: string | null; link: string | null; created_at: string; read_at: string | null };
+type Notice = { id: string; kind?: string; title: string; body: string | null; link: string | null; created_at: string; read_at: string | null };
 const when = (iso: string) => new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 const ROLE_LABEL: Record<string, string> = {
@@ -90,7 +90,7 @@ export default async function Me() {
     supabase.from("app_users").select("uid, email, joined_at").eq("id", access.user_id).maybeSingle(),
     supabase.from("employee_detail_submissions").select("state, note, data").eq("user_id", access.user_id).neq("state", "SUPERSEDED")
       .order("submitted_at", { ascending: false }).limit(1),
-    supabase.from("notifications").select("id, title, body, link, created_at, read_at").order("created_at", { ascending: false }).limit(15),
+    supabase.from("notifications").select("id, kind, title, body, link, created_at, read_at").order("created_at", { ascending: false }).limit(15),
   ]);
   const notices = (noticeData ?? []) as Notice[];
   const unread = notices.filter((n) => !n.read_at).length;
@@ -220,7 +220,7 @@ export default async function Me() {
                     <strong>{n.title}</strong> <span className="small muted">· {when(n.created_at)}</span><br />
                     <span className="small">{n.body}</span>
                   </span>
-                  {n.link && <Link className="small" href={noticeHref(n.link, n.body, branches) ?? n.link}>Open</Link>}
+                  {n.link && <Link className="small" href={noticeHref(n.link, n.body, branches) ?? n.link}>{noticeButton(n.kind)}</Link>}
                 </li>
               ))}
             </ul>
@@ -266,6 +266,7 @@ export default async function Me() {
             <dt>App access</dt><dd>{scope.join("; ") || "None yet"}</dd>
             <dt>Login email</dt><dd>{user?.email ?? ""}</dd>
             <dt>UID</dt><dd>{emp?.uid ? <>Staff record <code className="uid" style={{ marginLeft: 0 }}>{emp.uid}</code> · </> : ""}Login account <code className="uid" style={{ marginLeft: 0 }}>{user?.uid ?? ""}</code></dd>
+            <dt>Salary payout</dt><dd>Paid in cash by default. Bank accounts are for records only.</dd>
             {user?.joined_at && <><dt>Joined the app</dt><dd>{user.joined_at.slice(0, 10)}</dd></>}
           </dl>
           <p className="small muted" style={{ marginBottom: 0 }}>
