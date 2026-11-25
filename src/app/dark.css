@@ -13,7 +13,10 @@
 [data-mode="dark"] body { background: var(--pearl); }
 [data-mode="dark"] .sidebar { background: #17181b; }
 [data-mode="dark"] .brand, [data-mode="dark"] .me { border-color: var(--line); }
-[data-mode="dark"] .brand img, [data-mode="dark"] .mobile-bar img { background: #f4f1ec; border-radius: 12px; padding: 4px 8px; }
+.logo-dark { display: none !important; }
+[data-mode="dark"] .logo-light { display: none !important; }
+[data-mode="dark"] .logo-dark { display: block !important; }
+/* Dark-mode logo: same gold mark, lettering in light cream so it reads on dark (public/hermosa-logo-dark.png). */
 [data-mode="dark"] .side-nav a.active, [data-mode="dark"] .side-nav a:hover { background: var(--surface); box-shadow: none; }
 [data-mode="dark"] .mobile-bar { background: rgba(23, 24, 27, 0.94); }
 [data-mode="dark"] .tab-nav { background: rgba(23, 24, 27, 0.97); }

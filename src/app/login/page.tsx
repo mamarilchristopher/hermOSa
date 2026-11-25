@@ -5,7 +5,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <div className="center">
       <div className="card auth-card">
-        <img src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
+        <img className="logo-light" src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
+        <img className="logo-dark" src="/hermosa-logo-dark.png" alt="Hermosa Aesthetics" />
         <h1>Sign in to Hermosa OS</h1>
         <p className="muted small">New staff join through the invite link from the owner.</p>
         {error === "no_account" && (

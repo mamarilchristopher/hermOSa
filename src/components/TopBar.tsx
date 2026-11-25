@@ -85,7 +85,8 @@ export async function TopBar({ access }: { access: Access }) {
       <aside className="sidebar">
         <div className="brand">
           {/* Approved logo, original aspect ratio preserved via width + auto height. */}
-          <img src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
+          <img className="logo-light" src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
+          <img className="logo-dark" src="/hermosa-logo-dark.png" alt="Hermosa Aesthetics" />
           <span className="brand-tag">OS</span>
         </div>
         {/* View as sits above the menu so a long menu on a short laptop screen never pushes it out of sight. */}
@@ -104,7 +105,8 @@ export async function TopBar({ access }: { access: Access }) {
         </div>
       </aside>
       <header className="mobile-bar">
-        <img src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
+        <img className="logo-light" src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
+          <img className="logo-dark" src="/hermosa-logo-dark.png" alt="Hermosa Aesthetics" />
         <ThemeToggle />
         <a href="/me/photo" title={`${access.display_name} · ${role} · change your picture`}><Avatar name={access.display_name} url={myPhotoUrl} size={32} /></a>
         <form action="/auth/signout" method="post">

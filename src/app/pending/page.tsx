@@ -8,7 +8,8 @@ export default async function Pending() {
   return (
     <div className="center">
       <div className="card auth-card">
-        <img src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
+        <img className="logo-light" src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
+        <img className="logo-dark" src="/hermosa-logo-dark.png" alt="Hermosa Aesthetics" />
         <h1>Waiting for approval</h1>
         <p className="muted small">Hi {access.display_name}. You're registered. The owner still needs to approve you and set your staff level. Check back later.</p>
         <p className="small">While you wait, please fill in your employee details so the owner can set up your record.</p>

@@ -10,7 +10,8 @@ export default async function PinPage() {
   return (
     <div className="center">
       <div className="card auth-card">
-        <img src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
+        <img className="logo-light" src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
+        <img className="logo-dark" src="/hermosa-logo-dark.png" alt="Hermosa Aesthetics" />
         <h1>Enter your PIN</h1>
         <p className="muted small">The 4-digit PIN the owner gave you. You&apos;ll be asked again each day.</p>
         <PinForm />

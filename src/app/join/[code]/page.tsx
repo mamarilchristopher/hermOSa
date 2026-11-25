@@ -14,7 +14,8 @@ export default async function Join({ params }: { params: Promise<{ code: string 
   return (
     <div className="center">
       <div className="card auth-card">
-        <img src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
+        <img className="logo-light" src="/hermosa-logo-transparent.png" alt="Hermosa Aesthetics" />
+        <img className="logo-dark" src="/hermosa-logo-dark.png" alt="Hermosa Aesthetics" />
         <h1>Join Hermosa OS</h1>
         {info.valid ? (
           <>
