@@ -8,7 +8,7 @@ import { monthLabel } from "@/lib/insights";
 import { dayLabel } from "@/lib/homeGlance";
 import { timeLabel } from "@/lib/schedule";
 import { firstName, irReason, IR_MINUTES_DEFAULT, IR_NTE_COUNT, nteCount, type NteList } from "@/lib/nte";
-import { IssueLateIrForm, VoidNteForm } from "../../Forms";
+import { IssueLateIrForm, NteDeadline, VoidNteForm } from "../../Forms";
 import { Uid } from "@/components/Uid";
 
 const STATE: Record<string, { label: string; cls: string }> = {
@@ -25,6 +25,7 @@ export default async function StaffNtePage({ params, searchParams }: { params: P
   const thisMonth = manilaToday().slice(0, 7);
   const sp = await searchParams;
   const ym = /^\d{4}-\d{2}$/.test(sp.month ?? "") && sp.month! <= thisMonth ? sp.month! : thisMonth;
+  await supabase.rpc("run_nte_deadlines"); // automatic IRs that are due (update-0032)
   const [{ data }, { data: emp }] = await Promise.all([
     supabase.rpc("late_nte_list", { p_month: `${ym}-01`, p_employee: id }),
     supabase.from("employees").select("uid, full_name, position").eq("id", id).maybeSingle(),
@@ -76,6 +77,7 @@ export default async function StaffNtePage({ params, searchParams }: { params: P
                     <span><strong>NTE no. {n.nte_no} · {dayLabel(n.work_date)}</strong> <span className={`pill ${STATE[n.state].cls}`}>{STATE[n.state].label}</span>
                       <br /><span className="small muted">Shift starts {timeLabel(n.shift_start)}, timed in {timeLabel(n.time_in)} ({n.late_minutes} minutes late){n.branch ? ` · ${n.branch}` : ""}{n.ir_id ? " · in an IR" : ""}</span></span>
                     {n.explanation && <p className="small" style={{ margin: 0 }}>Explanation: {n.explanation}</p>}
+                    {n.state === "OPEN" && !n.ir_id && <NteDeadline n={n} />}
                     {n.state === "VOID" && <p className="small muted" style={{ margin: 0 }}>Doesn&apos;t count: {n.void_reason}</p>}
                   </div>
                   {n.state !== "VOID" && !n.ir_id && <VoidNteForm id={n.id} />}

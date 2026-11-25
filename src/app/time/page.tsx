@@ -6,7 +6,7 @@ import { manilaToday } from "@/lib/dates";
 import { cutoffEnd, dayLabel } from "@/lib/homeGlance";
 import { branchShort, timeLabel } from "@/lib/schedule";
 import { BranchLocation, TimeClock } from "./Clock";
-import { NteExplainForm } from "../nte/Forms";
+import { NteDeadline, NteExplainForm } from "../nte/Forms";
 import { Uid } from "@/components/Uid";
 
 type Punch = { kind: "IN" | "OUT"; punched_at: string; branch_id: string };
@@ -52,7 +52,7 @@ export default async function TimePage() {
 
   // A late time-in today makes a Late NTE: ask for the explanation right here.
   const { data: nteToday } = me
-    ? await supabase.from("late_ntes").select("id, late_minutes").eq("employee_id", me.id).eq("work_date", today).eq("state", "OPEN").maybeSingle()
+    ? await supabase.from("late_ntes").select("id, late_minutes, respond_by, ir_id").eq("employee_id", me.id).eq("work_date", today).eq("state", "OPEN").maybeSingle()
     : { data: null };
   return (
     <>
@@ -63,6 +63,7 @@ export default async function TimePage() {
           <div className="card nte-urgent">
             <h2>Late NTE: please explain</h2>
             <p className="small" style={{ margin: 0 }}>You timed in {nteToday.late_minutes} minutes after your shift started. This is required.</p>
+            <NteDeadline n={nteToday} />
             <NteExplainForm id={nteToday.id} prompt="Why were you late today?" />
           </div>
         )}

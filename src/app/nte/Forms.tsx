@@ -1,11 +1,22 @@
 "use client";
-import { useActionState, useState } from "react";
+import Link from "next/link";
+import { useActionState, useEffect, useState } from "react";
+import { nteDeadline } from "@/lib/nte";
 import { explainNte, issueLateIr, voidNte, type ActionState } from "./actions";
 
 function Msg({ s }: { s: ActionState }) {
   if (s?.error) return <div className="notice error">{s.error}</div>;
   if (s?.ok) return <div className="notice ok">{s.ok}</div>;
   return null;
+}
+
+/** Time left to explain (update-0032), counting down live; or the automatic IR once it's issued. */
+export function NteDeadline({ n }: { n: { respond_by?: string | null; ir_id?: string | null } }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(t); }, []);
+  if (n.ir_id) return <p className="small nte-deadline over" style={{ margin: 0 }}>Not explained within 2 working days, so an IR was issued. <Link href={`/incidents/${n.ir_id}`}>Open the IR</Link>. You can still write your explanation below.</p>;
+  const d = nteDeadline(n.respond_by, now);
+  return <p className={`small nte-deadline${d.urgent ? " over" : ""}`} style={{ margin: 0 }} suppressHydrationWarning><strong>{d.text}</strong></p>;
 }
 
 /** The employee's explanation box. Shown on Home, the time clock and My Late NTEs until it's answered. */

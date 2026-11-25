@@ -52,7 +52,7 @@ export async function drawIrImage(r: Ir, logoSrc: string, font: string): Promise
   const rows: [string, string, string, string][] = [
     ["Employee", r.name, "Position", r.position ?? ""],
     ["Branch", r.branch ?? "", "Date issued", r.issued_at ? day(r.issued_at.slice(0, 10)) : "Not issued yet"],
-    ["Covered period", r.basis === "LATE_NTE" ? `${MO[Number(r.period_start.slice(5, 7)) - 1]} ${r.period_start.slice(0, 4)}` : `${day(r.period_start)} to ${day(r.period_end)}`, "Issued by", r.issued_by ?? ""],
+    ["Covered period", r.basis === "LATE_NTE" ? `${MO[Number(r.period_start.slice(5, 7)) - 1]} ${r.period_start.slice(0, 4)}` : `${day(r.period_start)} to ${day(r.period_end)}`, "Issued by", r.issued_by ?? (r.issued_at ? "Hermosa OS (automatic)" : "")],
   ];
   const cw = (W - 2 * M) / 4;
   for (const row of rows) {
@@ -106,7 +106,7 @@ export async function drawIrImage(r: Ir, logoSrc: string, font: string): Promise
   g.fillRect(M, sy, 460, 2); g.fillRect(W - M - 460, sy, 460, 2);
   g.font = F(500, 20);
   g.fillText("Employee signature over printed name", M, sy + 32);
-  g.fillText(`Issued by${r.issued_by ? `: ${r.issued_by}` : ""}`, W - M - 460, sy + 32);
+  g.fillText(`Issued by${r.issued_by ? `: ${r.issued_by}` : r.issued_at ? ": Hermosa OS (automatic)" : ""}`, W - M - 460, sy + 32);
   g.font = F(400, 16); g.fillStyle = "#444";
   g.fillText(`Hermosa Aesthetics · Hermosa OS · IR no. ${r.ir_no} · saved ${stamp(new Date().toISOString())}`, M, H - 60);
   return c;

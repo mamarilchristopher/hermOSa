@@ -1,7 +1,7 @@
 /** Late NTE (Notice to Explain): one per late time-in, past the grace period (update-0030). */
 export type Nte = {
   id: string; nte_no: number; employee_id: string; name: string; uid?: string; position: string | null; branch: string | null;
-  work_date: string; shift_start: string; time_in: string; late_minutes: number;
+  work_date: string; shift_start: string; time_in: string; late_minutes: number; respond_by?: string | null;
   state: "OPEN" | "EXPLAINED" | "VOID"; explanation: string | null; explained_at: string | null; void_reason: string | null;
   ir_id: string | null; mine: boolean; can_manage: boolean;
 };
@@ -37,3 +37,21 @@ export function tracker(ntes: Nte[], limit = IR_MINUTES_DEFAULT): TrackerRow[] {
 export const times = (n: number) => `${n} time${n === 1 ? "" : "s"}`;
 export const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
 export const nteCount = (n: number) => `${n} Late NTE${n === 1 ? "" : "s"}`;
+
+/**
+ * The time left to explain a Late NTE (update-0032): until the end of `respondBy` (Manila), which is the employee's
+ * next scheduled working day after the late day, so 2 working days counting the late day. NULL = not scheduled yet.
+ */
+export function nteDeadline(respondBy: string | null | undefined, now = Date.now()): { text: string; urgent: boolean; overdue: boolean } {
+  if (!respondBy) return { text: "Explain by the end of your next scheduled working day, or an IR is issued automatically.", urgent: false, overdue: false };
+  const end = Date.parse(`${respondBy}T23:59:59+08:00`);
+  const left = end - now;
+  const MO = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const DW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const d = new Date(`${respondBy}T12:00:00+08:00`);
+  const label = `${DW[d.getUTCDay()]}, ${MO[d.getUTCMonth()]} ${d.getUTCDate()}`;
+  if (left <= 0) return { text: `The deadline (end of ${label}) has passed. An IR is issued automatically.`, urgent: true, overdue: true };
+  const h = Math.floor(left / 3_600_000), m = Math.floor((left % 3_600_000) / 60_000);
+  const span = h >= 24 ? `${Math.floor(h / 24)} day${Math.floor(h / 24) === 1 ? "" : "s"} ${h % 24} hour${h % 24 === 1 ? "" : "s"}` : h > 0 ? `${h} hour${h === 1 ? "" : "s"} ${m} min` : `${m} min`;
+  return { text: `${span} left: explain by the end of ${label}, or an IR is issued automatically.`, urgent: h < 24, overdue: false };
+}

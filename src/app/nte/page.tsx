@@ -6,7 +6,7 @@ import { monthLabel } from "@/lib/insights";
 import { dayLabel } from "@/lib/homeGlance";
 import { timeLabel } from "@/lib/schedule";
 import { firstName, times, tracker, type NteList } from "@/lib/nte";
-import { NteExplainForm } from "./Forms";
+import { NteDeadline, NteExplainForm } from "./Forms";
 import { Uid } from "@/components/Uid";
 
 const shiftMonth = (ym: string, n: number) => {
@@ -20,6 +20,7 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
   const thisMonth = manilaToday().slice(0, 7);
   const sp = await searchParams;
   const ym = /^\d{4}-\d{2}$/.test(sp.month ?? "") && sp.month! <= thisMonth ? sp.month! : thisMonth;
+  await supabase.rpc("run_nte_deadlines"); // automatic IRs that are due (update-0032)
   const { data, error } = await supabase.rpc("late_nte_list", { p_month: `${ym}-01`, p_employee: null });
   if (error) {
     return (<><TopBar access={access} /><main><h1>Late NTEs</h1>
@@ -72,7 +73,7 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
                     <div className="nte-body">
                       <span><strong>NTE no. {n.nte_no} · {dayLabel(n.work_date)}</strong>
                         <br /><span className="small muted">Shift starts {timeLabel(n.shift_start)}, timed in {timeLabel(n.time_in)} ({n.late_minutes} minutes late){n.branch ? ` · ${n.branch}` : ""}</span></span>
-                      {n.state === "OPEN" && <NteExplainForm id={n.id} prompt={`Why were you late, ${firstName(n.name)}?`} />}
+                      {n.state === "OPEN" && <><NteDeadline n={n} /><NteExplainForm id={n.id} prompt={`Why were you late, ${firstName(n.name)}?`} /></>}
                       {n.state === "EXPLAINED" && <p className="small" style={{ margin: 0 }}>Your explanation: {n.explanation}</p>}
                       {n.state === "VOID" && <p className="small muted" style={{ margin: 0 }}>Cancelled by management: {n.void_reason}</p>}
                     </div>

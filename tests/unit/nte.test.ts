@@ -28,3 +28,14 @@ describe("tracker due", () => {
     expect(r.due).toBeNull();
   });
 });
+
+import { nteDeadline } from "../../src/lib/nte";
+describe("nteDeadline", () => {
+  const at = (s: string) => Date.parse(`${s}+08:00`);
+  it("counts down to the end of the deadline day (Manila)", () => {
+    expect(nteDeadline("2026-11-26", at("2026-11-25T16:00:00")).text).toBe("1 day 7 hours left: explain by the end of Thu, Nov 26, or an IR is issued automatically.");
+    expect(nteDeadline("2026-11-26", at("2026-11-26T22:30:00")).urgent).toBe(true);
+    expect(nteDeadline("2026-11-26", at("2026-11-27T00:01:00")).overdue).toBe(true);
+  });
+  it("no deadline yet when the next working day isn't scheduled", () => expect(nteDeadline(null).text).toMatch(/next scheduled working day/));
+});

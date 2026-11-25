@@ -16,7 +16,7 @@ import { computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } 
 import { addDays, sortBranches } from "@/lib/insights";
 import { missingRequired, type Details } from "@/lib/employeeDetails";
 import { firstName, times, tracker, type NteList } from "@/lib/nte";
-import { NteExplainForm } from "../nte/Forms";
+import { NteDeadline, NteExplainForm } from "../nte/Forms";
 import { Uid } from "@/components/Uid";
 
 type Signoffs = { to_sign: { count: number; oldest: string | null }; mine: { count: number; oldest: string | null } };
@@ -124,12 +124,13 @@ export default async function Me() {
   if (timeTodo) (home?.todos ?? staffTodos)?.unshift(timeTodo);
   // Late NTEs waiting for my explanation (shown as boxes at the top), and the owner/GM tardiness tracker.
   const ownerLevel = isOwner || access.grants.some((g) => g.role === "MANAGER" && g.branch_id === null);
+  await supabase.rpc("run_nte_deadlines"); // issues the automatic IRs that are due (errors before update-0032 are ignored)
   const [{ data: myNteData }, { data: trackData }] = await Promise.all([
-    emp ? supabase.from("late_ntes").select("id, nte_no, work_date, shift_start, time_in, late_minutes").eq("employee_id", emp.id).eq("state", "OPEN").order("work_date")
+    emp ? supabase.from("late_ntes").select("id, nte_no, work_date, shift_start, time_in, late_minutes, respond_by, ir_id").eq("employee_id", emp.id).eq("state", "OPEN").order("work_date")
       : Promise.resolve({ data: [] }),
     ownerLevel ? supabase.rpc("late_nte_list", { p_month: `${today.slice(0, 7)}-01`, p_employee: null }) : Promise.resolve({ data: null }),
   ]);
-  const myNtes = (myNteData ?? []) as { id: string; nte_no: number; work_date: string; shift_start: string; time_in: string; late_minutes: number }[];
+  const myNtes = (myNteData ?? []) as { id: string; nte_no: number; work_date: string; shift_start: string; time_in: string; late_minutes: number; respond_by?: string | null; ir_id?: string | null }[];
   const tardy = trackData ? tracker((trackData as NteList).ntes, (trackData as NteList).ir_minutes) : [];
   if (missingTodo && !isOwner) (home?.todos ?? staffTodos)?.push(missingTodo);
   if (home && !isOwner && detailState !== "APPROVED" && detailState !== "PENDING") {
@@ -183,6 +184,7 @@ export default async function Me() {
               <div key={n.id} className="nte-box">
                 <p className="small" style={{ margin: 0 }}><strong>NTE no. {n.nte_no} · {dayLabel(n.work_date)}</strong>: your shift started {timeLabel(n.shift_start)} and you timed in{" "}
                   {new Date(n.time_in).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })} ({n.late_minutes} minutes late).</p>
+                <NteDeadline n={n} />
                 <NteExplainForm id={n.id} prompt={`Why were you late, ${first}?`} />
               </div>
             ))}

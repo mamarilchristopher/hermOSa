@@ -52,7 +52,7 @@ export function IrDocument({ r }: { r: Ir }) {
 
           <div className="ir-sign">
             <div><span className="line" />Employee signature over printed name</div>
-            <div><span className="line" />Issued by{r.issued_by ? `: ${r.issued_by}` : ""}</div>
+            <div><span className="line" />Issued by{(r.issued_by ?? (r.issued_at ? "Hermosa OS (automatic)" : "")) && `: ${r.issued_by ?? "Hermosa OS (automatic)"}`}</div>
           </div>
         </article>
   );

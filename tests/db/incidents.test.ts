@@ -18,6 +18,8 @@ beforeAll(async () => {
   bea = await db.person("Bea", [["CLINICIAN", "FAIRVIEW"]]);
   anaE = (await db.rpc(owner, "aal2", "save_employee", [null, FV, "DEMO Ana", "CMA", true, ana.appUserId, true])).id;
   await db.rpc(owner, "aal2", "save_employee", [null, FV, "DEMO Bea", "CMA", true, bea.appUserId, true]);
+  // These days are in the past, so the 2-working-day deadline (update-0032) has passed; that is tested in nte_deadline.test.ts.
+  await db.sql("CREATE OR REPLACE FUNCTION private.escalate_ntes(p_org uuid) RETURNS integer LANGUAGE sql AS 'SELECT 0'");
 }, 60_000);
 afterAll(async () => db?.close());
 
