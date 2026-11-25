@@ -6,6 +6,7 @@ import "./dark.css";
 import { VERSION } from "@/lib/version";
 import { cookies } from "next/headers";
 import { RegisterSW } from "@/components/Hermosapp";
+import { VersionGuard } from "@/components/VersionGuard";
 
 const sans = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
@@ -27,6 +28,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" className={sans.variable} data-theme="ivory" data-mode={mode}>
       <body>
+        <VersionGuard />
         {children}
         <RegisterSW />
         <footer className="build-note" title="The code version this page is running">

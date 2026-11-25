@@ -154,7 +154,7 @@ export default async function Me() {
         {otherUnread > 0 && (
           <div className="card chat-home">
             <span><strong>{otherUnread} unread chat {otherUnread === 1 ? "message" : "messages"}</strong></span>
-            <Link className="button secondary small" href="/chat">Open Chat</Link>
+            <a className="button secondary small" href="/chat">Open Chat</a>
           </div>
         )}
                 {home && <ManagerHome g={home.g} duty={home.duty} faces={home.faces} branches={branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: branchShort(b.name) }))} />}
