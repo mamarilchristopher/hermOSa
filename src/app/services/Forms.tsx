@@ -157,8 +157,8 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
           </label>
         )}
       </div>
-      <PhotoGroup api={photos} title="Before and after photos" hint={needsPhotos ? "Full quality, at least one of each." : "Optional for this visit."}
-        kinds={[{ kind: "BEFORE", label: "Add before photo" }, { kind: "AFTER", label: "Add after photo" }]} />
+      <PhotoGroup api={photos} title="Before and after photos" hint={needsPhotos ? "Pick them all at once (at least one before and one after). Tap a photo's label to switch Before / After." : "Optional for this visit. Tap a photo's label to switch Before / After."}
+        kinds={[{ kind: "AUTO", label: "Add before & after photos" }]} />
       <label className="check-row">
         <input type="checkbox" name="share" value="1" checked={share} onChange={(e) => setShare(e.target.checked)} />
         <span>Did the client allow sharing of their photos? <span className="muted">(adds them to Social media)</span></span>

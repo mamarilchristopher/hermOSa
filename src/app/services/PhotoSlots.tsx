@@ -29,8 +29,18 @@ export function usePhotoSlots(branch: string, fixedFolder?: string | null) {
   const [slots, setSlots] = useState<Slot[]>([]);
   const patch = (key: string, p: Partial<Slot>) => setSlots((l) => l.map((s) => (s.key === key ? { ...s, ...p } : s)));
 
-  const add = async (kind: PhotoKind, files: FileList | null) => {
-    for (const file of Array.from(files ?? [])) {
+  /**
+   * "AUTO" (CHRIS Nov 26: one button for before and after, picked as a batch): photos are ordered by when they were
+   * taken; the earlier half become Before, the later half After. One photo alone fills whichever is still missing.
+   * Staff tap a photo's label to switch it.
+   */
+  const add = async (pick: PhotoKind | "AUTO", files: FileList | null) => {
+    const list = Array.from(files ?? []).sort((a, b) => a.lastModified - b.lastModified);
+    const haveBefore = slots.some((x) => x.kind === "BEFORE");
+    const kindAt = (i: number): PhotoKind => pick !== "AUTO" ? pick
+      : list.length === 1 ? (haveBefore ? "AFTER" : "BEFORE") : i < Math.ceil(list.length / 2) ? "BEFORE" : "AFTER";
+    for (const [i, file] of list.entries()) {
+      const kind = kindAt(i);
       const key = uuid();
       const ext = EXT[file.type] ?? (/\.(heic|heif)$/i.test(file.name) ? file.name.split(".").pop()!.toLowerCase() : null);
       if (!ext) { alert("Only photos (JPG, PNG, WEBP or HEIC) can be added."); continue; }
@@ -48,17 +58,19 @@ export function usePhotoSlots(branch: string, fixedFolder?: string | null) {
       patch(key, { status: "done", path, thumb });
     }
   };
+  const flip = (key: string) => setSlots((l) => l.map((x) => (x.key === key && x.kind !== "WAIVER" ? { ...x, kind: x.kind === "BEFORE" ? "AFTER" : "BEFORE" } : x)));
   const remove = (key: string) => setSlots((l) => { const s = l.find((x) => x.key === key); if (s) URL.revokeObjectURL(s.preview); return l.filter((x) => x.key !== key); });
   const reset = () => { slots.forEach((s) => URL.revokeObjectURL(s.preview)); setSlots([]); setFolder(uuid()); };
   const json = JSON.stringify(slots.filter((s) => s.status === "done").map((s) => ({ kind: s.kind, path: s.path, thumb: s.thumb ?? null })));
   const count = (k: PhotoKind) => slots.filter((s) => s.kind === k && s.status === "done").length;
-  return { folder, slots, add, remove, reset, json, count, uploading: slots.some((s) => s.status === "uploading") };
+  return { folder, slots, add, flip, remove, reset, json, count, uploading: slots.some((s) => s.status === "uploading") };
 }
 
 type Api = ReturnType<typeof usePhotoSlots>;
 
-export function PhotoGroup({ api, kinds, title, hint }: { api: Api; kinds: { kind: PhotoKind; label: string }[]; title: string; hint?: string }) {
-  const mine = api.slots.filter((s) => kinds.some((k) => k.kind === s.kind));
+export function PhotoGroup({ api, kinds, title, hint }: { api: Api; kinds: { kind: PhotoKind | "AUTO"; label: string }[]; title: string; hint?: string }) {
+  const auto = kinds.some((k) => k.kind === "AUTO");
+  const mine = api.slots.filter((s) => (auto ? s.kind !== "WAIVER" : kinds.some((k) => k.kind === s.kind)));
   return (
     <div className="field photo-group">
       <span className="field-label">{title}</span>
@@ -68,7 +80,12 @@ export function PhotoGroup({ api, kinds, title, hint }: { api: Api; kinds: { kin
           <figure key={s.key} className={`photo-slot ${s.status}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={s.preview} alt={`${s.kind.toLowerCase()} photo`} />
-            <figcaption>{s.status === "uploading" ? "Uploading…" : s.status === "error" ? "Didn't upload" : s.kind === "WAIVER" ? `Page ${mine.filter((x) => x.kind === "WAIVER").indexOf(s) + 1}` : s.kind === "BEFORE" ? "Before" : "After"}</figcaption>
+            {s.status === "done" && s.kind !== "WAIVER" ? (
+              <figcaption><button type="button" className={`ba-toggle ${s.kind === "BEFORE" ? "before" : "after"}`} onClick={() => api.flip(s.key)} title="Tap to switch">
+                {s.kind === "BEFORE" ? "Before" : "After"} ⇄</button></figcaption>
+            ) : (
+              <figcaption>{s.status === "uploading" ? "Uploading…" : s.status === "error" ? "Didn't upload" : `Page ${mine.filter((x) => x.kind === "WAIVER").indexOf(s) + 1}`}</figcaption>
+            )}
             <button type="button" className="photo-x" aria-label="Remove photo" onClick={() => api.remove(s.key)}>×</button>
           </figure>
         ))}
@@ -104,7 +121,8 @@ export function AddPhotosLater({ log, branch, folder, needs }: { log: string; br
   return (
     <div className="add-later">
       <span className="small muted">Needed: {needs}</span>
-      <PhotoGroup api={api} title="Before and after photos" kinds={[{ kind: "BEFORE", label: "Add before photo" }, { kind: "AFTER", label: "Add after photo" }]} />
+      <PhotoGroup api={api} title="Before and after photos" kinds={[{ kind: "AUTO", label: "Add before & after photos" }]}
+        hint="Pick them all at once. Tap a photo's label to switch Before / After." />
       <PhotoGroup api={api} title="Waiver (2 pages)" kinds={[{ kind: "WAIVER", label: "Add waiver page" }]} />
       <div className="fill-row">
         <button type="button" className="small" disabled={busy || api.uploading || api.slots.every((s) => s.status !== "done")} onClick={save}>
