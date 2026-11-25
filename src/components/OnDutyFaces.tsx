@@ -23,7 +23,13 @@ export function OnDutyFaces({ rows, faces, branches, nowHm, photos, tagDate }: {
   const working = rows.filter((r) => !r.off);
   if (!working.length) return <p className="muted" style={{ margin: 0 }}>Nobody is on the published schedule for today yet.</p>;
   const name = (r: DutyRow) => faces[r.employee_id]?.short ?? r.name.split(" ")[0];
-  const groups = branches.map((b) => ({ ...b, list: working.filter((r) => r.branch_id === b.id) })).filter((g) => g.list.length);
+  // CHRIS Nov 25: CSRs (online, WFH) are shown apart from the clinic staff (CMAs).
+  const wfhIds = new Set(branches.filter((b) => b.name.toUpperCase() === "WFH").map((b) => b.id));
+  const isCsr = (r: DutyRow) => (r.position ?? "").toUpperCase() === "CSR" || (r.branch_id != null && wfhIds.has(r.branch_id));
+  const groups = branches.filter((b) => !wfhIds.has(b.id))
+    .map((b) => ({ ...b, list: working.filter((r) => r.branch_id === b.id && !isCsr(r)) })).filter((g) => g.list.length);
+  const csrs = working.filter(isCsr);
+  const csrGroup = csrs.length ? [{ id: "csr", name: "CSR (online)", list: csrs }] : [];
   const off = rows.filter((r) => r.off && !r.leave), leave = rows.filter((r) => r.off && r.leave);
   return (
     <>
@@ -31,8 +37,11 @@ export function OnDutyFaces({ rows, faces, branches, nowHm, photos, tagDate }: {
         <div className="notice info small irregular-day">Whole day marked irregular: <strong>{irregularLabel(wholeDay)}</strong>. Lateness today is ignored.
           {tagDate && <> <IrregularUndo id={wholeDay.id} /></>}</div>
       ) : tagDate && <div className="irregular-day"><IrregularTagForm date={tagDate} label="Mark the whole day irregular (everyone)" /></div>}
+      {[{ key: "clinic", title: "Clinic staff", list: groups }, { key: "csr", title: "Customer service (CSR)", list: csrGroup }].filter((sec) => sec.list.length).map((sec) => (
+      <div key={sec.key} className="faces-section">
+      {groups.length > 0 && csrGroup.length > 0 && <h3 className="faces-section-title">{sec.title}</h3>}
       <div className="faces-branches">
-        {groups.map((g) => (
+        {sec.list.map((g) => (
           <div key={g.id} className="faces-branch">
             <div className="faces-head"><strong>{g.name}</strong><span className="small muted">{g.list.filter((r) => r.time_in && !r.time_out).length} on duty{g.list.some((r) => r.time_out) ? ` · ${g.list.filter((r) => r.time_out).length} done` : ""}</span></div>
             <div className="faces-row">
@@ -60,6 +69,8 @@ export function OnDutyFaces({ rows, faces, branches, nowHm, photos, tagDate }: {
           </div>
         ))}
       </div>
+      </div>
+      ))}
       {(off.length > 0 || leave.length > 0) && (
         <p className="small muted" style={{ margin: "10px 0 0" }}>
           {off.length > 0 && <>Day off: {off.map(name).join(", ")}</>}
