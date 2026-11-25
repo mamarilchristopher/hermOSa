@@ -1,5 +1,5 @@
 // Staff phone test of the Service log (CHRIS, Nov 26): log "TEST Service", ₱100, with sample photos and waiver,
-// Solo if commission-based, No commission if not. Returns what's wrong; empty means it all worked.
+// any Done by / Assisted by (v0.55.11: no commission type check). Returns what's wrong; empty means it all worked.
 export type TestEntry = {
   kind: string; cents: number; type: string; eligible: boolean | null;
   photos: { kind: string }[]; photosDue: boolean;
@@ -11,7 +11,6 @@ export function testProblems(t: TestEntry): string[] {
   const n = (k: string) => t.photos.filter((p) => p.kind === k).length;
   if (t.kind !== "PAID") out.push("choose Paid");
   if (t.cents !== 10000) out.push("enter 100 as the amount paid");
-  if (t.eligible === true && t.type !== "SOLO") out.push("choose Solo commission (you're commission-based)");
   if (n("BEFORE") < 1) out.push("add a before photo");
   if (n("AFTER") < 1) out.push("add an after photo");
   if (n("WAIVER") < 2) out.push("add both waiver pages");
