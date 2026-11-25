@@ -10,7 +10,9 @@ import { markNoticesRead } from "./actions";
 import { ManagerHome, TodoCard, type Todo } from "./ManagerHome";
 import type { DutyRow } from "@/components/OnDuty";
 import type { Ir } from "@/lib/incidents";
-import { branchShort, timeLabel } from "@/lib/schedule";
+import { branchShort, shortNames, timeLabel } from "@/lib/schedule";
+import { photoUrls } from "@/lib/photos";
+import type { DutyFace } from "@/components/OnDutyFaces";
 import { noticeButton, noticeHref } from "@/lib/noticeLink";
 import { computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
 import { addDays, sortBranches } from "@/lib/insights";
@@ -67,7 +69,23 @@ async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>
     const notIn = duty.filter((r) => !r.off && r.start && !r.time_in && r.start.slice(0, 5) <= hm);
     if (notIn.length) todos.push({ text: `Not timed in yet: ${notIn.slice(0, 5).map((r) => r.name.split(" ")[0]).join(", ")}${notIn.length > 5 ? ", and more" : ""}`, href: "/time", urgent: true });
   }
-  return { g, todos, duty };
+  // Faces for the On duty card (CHRIS Nov 25: neat view with profile pictures): nickname or first name + approved photo.
+  const faces: Record<string, DutyFace> = {};
+  if (duty?.length) {
+    const ids = [...new Set(duty.map((r) => r.employee_id))];
+    const { data: emps } = await supabase.from("employees").select("id, full_name, nickname, app_user_id").in("id", ids);
+    const list = (emps ?? []) as { id: string; full_name: string; nickname: string | null; app_user_id: string | null }[];
+    const userIds = list.map((e) => e.app_user_id).filter((x): x is string => !!x);
+    const { data: users } = userIds.length ? await supabase.from("app_users").select("id, photo_path").in("id", userIds) : { data: [] };
+    const pathOf = new Map(((users ?? []) as { id: string; photo_path: string | null }[]).map((u) => [u.id, u.photo_path]));
+    const urls = await photoUrls(supabase, [...pathOf.values()]);
+    const names = shortNames(list.map((e) => ({ id: e.id, name: e.full_name, nick: e.nickname })));
+    for (const e of list) {
+      const path = e.app_user_id ? pathOf.get(e.app_user_id) : null;
+      faces[e.id] = { short: names[e.id] ?? e.full_name, photo: path ? urls.get(path) ?? null : null };
+    }
+  }
+  return { g, todos, duty, faces };
 }
 
 type Notice = { id: string; kind?: string; title: string; body: string | null; link: string | null; created_at: string; read_at: string | null };
@@ -224,7 +242,7 @@ export default async function Me() {
           </div>
         )}
         {staffTodos && <TodoCard todos={staffTodos} />}
-        {home && <ManagerHome g={home.g} todos={home.todos} duty={home.duty} branches={branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: branchShort(b.name) }))} />}
+        {home && <ManagerHome g={home.g} todos={home.todos} duty={home.duty} faces={home.faces} branches={branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: branchShort(b.name) }))} />}
         {ownerLevel && trackData != null && (
           <div className="card">
             <div className="card-head"><h2>Tardiness tracker, {monthLabel(today.slice(0, 7))}</h2><Link className="small" href="/nte">All Late NTEs</Link></div>

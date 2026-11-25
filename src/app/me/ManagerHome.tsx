@@ -2,7 +2,8 @@ import Link from "next/link";
 import { centsToPhp } from "@/lib/csv";
 import { monthLabel } from "@/lib/insights";
 import { dayLabel, type DayCell, type Glance } from "@/lib/homeGlance";
-import { OnDutyList, type DutyRow } from "@/components/OnDuty";
+import type { DutyRow } from "@/components/OnDuty";
+import { OnDutyFaces, type DutyFace } from "@/components/OnDutyFaces";
 
 export type Todo = { text: string; href: string; urgent?: boolean };
 
@@ -41,7 +42,7 @@ export function TodoCard({ todos }: { todos: Todo[] }) {
 }
 
 /** Home for owners, finance and managers: what needs doing, yesterday per branch, and how the month is going. */
-export function ManagerHome({ g, todos, duty, branches }: { g: Glance; todos: Todo[]; duty: DutyRow[] | null; branches: { id: string; name: string }[] }) {
+export function ManagerHome({ g, todos, duty, faces = {}, branches }: { g: Glance; todos: Todo[]; duty: DutyRow[] | null; faces?: Record<string, DutyFace>; branches: { id: string; name: string }[] }) {
   const ym = g.today.slice(0, 7);
   const hm = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" });
   const entered = g.branches.filter((b) => b.todayCell.kind !== "empty").length;
@@ -72,7 +73,7 @@ export function ManagerHome({ g, todos, duty, branches }: { g: Glance; todos: To
             <h2>On duty today</h2>
             <Link className="small" href="/time">Time clock →</Link>
           </div>
-          <OnDutyList rows={duty} branches={branches} nowHm={hm} compact />
+          <OnDutyFaces rows={duty} faces={faces} branches={branches} nowHm={hm} />
         </div>
       )}
 

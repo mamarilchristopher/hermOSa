@@ -795,3 +795,19 @@ h1 .uid { font-size: 0.9rem; }
 .duty-list .irregular-form { justify-content: flex-end; }
 .irregular-form select, .irregular-form input { max-width: 100%; }
 .irregular-day { margin: 0 0 10px; }
+
+/* On duty, neat Home view with faces (v0.44.2) */
+.faces-branches { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.faces-branch { background: var(--cream); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.faces-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.faces-row { display: flex; flex-wrap: wrap; gap: 14px; }
+.face { display: flex; flex-direction: column; align-items: center; width: 76px; text-align: center; gap: 2px; }
+.face .avatar { border: 3px solid transparent; box-sizing: content-box; }
+.face.is-in .avatar, .face.is-out .avatar { border-color: var(--good); }
+.face.is-late .avatar { border-color: var(--bad); }
+.face.is-missing .avatar { border-color: var(--bad); opacity: .55; }
+.face.is-waiting .avatar { opacity: .55; }
+.face-name { font-weight: 600; font-size: 14px; line-height: 1.2; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.face-status { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.face.is-missing .face-status { color: var(--bad); font-weight: 600; }
+.face-late { font-size: 12px; color: var(--bad); font-weight: 700; white-space: nowrap; }
