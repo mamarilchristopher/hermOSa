@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.55.13 | Nov 26, 2026 | none | Client archive and Social media: each day is split by branch (QC Main, Fairview, Sta. Maria, Marikina) with a count per branch |
 | 0.55.12 | Nov 26, 2026 | none | Add a service: the "still needs photos" note shows only once a new entry is started (it was showing on the empty form and looked like it was about the saved entries) |
 | 0.55.11 | Nov 26, 2026 | none | Staff test no longer asks for Solo: any Done by / Assisted by passes if Paid, ₱100, before + after photos and both waiver pages are in |
 | 0.55.10 | Nov 26, 2026 | none | Service log "Already logged?" now checks the same client name and service today (not staff and amount); "Yes, separate visit. Log it" goes through reliably |

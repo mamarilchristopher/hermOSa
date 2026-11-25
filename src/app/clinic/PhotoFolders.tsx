@@ -6,6 +6,7 @@ import { TopBar } from "@/components/TopBar";
 import { manilaToday } from "@/lib/dates";
 import { dayLabel } from "@/lib/homeGlance";
 import { branchShort } from "@/lib/schedule";
+import { BRANCH_ORDER } from "@/lib/insights";
 import { ShareToggle } from "./ShareToggle";
 import { TaggedDownload } from "./TaggedDownload";
 
@@ -53,6 +54,8 @@ export async function PhotoFolders({ social, searchParams }: { social: boolean; 
   const [view, save] = files.length ? await Promise.all([sign(files, false), sign(originals, true)]) : [{}, {}];
 
   const days = [...new Set(visits.map((v) => v.date))];
+  const rank = (id: string) => { const c = branches.find((b) => b.id === id)?.code ?? ""; const i = BRANCH_ORDER.indexOf(c); return i < 0 ? 99 : i; };
+  const branchOrder = [...new Set(visits.map((v) => v.branch_id))].sort((a, b) => rank(a) - rank(b));
   const base = social ? "/clinic/social" : "/clinic/archive";
   const link = (m: string) => `${base}?month=${m}${branch ? `&branch=${branch}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
   const canShare = owner || gm;
@@ -98,8 +101,12 @@ export async function PhotoFolders({ social, searchParams }: { social: boolean; 
             {days.map((d) => (
               <section key={d} className="folder-day">
                 <h2>{dayLabel(d)}</h2>
+                {/* CHRIS Nov 26: each day split by branch, in his branch order. */}
+                {branchOrder.filter((bid) => visits.some((v) => v.date === d && v.branch_id === bid)).map((bid) => (
+                <div key={bid} className="folder-branch">
+                <h3>{branchShort(branches.find((b) => b.id === bid)?.name ?? "")} <span className="small muted">({visits.filter((v) => v.date === d && v.branch_id === bid).length})</span></h3>
                 <div className="client-folders">
-                  {visits.filter((v) => v.date === d).map((v) => {
+                  {visits.filter((v) => v.date === d && v.branch_id === bid).map((v) => {
                     // Archive auto-tag (CHRIS Nov 26): client, service, branch, date, lead/assist. Social media photos stay clean.
                     const tag = [v.client, v.service, branchShort(v.branch ?? ""), longDate(v.date), v.lead && `Lead ${v.lead}`, v.assist && `Assist ${v.assist}`].filter(Boolean).join(" · ");
                     const groups = ([["Before and after", ["BEFORE", "AFTER"]], ["Waiver", ["WAIVER"]]] as const)
@@ -149,6 +156,8 @@ export async function PhotoFolders({ social, searchParams }: { social: boolean; 
                     );
                   })}
                 </div>
+                </div>
+                ))}
               </section>
             ))}
           </>
