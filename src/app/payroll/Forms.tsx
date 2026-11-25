@@ -1,6 +1,6 @@
 "use client";
 import { useActionState } from "react";
-import { addAdjustment, finalizePayroll, saveHoliday, savePaySettings } from "./actions";
+import { addAdjustment, finalizePayroll, saveHoliday, savePaySettings, savePayrollRules } from "./actions";
 
 const php = (c: number | null | undefined) => (c == null ? "" : String(c / 100));
 const Msg = ({ st }: { st?: { ok?: string; error?: string } }) => (
@@ -10,7 +10,7 @@ const Msg = ({ st }: { st?: { ok?: string; error?: string } }) => (
   </>
 );
 
-export type PaySetting = { basis: "MONTHLY" | "DAILY"; rate_cents: number; allowance_cents: number; statutory: boolean; tax: boolean; deduct_lates: boolean };
+export type PaySetting = { basis: "MONTHLY" | "DAILY"; rate_cents: number; allowance_cents: number; statutory: boolean; tax: boolean; deduct_lates: boolean; declared_cents?: number | null };
 
 /** One staff member's pay rate and switches. CSRs default to basic pay only (no government shares or tax). */
 export function PayRateForm({ employee, s, csr }: { employee: string; s: PaySetting | null; csr: boolean }) {
@@ -25,9 +25,10 @@ export function PayRateForm({ employee, s, csr }: { employee: string; s: PaySett
       </select>
       <input name="rate" defaultValue={php(s?.rate_cents)} inputMode="decimal" placeholder="Rate ₱" aria-label="Rate in pesos" required />
       <input name="allowance" defaultValue={php(s?.allowance_cents || null)} inputMode="decimal" placeholder="Allowance ₱/cutoff" aria-label="Allowance per cutoff" />
+      <input name="declared" defaultValue={php(s?.declared_cents ?? null)} inputMode="decimal" placeholder="Declared salary ₱" aria-label="Declared salary for SSS, PhilHealth, Pag-IBIG and tax" title="Leave empty to use the rate" />
       <label className="check"><input type="checkbox" name="statutory" defaultChecked={gov} /> SSS, PhilHealth, Pag-IBIG</label>
       <label className="check"><input type="checkbox" name="tax" defaultChecked={tax} /> Tax</label>
-      <label className="check"><input type="checkbox" name="lates" defaultChecked={s ? s.deduct_lates : true} /> Deduct lates</label>
+      <label className="check"><input type="checkbox" name="lates" defaultChecked={s ? s.deduct_lates : false} /> Deduct lates</label>
       <button className="small" disabled={pending}>{pending ? "Saving…" : "Save"}</button>
       <Msg st={st} />
     </form>
@@ -77,6 +78,24 @@ export function HolidayForm() {
         <option value="SPECIAL">Special non-working day</option>
       </select>
       <button className="small" disabled={pending}>{pending ? "Saving…" : "Add"}</button>
+      <Msg st={st} />
+    </form>
+  );
+}
+
+export function RulesForm({ statutory, special }: { statutory: string; special: boolean }) {
+  const [st, action, pending] = useActionState(savePayrollRules, undefined);
+  return (
+    <form action={action} className="pay-rate">
+      <label className="check">SSS, PhilHealth, Pag-IBIG deducted
+        <select name="statutory" defaultValue={statutory}>
+          <option value="FIRST">in full on the 1st–15th cutoff</option>
+          <option value="SECOND">in full on the 16th–end cutoff</option>
+          <option value="SPLIT">half on each cutoff</option>
+        </select>
+      </label>
+      <label className="check"><input type="checkbox" name="special" defaultChecked={special} /> +30% for working a special day</label>
+      <button className="small" disabled={pending}>{pending ? "Saving…" : "Save rules"}</button>
       <Msg st={st} />
     </form>
   );

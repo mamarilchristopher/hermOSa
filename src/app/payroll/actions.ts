@@ -12,7 +12,7 @@ const cents = (v: FormDataEntryValue | null): number | null | "bad" => {
   if (!t) return null;
   return /^\d+(\.\d{1,2})?$/.test(t) ? Math.round(Number(t) * 100) : "bad";
 };
-const missing = (code?: string) => (code === "PGRST202" || code === "42P01" ? "The owner needs to run update-0046 in Supabase first." : "Could not save. Try again.");
+const missing = (code?: string) => (code === "PGRST202" || code === "42P01" || code === "42703" ? "The owner needs to run the latest update (update-0047) in Supabase first." : "Could not save. Try again.");
 
 /** Pay rate and switches for one staff member. Owners and the GM (the database checks). */
 export async function savePaySettings(prev: PayState, fd: FormData): Promise<PayState> {
@@ -20,13 +20,14 @@ export async function savePaySettings(prev: PayState, fd: FormData): Promise<Pay
   const emp = z.uuid().safeParse(String(fd.get("employee") ?? ""));
   if (!emp.success) return { error: "Refresh the page and try again.", n };
   const basis = String(fd.get("basis")) === "DAILY" ? "DAILY" : "MONTHLY";
-  const rate = cents(fd.get("rate")), allowance = cents(fd.get("allowance"));
+  const rate = cents(fd.get("rate")), allowance = cents(fd.get("allowance")), declared = cents(fd.get("declared"));
   if (rate === "bad" || rate == null) return { error: "Type the rate in pesos, like 18000.", n };
   if (allowance === "bad") return { error: "The allowance is a peso amount, like 500.", n };
+  if (declared === "bad") return { error: "The declared salary is a peso amount, like 14820, or leave it empty.", n };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("save_pay_settings", {
     p_employee: emp.data, p_basis: basis, p_rate_cents: rate, p_allowance_cents: allowance ?? 0,
-    p_statutory: fd.get("statutory") === "on", p_tax: fd.get("tax") === "on", p_deduct_lates: fd.get("lates") === "on",
+    p_statutory: fd.get("statutory") === "on", p_tax: fd.get("tax") === "on", p_deduct_lates: fd.get("lates") === "on", p_declared_cents: declared,
   });
   if (error) return { error: missing(error.code), n };
   if (!data?.ok) return { error: errorText(data?.error), n };
@@ -102,4 +103,14 @@ export async function deleteHoliday(fd: FormData) {
   const supabase = await createClient();
   await supabase.rpc("delete_holiday", { p_date: d });
   revalidatePath("/payroll");
+}
+
+export async function savePayrollRules(prev: PayState, fd: FormData): Promise<PayState> {
+  const n = (prev?.n ?? 0) + 1;
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("save_payroll_rules", { p_statutory_cutoff: String(fd.get("statutory") ?? ""), p_special_worked_premium: fd.get("special") === "on" });
+  if (error) return { error: missing(error.code), n };
+  if (!data?.ok) return { error: errorText(data?.error), n };
+  revalidatePath("/payroll");
+  return { ok: "Saved. Recompute a draft cutoff to apply.", n };
 }

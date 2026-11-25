@@ -37,10 +37,10 @@ const amt = (lines: Line[], start: string) => lines.find((l) => l.label.startsWi
 
 describe("payroll", () => {
   it("only owners and the GM set pay rates and open payroll", async () => {
-    expect((await db.rpc(lead, "aal1", "save_pay_settings", [anaE, "MONTHLY", 2_000_000, 0, true, true, true])).ok).toBe(false);
+    expect((await db.rpc(lead, "aal1", "save_pay_settings", [anaE, "MONTHLY", 2_000_000, 0, true, true, true, null])).ok).toBe(false);
     expect((await db.rpc(ana, "aal1", "open_payroll", ["2026-10-01"])).ok).toBe(false);
-    expect((await db.rpc(owner, "aal2", "save_pay_settings", [anaE, "MONTHLY", 2_000_000, 50_000, true, true, true])).ok).toBe(true);
-    expect((await db.rpc(gm, "aal1", "save_pay_settings", [beaE, "DAILY", 60_000, 0, false, false, true])).ok).toBe(true);
+    expect((await db.rpc(owner, "aal2", "save_pay_settings", [anaE, "MONTHLY", 2_000_000, 50_000, true, true, true, null])).ok).toBe(true);
+    expect((await db.rpc(gm, "aal1", "save_pay_settings", [beaE, "DAILY", 60_000, 0, false, false, true, null])).ok).toBe(true);
     expect((await db.rpc(gm, "aal1", "save_holiday", ["2026-10-10", "DEMO Holiday", "REGULAR"])).ok).toBe(true);
   });
 
@@ -60,16 +60,16 @@ describe("payroll", () => {
     expect(o).toMatchObject({ ok: true, state: "DRAFT" });
     run = o.id;
     const s = await slip(anaE);
-    const daily = (2_000_000 * 12) / 313;
+    const daily = 2_000_000 / 26;
     expect(amt(s.earnings, "Basic pay")).toBe(1_000_000);
     expect(amt(s.earnings, "Commission")).toBe(50_000);
     expect(amt(s.earnings, "Allowance")).toBe(50_000);
     expect(amt(s.deductions, "Absences")).toBe(Math.round(daily));
     expect(s.deductions.find((l: Line) => l.label.startsWith("Absences")).label).toContain("Oct 4");
     expect(amt(s.deductions, "Lates (40 min)")).toBe(Math.round((daily / 480) * 40));
-    expect(amt(s.deductions, "SSS")).toBe(50_000);       // P1,000 a month for a P20,000 credit, half per cutoff
-    expect(amt(s.deductions, "PhilHealth")).toBe(25_000); // 2.5% of P20,000, half
-    expect(amt(s.deductions, "Pag-IBIG")).toBe(10_000);   // P200 a month, half
+    expect(amt(s.deductions, "SSS")).toBe(100_000);       // P1,000 a month for a P20,000 credit, all on the 1st-15th cutoff
+    expect(amt(s.deductions, "PhilHealth")).toBe(50_000); // 2.5% of P20,000
+    expect(amt(s.deductions, "Pag-IBIG")).toBe(20_000);   // P200 a month
     expect(amt(s.deductions, "Withholding")).toBeUndefined(); // below the taxable line
     expect(s.attendance).toMatchObject({ worked: 3, paid_leave: 1, absent: 1, late_min: 40 });
     expect(Number(s.net_cents)).toBe(Number(s.gross_cents) - Number(s.deductions_cents));
@@ -110,6 +110,30 @@ describe("payroll", () => {
     const next = await db.rpc(gm, "aal1", "open_payroll", ["2026-10-20"]);
     const s2 = (await db.sql("SELECT * FROM public.payslips WHERE run_id = $1 AND employee_id = $2", [next.id, anaE])).rows[0];
     expect(s2.commissions).toEqual([]);
+  });
+
+  it("update-0047 rules: declared salary for government shares, none on the 16th-end cutoff, special day no premium unless switched on", async () => {
+    expect((await db.rpc(gm, "aal1", "save_pay_settings", [anaE, "MONTHLY", 2_750_000, 0, true, true, false, 1_482_000])).ok).toBe(true);
+    const o = await db.rpc(gm, "aal1", "open_payroll", ["2026-09-01"]);
+    const s = (await db.sql("SELECT * FROM public.payslips WHERE run_id = $1 AND employee_id = $2", [o.id, anaE])).rows[0];
+    expect(amt(s.earnings, "Basic pay")).toBe(1_375_000);
+    expect(amt(s.deductions, "SSS")).toBe(75_000);       // P14,820 declared -> P15,000 credit -> P750
+    expect(amt(s.deductions, "PhilHealth")).toBe(37_050); // 2.5% of P14,820
+    expect(amt(s.deductions, "Withholding")).toBeUndefined(); // taxed on half the declared salary
+    const second = await db.rpc(gm, "aal1", "open_payroll", ["2026-09-20"]);
+    const s2 = (await db.sql("SELECT * FROM public.payslips WHERE run_id = $1 AND employee_id = $2", [second.id, anaE])).rows[0];
+    expect(amt(s2.deductions, "SSS")).toBeUndefined();
+
+    await db.rpc(gm, "aal1", "save_holiday", ["2026-09-08", "DEMO Special", "SPECIAL"]);
+    await shift(beaE, "2026-09-08"); await timeIn(beaE, bea, "2026-09-08", "10:00");
+    await db.rpc(gm, "aal1", "open_payroll", ["2026-09-01"]);
+    let b = (await db.sql("SELECT * FROM public.payslips WHERE run_id = $1 AND employee_id = $2", [o.id, beaE])).rows[0];
+    expect(amt(b.earnings, "Special day worked")).toBeUndefined();
+    expect((await db.rpc(lead, "aal1", "save_payroll_rules", ["SPLIT", true])).ok).toBe(false);
+    expect((await db.rpc(owner, "aal2", "save_payroll_rules", ["FIRST", true])).ok).toBe(true);
+    await db.rpc(gm, "aal1", "open_payroll", ["2026-09-01"]);
+    b = (await db.sql("SELECT * FROM public.payslips WHERE run_id = $1 AND employee_id = $2", [o.id, beaE])).rows[0];
+    expect(amt(b.earnings, "Special day worked")).toBe(18_000);
   });
 
   it("a cutoff that hasn't ended can't be finalized", async () => {

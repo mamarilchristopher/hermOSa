@@ -863,7 +863,7 @@ h1 .uid { font-size: 0.9rem; }
 .pay-rate-row:first-child { border-top: 0; }
 .pay-rate-row.missing strong::after { content: " · no rate yet"; font-weight: 400; color: var(--bad); font-size: 0.8rem; }
 .pay-rate { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.pay-rate input[name="rate"], .pay-rate input[name="allowance"] { width: 9.5em; }
+.pay-rate input[name="rate"], .pay-rate input[name="allowance"], .pay-rate input[name="declared"] { width: 9.5em; }
 .pay-rate .check { display: inline-flex; gap: 6px; align-items: center; font-size: 0.85rem; }
 tr.total td { font-weight: 800; border-top: 2px solid var(--line); }
 .payslip { display: grid; gap: 14px; }

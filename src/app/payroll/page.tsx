@@ -4,7 +4,7 @@ import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { Uid } from "@/components/Uid";
 import { openPayroll, deleteHoliday } from "./actions";
-import { FinalizeForm, HolidayForm, PayRateForm, type PaySetting } from "./Forms";
+import { FinalizeForm, HolidayForm, PayRateForm, RulesForm, type PaySetting } from "./Forms";
 import { peso, periodLabel, manilaToday } from "@/lib/payroll";
 
 type Run = { id: string; period_start: string; period_end: string; state: "DRAFT" | "FINAL"; computed_at: string | null; finalized_at: string | null };
@@ -22,12 +22,14 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
     ? new Date(Date.parse(`${today.slice(0, 7)}-01T00:00:00Z`) - 86400000).toISOString().slice(0, 10)
     : `${today.slice(0, 7)}-01`;
 
-  const [{ data: runsData, error: runsErr }, { data: emps }, { data: settings }, { data: hols }] = await Promise.all([
+  const [{ data: runsData, error: runsErr }, { data: emps }, { data: settings }, { data: hols }, { data: org }] = await Promise.all([
     supabase.from("payroll_runs").select("id, period_start, period_end, state, computed_at, finalized_at").order("period_start", { ascending: false }).limit(24),
     supabase.from("employees").select("id, uid, full_name, position").eq("active", true).order("full_name"),
-    supabase.from("pay_settings").select("employee_id, basis, rate_cents, allowance_cents, statutory, tax, deduct_lates"),
+    supabase.from("pay_settings").select("employee_id, basis, rate_cents, allowance_cents, statutory, tax, deduct_lates, declared_cents"),
     supabase.from("holidays").select("holiday_date, name, kind").gte("holiday_date", `${Number(today.slice(0, 4)) - 1}-12-01`).order("holiday_date"),
+    supabase.from("organizations").select("payroll_rules").maybeSingle(),
   ]);
+  const rules = ((org as { payroll_rules?: { statutory_cutoff?: string; special_worked_premium?: boolean } } | null)?.payroll_rules) ?? {};
   const runs = (runsData ?? []) as Run[];
   const run = runs.find((r) => r.id === runParam) ?? runs[0] ?? null;
   const { data: slipsData } = run
@@ -108,8 +110,8 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         <div className="card">
           <h2>Pay rates</h2>
           <p className="muted small">
-            Monthly: half is paid each cutoff, and a day&apos;s pay (for absences and lates) is monthly × 12 ÷ 313. Daily: paid for days worked, paid leave and regular holidays.
-            Allowance is per cutoff and not taxed. Staff without a rate aren&apos;t in payroll{noRate.length > 0 ? ` (${noRate.length} without one yet)` : ""}.
+            Monthly: half is paid each cutoff, and a day&apos;s pay (for absences) is monthly ÷ 26. Daily: paid for days worked, paid leave and regular holidays.
+            Allowance is per cutoff and not taxed. A declared salary, if set, is what SSS, PhilHealth, Pag-IBIG and tax are based on. Lates are only deducted when ticked. Staff without a rate aren&apos;t in payroll{noRate.length > 0 ? ` (${noRate.length} without one yet)` : ""}.
           </p>
           <div className="pay-rates">
             {staff.map((e) => (
@@ -122,8 +124,13 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         </div>
 
         <div className="card">
+          <h2>Rules</h2>
+          <RulesForm statutory={rules.statutory_cutoff ?? "FIRST"} special={!!rules.special_worked_premium} />
+        </div>
+
+        <div className="card">
           <h2>Holidays</h2>
-          <p className="muted small">Regular holiday worked: +100% of a day&apos;s pay. Special day worked: +30%. A regular holiday off is paid; a special day off is not.</p>
+          <p className="muted small">Regular holiday worked: +100% of a day&apos;s pay; a regular holiday off is still paid. Special day: no work, no pay; working it adds +30% only if switched on under Rules.</p>
           <HolidayForm />
           <ul className="plain-list">
             {(hols ?? []).map((h: { holiday_date: string; name: string; kind: string }) => (
