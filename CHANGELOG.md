@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.55.10 | Nov 26, 2026 | none | Service log "Already logged?" now checks the same client name and service today (not staff and amount); "Yes, separate visit. Log it" goes through reliably |
 | 0.55.9 | Nov 26, 2026 | none | Service log: no Lead / Assist / Solo buttons. Pick who did it ("Done by"); if she is commission-based, "Assisted by" appears (default None = 100% to her; an assistant = 60/40, a non-commission assistant's 40% goes to no one). Staff not on commission just pick themselves |
 | 0.55.8 | Nov 26, 2026 | none | Service log staff lists show clinic staff only (CSRs and WFH staff removed) |
 | 0.55.7 | Nov 26, 2026 | none | Service log: one "Add before & after photos" button; pick the batch at once, earlier photos become Before and later ones After (by time taken), tap a photo's label to switch |

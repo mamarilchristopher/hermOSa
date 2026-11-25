@@ -44,10 +44,20 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     if (cents <= 0) return { error: "Enter the amount paid. If the client didn't pay, choose Backjob, Check-up or No charge." };
   }
   const supabase = await createClient();
+  // CHRIS Nov 26: "already logged?" checks the same client and service today (not staff and amount).
+  if (fd.get("confirm") !== "1") {
+    const like = p.data.client.trim().replace(/[\\%_]/g, (c) => "\\" + c);
+    const { data: same } = await supabase.from("service_logs").select("created_at").eq("branch_id", p.data.branch).eq("service_date", p.data.date)
+      .eq("service_id", p.data.service).neq("state", "REJECTED").ilike("client_name", like).order("created_at", { ascending: false }).limit(1);
+    if (same?.length) {
+      const at = new Date(same[0].created_at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
+      return { duplicate: `${p.data.client.trim()} already has this service logged today (at ${at}). Is this a separate visit?`, at: Date.now() };
+    }
+  }
   const { data, error } = await supabase.rpc("log_client_visit", {
     p_branch: p.data.branch, p_date: p.data.date, p_service: p.data.service, p_amount_cents: cents, p_type: !paid ? "NONCOMMI" : p.data.type === "LEAD" && !p.data.partner ? "SOLO" : p.data.type,
     p_employee: p.data.employee, p_partner: paid ? p.data.partner || null : null, p_note: p.data.note || null,
-    p_kind: p.data.kind, p_confirm: fd.get("confirm") === "1",
+    p_kind: p.data.kind, p_confirm: true, // the client + service check above replaces the old staff + amount check
     p_client: p.data.client, p_price_note: p.data.price_note || null, p_folder: p.data.folder, p_photos: photos, p_share: p.data.share === "1",
   });
   if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0053 in Supabase first." : "Could not save. Try again." };

@@ -62,6 +62,7 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
   useEffect(() => {
     if (state?.ok) {
       form.current?.reset();
+      form.current?.querySelector('input[name="confirm"]')?.remove();
       setAmount("");
       setKind("PAID");
       setWho("");
@@ -200,7 +201,13 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
       {state?.duplicate && (
         <div className="notice warn dup-check">
           <span><strong>Already logged?</strong> {state.duplicate}</span>
-          <button type="submit" name="confirm" value="1" className="small" disabled={pending}>Yes, different client. Log it</button>
+          <button type="submit" className="small" disabled={pending} onClick={(e) => {
+            // A button's own name/value doesn't always reach a server action (see pick()), so write it into a hidden field.
+            const f = e.currentTarget.form; if (!f) return;
+            let i = f.querySelector<HTMLInputElement>('input[name="confirm"]');
+            if (!i) { i = document.createElement("input"); i.type = "hidden"; i.name = "confirm"; f.appendChild(i); }
+            i.value = "1";
+          }}>Yes, separate visit. Log it</button>
         </div>
       )}
     </form>
