@@ -173,12 +173,16 @@ describe("payroll", () => {
     expect((await db.rpc(owner, "aal2", "decide_cola", [req, true])).error).toBe("ALREADY_DECIDED");
     expect((await db.sql("SELECT cola_cents FROM public.pay_settings WHERE employee_id = $1", [anaE])).rows[0].cola_cents).toBe("150000");
     expect(await db.rpc(owner, "aal2", "request_cola", [beaE, 250_000])).toMatchObject({ ok: true, applied: true });
+    const big = await db.rpc(lead, "aal1", "log_service", [FV, "2026-08-03", svc, 20_000_000, "SOLO", anaE, null, null, null]);
+    expect((await db.rpc(owner, "aal2", "decide_service_log", [big.id, true, null])).ok).toBe(true);
     const first = await db.rpc(gm, "aal1", "open_payroll", ["2026-08-01"]);
     const second = await db.rpc(gm, "aal1", "open_payroll", ["2026-08-20"]);
     const s1 = (await db.sql("SELECT * FROM public.payslips WHERE run_id = $1 AND employee_id = $2", [first.id, anaE])).rows[0];
     const s2 = (await db.sql("SELECT * FROM public.payslips WHERE run_id = $1 AND employee_id = $2", [second.id, anaE])).rows[0];
     expect(amt(s1.earnings, "COLA")).toBe(150_000);
     expect(amt(s2.earnings, "COLA")).toBeUndefined();
+    expect(amt(s1.earnings, "Commission")).toBe(1_000_000);
+    expect(amt(s1.deductions, "Withholding")).toBeUndefined(); // commissions are not taxed (CHRIS Nov 25)
   });
 
   it("a cutoff that hasn't ended can't be finalized", async () => {

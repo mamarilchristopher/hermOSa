@@ -9,6 +9,7 @@
 --   * 13th month pay: a month's basic pay x months worked in the year / 12, prorated from the start date for staff hired
 --     in the year (CHRIS: from Jan 1, 2026), less unpaid absences on final payslips / 12. CSRs (contractors) excluded.
 --     Added as a non-taxable line on a draft cutoff's payslips (due by Dec 24).
+--   * Commissions are not taxed (CHRIS Nov 25).
 --   * COLA per person: a monthly amount paid in full on the 1st-15th cutoff, not taxed. Only an Owner sets it; when the
 --     GM changes it, the change waits for an Owner to approve (CHRIS Nov 25).
 
@@ -157,6 +158,7 @@ BEGIN
   WHERE c.employee_id = p_employee AND l.state = 'APPROVED' AND l.service_date <= r.period_end
     AND NOT EXISTS (SELECT 1 FROM public.commission_paid cp WHERE cp.commission_line_id = c.id);
   IF v_comm > 0 THEN v_earn := v_earn || jsonb_build_object('label', 'Commission (' || jsonb_array_length(v_comm_list) || ')', 'amount', v_comm); END IF;
+  v_nontax := v_nontax + v_comm;   -- commissions are not taxed (CHRIS Nov 25)
   IF ps.allowance_cents > 0 THEN
     v_earn := v_earn || jsonb_build_object('label', 'Allowance', 'amount', ps.allowance_cents);
     v_nontax := v_nontax + ps.allowance_cents;
