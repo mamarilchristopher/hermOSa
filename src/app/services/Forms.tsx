@@ -194,9 +194,10 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
           {pending ? "Saving…" : photos.uploading ? "Uploading photos…" : "Add to today's log"}
         </button>
       </div>
-      {missing && !photos.uploading && <p className="small muted entry-missing">{missing}</p>}
-      {photosOptional && missingPhotos && !photos.uploading && (
-        <p className="small entry-missing" style={{ color: "var(--bad)" }}><strong>Still missing: {missingPhotos}</strong> You can save without them, but the entry will show "Photos missing": the lead and assist get an urgent notice to add them, and their commission for this entry is held until they do.</p>
+      {missing && !photos.uploading && (!!service || !!client || photos.slots.length > 0) && <p className="small muted entry-missing">{missing}</p>}
+      {/* Only once this new entry is under way: an empty form isn't "missing" anything yet. */}
+      {photosOptional && missingPhotos && !photos.uploading && (!!service || !!client || photos.slots.length > 0) && (
+        <p className="small entry-missing" style={{ color: "var(--bad)" }}><strong>This new entry still needs photos: {missingPhotos}</strong> You can save without them, but the entry will show "Photos missing": the lead and assist get an urgent notice to add them, and their commission for this entry is held until they do.</p>
       )}
       {state?.duplicate && (
         <div className="notice warn dup-check">
