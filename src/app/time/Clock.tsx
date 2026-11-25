@@ -8,6 +8,14 @@ import { photoTakenAt } from "@/lib/exif";
 
 type B = { id: string; name: string };
 const PENDING = "hermosa-pending-punch";
+/** A random v4 UUID. crypto.randomUUID is missing in some in-app browsers (Messenger) and older phones. */
+function newId(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
 /** A short reason from any error, for the on-screen message. */
 const why = (e: unknown) => (e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : String(e)).slice(0, 120) || "unknown";
 
@@ -97,7 +105,7 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
       const [blob, pos, taken] = await Promise.all([shrink(f).catch(() => null), locate(), f.slice(0, 262144).arrayBuffer().then((b) => photoTakenAt(b), () => null)]);
       if (!blob) { setRes({ error: "This photo couldn't be read. Take the photo again with the phone's camera." }); return; }
       setBusy("Saving your photo…"); step = "upload";
-      const path = `${userId}/${crypto.randomUUID()}.jpg`;
+      const path = `${userId}/${newId()}.jpg`;
       const up = createClient().storage.from("timeclock").upload(path, blob, { contentType: "image/jpeg" });
       const { error } = await within(up, 30000, () => ({ data: null, error: new Error("timeout") }) as unknown as Awaited<typeof up>);
       if (error) { setRes({ error: `Could not upload the photo. Check your internet and try again. (${why(error)})` }); return; }
