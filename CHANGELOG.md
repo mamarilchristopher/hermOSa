@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.55.5 | Nov 26, 2026 | none | Service log: the General Manager is no longer in the Lead / Assisted by lists (she can still log entries for others) |
 | 0.55.3 | Nov 26, 2026 | none | Staff test result pops up (✅ working correctly, or what to fix) so it can't be missed; owners/GM see exactly which photos are still missing before saving; phone entry cards no longer cut off the lead/assist labels |
 | 0.55.2 | Nov 26, 2026 | none | Timed-in staff must have phone notifications on: a red bar that can't be closed shows on every page until notifications are on for that phone (with steps for blocked, iPhone-not-installed and too-old phones). Service log: "Assisted by" is optional and defaults to None; a Lead with no assistant is saved as Solo (100%), and the 60/40 split applies only when an assistant is chosen; the lead can't also be picked as the assistant |
 | 0.55.0 | Nov 26, 2026 | update-0055 | Hermosapp: install Hermosa OS on Android and iPhone home screens (own icon, opens full screen to Home); a card on Home shows how. Phone notifications: chat messages (to that chat's members only), notices, urgent photo reminders and approvals pop up even when the app is closed (turn on once per phone). Chat read receipts: "Read by Ana, Bea, Cy" in chats of 3 or more, "Read 3:58 AM" in 1-on-1 chats, under the last message each person has read |

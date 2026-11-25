@@ -34,7 +34,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
 
   const [{ data: services }, { data: emps }, { data: logs }] = await Promise.all([
     supabase.from("services").select("id, name, price_cents, commission_cents").eq("active", true).order("name"),
-    supabase.from("employees").select("id, full_name, branch_id, commission_eligible, app_user_id").eq("active", true).order("full_name"),
+    supabase.from("employees").select("id, full_name, branch_id, commission_eligible, app_user_id, position").eq("active", true).order("full_name"),
     supabase.from("service_logs").select("*, services(name)")
       .eq("branch_id", branch.id).eq("service_date", date).order("created_at"),
   ]);
@@ -47,7 +47,8 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const lines = (lineRows ?? []) as Line[];
   const name = Object.fromEntries((emps ?? []).map((e) => [e.id, e.full_name]));
   const mine = new Set((emps ?? []).filter((e) => e.app_user_id === access.user_id).map((e) => e.id));
-  const employees = (emps ?? []).map((e) => ({ id: e.id, name: e.full_name, eligible: e.commission_eligible, here: e.branch_id === branch.id }));
+  // CHRIS Nov 26: the General Manager doesn't perform services, so she isn't in the Lead / Assisted by lists.
+  const employees = (emps ?? []).filter((e) => !/general\s*manager/i.test(e.position ?? "")).map((e) => ({ id: e.id, name: e.full_name, eligible: e.commission_eligible, here: e.branch_id === branch.id }));
   // Staff who aren't on commission never see commission choices (management still does, to log for others).
   const myEmp = (emps ?? []).find((e) => e.app_user_id === access.user_id);
   const noCommission = !!myEmp && !myEmp.commission_eligible && !access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
