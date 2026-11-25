@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.48.1 | Nov 25, 2026 | none (needs update-0048) | Light / Dark switch is now a two-option pill at the bottom of the side menu, above your name. Phones keep the small sun/moon in the top bar |
 | 0.48.0 | Nov 25, 2026 | update-0048 | Per-dose commission (new price list): Barbie Arms Trio pays P300 on the 1st dose (P8,000 paid), then P50 each for the "Barbie Arms Trio 2nd dose" and "3rd dose" services, logged with P0 paid. A P0-priced service with a set commission now pays it even when nothing is paid that visit |
 | 0.47.2 | Nov 25, 2026 | none | Menu grouped into 8 items: Home, Time clock, Sales, Clinic, Team, Pay, People, Settings. Related pages are tabs across the top of each (red badges add up per item). Phones: Home, Clock and the two most-used items, plus More. Dark mode switch (moon/sun beside your name; on phones in the top bar), remembered per device; dark mode uses a light-lettering logo (same gold mark) |
 | 0.47.1 | Nov 25, 2026 | none | Payroll page cleaned up for PC and phone: one Cutoff dropdown (shows Draft/Final) and a one-person payslip picker side by side; cutoff totals as tiles; payslip list with tap-to-open rows (on phones: name and net pay, with gross/deductions/commission underneath); tidy finalize bar; labeled pay-rate fields. Commission details per person right on the Payroll page (tap a name: date, service, role, amount paid, commission) |

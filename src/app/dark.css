@@ -60,3 +60,7 @@
 [data-mode="dark"] .side-nav a.active svg, [data-mode="dark"] .tab-nav a.active svg { color: var(--gold); }
 [data-mode="dark"] .side-nav a, [data-mode="dark"] .tab-nav a, [data-mode="dark"] .more-sheet a, [data-mode="dark"] .slip-row, [data-mode="dark"] .segmented a { color: var(--ink-2); }
 [data-mode="dark"] .side-nav a.active, [data-mode="dark"] .tab-nav a.active, [data-mode="dark"] .segmented a.on { color: var(--ink); }
+/* v0.48.1 Light | Dark pill */
+[data-mode="dark"] .mode-pill { background: #121316; }
+[data-mode="dark"] .mode-pill button { background: transparent; border-color: transparent; color: var(--muted); }
+[data-mode="dark"] .mode-pill button.on { background: #2a2c31; color: var(--ink); }

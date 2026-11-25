@@ -92,13 +92,13 @@ export async function TopBar({ access }: { access: Access }) {
         {/* View as sits above the menu so a long menu on a short laptop screen never pushes it out of sight. */}
         {viewList.length > 0 && <ViewAsButton people={viewList} variant="side" />}
         <NavLinks hubs={hubs} variant="side" />
+        <div className="side-mode"><ThemeToggle variant="pill" /></div>
         <div className="me">
           <Avatar name={access.display_name} url={myPhotoUrl} />
           <span className="me-text">
             <strong>{access.display_name}</strong>
             <span>{role}{access.mfa && <span className="mfa" title="Signed in with 2-step verification"><IconShield /> 2FA</span>}</span>
           </span>
-          <ThemeToggle />
           <form action="/auth/signout" method="post">
             <button className="icon-btn" type="submit" title="Sign out" aria-label="Sign out"><IconLogout /></button>
           </form>

@@ -74,6 +74,14 @@ code { font-size: 0.85em; background: var(--cream); padding: 1px 6px; border-rad
 .side-nav a.active { background: var(--gold-soft); color: var(--brown-dark); }
 .side-nav a.active svg { color: var(--gold); }
 .side-nav a.active::before { content: ""; position: absolute; left: -14px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--gold); }
+/* v0.48.1: Light | Dark pill at the foot of the side menu. */
+.side-mode { padding: 12px 8px 0; border-top: 1px solid var(--line); }
+.mode-pill { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 4px; background: var(--pearl); border: 1px solid var(--line); border-radius: 999px; }
+.mode-pill button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 0; padding: 7px 10px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: 0.85rem; font-weight: 500; box-shadow: none; cursor: pointer; }
+.mode-pill button svg { width: 15px; height: 15px; }
+.mode-pill button:hover { color: var(--ink); }
+.mode-pill button.on { background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: var(--shadow-sm); }
+.side-mode + .me { border-top: 0; }
 .me { display: flex; align-items: center; gap: 10px; padding: 12px 8px 4px; border-top: 1px solid var(--line); }
 .me form { margin-left: auto; }
 .me-text { display: grid; line-height: 1.25; min-width: 0; }
