@@ -23,10 +23,28 @@ const KINDS = [
 ] as const;
 type Kind = (typeof KINDS)[number]["v"];
 
+/** Staff phone test (CHRIS Nov 26): the result pops up so nobody misses it. */
+function TestPopup({ s }: { s: ActionState }) {
+  const [closedAt, setClosedAt] = useState<number | undefined>(undefined);
+  const pass = !!s?.ok?.startsWith("✅");
+  const fail = !!s?.ok?.startsWith("Test saved, but");
+  if ((!pass && !fail) || closedAt === s?.at) return null;
+  return (
+    <div className="modal-back" role="dialog" aria-modal="true" onClick={() => setClosedAt(s?.at)}>
+      <div className={`card modal test-popup ${pass ? "pass" : "fail"}`} onClick={(e) => e.stopPropagation()}>
+        <div className="test-popup-icon" aria-hidden>{pass ? "✅" : "⚠️"}</div>
+        <h2>{pass ? "Your service logging feature is working correctly." : "Almost there"}</h2>
+        {!pass && <p>{s!.ok!.replace("Test saved, but it isn't complete yet: ", "Your test was saved, but: ")}</p>}
+        <button type="button" onClick={() => setClosedAt(s?.at)}>OK</button>
+      </div>
+    </div>
+  );
+}
+
 function Msg({ s }: { s: ActionState }) {
   if (s?.error) return <div className="notice error">{s.error}</div>;
-  if (s?.ok?.startsWith("Test saved, but")) return <div className="notice warn">{s.ok}</div>;
-  if (s?.ok?.startsWith("✅")) return <div className="notice ok test-pass"><strong>{s.ok}</strong></div>;
+  if (s?.ok?.startsWith("Test saved, but")) return <><TestPopup s={s} /><div className="notice warn">{s.ok}</div></>;
+  if (s?.ok?.startsWith("✅")) return <><TestPopup s={s} /><div className="notice ok test-pass"><strong>{s.ok}</strong></div></>;
   if (s?.ok) return <div className="notice ok">{s.ok}</div>;
   return null;
 }
@@ -198,7 +216,7 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
       </div>
       {missing && !photos.uploading && <p className="small muted entry-missing">{missing}</p>}
       {photosOptional && missingPhotos && !photos.uploading && (
-        <p className="small muted entry-missing">You can save without photos. The lead and assist will get an urgent notice to add them, and their commission for this entry is held until they do.</p>
+        <p className="small entry-missing" style={{ color: "var(--bad)" }}><strong>Still missing: {missingPhotos}</strong> You can save without them, but the entry will show "Photos missing": the lead and assist get an urgent notice to add them, and their commission for this entry is held until they do.</p>
       )}
       {state?.duplicate && (
         <div className="notice warn dup-check">
