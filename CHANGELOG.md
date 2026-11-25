@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.44.8 | Nov 25, 2026 | none | On duty spacing: each face is a fixed width with its lines wrapping inside it (no more text spilling into the next person); shift times shortened to "4:15–7:09 PM"; "Irregular" and its reason on their own small lines |
 | 0.44.7 | Nov 25, 2026 | none | Bookings: "+ Add a booking" is now at the top of the page (tap to open) for owners, the GM and CSRs, for calls, texts, walk-ins and online bookings; "Booked through" says Text / Messenger; bookings by an owner without a staff record show "by owner / GM" |
 | 0.44.6 | Nov 25, 2026 | none | Fix: the Time clock and Home pages crashed ("Application error") once a day or a late was marked irregular (Ignore late / Maintenance); the irregular label is now shared code the server can use |
 | 0.44.5 | Nov 25, 2026 | none | Management (owners and the GM) can also time out with an uploaded screenshot ("Time out with a screenshot" under the Time out button) |

@@ -847,3 +847,9 @@ h1 .uid { font-size: 0.9rem; }
 .add-booking summary { cursor: pointer; list-style: none; }
 .add-booking summary::-webkit-details-marker { display: none; }
 .add-booking[open] summary { margin-bottom: 12px; }
+/* v0.44.8 spacing: faces sized to their text, lines wrap inside the face instead of spilling into the next one */
+.faces-row { gap: 10px 8px; }
+.face { width: 104px; min-width: 0; }
+.face > span { max-width: 100%; overflow-wrap: anywhere; }
+.face-status, .face-late, .face-shift { white-space: normal; line-height: 1.3; }
+.face-note { font-size: 11px; color: var(--muted); line-height: 1.3; margin-top: 2px; overflow-wrap: anywhere; }

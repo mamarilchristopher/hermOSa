@@ -5,6 +5,12 @@ import { irregularLabel } from "@/lib/irregular";
 
 export type DutyFace = { short: string; photo: string | null };
 const clock = (ts: string) => new Date(ts).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" });
+/** "4:15–7:09 PM": one AM/PM when both times share it, so the range fits under a face. */
+const range = (a: string, b: string) => {
+  const x = clock(a), y = clock(b);
+  const px = x.slice(-2), py = y.slice(-2);
+  return px === py ? `${x.slice(0, -3)}–\u200b${y}` : `${x}–\u200b${y}`; // \u200b lets a long range wrap after the dash
+};
 const lateText = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}` : `${m}m`);
 
 /** On duty, the neat view (CHRIS Nov 25): per branch, a face per person with a short status.
@@ -41,9 +47,9 @@ export function OnDutyFaces({ rows, faces, branches, nowHm, photos, tagDate }: {
                     <span className={`face-shift ${state === "out" ? "over" : r.time_in ? "going" : ""}`}>
                       {state === "missing" ? "Not in" : state === "waiting" ? "Not in yet" : state === "out" ? "Duty over" : "On duty"}
                     </span>
-                    {r.time_in && <span className="face-status">{state === "out" ? `${clock(r.time_in)} – ${clock(r.time_out!)}` : `Since ${clock(r.time_in)}`}</span>}
+                    {r.time_in && <span className="face-status">{state === "out" ? range(r.time_in, r.time_out!) : `Since ${clock(r.time_in)}`}</span>}
                     {late > 0 && <span className="face-late">{lateText(late)} late</span>}
-                    {r.irregular && !r.irregular.whole_day && <span className="face-status">Irregular: {irregularLabel(r.irregular)}{tagDate && <> <IrregularUndo id={r.irregular.id} /></>}</span>}
+                    {r.irregular && !r.irregular.whole_day && <span className="face-note">Irregular<br />{irregularLabel(r.irregular)}{tagDate && <><br /><IrregularUndo id={r.irregular.id} /></>}</span>}
                     {r.in_distance_m != null && r.in_distance_m > 300 && photos && <span className="face-late">{r.in_distance_m >= 1000 ? `${(r.in_distance_m / 1000).toFixed(1)} km` : `${r.in_distance_m} m`} away</span>}
                     {photos && r.in_photo && photos[r.in_photo] && <a className="face-link" href={photos[r.in_photo]} target="_blank" rel="noreferrer">Time-in photo</a>}
                     {tagDate && !r.irregular && r.time_in && r.start && late > 0 && <IrregularTagForm date={tagDate} employee={r.employee_id} label="Ignore late" />}
