@@ -2,13 +2,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { IconCalendar, IconChart, IconClipboard, IconCoins, IconHome, IconIdCard, IconPen, IconPeople, IconUpload, IconUsers, IconWeek, IconClock, IconMore, IconSettings } from "./Icons";
+import { IconCalendar, IconChart, IconClipboard, IconCoins, IconHome, IconIdCard, IconPen, IconPeople, IconUpload, IconUsers, IconWeek, IconClock, IconMore, IconSettings, IconChat } from "./Icons";
 
-const ICONS = { chart: IconChart, calendar: IconCalendar, upload: IconUpload, users: IconUsers, clipboard: IconClipboard, people: IconPeople, coins: IconCoins, home: IconHome, idcard: IconIdCard, pen: IconPen, week: IconWeek, clock: IconClock, settings: IconSettings };
+const ICONS = { chart: IconChart, calendar: IconCalendar, upload: IconUpload, users: IconUsers, clipboard: IconClipboard, people: IconPeople, coins: IconCoins, home: IconHome, idcard: IconIdCard, pen: IconPen, week: IconWeek, clock: IconClock, settings: IconSettings, chat: IconChat };
 
 /** One page inside a hub (shown as a tab across the top of the page). */
 export type HubTab = { href: string; label: string; badge?: number };
-/** A menu item: a group of related pages (v0.48: Home, Time clock, Sales, Clinic, Team, Pay, People, Settings). */
+/** A menu item: a group of related pages (v0.48: Home, Time clock, Sales, Clinic, Team, Pay, People, Settings; v0.49 adds Chat). */
 export type Hub = { key: string; label: string; short: string; icon: keyof typeof ICONS; tabs: HubTab[] };
 
 const matches = (path: string, href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`));
@@ -23,8 +23,8 @@ export function activeOf(hubs: Hub[], path: string): { hub: string | null; tab: 
 }
 const badgeOf = (h: Hub) => h.tabs.reduce((n, t) => n + (t.badge ?? 0), 0);
 
-// Phone bottom bar: Home and Time clock always, then these hubs in this order; the rest go under More.
-const PHONE_ORDER = ["clinic", "team", "sales", "pay", "people", "settings"];
+// Phone bottom bar: Home and Time clock always (v0.49: Chat comes next), then these hubs in this order; the rest go under More.
+const PHONE_ORDER = ["chat", "clinic", "team", "sales", "pay", "people", "settings"];
 
 export function NavLinks({ hubs, variant }: { hubs: Hub[]; variant: "side" | "tabs" }) {
   const path = usePathname();

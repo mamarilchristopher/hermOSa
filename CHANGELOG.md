@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.49.0 | Nov 26, 2026 | update-0049 | Team chat: private 1-on-1 and group chats (only members can read, owners included), photos, live delivery, unread badges, seen, delete your own message. Automatic groups: All staff and one per branch. Chat sounds with an on/off switch. Messages from management (owners, GM) get a gold Management tag and a can't-miss notice with a distinct chime on every page until staff open them. Service log: Staff and Commission are now separate, aligned columns |
 | 0.48.2 | Nov 25, 2026 | none (cleanup: remove-all-test-data.sql) | Switched-off branches are hidden everywhere (branch pickers, schedules, home). Goes with the one-time test data cleanup that switches off the TEST (Chris) branch |
 | 0.48.1 | Nov 25, 2026 | none (needs update-0048) | Light / Dark switch is now a two-option pill at the bottom of the side menu, above your name. Phones keep the small sun/moon in the top bar |
 | 0.48.0 | Nov 25, 2026 | update-0048 | Per-dose commission (new price list): Barbie Arms Trio pays P300 on the 1st dose (P8,000 paid), then P50 each for the "Barbie Arms Trio 2nd dose" and "3rd dose" services, logged with P0 paid. A P0-priced service with a set commission now pays it even when nothing is paid that visit |

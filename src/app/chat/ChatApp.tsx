@@ -1,0 +1,429 @@
+"use client";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/browser";
+import { Avatar } from "@/components/Avatar";
+import { IconBack, IconImage, IconInfo, IconPlus, IconSend } from "@/components/Icons";
+import { CHAT_SOUNDS_EVENT, playChatSound, setSoundsOn, soundsOn } from "@/lib/chatSounds";
+
+/** Team chat client (v0.49, update-0049). Messages arrive live through Supabase Realtime; reading is limited to members by the database. */
+
+export type ChatPerson = { id: string; name: string; photo_path: string | null; photo_url?: string | null };
+export type ChatRoomRow = {
+  id: string; kind: "DM" | "GROUP"; auto: boolean; name: string | null; photo_path: string | null; photo_url?: string | null;
+  other_id: string | null; last_at: string; members: number; unread: number; mgmt_unread?: number;
+  last: { sender: string; mine: boolean; text: string; mgmt?: boolean } | null;
+};
+type Member = { id: string; name: string; photo_path: string | null; last_read_at: string };
+type RoomInfo = { id: string; kind: "DM" | "GROUP"; auto: boolean; name: string; members: Member[] };
+type Msg = { id: string; room_id: string; sender_id: string; body: string | null; photo_path: string | null; gif_url: string | null; from_management?: boolean; created_at: string; deleted_at: string | null };
+
+const PAGE = 50;
+const ERR: Record<string, string> = {
+  FORBIDDEN: "You can't do that in this chat.", EMPTY_MESSAGE: "Type a message or add a photo.", MESSAGE_TOO_LONG: "That message is too long.",
+  NAME_REQUIRED: "Give the group a name.", NOT_FOUND: "That chat isn't available.", BAD_REQUEST: "That didn't work. Try again.",
+};
+const time = (iso: string) => new Date(iso).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
+const dayKey = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
+const dayLabel = (iso: string) => {
+  const k = dayKey(iso), today = dayKey(new Date().toISOString()), yest = dayKey(new Date(Date.now() - 86400000).toISOString());
+  if (k === today) return "Today";
+  if (k === yest) return "Yesterday";
+  return new Date(iso).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric", year: k.slice(0, 4) === today.slice(0, 4) ? undefined : "numeric" });
+};
+const listTime = (iso: string) => (dayKey(iso) === dayKey(new Date().toISOString()) ? time(iso) : new Date(iso).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" }));
+const uuid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`);
+
+/** Phone photos are big: shrink to at most 1600px and save as JPEG before upload. */
+async function shrink(file: File): Promise<Blob> {
+  if (file.type === "image/gif") return file;
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = url; });
+    const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
+    c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+    return await new Promise<Blob>((ok, bad) => c.toBlob((b) => (b ? ok(b) : bad(new Error("photo"))), "image/jpeg", 0.82));
+  } finally { URL.revokeObjectURL(url); }
+}
+
+export function ChatApp({ me, initialRooms, people, initialRoom }: {
+  me: { id: string; name: string; photo_url: string | null }; initialRooms: ChatRoomRow[]; people: ChatPerson[]; initialRoom: string | null;
+}) {
+  const supabase = useMemo(() => createClient(), []);
+  const [rooms, setRooms] = useState(initialRooms);
+  const [active, setActive] = useState<string | null>(initialRoom);
+  const [info, setInfo] = useState<RoomInfo | null>(null);
+  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [more, setMore] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [panel, setPanel] = useState<null | "new" | "info">(null);
+  const [picked, setPicked] = useState<string | null>(null); // message whose actions are open (phones)
+  const [photos, setPhotos] = useState<Record<string, string>>({});
+  const scroller = useRef<HTMLDivElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [sounds, setSounds] = useState(true);
+  useEffect(() => {
+    const sync = () => setSounds(soundsOn());
+    sync(); addEventListener(CHAT_SOUNDS_EVENT, sync);
+    return () => removeEventListener(CHAT_SOUNDS_EVENT, sync);
+  }, []);
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const faces = useMemo(() => new Map(people.map((p) => [p.id, p.photo_url ?? null])), [people]);
+
+  const refreshList = useCallback(async () => {
+    const { data } = await supabase.rpc("chat_list");
+    if (!Array.isArray(data)) return;
+    setRooms((old) => {
+      const urls = new Map(old.map((r) => [r.id, r.photo_url]));
+      return (data as ChatRoomRow[]).map((r) => ({ ...r, photo_url: urls.get(r.id) ?? (r.other_id ? faces.get(r.other_id) ?? null : null) }));
+    });
+  }, [supabase, faces]);
+
+  const signPhotos = useCallback(async (list: Msg[]) => {
+    const need = list.map((m) => m.photo_path).filter((p): p is string => !!p);
+    if (!need.length) return;
+    const { data } = await supabase.storage.from("chat").createSignedUrls([...new Set(need)], 3600);
+    const add: Record<string, string> = {};
+    for (const d of data ?? []) if (d.path && d.signedUrl) add[d.path] = d.signedUrl;
+    setPhotos((p) => ({ ...p, ...add }));
+  }, [supabase]);
+
+  const markRead = useCallback((room: string) => {
+    void supabase.rpc("chat_mark_read", { p_room: room });
+    setRooms((rs) => rs.map((r) => (r.id === room ? { ...r, unread: 0 } : r)));
+  }, [supabase]);
+
+  // Open a chat: its members and the newest messages.
+  useEffect(() => {
+    setInfo(null); setMsgs([]); setMore(false); setError(null); setPanel((p) => (p === "info" ? null : p));
+    if (!active) return;
+    let gone = false;
+    setLoading(true);
+    (async () => {
+      const [{ data: r }, { data: m }] = await Promise.all([
+        supabase.rpc("chat_room", { p_room: active }),
+        supabase.from("chat_messages").select("*").eq("room_id", active).order("created_at", { ascending: false }).limit(PAGE),
+      ]);
+      if (gone) return;
+      setLoading(false);
+      if (!r?.ok) { setError(ERR.NOT_FOUND); return; }
+      setInfo(r as RoomInfo);
+      const list = ((m ?? []) as Msg[]).reverse();
+      setMsgs(list);
+      setMore(list.length === PAGE);
+      void signPhotos(list);
+      markRead(active);
+      requestAnimationFrame(() => scroller.current?.scrollTo({ top: scroller.current.scrollHeight }));
+    })();
+    return () => { gone = true; };
+  }, [active, supabase, signPhotos, markRead]);
+
+  // Live: new and deleted messages, and "seen" updates. The database only sends rows from chats you're in.
+  useEffect(() => {
+    const ch = supabase.channel(`chat-${me.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, (p) => {
+        const m = p.new as Msg;
+        if (m.room_id === activeRef.current) {
+          setMsgs((list) => (list.some((x) => x.id === m.id) ? list : [...list, m]));
+          void signPhotos([m]);
+          if (m.sender_id !== me.id && document.visibilityState === "visible") markRead(m.room_id);
+          const el = scroller.current;
+          if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 160) requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }));
+        }
+        void refreshList();
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_messages" }, (p) => {
+        const m = p.new as Msg;
+        setMsgs((list) => list.map((x) => (x.id === m.id ? m : x)));
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_members" }, (p) => {
+        const row = p.new as { room_id: string; user_id: string; last_read_at: string };
+        setInfo((i) => (i && i.id === row.room_id ? { ...i, members: i.members.map((x) => (x.id === row.user_id ? { ...x, last_read_at: row.last_read_at } : x)) } : i));
+      })
+      .subscribe();
+    // Fallback if live updates drop (weak signal): refresh the list every 30 seconds.
+    const t = setInterval(() => { void refreshList(); }, 30000);
+    return () => { clearInterval(t); void supabase.removeChannel(ch); };
+  }, [supabase, me.id, refreshList, signPhotos, markRead]);
+
+  // Back/forward buttons move between chats.
+  useEffect(() => {
+    const pop = () => setActive(location.pathname.split("/")[2] || null);
+    addEventListener("popstate", pop);
+    return () => removeEventListener("popstate", pop);
+  }, []);
+  const open = (id: string | null) => {
+    setActive(id); setPanel(null); setText("");
+    history.pushState(null, "", id ? `/chat/${id}` : "/chat");
+  };
+
+  const older = async () => {
+    if (!active || !msgs.length) return;
+    const el = scroller.current, before = el ? el.scrollHeight : 0;
+    const { data } = await supabase.from("chat_messages").select("*").eq("room_id", active).lt("created_at", msgs[0].created_at).order("created_at", { ascending: false }).limit(PAGE);
+    const list = ((data ?? []) as Msg[]).reverse();
+    setMsgs((m) => [...list, ...m]);
+    setMore(list.length === PAGE);
+    void signPhotos(list);
+    requestAnimationFrame(() => { if (el) el.scrollTop = el.scrollHeight - before; });
+  };
+
+  const send = async (photo?: string) => {
+    if (!active || busy) return;
+    const body = photo ? null : text.trim();
+    if (!photo && !body) return;
+    setBusy(true); setError(null);
+    const { data, error: e } = await supabase.rpc("chat_send", { p_room: active, p_body: body, p_photo_path: photo ?? null, p_gif_url: null });
+    setBusy(false);
+    if (e || !data?.ok) { setError(ERR[data?.error] ?? "Couldn't send. Check your connection and try again."); return; }
+    if (!photo) setText("");
+    playChatSound("sent");
+    const m = data.message as Msg;
+    setMsgs((list) => (list.some((x) => x.id === m.id) ? list : [...list, m]));
+    void signPhotos([m]);
+    requestAnimationFrame(() => scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" }));
+    void refreshList();
+  };
+
+  const sendPhoto = async (file: File | undefined) => {
+    if (!file || !active) return;
+    if (!file.type.startsWith("image/")) { setError("Only photos can be sent."); return; }
+    setBusy(true); setError(null);
+    try {
+      const blob = await shrink(file);
+      const ext = blob.type === "image/gif" ? "gif" : "jpg";
+      const path = `${active}/${me.id}/${uuid()}.${ext}`;
+      const { error: e } = await supabase.storage.from("chat").upload(path, blob, { contentType: blob.type || "image/jpeg" });
+      if (e) throw e;
+      setBusy(false);
+      await send(path);
+    } catch {
+      setBusy(false);
+      setError("The photo didn't upload. Try again.");
+    } finally {
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  };
+
+  const remove = async (m: Msg) => {
+    if (!confirm("Delete this message for everyone?")) return;
+    const { data } = await supabase.rpc("chat_delete_message", { p_message: m.id });
+    if (!data?.ok) { setError("Couldn't delete that message."); return; }
+    if (data.photo_path) void supabase.storage.from("chat").remove([data.photo_path]);
+    setMsgs((list) => list.map((x) => (x.id === m.id ? { ...x, body: null, photo_path: null, gif_url: null, deleted_at: new Date().toISOString() } : x)));
+    setPicked(null);
+    void refreshList();
+  };
+
+  const room = rooms.find((r) => r.id === active);
+  const names = new Map((info?.members ?? []).map((m) => [m.id, m]));
+  const group = info?.kind === "GROUP";
+  const lastMine = [...msgs].reverse().find((m) => m.sender_id === me.id && !m.deleted_at);
+  const seenBy = lastMine ? (info?.members ?? []).filter((m) => m.id !== me.id && m.last_read_at >= lastMine.created_at) : [];
+
+  return (
+    <div className={`chat-wrap ${active ? "room-open" : ""}`}>
+      <aside className="chat-list" aria-label="Chats">
+        <div className="chat-list-head">
+          <h1>Chat</h1>
+          <button type="button" className="icon-btn chat-sound" aria-pressed={sounds} title={sounds ? "Chat sounds are on. Tap to mute." : "Chat sounds are off. Tap to turn on."}
+            aria-label={sounds ? "Mute chat sounds" : "Turn on chat sounds"} onClick={() => setSoundsOn(!sounds)}>{sounds ? "🔔" : "🔕"}</button>
+          <button type="button" className="secondary chat-new" onClick={() => setPanel(panel === "new" ? null : "new")}><IconPlus /> New</button>
+        </div>
+        {panel === "new" && <NewChat people={people} supabase={supabase} onDone={async (id) => { await refreshList(); open(id); }} onClose={() => setPanel(null)} />}
+        <ul className="chat-rooms">
+          {rooms.map((r) => (
+            <li key={r.id}>
+              <button type="button" className={`chat-room-btn ${r.id === active ? "on" : ""} ${r.unread ? "unread" : ""} ${r.mgmt_unread ? "mgmt" : ""}`} onClick={() => open(r.id)}>
+                {r.kind === "DM" ? <Avatar name={r.name ?? "?"} url={r.photo_url} size={44} /> : <span className="chat-group-face" aria-hidden>{r.auto ? "#" : (r.name ?? "?").slice(0, 1).toUpperCase()}</span>}
+                <span className="chat-room-text">
+                  <span className="chat-room-top"><strong>{r.name ?? "Chat"}</strong>{r.last && <span className="chat-time">{listTime(r.last_at)}</span>}</span>
+                  <span className="chat-room-last">
+                    <span>{r.last ? `${r.last.mine ? "You: " : r.kind === "GROUP" ? `${r.last.sender.split(" ")[0]}: ` : ""}${r.last.text}` : r.kind === "GROUP" ? `${r.members} people` : "Say hi"}</span>
+                    {!!r.mgmt_unread && <span className="mgmt-chip">Management</span>}
+                    {r.unread > 0 && <span className="nav-badge">{r.unread > 99 ? "99+" : r.unread}</span>}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+          {rooms.length === 0 && <li className="muted small chat-empty">No chats yet. Tap New to message someone.</li>}
+        </ul>
+      </aside>
+
+      <section className="chat-pane" aria-label={info?.name ?? "Conversation"}>
+        {!active ? (
+          <div className="chat-blank muted"><p>Pick a chat, or tap <strong>New</strong> to message someone or start a group.</p><p className="small">Chats are private: only the people in a chat can read it.</p></div>
+        ) : (
+          <>
+            <header className="chat-head">
+              <button type="button" className="icon-btn chat-back" aria-label="Back to chats" onClick={() => open(null)}><IconBack /></button>
+              {room?.kind === "DM" ? <Avatar name={info?.name ?? room?.name ?? "?"} url={room?.photo_url} size={36} /> : <span className="chat-group-face small" aria-hidden>{room?.auto ? "#" : (info?.name ?? room?.name ?? "?").slice(0, 1).toUpperCase()}</span>}
+              <span className="chat-head-text"><strong>{info?.name ?? room?.name ?? "Chat"}</strong>{group && <span className="small muted">{info?.members.length} people</span>}</span>
+              {group && <button type="button" className="icon-btn" aria-label="Group details" title="Group details" onClick={() => setPanel(panel === "info" ? null : "info")}><IconInfo /></button>}
+            </header>
+            {panel === "info" && info && <GroupInfo info={info} me={me.id} people={people} supabase={supabase}
+              onChanged={async (left) => { if (left) { await refreshList(); open(null); return; } const { data } = await supabase.rpc("chat_room", { p_room: info.id }); if (data?.ok) setInfo(data as RoomInfo); void refreshList(); }} />}
+            <div className="chat-scroll" ref={scroller} onClick={() => setPicked(null)}>
+              {more && <p className="chat-older"><button type="button" className="link-like small" onClick={older}>Load older messages</button></p>}
+              {loading && <p className="muted small chat-older">Loading…</p>}
+              {msgs.map((m, i) => {
+                const prev = msgs[i - 1];
+                const newDay = !prev || dayKey(prev.created_at) !== dayKey(m.created_at);
+                const mine = m.sender_id === me.id;
+                const first = newDay || !prev || prev.sender_id !== m.sender_id || Date.parse(m.created_at) - Date.parse(prev.created_at) > 5 * 60000;
+                const who = names.get(m.sender_id);
+                const next = msgs[i + 1];
+                const last = !next || next.sender_id !== m.sender_id || dayKey(next.created_at) !== dayKey(m.created_at) || Date.parse(next.created_at) - Date.parse(m.created_at) > 5 * 60000;
+                return (
+                  <div key={m.id}>
+                    {newDay && <div className="chat-day"><span>{dayLabel(m.created_at)}</span></div>}
+                    <div className={`chat-msg ${mine ? "mine" : ""} ${first ? "first" : ""} ${m.from_management && !m.deleted_at ? "mgmt" : ""}`}>
+                      {!mine && group && (first ? <Avatar name={who?.name ?? "?"} url={faces.get(m.sender_id) ?? null} size={30} /> : <span className="chat-face-gap" />)}
+                      <div className="chat-bubble-wrap">
+                        {!mine && group && first && <span className="chat-name">{who?.name ?? "Former member"}</span>}
+                        {!mine && m.from_management && !m.deleted_at && <span className="mgmt-chip">📣 Management</span>}
+                        <div className={`chat-bubble ${m.deleted_at ? "deleted" : ""} ${m.photo_path && !m.body ? "photo-only" : ""}`}
+                          onClick={(e) => { if (mine && !m.deleted_at) { e.stopPropagation(); setPicked(picked === m.id ? null : m.id); } }} title={time(m.created_at)}>
+                          {m.deleted_at ? <em>Message deleted</em> : (
+                            <>
+                              {m.photo_path && (photos[m.photo_path]
+                                // eslint-disable-next-line @next/next/no-img-element
+                                ? <a href={photos[m.photo_path]} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><img src={photos[m.photo_path]} alt="Photo" className="chat-photo" /></a>
+                                : <span className="chat-photo loading">Photo</span>)}
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              {m.gif_url && <img src={m.gif_url} alt="GIF" className="chat-photo" />}
+                              {m.body && <span className="chat-text">{m.body}</span>}
+                            </>
+                          )}
+                        </div>
+                        <span className={`chat-meta ${last ? "" : "quiet"} ${picked === m.id ? "show" : ""}`}>
+                          {time(m.created_at)}
+                          {mine && !m.deleted_at && <button type="button" className={`link-like chat-del ${picked === m.id ? "show" : ""}`} onClick={(e) => { e.stopPropagation(); void remove(m); }}>Delete</button>}
+                        </span>
+                        {lastMine?.id === m.id && seenBy.length > 0 && (
+                          <span className="chat-seen">{group ? `Seen by ${seenBy.length === 1 ? seenBy[0].name.split(" ")[0] : `${seenBy.length}`}` : "Seen"}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {!loading && msgs.length === 0 && !error && <p className="muted small chat-older">No messages yet. Say hi!</p>}
+            </div>
+            {error && <p className="chat-error small" role="alert">{error}</p>}
+            <form className="chat-compose" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+              <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => void sendPhoto(e.target.files?.[0])} />
+              <button type="button" className="icon-btn" aria-label="Send a photo" title="Send a photo" disabled={busy} onClick={() => fileInput.current?.click()}><IconImage /></button>
+              <textarea value={text} rows={1} maxLength={4000} placeholder="Message" aria-label="Message"
+                onChange={(e) => setText(e.target.value)}
+                onPaste={(e) => { const f = [...e.clipboardData.files].find((x) => x.type.startsWith("image/")); if (f) { e.preventDefault(); void sendPhoto(f); } }}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !("ontouchstart" in window)) { e.preventDefault(); void send(); } }} />
+              <button type="submit" className="chat-send" aria-label="Send" disabled={busy || !text.trim()}><IconSend /></button>
+            </form>
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
+
+type Sb = ReturnType<typeof createClient>;
+
+function PeoplePicker({ people, chosen, toggle, filter }: { people: ChatPerson[]; chosen: Set<string>; toggle: (id: string) => void; filter: string }) {
+  const q = filter.trim().toLowerCase();
+  const list = people.filter((p) => !q || p.name.toLowerCase().includes(q));
+  return (
+    <ul className="chat-people">
+      {list.map((p) => (
+        <li key={p.id}><label><input type="checkbox" checked={chosen.has(p.id)} onChange={() => toggle(p.id)} /><Avatar name={p.name} url={p.photo_url} size={30} /> {p.name}</label></li>
+      ))}
+      {list.length === 0 && <li className="muted small">Nobody matches.</li>}
+    </ul>
+  );
+}
+
+function NewChat({ people, supabase, onDone, onClose }: { people: ChatPerson[]; supabase: Sb; onDone: (id: string) => void; onClose: () => void }) {
+  const [mode, setMode] = useState<"dm" | "group">("dm");
+  const [q, setQ] = useState("");
+  const [name, setName] = useState("");
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [err, setErr] = useState<string | null>(null);
+  const toggle = (id: string) => setChosen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const dm = async (id: string) => {
+    const { data } = await supabase.rpc("chat_start_dm", { p_user: id });
+    if (data?.ok) onDone(data.id); else setErr(ERR[data?.error] ?? "Couldn't start the chat.");
+  };
+  const create = async () => {
+    const { data } = await supabase.rpc("chat_create_group", { p_name: name, p_members: [...chosen] });
+    if (data?.ok) onDone(data.id); else setErr(ERR[data?.error] ?? "Couldn't make the group.");
+  };
+  const ql = q.trim().toLowerCase();
+  return (
+    <div className="chat-panel">
+      <div className="segmented chat-mode">
+        <button type="button" className={mode === "dm" ? "on" : undefined} onClick={() => setMode("dm")}>Message someone</button>
+        <button type="button" className={mode === "group" ? "on" : undefined} onClick={() => setMode("group")}>New group</button>
+      </div>
+      {mode === "group" && <input value={name} maxLength={60} placeholder="Group name" aria-label="Group name" onChange={(e) => setName(e.target.value)} />}
+      <input value={q} placeholder="Search names" aria-label="Search names" onChange={(e) => setQ(e.target.value)} />
+      {mode === "dm" ? (
+        <ul className="chat-people">
+          {people.filter((p) => !ql || p.name.toLowerCase().includes(ql)).map((p) => (
+            <li key={p.id}><button type="button" className="link-like chat-person" onClick={() => void dm(p.id)}><Avatar name={p.name} url={p.photo_url} size={30} /> {p.name}</button></li>
+          ))}
+        </ul>
+      ) : <PeoplePicker people={people} chosen={chosen} toggle={toggle} filter={q} />}
+      {err && <p className="chat-error small">{err}</p>}
+      <div className="chat-panel-actions">
+        <button type="button" className="secondary" onClick={onClose}>Cancel</button>
+        {mode === "group" && <button type="button" disabled={!name.trim() || chosen.size === 0} onClick={() => void create()}>Create group ({chosen.size + 1})</button>}
+      </div>
+    </div>
+  );
+}
+
+function GroupInfo({ info, me, people, supabase, onChanged }: { info: RoomInfo; me: string; people: ChatPerson[]; supabase: Sb; onChanged: (left: boolean) => void }) {
+  const [name, setName] = useState(info.name);
+  const [adding, setAdding] = useState(false);
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [err, setErr] = useState<string | null>(null);
+  const inGroup = new Set(info.members.map((m) => m.id));
+  const call = async (fn: string, args: Record<string, unknown>, left = false) => {
+    const { data } = await supabase.rpc(fn, args);
+    if (data?.ok) { setAdding(false); setChosen(new Set()); onChanged(left); } else setErr(ERR[data?.error] ?? "That didn't work.");
+  };
+  return (
+    <div className="chat-panel chat-info">
+      {info.auto ? <p className="small muted">This group updates itself: staff join and leave it with their branch.</p> : (
+        <form className="chat-rename" onSubmit={(e) => { e.preventDefault(); void call("chat_rename", { p_room: info.id, p_name: name }); }}>
+          <input value={name} maxLength={60} aria-label="Group name" onChange={(e) => setName(e.target.value)} />
+          <button type="submit" className="secondary" disabled={!name.trim() || name.trim() === info.name}>Rename</button>
+        </form>
+      )}
+      <ul className="chat-people">
+        {info.members.map((m) => <li key={m.id}><span><Avatar name={m.name} url={people.find((p) => p.id === m.id)?.photo_url ?? null} size={28} /> {m.name}{m.id === me ? " (you)" : ""}</span></li>)}
+      </ul>
+      {!info.auto && (adding ? (
+        <>
+          <PeoplePicker people={people.filter((p) => !inGroup.has(p.id))} chosen={chosen} toggle={(id) => setChosen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; })} filter="" />
+          <div className="chat-panel-actions">
+            <button type="button" className="secondary" onClick={() => setAdding(false)}>Cancel</button>
+            <button type="button" disabled={!chosen.size} onClick={() => void call("chat_add_members", { p_room: info.id, p_members: [...chosen] })}>Add {chosen.size || ""}</button>
+          </div>
+        </>
+      ) : (
+        <div className="chat-panel-actions">
+          <button type="button" className="secondary" onClick={() => { if (confirm("Leave this group? You won't see its messages anymore.")) void call("chat_leave", { p_room: info.id }, true); }}>Leave group</button>
+          <button type="button" onClick={() => setAdding(true)}>Add people</button>
+        </div>
+      ))}
+      {err && <p className="chat-error small">{err}</p>}
+    </div>
+  );
+}

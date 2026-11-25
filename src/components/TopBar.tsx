@@ -10,6 +10,7 @@ import { ViewAsButton } from "./ViewAsButton";
 import { Avatar } from "./Avatar";
 import { photoUrls } from "@/lib/photos";
 import { NotifBell } from "./NotifBell";
+import { ChatAlerts } from "./ChatAlerts";
 
 const ROLE_LABEL: Record<string, string> = {
   OWNER: "Owner", FINANCE: "Finance", MANAGER: "Manager", CASHIER: "Cashier", HR: "HR",
@@ -24,7 +25,7 @@ export async function TopBar({ access }: { access: Access }) {
   const viewAs = access.grants.some((g) => (g.role === "OWNER" || g.role === "MANAGER") && g.branch_id === null);
   const gm = !owner && can(access, ["MANAGER"], null);
   const detailsApprover = owner || gm;
-  const [{ data: overdueData }, { count: detailsWaiting }, { count: unreadNotices }, { data: viewPeople }, { count: joinsWaiting }, { data: meRow }, { count: photosWaiting }, { count: leaveWaiting }] = await Promise.all([
+  const [{ data: overdueData }, { count: detailsWaiting }, { count: unreadNotices }, { data: viewPeople }, { count: joinsWaiting }, { data: meRow }, { count: photosWaiting }, { count: leaveWaiting }, { data: chatUnread }] = await Promise.all([
     approver ? supabase.rpc("overdue_commission_days") : Promise.resolve({ data: [] }),
     detailsApprover ? supabase.from("employee_detail_submissions").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("user_id", access.user_id) : Promise.resolve({ count: 0 }),
     supabase.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null),
@@ -33,6 +34,7 @@ export async function TopBar({ access }: { access: Access }) {
     supabase.from("app_users").select("photo_path").eq("id", access.user_id).maybeSingle(), // errors (before update-0034) mean initials
     detailsApprover ? supabase.from("profile_photos").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("user_id", owner ? "00000000-0000-0000-0000-000000000000" : access.user_id) : Promise.resolve({ count: 0 }),
     detailsApprover ? supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("state", "PENDING").neq("filed_by", owner ? "00000000-0000-0000-0000-000000000000" : access.user_id) : Promise.resolve({ count: 0 }),
+    supabase.rpc("chat_unread"), // errors (before update-0049) mean no badge
   ]);
   const myPhoto = (meRow as { photo_path?: string | null } | null)?.photo_path ?? null;
   const myPhotoUrl = myPhoto ? (await photoUrls(supabase, [myPhoto])).get(myPhoto) ?? null : null;
@@ -49,6 +51,8 @@ export async function TopBar({ access }: { access: Access }) {
   const hubs: Hub[] = ([
     { key: "home", label: "Home", short: "Home", icon: "home", tabs: [{ href: "/me", label: "Home" }] },
     { key: "time", label: "Time clock", short: "Clock", icon: "clock", tabs: [{ href: "/time", label: "Time clock" }] },
+    // Team chat (v0.49, update-0049): private 1-on-1 and group chats; the badge counts unread messages.
+    { key: "chat", label: "Chat", short: "Chat", icon: "chat", tabs: [{ href: "/chat", label: "Chat", badge: typeof chatUnread === "number" && chatUnread > 0 ? chatUnread : undefined }] },
     { key: "sales", label: "Sales", short: "Sales", icon: "chart", tabs: [
       ...(management ? [{ href: "/", label: "Dashboard" }] : []),
       ...(filler ? [{ href: "/sales/daily", label: "Daily sales" }, { href: "/sales/missing", label: "Missing days" }] : []),
@@ -131,6 +135,8 @@ export async function TopBar({ access }: { access: Access }) {
         </div>
       )}
       <HubTabs hubs={hubs} />
+      {/* v0.49: chat sounds, and the can't-miss notice when management messages staff. */}
+      <ChatAlerts me={access.user_id} management={viewAs} />
     </>
   );
 }

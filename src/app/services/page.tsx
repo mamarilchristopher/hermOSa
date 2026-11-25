@@ -98,7 +98,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
         <div className="table-wrap">
           <table className="log-table">
             <thead>
-              <tr><th>Service</th><th className="num">Paid</th><th>Type</th><th>Staff and commission</th><th>Status</th></tr>
+              <tr><th>Service</th><th className="num">Paid</th><th>Type</th><th>Staff</th><th className="num">Commission</th><th>Status</th></tr>
             </thead>
             <tbody>
               {list.map((l) => {
@@ -111,16 +111,20 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                     <td>{l.visit_kind && l.visit_kind !== "PAID"
                       ? <span className="tag">{VISIT_TEXT[l.visit_kind] ?? l.visit_kind}</span>
                       : <span className={`tag ${l.commission_type}`}>{TYPE_TEXT[l.commission_type]}</span>}</td>
+                    {/* v0.49 (CHRIS Nov 26): staff and commission in their own columns, one line per person, aligned. */}
                     <td>
+                      {staff.map((id) => (
+                        <div key={id} className="staff-line">{name[id] ?? "Former staff"}{mine.has(id) && <span className="muted"> (you)</span>}</div>
+                      ))}
+                    </td>
+                    <td className="num">
                       {staff.map((id, i) => {
                         const line = ls.find((x) => x.employee_id === id);
                         const role = l.commission_type === "LEAD" ? (i === 0 ? "lead" : "assist") : l.commission_type === "SOLO" ? "solo" : "";
                         return (
-                          <div key={id} className="staff-line">
-                            <span>{name[id] ?? "Former staff"}{mine.has(id) && <span className="muted"> (you)</span>}</span>
-                            <span className="muted small">
-                              {line ? `${centsToPhp(line.amount_cents)} ${ROLE_TEXT[line.role]}` : l.commission_type === "NONCOMMI" ? "" : approver || mine.has(id) ? `no commission · ${role}` : role}
-                            </span>
+                          <div key={id} className="staff-line comm">
+                            {line ? <><strong>{centsToPhp(line.amount_cents)}</strong> <span className="muted small">{ROLE_TEXT[line.role]}</span></>
+                              : <span className="muted small">{l.commission_type === "NONCOMMI" ? "-" : approver || mine.has(id) ? `no commission · ${role}` : role}</span>}
                           </div>
                         );
                       })}
@@ -136,7 +140,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                   </tr>
                 );
               })}
-              {list.length === 0 && <tr><td colSpan={5} className="muted">Nothing logged for this day yet.</td></tr>}
+              {list.length === 0 && <tr><td colSpan={6} className="muted">Nothing logged for this day yet.</td></tr>}
             </tbody>
           </table>
         </div>

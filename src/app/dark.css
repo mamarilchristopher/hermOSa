@@ -64,3 +64,17 @@
 [data-mode="dark"] .mode-pill { background: #121316; }
 [data-mode="dark"] .mode-pill button { background: transparent; border-color: transparent; color: var(--muted); }
 [data-mode="dark"] .mode-pill button.on { background: #2a2c31; color: var(--ink); }
+/* v0.49 team chat */
+[data-mode="dark"] .chat-room-btn, [data-mode="dark"] .chat-new.secondary { color: var(--ink); }
+[data-mode="dark"] .chat-room-btn { background: transparent; border-color: transparent; }
+[data-mode="dark"] .chat-room-btn:hover, [data-mode="dark"] .chat-room-btn.on { background: #26282d; }
+[data-mode="dark"] .chat-room-btn.mgmt { background: #3a3220; }
+[data-mode="dark"] .chat-bubble { background: #2a2c31; color: var(--ink); }
+[data-mode="dark"] .chat-msg.mine .chat-bubble { background: #ececef; color: #16171a; }
+[data-mode="dark"] .chat-msg.mgmt:not(.mine) .chat-bubble { background: #3a3220; border-color: #d9b56b; }
+[data-mode="dark"] .chat-send { background: #ececef; color: #16171a; }
+[data-mode="dark"] .chat-group-face { background: #2a2c31; color: #e3c27f; border-color: #3a3c42; }
+[data-mode="dark"] .mgmt-alert-card { background: #1c1d21; }
+[data-mode="dark"] .chat-person { background: transparent; border-color: transparent; color: var(--ink); }
+[data-mode="dark"] .chat-bubble.photo-only, [data-mode="dark"] .chat-msg.mine .chat-bubble.photo-only { background: transparent; }
+[data-mode="dark"] .chat-del { background: transparent; border-color: transparent; color: #f08a80; }
