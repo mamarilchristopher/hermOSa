@@ -78,3 +78,5 @@
 [data-mode="dark"] .chat-person { background: transparent; border-color: transparent; color: var(--ink); }
 [data-mode="dark"] .chat-bubble.photo-only, [data-mode="dark"] .chat-msg.mine .chat-bubble.photo-only { background: transparent; }
 [data-mode="dark"] .chat-del { background: transparent; border-color: transparent; color: #f08a80; }
+[data-mode="dark"] .chat-people .chat-person, [data-mode="dark"] .chat-people li > label { background: transparent; color: var(--ink); }
+[data-mode="dark"] .chat-people .chat-person:hover, [data-mode="dark"] .chat-people li > label:hover { background: #26282d; }

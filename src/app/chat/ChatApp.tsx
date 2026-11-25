@@ -78,6 +78,8 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
   const refreshList = useCallback(async () => {
     const { data } = await supabase.rpc("chat_list");
     if (!Array.isArray(data)) return;
+    // The open chat was deleted by someone else: close it.
+    if (activeRef.current && !(data as ChatRoomRow[]).some((r) => r.id === activeRef.current)) { setActive(null); history.replaceState(null, "", "/chat"); }
     setRooms((old) => {
       const urls = new Map(old.map((r) => [r.id, r.photo_url]));
       return (data as ChatRoomRow[]).map((r) => ({ ...r, photo_url: urls.get(r.id) ?? (r.other_id ? faces.get(r.other_id) ?? null : null) }));
@@ -265,9 +267,10 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
               <button type="button" className="icon-btn chat-back" aria-label="Back to chats" onClick={() => open(null)}><IconBack /></button>
               {room?.kind === "DM" ? <Avatar name={info?.name ?? room?.name ?? "?"} url={room?.photo_url} size={36} /> : <span className="chat-group-face small" aria-hidden>{room?.auto ? "#" : (info?.name ?? room?.name ?? "?").slice(0, 1).toUpperCase()}</span>}
               <span className="chat-head-text"><strong>{info?.name ?? room?.name ?? "Chat"}</strong>{group && <span className="small muted">{info?.members.length} people</span>}</span>
-              {group && <button type="button" className="icon-btn" aria-label="Group details" title="Group details" onClick={() => setPanel(panel === "info" ? null : "info")}><IconInfo /></button>}
+              {info && <button type="button" className="icon-btn" aria-label={group ? "Group details" : "Chat details"} title={group ? "Group details" : "Chat details"} onClick={() => setPanel(panel === "info" ? null : "info")}><IconInfo /></button>}
             </header>
-            {panel === "info" && info && <GroupInfo info={info} me={me.id} canAdd={!info.auto || management} people={people} supabase={supabase}
+            {panel === "info" && info && <GroupInfo key={info.id} info={info} me={me.id} canAdd={info.kind === "GROUP" && (!info.auto || management)} people={people} supabase={supabase}
+              onCleared={() => { setMsgs([]); setPanel(null); void refreshList(); }}
               onChanged={async (left) => { if (left) { await refreshList(); open(null); return; } const { data } = await supabase.rpc("chat_room", { p_room: info.id }); if (data?.ok) setInfo(data as RoomInfo); void refreshList(); }} />}
             <div className="chat-scroll" ref={scroller} onClick={() => setPicked(null)}>
               {more && <p className="chat-older"><button type="button" className="link-like small" onClick={older}>Load older messages</button></p>}
@@ -388,8 +391,22 @@ function NewChat({ people, supabase, onDone, onClose }: { people: ChatPerson[]; 
   );
 }
 
-function GroupInfo({ info, me, canAdd, people, supabase, onChanged }: { info: RoomInfo; me: string; canAdd: boolean; people: ChatPerson[]; supabase: Sb; onChanged: (left: boolean) => void }) {
+function GroupInfo({ info, me, canAdd, people, supabase, onChanged, onCleared }: { info: RoomInfo; me: string; canAdd: boolean; people: ChatPerson[]; supabase: Sb; onChanged: (left: boolean) => void; onCleared: () => void }) {
   const [name, setName] = useState(info.name);
+  const [canDelete, setCanDelete] = useState(false);
+  useEffect(() => { void supabase.rpc("chat_can_delete", { p_room: info.id }).then(({ data }) => setCanDelete(data === true)); }, [supabase, info.id]);
+  const group = info.kind === "GROUP";
+  // Delete the conversation for everyone (update-0050). Photos are removed from the private folder first.
+  const wipe = async () => {
+    const ask = info.auto ? "Clear ALL messages in this group for everyone? This can't be undone." : "Delete this conversation for everyone in it, with all its messages and photos? This can't be undone.";
+    if (!confirm(ask)) return;
+    const { data: ph } = await supabase.from("chat_messages").select("photo_path").eq("room_id", info.id).not("photo_path", "is", null);
+    const paths = ((ph ?? []) as { photo_path: string }[]).map((x) => x.photo_path);
+    for (let i = 0; i < paths.length; i += 100) await supabase.storage.from("chat").remove(paths.slice(i, i + 100));
+    const { data } = await supabase.rpc("chat_delete_room", { p_room: info.id });
+    if (!data?.ok) { setErr(ERR[data?.error] ?? "Couldn't delete it."); return; }
+    if (data.cleared) onCleared(); else onChanged(true);
+  };
   const [adding, setAdding] = useState(false);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [err, setErr] = useState<string | null>(null);
@@ -400,7 +417,7 @@ function GroupInfo({ info, me, canAdd, people, supabase, onChanged }: { info: Ro
   };
   return (
     <div className="chat-panel chat-info">
-      {info.auto ? <p className="small muted">Everyone is in this group automatically: staff join and leave it with their home branch. Messages wait here for people who are offline.</p> : (
+      {!group ? null : info.auto ? <p className="small muted">Everyone is in this group automatically: staff join and leave it with their home branch. Messages wait here for people who are offline.</p> : (
         <form className="chat-rename" onSubmit={(e) => { e.preventDefault(); void call("chat_rename", { p_room: info.id, p_name: name }); }}>
           <input value={name} maxLength={60} aria-label="Group name" onChange={(e) => setName(e.target.value)} />
           <button type="submit" className="secondary" disabled={!name.trim() || name.trim() === info.name}>Rename</button>
@@ -418,10 +435,15 @@ function GroupInfo({ info, me, canAdd, people, supabase, onChanged }: { info: Ro
           </div>
         </>
       )}
-      {!adding && (canAdd || !info.auto) && (
+      {!adding && group && (canAdd || !info.auto) && (
         <div className="chat-panel-actions">
           {!info.auto && <button type="button" className="secondary" onClick={() => { if (confirm("Leave this group? You won't see its messages anymore.")) void call("chat_leave", { p_room: info.id }, true); }}>Leave group</button>}
           {canAdd && <button type="button" onClick={() => setAdding(true)}>Add people</button>}
+        </div>
+      )}
+      {canDelete && !adding && (
+        <div className="chat-panel-actions chat-danger">
+          <button type="button" className="secondary danger" onClick={() => void wipe()}>{info.auto ? "Clear all messages" : "Delete conversation"}</button>
         </div>
       )}
       {err && <p className="chat-error small">{err}</p>}

@@ -123,3 +123,27 @@ describe("update-0050: everyone in from the start", () => {
     expect((await db.rpc(cy, "aal1", "chat_room", [fv.id])).ok).toBe(true);
   });
 });
+
+describe("update-0050: deleting conversations", () => {
+  it("1-on-1: either person deletes it for both; groups: the maker or management; auto groups are only cleared", async () => {
+    const dm = (await db.rpc(ana, "aal1", "chat_start_dm", [cy.appUserId])).id;
+    await db.rpc(ana, "aal1", "chat_send", [dm, "DEMO hello", null, null]);
+    expect(await db.rpc(bea, "aal1", "chat_delete_room", [dm])).toEqual({ ok: false, error: "FORBIDDEN" });
+    expect(await db.rpc(cy, "aal1", "chat_can_delete", [dm])).toBe(true);
+    expect((await db.rpc(cy, "aal1", "chat_delete_room", [dm])).ok).toBe(true);
+    expect(await read(ana, dm)).toEqual([]);
+    expect((await db.rpc(ana, "aal1", "chat_list", [])).some((r: { id: string }) => r.id === dm)).toBe(false);
+
+    const g = (await db.rpc(ana, "aal1", "chat_create_group", ["DEMO Team B", [bea.appUserId, gm.appUserId]])).id;
+    expect(await db.rpc(bea, "aal1", "chat_can_delete", [g])).toBe(false);
+    expect(await db.rpc(gm, "aal1", "chat_can_delete", [g])).toBe(true);
+    expect((await db.rpc(ana, "aal1", "chat_delete_room", [g])).ok).toBe(true);
+
+    const all = ((await db.rpc(owner, "aal2", "chat_list", [])) as { id: string; name: string }[]).find((r) => r.name === "All staff")!.id;
+    await db.rpc(ana, "aal1", "chat_send", [all, "DEMO hi all", null, null]);
+    expect(await db.rpc(ana, "aal1", "chat_can_delete", [all])).toBe(false);
+    expect(await db.rpc(owner, "aal2", "chat_delete_room", [all])).toEqual({ ok: true, cleared: true });
+    expect(await read(ana, all)).toEqual([]);
+    expect((await db.rpc(ana, "aal1", "chat_room", [all])).ok).toBe(true); // the group stays
+  });
+});

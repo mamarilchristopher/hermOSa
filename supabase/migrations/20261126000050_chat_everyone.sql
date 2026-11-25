@@ -97,3 +97,46 @@ DECLARE o uuid;
 BEGIN
   FOR o IN SELECT id FROM public.organizations LOOP PERFORM private.chat_sync_org(o); END LOOP;
 END $$;
+
+-- Delete a conversation (CHRIS, Nov 26): it's gone for everyone in it, with its messages and photos.
+--   * 1-on-1: either person.   * A group: whoever made it, or an owner / the GM.
+--   * All staff and branch teams can't be removed; an owner or the GM can clear their messages instead.
+CREATE OR REPLACE FUNCTION private.chat_can_delete(p_room uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+  SELECT private.is_chat_member(p_room) AND EXISTS (
+    SELECT 1 FROM public.chat_rooms r WHERE r.id = p_room
+      AND (r.kind = 'DM' OR (r.auto_key IS NULL AND r.created_by = private.current_user_id()) OR private.is_management(private.current_user_id())))
+$$;
+REVOKE ALL ON FUNCTION private.chat_can_delete(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION private.chat_can_delete(uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.chat_can_delete(p_room uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$ SELECT private.chat_can_delete(p_room) $$;
+
+CREATE OR REPLACE FUNCTION public.chat_delete_room(p_room uuid) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE v_auto boolean;
+BEGIN
+  IF NOT private.chat_can_delete(p_room) THEN RETURN jsonb_build_object('ok', false, 'error', 'FORBIDDEN'); END IF;
+  SELECT auto_key IS NOT NULL INTO v_auto FROM public.chat_rooms WHERE id = p_room;
+  IF v_auto THEN
+    DELETE FROM public.chat_messages WHERE room_id = p_room;
+    UPDATE public.chat_rooms SET last_message_at = now() WHERE id = p_room;
+  ELSE
+    DELETE FROM public.chat_rooms WHERE id = p_room;  -- members and messages go with it
+  END IF;
+  RETURN jsonb_build_object('ok', true, 'cleared', v_auto);
+END $$;
+REVOKE ALL ON FUNCTION public.chat_can_delete(uuid), public.chat_delete_room(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.chat_can_delete(uuid), public.chat_delete_room(uuid) TO authenticated;
+
+-- Whoever may delete the conversation may also remove its photos from the private folder (the app does this first).
+DO $$
+BEGIN
+  IF to_regclass('storage.buckets') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS chat_photos_delete ON storage.objects';
+    EXECUTE $p$CREATE POLICY chat_photos_delete ON storage.objects FOR DELETE TO authenticated
+      USING (bucket_id = 'chat' AND ((storage.foldername(name))[2] = private.current_user_id()::text
+             OR private.chat_can_delete(((storage.foldername(name))[1])::uuid)))$p$;
+  END IF;
+END $$;
