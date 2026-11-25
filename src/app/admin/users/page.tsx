@@ -9,21 +9,23 @@ import Link from "next/link";
 import { byRankThenName, staffRank } from "@/lib/staffOrder";
 import { PositionCell } from "../../people/PositionCell";
 import { PinCell } from "./PinCell";
+import { Uid } from "@/components/Uid";
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<{ sort?: string }> }) {
   const sortByName = (await searchParams).sort === "name";
   const { supabase, access, branches } = await requireAccess();
   if (!can(access, ["OWNER"], null)) redirect("/");
   const [{ data: all }, { data: grants }, { data: invites }, { data: emps }, { data: pinData }] = await Promise.all([
-    supabase.from("app_users").select("id, display_name, email, active, join_status, requested_branch_id, joined_at").order("display_name"),
+    supabase.from("app_users").select("id, uid, display_name, email, active, join_status, requested_branch_id, joined_at").order("display_name"),
     supabase.from("role_grants").select("id, user_id, role_code, branch_id").is("revoked_at", null),
     supabase.from("staff_invites").select("id, code, expires_at, use_count").is("revoked_at", null)
       .gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }),
-    supabase.from("employees").select("id, app_user_id, position"),
+    supabase.from("employees").select("id, uid, app_user_id, position"),
     supabase.rpc("staff_pin_list"),
   ]);
   const pins = new Set(Array.isArray(pinData) ? (pinData as string[]) : []);
   const positionOf = new Map((emps ?? []).map((e) => [e.app_user_id, e.position as string | null]));
+  const staffUidOf = new Map((emps ?? []).map((e) => [e.app_user_id, e.uid as string]));
   const employeeOf = new Map((emps ?? []).map((e) => [e.app_user_id, e.id as string]));
   const grantsOf = (id: string) => (grants ?? []).filter((g) => g.user_id === id);
   const listed = (all ?? []).filter((u) => u.join_status !== "PENDING" && u.join_status !== "REJECTED");
@@ -51,7 +53,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           {waiting.map((u) => (
             <div key={u.id} className="join-request">
               <div className="join-who">
-                <strong>{u.display_name}</strong>
+                <strong>{u.display_name}<Uid v={u.uid} /></strong>
                 <span className="small muted">{u.email} · registered {new Date(u.joined_at).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" })}
                   {u.requested_branch_id && ` · says ${branchName[u.requested_branch_id] ?? "a branch"}`}</span>
               </div>
@@ -93,7 +95,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
             <tbody>
               {users.map((u) => (
                 <tr key={u.id}>
-                  <td>{u.display_name}{!u.active && <span className="pill REVERSED" style={{ marginLeft: 6 }}>Inactive</span>}</td>
+                  <td>{u.display_name}<Uid v={u.uid} /><Uid v={staffUidOf.get(u.id)} />{!u.active && <span className="pill REVERSED" style={{ marginLeft: 6 }}>Inactive</span>}</td>
                   <td>{employeeOf.get(u.id) ? <PositionCell employeeId={employeeOf.get(u.id)!} position={positionOf.get(u.id) ?? null} /> : grantsOf(u.id).some((g) => g.role_code === "OWNER") ? "Owner" : <span className="muted small">No employee record</span>}</td>
                   <td className="small">{u.email}</td>
                   <td>

@@ -7,6 +7,7 @@ import { DetailsForm } from "@/components/DetailsForm";
 import { legalName, type Details } from "@/lib/employeeDetails";
 import { approveDetails } from "../actions";
 import { ReturnForm } from "./ReturnForm";
+import { Uid } from "@/components/Uid";
 
 /** Owner or GM reviews one submission: correct anything, then approve (applies it) or send back with a note. */
 export default async function Review({ params }: { params: Promise<{ id: string }> }) {
@@ -17,8 +18,8 @@ export default async function Review({ params }: { params: Promise<{ id: string 
   const { data: s } = await supabase.from("employee_detail_submissions").select("id, user_id, data, state, submitted_at").eq("id", id).maybeSingle();
   if (!s) notFound();
   const [{ data: u }, { data: emp }] = await Promise.all([
-    supabase.from("app_users").select("display_name, email, join_status").eq("id", s.user_id).maybeSingle(),
-    supabase.from("employees").select("id, full_name, position").eq("app_user_id", s.user_id).maybeSingle(),
+    supabase.from("app_users").select("uid, display_name, email, join_status").eq("id", s.user_id).maybeSingle(),
+    supabase.from("employees").select("id, uid, full_name, position").eq("app_user_id", s.user_id).maybeSingle(),
   ]);
   const data = s.data as Details;
 
@@ -27,7 +28,7 @@ export default async function Review({ params }: { params: Promise<{ id: string 
       <TopBar access={access} />
       <main className="narrow">
         <nav className="crumbs"><Link className="back" href="/admin/details">← Staff details</Link></nav>
-        <h1>Review: {u?.display_name}</h1>
+        <h1>Review: {u?.display_name} <Uid v={u?.uid} /><Uid v={emp?.uid} /></h1>
         <p className="muted small">{u?.email} · {emp ? `${emp.position ?? "No position yet"}` : "No employee record yet"}</p>
         {s.state !== "PENDING" ? (
           <div className="notice info">This one was already decided, or they sent a newer copy.</div>

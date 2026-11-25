@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.29.0 | Nov 25, 2026 | update-0029 | Every staff record has a UID (ST-0001) and every login account a UID (AC-0001), shown on Employees, Users and roles, Join requests, Staff details, On Duty, attendance, Time-in photos and My details, so invalid or duplicate records can be named and cleaned up |
 | 0.28.0 | Nov 25, 2026 | update-0028 | General Manager gives every owner-level approval: staff details (not her own), join requests at every level except Owner, sales changes, Closed / No sales days, sales imports; staff details list no longer repeats a person and shows emails when names match; View as list fits laptop screens |
 | 0.27.0 | Nov 25, 2026 | update-0027 | General Manager can accept or reject join requests on a new Join requests page; owner-level accounts stay owner-only |
 | 0.26.2 | Nov 25, 2026 | none | Service log: staff who are not on commission no longer see commission choices |

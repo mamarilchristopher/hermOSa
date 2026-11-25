@@ -8,6 +8,7 @@ import { monthStart } from "@/lib/insights";
 import { EmployeeForm } from "./EmployeeForm";
 import { PositionCell } from "./PositionCell";
 import { byRankThenName, staffRank } from "@/lib/staffOrder";
+import { Uid } from "@/components/Uid";
 
 export default async function People() {
   const { supabase, access, branches } = await requireAccess();
@@ -17,7 +18,7 @@ export default async function People() {
   const isOwner = can(access, ["OWNER"], null);
   const from = monthStart(manilaToday());
   const [{ data: emps }, { data: lines }, { data: users }, { data: grants }] = await Promise.all([
-    supabase.from("employees").select("id, full_name, branch_id, position, commission_eligible, active, app_user_id").order("full_name"),
+    supabase.from("employees").select("id, uid, full_name, branch_id, position, commission_eligible, active, app_user_id").order("full_name"),
     supabase.from("commission_lines").select("employee_id, amount_cents, service_logs!inner(service_date, state)").gte("service_logs.service_date", from).neq("service_logs.state", "REJECTED"),
     isOwner ? supabase.from("app_users").select("id, display_name").eq("active", true).order("display_name") : Promise.resolve({ data: null }),
     supabase.from("role_grants").select("user_id, role_code, branch_id").is("revoked_at", null),
@@ -51,7 +52,7 @@ export default async function People() {
                     const t = monthTotals.get(e.id);
                     return (
                       <tr key={e.id} className={e.active ? undefined : "rejected"}>
-                        <td><Link href={`/people/${e.id}`}><strong>{e.full_name}</strong></Link>{!e.active && <span className="pill REVERSED" style={{ marginLeft: 6 }}>Inactive</span>}</td>
+                        <td><Link href={`/people/${e.id}`}><strong>{e.full_name}</strong></Link><Uid v={e.uid} />{!e.active && <span className="pill REVERSED" style={{ marginLeft: 6 }}>Inactive</span>}</td>
                         <td>{manage.some((m) => m.id === e.branch_id) ? <PositionCell employeeId={e.id} position={e.position} /> : e.position ?? <span className="muted">–</span>}</td>
                         <td>{e.commission_eligible ? <span className="tag LEAD">Commission-based</span> : <span className="tag NONCOMMI">No commission</span>}</td>
                         <td className="num">{t ? centsToPhp(t.approved) : "–"}</td>

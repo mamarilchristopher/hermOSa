@@ -83,8 +83,8 @@ export default async function Me() {
   const today = manilaToday();
   const start = monthStart(today), ym = today.slice(0, 7);
   const [{ data: emp }, { data: user }, { data: subs }, { data: noticeData }] = await Promise.all([
-    supabase.from("employees").select("id, full_name, branch_id, position, commission_eligible, active").eq("app_user_id", access.user_id).maybeSingle(),
-    supabase.from("app_users").select("email, joined_at").eq("id", access.user_id).maybeSingle(),
+    supabase.from("employees").select("id, uid, full_name, branch_id, position, commission_eligible, active").eq("app_user_id", access.user_id).maybeSingle(),
+    supabase.from("app_users").select("uid, email, joined_at").eq("id", access.user_id).maybeSingle(),
     supabase.from("employee_detail_submissions").select("state, note, data").eq("user_id", access.user_id).neq("state", "SUPERSEDED")
       .order("submitted_at", { ascending: false }).limit(1),
     supabase.from("notifications").select("id, title, body, link, created_at, read_at").order("created_at", { ascending: false }).limit(15),
@@ -224,6 +224,7 @@ export default async function Me() {
             <dt>Commission</dt><dd>{emp ? (emp.commission_eligible ? "Yes, 5% of amount paid" : "No") : isOwner ? "No" : "Not set yet"}</dd>
             <dt>App access</dt><dd>{scope.join("; ") || "None yet"}</dd>
             <dt>Login email</dt><dd>{user?.email ?? ""}</dd>
+            <dt>UID</dt><dd>{emp?.uid ? <>Staff record <code className="uid" style={{ marginLeft: 0 }}>{emp.uid}</code> · </> : ""}Login account <code className="uid" style={{ marginLeft: 0 }}>{user?.uid ?? ""}</code></dd>
             {user?.joined_at && <><dt>Joined the app</dt><dd>{user.joined_at.slice(0, 10)}</dd></>}
           </dl>
           <p className="small muted" style={{ marginBottom: 0 }}>

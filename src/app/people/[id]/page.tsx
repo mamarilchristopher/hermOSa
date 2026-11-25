@@ -11,6 +11,7 @@ import { EmployeeForm } from "../EmployeeForm";
 import { Reveal } from "@/components/Reveal";
 import { DetailsView } from "@/components/DetailsView";
 import type { Details } from "@/lib/employeeDetails";
+import { Uid } from "@/components/Uid";
 
 type Line = { id: string; role: string; amount_cents: number; service_logs: { id: string; service_date: string; state: string; amount_paid_cents: number; branch_id: string; services: { name: string } | null } };
 
@@ -18,7 +19,7 @@ export default async function Employee({ params, searchParams }: { params: Promi
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) notFound();
   const { supabase, access, branches } = await requireAccess();
-  const { data: e } = await supabase.from("employees").select("id, full_name, branch_id, position, commission_eligible, app_user_id, active").eq("id", id).maybeSingle();
+  const { data: e } = await supabase.from("employees").select("id, uid, full_name, branch_id, position, commission_eligible, app_user_id, active").eq("id", id).maybeSingle();
   if (!e) notFound();
   const sp = await searchParams;
   const thisMonth = manilaToday().slice(0, 7);
@@ -47,7 +48,7 @@ export default async function Employee({ params, searchParams }: { params: Promi
       <TopBar access={access} />
       <main>
         {!isMe && <nav className="crumbs"><Link className="back" href="/people">← Employees</Link></nav>}
-        <h1>{isMe ? "My commissions" : e.full_name}</h1>
+        <h1>{isMe ? "My commissions" : e.full_name} <Uid v={e.uid} /></h1>
         <p className="muted small">{e.position ?? "Staff"} · {branchName[e.branch_id]} · {e.commission_eligible ? "commission-based" : "not commission-based"}{!e.active && " · inactive"}</p>
 
         <div className="periods card">

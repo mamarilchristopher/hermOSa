@@ -7,9 +7,10 @@ import { addDays } from "@/lib/insights";
 import { dayLabel } from "@/lib/homeGlance";
 import { branchShort } from "@/lib/schedule";
 import { photoGapMinutes } from "@/lib/exif";
+import { Uid } from "@/components/Uid";
 
 type Row = { id: string; kind: "IN" | "OUT"; punched_at: string; photo_taken_at: string | null; photo_path: string | null; distance_m: number | null;
-  branch_id: string; employee_id: string; employees: { full_name: string } | null };
+  branch_id: string; employee_id: string; employees: { full_name: string; uid: string } | null };
 const clock = (ts: string) => new Date(ts).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" });
 const when = (ts: string, day: string) => {
   const d = new Date(ts).toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
@@ -28,7 +29,7 @@ export default async function TimePhotosPage({ searchParams }: { searchParams: P
   const clinics = branches.filter((b) => b.kind === "CLINIC").map((b) => ({ id: b.id, name: branchShort(b.name) }));
   const branch = clinics.some((b) => b.id === sp.branch) ? sp.branch! : "";
 
-  let q = supabase.from("time_punches").select("id, kind, punched_at, photo_taken_at, photo_path, distance_m, branch_id, employee_id, employees(full_name)")
+  let q = supabase.from("time_punches").select("id, kind, punched_at, photo_taken_at, photo_path, distance_m, branch_id, employee_id, employees(full_name, uid)")
     .eq("work_date", day).order("punched_at");
   if (branch) q = q.eq("branch_id", branch);
   const { data, error } = await q;
@@ -89,7 +90,7 @@ export default async function TimePhotosPage({ searchParams }: { searchParams: P
                     {src ? <a href={src} target="_blank" rel="noreferrer"><img src={src} alt={`${r.employees?.full_name ?? "Staff"} ${r.kind === "IN" ? "time-in" : "time-out"} photo`} /></a>
                       : <div className="photo-missing small muted">No photo</div>}
                     <div className="photo-meta">
-                      <strong>{r.employees?.full_name ?? "Staff"}</strong>
+                      <strong>{r.employees?.full_name ?? "Staff"}</strong><Uid v={r.employees?.uid} />
                       <span className="small">{r.kind === "IN" ? "Time in" : "Time out"} · {clinics.find((b) => b.id === r.branch_id)?.name ?? ""}</span>
                       <span className="small">Server time <strong>{clock(r.punched_at)}</strong></span>
                       <span className="small muted">{r.photo_taken_at ? `Photo taken ${when(r.photo_taken_at, day)}` : "Photo has no time saved"}</span>
