@@ -34,7 +34,7 @@ export function AddBookingForm({ branches, today, min, max, services }: { branch
       <label className="field half">Booked through
         <select name="platform" defaultValue="FACEBOOK">
           <option value="FACEBOOK">Facebook</option><option value="INSTAGRAM">Instagram</option><option value="CALL">Call</option>
-          <option value="SMS">Text</option><option value="WALK_IN">Walk-in</option><option value="OTHER">Other</option>
+          <option value="SMS">Text / Messenger</option><option value="WALK_IN">Walk-in</option><option value="OTHER">Other</option>
         </select>
       </label>
       <label className="field half">Down payment (₱, optional)<input name="dp" inputMode="decimal" value={dp} onChange={(e) => setDp(e.target.value)} placeholder="e.g. 500" /></label>

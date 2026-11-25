@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.44.7 | Nov 25, 2026 | none | Bookings: "+ Add a booking" is now at the top of the page (tap to open) for owners, the GM and CSRs, for calls, texts, walk-ins and online bookings; "Booked through" says Text / Messenger; bookings by an owner without a staff record show "by owner / GM" |
 | 0.44.6 | Nov 25, 2026 | none | Fix: the Time clock and Home pages crashed ("Application error") once a day or a late was marked irregular (Ignore late / Maintenance); the irregular label is now shared code the server can use |
 | 0.44.5 | Nov 25, 2026 | none | Management (owners and the GM) can also time out with an uploaded screenshot ("Time out with a screenshot" under the Time out button) |
 | 0.44.4 | Nov 25, 2026 | none | Notification bell on every page (top right, like Facebook): the count shows to-dos plus unread notices (red when something is urgent); tap it for the To do list and Notifications, and every item opens its page (a notice is marked read when opened; Mark all read). The To do and Notices cards are gone from Home. On duty (Home and Time clock) shows each person's shift as On duty (since when) or Duty over (in to out), with per-branch counts; the Time clock page uses the same neat faces view with the time-in photo link, far-from-branch flag and Ignore late (irregular) for owners and the GM |

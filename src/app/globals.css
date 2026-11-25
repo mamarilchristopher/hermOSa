@@ -844,3 +844,6 @@ h1 .uid { font-size: 0.9rem; }
 .face .irregular-form select, .face .irregular-form input { width: 100%; }
 .face .irregular-form .ok-text, .face .irregular-form .field-error { white-space: normal; }
 .face .face-status button { font-size: 11px; padding: 1px 6px; }
+.add-booking summary { cursor: pointer; list-style: none; }
+.add-booking summary::-webkit-details-marker { display: none; }
+.add-booking[open] summary { margin-bottom: 12px; }

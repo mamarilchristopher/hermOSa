@@ -78,7 +78,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
       <TopBar access={access} />
       <main>
         <h1>Bookings</h1>
-        <p className="muted small">{booker ? "Log each booking here. The branch marks Arrived or Done, and you see it right away." : "Today's online bookings for your branch. Tap Arrived when they come in and Done when finished."}</p>
+        <p className="muted small">{booker ? "Log each booking here, from Facebook, calls, texts or walk-ins. The branch marks Arrived or Done, and you see it right away." : "Today's online bookings for your branch. Tap Arrived when they come in and Done when finished."}</p>
         {error && <div className="notice info">{error.code === "42P01" ? "The owner needs to run update-0040 in Supabase first." : "Could not load. Try again."}</div>}
 
         <div className="card">
@@ -106,6 +106,14 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
           {rows.length > 0 && <div style={{ marginTop: 8 }}><CopyForGc text={gc} /></div>}
         </div>
 
+        {booker && (
+          // At the top (CHRIS Nov 25): management also books calls, walk-ins and texts, not only CSRs' online bookings.
+          <details className="card add-booking">
+            <summary><strong>+ Add a booking</strong> <span className="small muted">online, call, text or walk-in</span></summary>
+            <AddBookingForm branches={clinics.map((b) => ({ id: b.id, name: b.name }))} today={day < today ? today : day} min={addDays(today, -30)} max={addDays(today, 365)} services={((svcs ?? []) as { name: string; price_cents: number | null }[]).map((x) => ({ name: x.name, price: x.price_cents }))} />
+          </details>
+        )}
+
         {byBranch.map(({ b, list }) => (
           <div className="card" key={b.id}>
             <h2>{b.name} ({list.filter((r) => !moved(r)).length}){seesValue && worth(open(list)) > 0 && <span className="small muted" style={{ fontWeight: 500 }}> · expected {peso(worth(open(list)))}</span>}</h2>
@@ -128,7 +136,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
                 <p className="small muted" style={{ margin: "0 0 6px" }}>
                   {r.note && <>“{r.note}” · </>}
                   {r.status_note && <>{r.status_note} · </>}
-                  Booked {fmt(r.booked_on)}{r.csr_employee_id && name.get(r.csr_employee_id) ? ` by ${name.get(r.csr_employee_id)}` : ""}
+                  Booked {fmt(r.booked_on)}{r.csr_employee_id && name.get(r.csr_employee_id) ? ` by ${name.get(r.csr_employee_id)}` : r.csr_employee_id ? "" : " by owner / GM"}
                   {r.platform !== "FACEBOOK" && ` · ${r.platform.replace("_", "-").toLowerCase()}`}
                 </p>
                 {!moved(r) && <><StatusForm id={r.id} status={r.status} booker={booker} today={today} /> <NoteForm id={r.id} note={r.status_note} /></>}
@@ -136,13 +144,6 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
             ))}
           </div>
         ))}
-
-        {booker && (
-          <div className="card">
-            <h2>Add a booking</h2>
-            <AddBookingForm branches={clinics.map((b) => ({ id: b.id, name: b.name }))} today={day < today ? today : day} min={addDays(today, -30)} max={addDays(today, 365)} services={((svcs ?? []) as { name: string; price_cents: number | null }[]).map((x) => ({ name: x.name, price: x.price_cents }))} />
-          </div>
-        )}
 
         {booker && perCsr.size > 0 && (
           <div className="card">
