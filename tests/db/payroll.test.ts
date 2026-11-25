@@ -112,7 +112,7 @@ describe("payroll", () => {
     expect(s2.commissions).toEqual([]);
   });
 
-  it("update-0047 rules: declared salary for government shares, none on the 16th-end cutoff, special day no premium unless switched on", async () => {
+  it("update-0047 rules: declared salary for government shares, none on the 16th-end cutoff, special day +30% except CSRs", async () => {
     expect((await db.rpc(gm, "aal1", "save_pay_settings", [anaE, "MONTHLY", 2_750_000, 0, true, true, false, 1_482_000])).ok).toBe(true);
     const o = await db.rpc(gm, "aal1", "open_payroll", ["2026-09-01"]);
     const s = (await db.sql("SELECT * FROM public.payslips WHERE run_id = $1 AND employee_id = $2", [o.id, anaE])).rows[0];
@@ -128,12 +128,17 @@ describe("payroll", () => {
     await shift(beaE, "2026-09-08"); await timeIn(beaE, bea, "2026-09-08", "10:00");
     await db.rpc(gm, "aal1", "open_payroll", ["2026-09-01"]);
     let b = (await db.sql("SELECT * FROM public.payslips WHERE run_id = $1 AND employee_id = $2", [o.id, beaE])).rows[0];
-    expect(amt(b.earnings, "Special day worked")).toBeUndefined();
-    expect((await db.rpc(lead, "aal1", "save_payroll_rules", ["SPLIT", true])).ok).toBe(false);
-    expect((await db.rpc(owner, "aal2", "save_payroll_rules", ["FIRST", true])).ok).toBe(true);
+    expect(amt(b.earnings, "Special day worked")).toBe(18_000); // +30% (CHRIS: x1.3 for all staff except CSRs)
+    await db.sql("UPDATE public.employees SET position = 'CSR' WHERE id = $1", [beaE]);
     await db.rpc(gm, "aal1", "open_payroll", ["2026-09-01"]);
     b = (await db.sql("SELECT * FROM public.payslips WHERE run_id = $1 AND employee_id = $2", [o.id, beaE])).rows[0];
-    expect(amt(b.earnings, "Special day worked")).toBe(18_000);
+    expect(amt(b.earnings, "Special day worked")).toBeUndefined(); // CSRs: basic pay only
+    await db.sql("UPDATE public.employees SET position = 'CMA' WHERE id = $1", [beaE]);
+    expect((await db.rpc(lead, "aal1", "save_payroll_rules", ["SPLIT", false])).ok).toBe(false);
+    expect((await db.rpc(owner, "aal2", "save_payroll_rules", ["FIRST", false])).ok).toBe(true);
+    await db.rpc(gm, "aal1", "open_payroll", ["2026-09-01"]);
+    b = (await db.sql("SELECT * FROM public.payslips WHERE run_id = $1 AND employee_id = $2", [o.id, beaE])).rows[0];
+    expect(amt(b.earnings, "Special day worked")).toBeUndefined();
   });
 
   it("a cutoff that hasn't ended can't be finalized", async () => {

@@ -125,12 +125,12 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
 
         <div className="card">
           <h2>Rules</h2>
-          <RulesForm statutory={rules.statutory_cutoff ?? "FIRST"} special={!!rules.special_worked_premium} />
+          <RulesForm statutory={rules.statutory_cutoff ?? "FIRST"} special={rules.special_worked_premium ?? true} />
         </div>
 
         <div className="card">
           <h2>Holidays</h2>
-          <p className="muted small">Regular holiday worked: +100% of a day&apos;s pay; a regular holiday off is still paid. Special day: no work, no pay; working it adds +30% only if switched on under Rules.</p>
+          <p className="muted small">Regular holiday worked: +100% of a day&apos;s pay; a regular holiday off is still paid. Special day: no work, no pay; working it adds +30% (switch under Rules). CSRs get basic pay only, no holiday extras.</p>
           <HolidayForm />
           <ul className="plain-list">
             {(hols ?? []).map((h: { holiday_date: string; name: string; kind: string }) => (

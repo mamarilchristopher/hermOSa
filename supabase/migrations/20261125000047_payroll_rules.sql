@@ -2,13 +2,14 @@
 --   * A day's pay of a monthly salary = monthly / 26 (was x 12 / 313).
 --   * SSS, PhilHealth and Pag-IBIG are deducted in full on the 1st-15th cutoff (organizations.payroll_rules.statutory_cutoff:
 --     FIRST, SECOND or SPLIT).
---   * No extra pay for working a special non-working day (payroll_rules.special_worked_premium = false); regular holiday
---     worked still pays double.
+--   * Working a special non-working day pays +30% (payroll_rules.special_worked_premium, on) and a regular holiday worked
+--     pays double, for everyone except CSRs (contractors on basic pay only: no holiday premiums).
 --   * Lates are not deducted from pay by default (NTE / IR only); the per-person switch stays.
 --   * Declared salary per person (optional): government shares and the tax on basic pay use it instead of the actual rate.
 
 ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS payroll_rules jsonb NOT NULL
-  DEFAULT '{"statutory_cutoff": "FIRST", "special_worked_premium": false, "daily_divisor": 26}';
+  DEFAULT '{"statutory_cutoff": "FIRST", "special_worked_premium": true, "daily_divisor": 26}';
+UPDATE public.organizations SET payroll_rules = payroll_rules || '{"special_worked_premium": true}';
 ALTER TABLE public.pay_settings ADD COLUMN IF NOT EXISTS declared_cents bigint CHECK (declared_cents IS NULL OR (declared_cents >= 0 AND declared_cents <= 100000000));
 ALTER TABLE public.pay_settings ALTER COLUMN deduct_lates SET DEFAULT false;
 UPDATE public.pay_settings SET deduct_lates = false;
@@ -77,15 +78,16 @@ DECLARE
   v_sss bigint := 0; v_ph bigint := 0; v_pi bigint := 0; v_tax bigint := 0;
   v_gross bigint; v_dtotal bigint; v_taxable bigint; v_nontax bigint := 0;
   a record; v_first boolean;
-  v_rules jsonb; v_stat_when text; v_special_premium boolean; v_divisor numeric; v_tax_basic bigint;
+  v_csr boolean; v_rules jsonb; v_stat_when text; v_special_premium boolean; v_divisor numeric; v_tax_basic bigint;
 BEGIN
   SELECT * INTO r FROM public.payroll_runs WHERE id = p_run;
   SELECT * INTO ps FROM public.pay_settings WHERE employee_id = p_employee;
   IF NOT FOUND THEN DELETE FROM public.payslips WHERE run_id = p_run AND employee_id = p_employee; RETURN; END IF;
   SELECT late_grace_minutes, coalesce(payroll_rules, '{}') INTO v_grace, v_rules FROM public.organizations WHERE id = r.organization_id;
   v_stat_when := coalesce(v_rules ->> 'statutory_cutoff', 'FIRST');
-  v_special_premium := coalesce((v_rules ->> 'special_worked_premium')::boolean, false);
+  v_special_premium := coalesce((v_rules ->> 'special_worked_premium')::boolean, true);
   v_divisor := coalesce((v_rules ->> 'daily_divisor')::numeric, 26);
+  SELECT upper(coalesce(position, '')) = 'CSR' INTO v_csr FROM public.employees WHERE id = p_employee;
   v_first := extract(day FROM r.period_start) = 1;
   v_daily := CASE ps.basis WHEN 'MONTHLY' THEN ps.rate_cents / v_divisor ELSE ps.rate_cents END;
   -- Government shares (and tax on basic) use the declared salary when one is set.
@@ -131,11 +133,11 @@ BEGIN
   END IF;
   v_earn := v_earn || jsonb_build_object('label', CASE ps.basis WHEN 'MONTHLY' THEN 'Basic pay (half of monthly salary)'
               ELSE 'Basic pay (' || (n_worked + n_paid_leave + v_reg_off) || ' days)' END, 'amount', v_basic);
-  IF v_reg_worked > 0 THEN
+  IF v_reg_worked > 0 AND NOT v_csr THEN
     v_hol := v_hol + round(v_daily * v_reg_worked);
     v_earn := v_earn || jsonb_build_object('label', 'Regular holiday worked (+100%, ' || v_reg_worked || ' day' || CASE WHEN v_reg_worked > 1 THEN 's' ELSE '' END || ')', 'amount', round(v_daily * v_reg_worked));
   END IF;
-  IF v_spec_worked > 0 AND v_special_premium THEN
+  IF v_spec_worked > 0 AND v_special_premium AND NOT v_csr THEN
     v_hol := v_hol + round(v_daily * 0.3 * v_spec_worked);
     v_earn := v_earn || jsonb_build_object('label', 'Special day worked (+30%, ' || v_spec_worked || ' day' || CASE WHEN v_spec_worked > 1 THEN 's' ELSE '' END || ')', 'amount', round(v_daily * 0.3 * v_spec_worked));
   END IF;
