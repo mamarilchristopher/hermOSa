@@ -26,7 +26,7 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
   }
   const list = data as NteList;
   const mine = list.ntes.filter((n) => n.mine);
-  const rows = tracker(list.ntes);
+  const rows = tracker(list.ntes, list.ir_minutes);
   const manager = access.grants.some((g) => g.role === "OWNER" || g.role === "MANAGER");
 
   return (
@@ -35,7 +35,7 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
       <main>
         <h1>Late NTEs</h1>
         <p className="muted small">A Late NTE (Notice to Explain) is made automatically when someone times in more than {list.grace} minutes after their shift starts.
-          {manager ? " Open a person to see their NTEs and issue an IR." : " Write your explanation for each one."}</p>
+          {manager ? ` An IR is suggested at 3 Late NTEs in a month, or sooner once someone is more than ${list.ir_minutes ?? 60} minutes late in total. Open a person to see their NTEs and issue an IR.` : " Write your explanation for each one."}</p>
 
         <div className="week-nav">
           <Link className="button secondary small" href={`/nte?month=${shiftMonth(ym, -1)}`}>← {monthLabel(shiftMonth(ym, -1))}</Link>
@@ -49,9 +49,10 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
             {rows.length === 0 ? <p className="muted" style={{ margin: 0 }}>No Late NTEs this month.</p> : (
               <ul className="plain-list">
                 {rows.map((r) => (
-                  <li key={r.employee_id}>
+                  <li key={r.employee_id} className={r.due ? "ir-due" : undefined}>
                     <span><strong>{r.name}</strong> has been issued Late NTEs <strong>{times(r.count)}</strong> this month
-                      <br /><span className="small muted">{r.minutes} minutes late in total{r.open ? ` · ${r.open} not explained yet` : ""}{r.notInIr && r.notInIr < r.count ? ` · ${r.count - r.notInIr} already in an IR` : r.notInIr === 0 ? " · all in an IR" : ""}</span></span>
+                      <br /><span className="small muted">{r.minutes} minutes late in total{r.open ? ` · ${r.open} not explained yet` : ""}{r.notInIr && r.notInIr < r.count ? ` · ${r.count - r.notInIr} already in an IR` : r.notInIr === 0 ? " · all in an IR" : ""}</span>
+                      {r.due && <><br /><span className="small ir-due-tag">IR suggested: {r.due}</span></>}</span>
                     <Link className="button secondary small" href={`/nte/staff/${r.employee_id}?month=${ym}`}>Open</Link>
                   </li>
                 ))}

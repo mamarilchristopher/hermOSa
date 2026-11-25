@@ -128,6 +128,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
   )
   SELECT jsonb_build_object('month', (SELECT s FROM m),
     'grace', (SELECT late_grace_minutes FROM public.organizations WHERE id = private.current_org_id()),
+    'ir_minutes', (SELECT ir_late_minutes FROM public.organizations WHERE id = private.current_org_id()),
     'ntes', coalesce((SELECT jsonb_agg(jsonb_build_object('id', id, 'nte_no', nte_no, 'employee_id', employee_id, 'name', full_name, 'position', position,
       'branch', branch, 'work_date', work_date, 'shift_start', to_char(shift_start, 'HH24:MI'), 'time_in', to_char(time_in AT TIME ZONE 'Asia/Manila', 'HH24:MI'),
       'late_minutes', late_minutes, 'state', state, 'explanation', explanation, 'explained_at', explained_at, 'void_reason', void_reason,

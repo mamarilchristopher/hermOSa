@@ -740,4 +740,6 @@ table.sheet .none { color: #d6cabd; }
 .nte-body { display: grid; gap: 8px; flex: 1; min-width: 0; }
 .nte-reminder { border: 1px solid var(--gold-line); background: var(--gold-soft); }
 .nte-ask p { margin: 0 0 12px; }
+.plain-list li.ir-due { background: var(--gold-soft); border-radius: var(--radius-sm); padding: 10px 12px; }
+.ir-due-tag { font-weight: 700; color: var(--ink); }
 .ir-days tr.ir-nte-why td { font-size: 0.82rem; color: var(--ink-2); font-style: italic; border-top: 0; }

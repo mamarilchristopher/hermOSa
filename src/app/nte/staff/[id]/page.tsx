@@ -7,7 +7,7 @@ import { manilaToday } from "@/lib/dates";
 import { monthLabel } from "@/lib/insights";
 import { dayLabel } from "@/lib/homeGlance";
 import { timeLabel } from "@/lib/schedule";
-import { firstName, nteCount, type NteList } from "@/lib/nte";
+import { firstName, irReason, IR_MINUTES_DEFAULT, IR_NTE_COUNT, nteCount, type NteList } from "@/lib/nte";
 import { IssueLateIrForm, VoidNteForm } from "../../Forms";
 
 const STATE: Record<string, { label: string; cls: string }> = {
@@ -36,6 +36,10 @@ export default async function StaffNtePage({ params, searchParams }: { params: P
   const notInIr = counted.filter((n) => !n.ir_id);
   const irs = [...new Set(counted.map((n) => n.ir_id).filter(Boolean))] as string[];
   const first = firstName(emp.full_name);
+  const minutes = counted.reduce((t, n) => t + n.late_minutes, 0);
+  const limit = list.ir_minutes ?? IR_MINUTES_DEFAULT;
+  const due = notInIr.length > 0 && irReason(counted.length, minutes, limit) != null;
+  const early = due && counted.length < IR_NTE_COUNT; // over the minutes limit before reaching 3 NTEs
 
   return (
     <>
@@ -46,10 +50,12 @@ export default async function StaffNtePage({ params, searchParams }: { params: P
         <p className="muted small">{emp.position ?? "Staff"} · Late NTEs, {monthLabel(ym)}</p>
 
         {counted.length > 0 && (
-          <div className={`card ${notInIr.length ? "nte-reminder" : ""}`}>
+          <div className={`card ${due ? "nte-reminder" : ""}`}>
             {notInIr.length > 0 ? (
               <IssueLateIrForm employee={id} month={`${ym}-01`}
-                question={`${first} has been issued ${nteCount(counted.length)} this month${irs.length ? ` (${notInIr.length} not in an IR yet)` : ""}. Do you want to issue an IR?`} />
+                question={early
+                  ? `${first} has been late ${minutes} minutes this month (${nteCount(counted.length)}), more than the ${limit}-minute limit. Do you want to issue an IR?`
+                  : `${first} has been issued ${nteCount(counted.length)} this month (${minutes} minutes late)${irs.length ? `, ${notInIr.length} not in an IR yet` : ""}. ${due ? "Do you want to issue an IR?" : `An IR is suggested at ${IR_NTE_COUNT} Late NTEs or more than ${limit} minutes late. You can still issue one now.`}`} />
             ) : (
               <p style={{ margin: 0 }}><strong>{first} has been issued {nteCount(counted.length)} this month.</strong> All of them are already in an IR.</p>
             )}

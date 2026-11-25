@@ -129,7 +129,7 @@ export default async function Me() {
     ownerLevel ? supabase.rpc("late_nte_list", { p_month: `${today.slice(0, 7)}-01`, p_employee: null }) : Promise.resolve({ data: null }),
   ]);
   const myNtes = (myNteData ?? []) as { id: string; nte_no: number; work_date: string; shift_start: string; time_in: string; late_minutes: number }[];
-  const tardy = trackData ? tracker((trackData as NteList).ntes) : [];
+  const tardy = trackData ? tracker((trackData as NteList).ntes, (trackData as NteList).ir_minutes) : [];
   if (missingTodo && !isOwner) (home?.todos ?? staffTodos)?.push(missingTodo);
   if (home && !isOwner && detailState !== "APPROVED" && detailState !== "PENDING") {
     home.todos.push({ text: detailState === "RETURNED" ? "The owner sent your employee details back. Please fix them" : "Fill in your employee details (needed for payroll and government reports)", href: "/me/details" });
@@ -195,9 +195,10 @@ export default async function Me() {
             {tardy.length === 0 ? <p className="muted" style={{ margin: 0 }}>No Late NTEs this month.</p> : (
               <ul className="plain-list">
                 {tardy.slice(0, 8).map((r) => (
-                  <li key={r.employee_id}>
+                  <li key={r.employee_id} className={r.due ? "ir-due" : undefined}>
                     <span><strong>{firstName(r.name)}</strong> has been issued Late NTEs <strong>{times(r.count)}</strong> this month
-                      {r.open > 0 && <span className="small muted"> · {r.open} not explained yet</span>}</span>
+                      {r.open > 0 && <span className="small muted"> · {r.open} not explained yet</span>}
+                      {r.due && <><br /><span className="small ir-due-tag">IR suggested: {r.due}</span></>}</span>
                     <Link className="button secondary small" href={`/nte/staff/${r.employee_id}`}>Open</Link>
                   </li>
                 ))}
