@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.48.2 | Nov 25, 2026 | none (cleanup: remove-all-test-data.sql) | Switched-off branches are hidden everywhere (branch pickers, schedules, home). Goes with the one-time test data cleanup that switches off the TEST (Chris) branch |
 | 0.48.1 | Nov 25, 2026 | none (needs update-0048) | Light / Dark switch is now a two-option pill at the bottom of the side menu, above your name. Phones keep the small sun/moon in the top bar |
 | 0.48.0 | Nov 25, 2026 | update-0048 | Per-dose commission (new price list): Barbie Arms Trio pays P300 on the 1st dose (P8,000 paid), then P50 each for the "Barbie Arms Trio 2nd dose" and "3rd dose" services, logged with P0 paid. A P0-priced service with a set commission now pays it even when nothing is paid that visit |
 | 0.47.2 | Nov 25, 2026 | none | Menu grouped into 8 items: Home, Time clock, Sales, Clinic, Team, Pay, People, Settings. Related pages are tabs across the top of each (red badges add up per item). Phones: Home, Clock and the two most-used items, plus More. Dark mode switch (moon/sun beside your name; on phones in the top bar), remembered per device; dark mode uses a light-lettering logo (same gold mark) |

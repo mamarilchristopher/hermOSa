@@ -37,7 +37,8 @@ export async function requireAccess(opts: { allowWithoutMfa?: boolean; allowPend
   if (access.join_status === "PENDING" && !opts.allowPending) redirect("/pending");
   if (access.needs_mfa && !access.mfa && !opts.allowWithoutMfa) redirect("/mfa");
   if (pin?.has_pin && !pin.verified && !opts.allowWithoutPin) redirect("/pin");
-  return { supabase, access, branches: sortBranches((branches ?? []) as Branch[]) };
+  // v0.48.2: switched-off branches (e.g. the old "TEST (Chris)" branch) are hidden everywhere in the app.
+  return { supabase, access, branches: sortBranches(((branches ?? []) as Branch[]).filter((b) => b.active !== false)) };
 }
 
 const effective = (a: Access, role: Role) =>
