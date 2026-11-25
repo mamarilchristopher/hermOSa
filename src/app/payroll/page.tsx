@@ -5,11 +5,11 @@ import { TopBar } from "@/components/TopBar";
 import { Uid } from "@/components/Uid";
 import { openPayroll, deleteHoliday, addThirteenth, decideCola, openPayslip } from "./actions";
 import { ColaForm, FinalizeForm, HolidayForm, PayRateForm, RulesForm, type PaySetting } from "./Forms";
-import { peso, periodLabel, manilaToday } from "@/lib/payroll";
+import { peso, periodLabel, manilaToday, shortDate, ROLE_TEXT, type CommissionItem } from "@/lib/payroll";
 
 type Run = { id: string; period_start: string; period_end: string; state: "DRAFT" | "FINAL"; computed_at: string | null; finalized_at: string | null };
 type Slip = { id: string; employee_id: string; slip_no: string; gross_cents: number; deductions_cents: number; net_cents: number;
-  earnings: { label: string; amount: number }[]; employees: { full_name: string; uid: string | null } | null };
+  earnings: { label: string; amount: number }[]; commissions: CommissionItem[] | null; employees: { full_name: string; uid: string | null } | null };
 type Emp = { id: string; uid: string | null; full_name: string; position: string | null };
 
 /** Payroll per cutoff (update-0046). Owners and the GM. */
@@ -48,7 +48,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   const when = (t: string) => new Date(t).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   const run = runs.find((r) => r.id === runParam) ?? runs[0] ?? null;
   const { data: slipsData } = run
-    ? await supabase.from("payslips").select("id, employee_id, slip_no, gross_cents, deductions_cents, net_cents, earnings, employees(full_name, uid)").eq("run_id", run.id)
+    ? await supabase.from("payslips").select("id, employee_id, slip_no, gross_cents, deductions_cents, net_cents, earnings, commissions, employees(full_name, uid)").eq("run_id", run.id)
     : { data: [] };
   const year = Number((run?.period_start ?? today).slice(0, 4));
   const { data: thirteenthData } = await supabase.rpc("thirteenth_month", { p_year: year });
@@ -140,6 +140,33 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
                   ))}
                 </div>
               </>
+            )}
+            {slips.some((s) => (s.commissions ?? []).length > 0) && (
+              <div className="comm-drill">
+                <h3>Commission details</h3>
+                <p className="muted small">Signed-off services up to the end of this cutoff that weren&apos;t paid before. Tap a name to see each one.</p>
+                {slips.filter((s) => (s.commissions ?? []).length > 0).map((s) => {
+                  const list = s.commissions ?? [];
+                  return (
+                    <details key={s.id} className="comm-person">
+                      <summary>
+                        <span className="slip-name">{s.employees?.full_name}<Uid v={s.employees?.uid ?? null} /></span>
+                        <span className="small muted">{list.length} service{list.length === 1 ? "" : "s"}</span>
+                        <strong>{peso(comm(s))}</strong>
+                      </summary>
+                      <div className="comm-lines">
+                        <div className="comm-line comm-line-head" aria-hidden="true"><span>Date</span><span>Service</span><span>Role</span><span>Paid</span><span>Commission</span></div>
+                        {list.map((c) => (
+                          <div key={c.id} className="comm-line">
+                            <span>{shortDate(c.date)}</span><span className="svc">{c.service}</span><span>{ROLE_TEXT[c.role] ?? c.role}</span>
+                            <span className="num">{peso(c.paid)}</span><span className="num"><strong>{peso(c.amount)}</strong></span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  );
+                })}
+              </div>
             )}
             {run.state === "DRAFT" && slips.length > 0 && <FinalizeForm run={run.id} />}
             {run.state === "FINAL" && <p className="small muted" style={{ marginBottom: 0 }}>Staff can see their payslips under My payslips.</p>}

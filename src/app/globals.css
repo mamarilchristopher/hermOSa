@@ -939,3 +939,28 @@ button.link { background: none; border: 0; padding: 0; color: var(--bad); text-d
 }
 .pay-switches .check { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
 .pay-rate input[type="checkbox"] { accent-color: var(--gold); width: 18px; height: 18px; min-height: 0; padding: 0; margin: 0; }
+.comm-drill { margin-top: 18px; }
+.comm-drill h3 { margin: 0 0 4px; font-size: 0.95rem; }
+.comm-person { border: 1px solid var(--line); border-radius: var(--radius-sm); margin-top: 8px; background: var(--surface); }
+.comm-person summary { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 12px; align-items: center; padding: 10px 14px; cursor: pointer; list-style: none; color: var(--ink); }
+.comm-person summary::-webkit-details-marker { display: none; }
+.comm-person summary::after { content: "›"; color: var(--muted); font-size: 1.2rem; transition: transform 0.15s; }
+.comm-person[open] summary::after { transform: rotate(90deg); }
+.comm-person summary strong { font-variant-numeric: tabular-nums; }
+.comm-lines { border-top: 1px solid var(--line); padding: 4px 14px 10px; }
+.comm-line { display: grid; grid-template-columns: 70px minmax(0, 1fr) 70px 110px 110px; gap: 10px; padding: 7px 0; border-top: 1px dashed var(--line); font-size: 0.87rem; align-items: center; }
+.comm-line .num { text-align: right; font-variant-numeric: tabular-nums; }
+.comm-line-head { border-top: 0; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; }
+.comm-line-head span:nth-child(n+4) { text-align: right; }
+@media (max-width: 760px) {
+  .comm-person summary { display: flex; gap: 10px; }
+  .comm-person summary .slip-name { flex: 1 1 auto; }
+  .comm-person summary .small { display: none; }
+  .comm-line-head { display: none; }
+  .comm-line { grid-template-columns: 56px minmax(0, 1fr) auto; grid-template-areas: "d s c" "d r p"; gap: 2px 10px; }
+  .comm-line > span:nth-child(1) { grid-area: d; color: var(--muted); }
+  .comm-line .svc { grid-area: s; }
+  .comm-line > span:nth-child(3) { grid-area: r; font-size: 0.78rem; color: var(--muted); }
+  .comm-line > span:nth-child(4) { grid-area: p; font-size: 0.78rem; color: var(--muted); }
+  .comm-line > span:nth-child(5) { grid-area: c; }
+}
