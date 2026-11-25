@@ -32,7 +32,10 @@ export default async function People() {
     else t.pending += Number(l.amount_cents);
     monthTotals.set(l.employee_id, t);
   }
-  const byBranch = branches.filter((b) => b.kind === "CLINIC").map((b) => ({ b, list: byRankThenName((emps ?? []).filter((e) => e.branch_id === b.id), rank, (e) => e.full_name) })).filter((x) => x.list.length > 0);
+  const byBranch = branches.filter((b) => b.kind === "CLINIC").map((b) => ({ b, list: byRankThenName((emps ?? []).filter((e) => e.active && e.branch_id === b.id), rank, (e) => e.full_name) })).filter((x) => x.list.length > 0);
+  // Inactive records go in their own section at the bottom (CHRIS, Nov 25).
+  const inactive = byRankThenName((emps ?? []).filter((e) => !e.active), rank, (e) => e.full_name);
+  if (inactive.length) byBranch.push({ b: { ...branches[0], id: "inactive", name: `Inactive (${inactive.length})` }, list: inactive });
 
   return (
     <>

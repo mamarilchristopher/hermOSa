@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.32.2 | Nov 25, 2026 | none | Users and roles: staff split into Active and Inactive sections; Employees: inactive records moved to their own Inactive section at the bottom |
 | 0.32.1 | Nov 25, 2026 | none | Time clock: if Hermosa OS is updated while the clock page is open, Time in / Time out no longer fails with "Something went wrong"; the page reloads itself and finishes the punch with the photo already taken. A photo the phone can't read now says so instead of a general error, and errors show a Reload button |
 | 0.32.0 | Nov 25, 2026 | update-0032 | Late NTE deadline: explain within 2 scheduled working days counting the late day (until the end of the next scheduled working day); the time left counts down on Home, the time clock and Late NTEs; no explanation by then issues an IR automatically (urgent for the employee, management told); IRs issued automatically say "Issued by: Hermosa OS (automatic)" |
 | 0.31.0 | Nov 25, 2026 | update-0031 | Employees get a Home notice when management decides: staff details approved or sent back; commission signed off ("Your commission amounting to ₱X has been approved and will be included in this cutoff's pay", with a Check your current commission total button opening the drilldown); entry not approved, with the reason. Salary payout section and My details say salaries are paid in cash by default and bank accounts are for records only |

@@ -37,6 +37,43 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const branchName = Object.fromEntries(branches.map((b) => [b.id, b.name]));
   const others = (users ?? []).filter((u) => u.id !== access.user_id && u.active);
 
+  const activeUsers = users.filter((u) => u.active), inactiveUsers = users.filter((u) => !u.active);
+  const staffTable = (list: typeof users) => (
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Position</th><th>Email</th><th>Roles</th><th>Sign-in PIN</th><th></th></tr></thead>
+            <tbody>
+              {list.map((u) => (
+                <tr key={u.id}>
+                  <td>{u.display_name}<Uid v={u.uid} /><Uid v={staffUidOf.get(u.id)} /></td>
+                  <td>{employeeOf.get(u.id) ? <PositionCell employeeId={employeeOf.get(u.id)!} position={positionOf.get(u.id) ?? null} /> : grantsOf(u.id).some((g) => g.role_code === "OWNER") ? "Owner" : <span className="muted small">No employee record</span>}</td>
+                  <td className="small">{u.email}</td>
+                  <td>
+                    {(grants ?? []).filter((g) => g.user_id === u.id).map((g) => (
+                      <form key={g.id} action={revokeRole} style={{ display: "flex", gap: 8, alignItems: "center", margin: "2px 0" }}>
+                        <input type="hidden" name="grant" value={g.id} />
+                        <span>{g.role_code} · {g.branch_id ? branchName[g.branch_id] : "All branches"}</span>
+                        {u.id !== access.user_id && <button className="secondary small" type="submit">Remove</button>}
+                      </form>
+                    ))}
+                  </td>
+                  <td>{u.id !== access.user_id && u.active && <PinCell userId={u.id} hasPin={pins.has(u.id)} />}</td>
+                  <td>
+                    {u.id !== access.user_id && (
+                      <form action={setActive}>
+                        <input type="hidden" name="user" value={u.id} />
+                        <input type="hidden" name="name" value={u.display_name} />
+                        <input type="hidden" name="active" value={u.active ? "false" : "true"} />
+                        <button className="secondary" type="submit">{u.active ? "Deactivate" : "Reactivate"}</button>
+                      </form>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+  );
   return (
     <>
       <TopBar access={access} />
@@ -89,40 +126,15 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
             <Link href="/admin/users?sort=name" className={sortByName ? "on" : ""}>By name</Link>
           </div>
         </div>
-        <div className="table-wrap">
-          <table>
-            <thead><tr><th>Name</th><th>Position</th><th>Email</th><th>Roles</th><th>Sign-in PIN</th><th></th></tr></thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id}>
-                  <td>{u.display_name}<Uid v={u.uid} /><Uid v={staffUidOf.get(u.id)} />{!u.active && <span className="pill REVERSED" style={{ marginLeft: 6 }}>Inactive</span>}</td>
-                  <td>{employeeOf.get(u.id) ? <PositionCell employeeId={employeeOf.get(u.id)!} position={positionOf.get(u.id) ?? null} /> : grantsOf(u.id).some((g) => g.role_code === "OWNER") ? "Owner" : <span className="muted small">No employee record</span>}</td>
-                  <td className="small">{u.email}</td>
-                  <td>
-                    {(grants ?? []).filter((g) => g.user_id === u.id).map((g) => (
-                      <form key={g.id} action={revokeRole} style={{ display: "flex", gap: 8, alignItems: "center", margin: "2px 0" }}>
-                        <input type="hidden" name="grant" value={g.id} />
-                        <span>{g.role_code} · {g.branch_id ? branchName[g.branch_id] : "All branches"}</span>
-                        {u.id !== access.user_id && <button className="secondary small" type="submit">Remove</button>}
-                      </form>
-                    ))}
-                  </td>
-                  <td>{u.id !== access.user_id && u.active && <PinCell userId={u.id} hasPin={pins.has(u.id)} />}</td>
-                  <td>
-                    {u.id !== access.user_id && (
-                      <form action={setActive}>
-                        <input type="hidden" name="user" value={u.id} />
-                        <input type="hidden" name="name" value={u.display_name} />
-                        <input type="hidden" name="active" value={u.active ? "false" : "true"} />
-                        <button className="secondary" type="submit">{u.active ? "Deactivate" : "Reactivate"}</button>
-                      </form>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <h3 className="list-sub">Active ({activeUsers.length})</h3>
+        {staffTable(activeUsers)}
+        {inactiveUsers.length > 0 && (
+          <>
+            <h3 className="list-sub">Inactive ({inactiveUsers.length})</h3>
+            <p className="small muted" style={{ marginTop: 0 }}>Turned off: they can&apos;t sign in. Reactivate one only if it was turned off by mistake.</p>
+            {staffTable(inactiveUsers)}
+          </>
+        )}
         {others.length > 0 && (
           <div className="card">
             <h2 style={{ marginTop: 0 }}>Give someone an extra role</h2>
