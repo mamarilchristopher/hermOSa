@@ -58,4 +58,14 @@ describe("service prices and commissions", () => {
     expect(rows).toEqual([{ p: 899900, c: 45000 }]);
     expect((await db.sql("SELECT count(*)::int n FROM public.services WHERE name LIKE 'Diode %'")).rows[0].n).toBe(12);
   });
+
+  it("update-0048: a follow-up dose priced at P0 with a set commission pays that commission with nothing paid", async () => {
+    const d2 = (await db.rpc(owner, "aal2", "save_service", [null, "DEMO Arms 2nd dose", 0, 5000, true])).id;
+    const log = await db.rpc(staff, "aal1", "log_service", [db.branches.FAIRVIEW, today(), d2, 0, "SOLO", ana, null, null, null]);
+    expect(log.ok).toBe(true);
+    expect(await lines(log.id)).toEqual([{ role: "SOLO", a: 5000 }]);
+    const plain = (await db.rpc(owner, "aal2", "save_service", [null, "DEMO Priced", 100000, 5000, true])).id;
+    const unpaid = await db.rpc(staff, "aal1", "log_service", [db.branches.FAIRVIEW, today(), plain, 0, "SOLO", ana, null, null, null]);
+    expect(await lines(unpaid.id)).toEqual([{ role: "SOLO", a: 0 }]); // a priced service with nothing paid earns nothing
+  });
 });
