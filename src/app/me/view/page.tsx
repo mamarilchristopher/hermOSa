@@ -34,7 +34,7 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
     supabase.rpc("view_as_chat", { p_user: id.data }), // counts only; chats stay private (update-0051)
     supabase.rpc("view_as_notices", { p_user: id.data }), // their bell; chat notices without the message (update-0052)
   ]);
-  const notices = (noticeData ?? null) as { ok: boolean; unread: number; latest: { title: string; body: string | null; created_at: string; read: boolean }[] } | null;
+  const notices = (noticeData ?? null) as { ok: boolean; unread: number; latest: { title: string; body: string | null; created_at: string; read: boolean; kind?: string }[] } | null;
   const chat = (chatData ?? null) as { ok: boolean; unread: number; mgmt_unread: number; tagged_unread: number } | null;
   const v = (data ?? { ok: false, error: "UNKNOWN" }) as ViewAs;
   const today = manilaToday();
@@ -69,14 +69,17 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
         <TodoCard todos={todos} />
         {notices?.ok && (
           <div className="card">
-            <h2>Notifications {notices.unread > 0 && <span className="nav-badge">{notices.unread}</span>}</h2>
+            <h2 className="notices-head">Notifications{notices.unread > 0 && <span className="nav-badge inline">{notices.unread}</span>}
+              {notices.unread > 0 && <span className="count">unread</span>}</h2>
             {notices.latest.length === 0 ? <p className="muted small">None yet.</p> : (
               <ul className="view-notices">
                 {notices.latest.map((n, i) => (
                   <li key={i} className={n.read ? "" : "unread"}>
-                    <strong>{n.title}</strong>{!n.read && <span className="pill STAGED">Unread</span>}
-                    {n.body && <span className="small">{n.body}</span>}
-                    <span className="small muted">{new Date(n.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+                    <span className="vn-icon" aria-hidden>{(n.kind ?? "").startsWith("CHAT") ? "💬" : n.kind === "PHOTOS_DUE" ? "📷" : (n.kind ?? "").includes("NTE") || (n.kind ?? "").includes("IR") ? "⏰" : "🔔"}</span>
+                    <strong>{!n.read && <span className="vn-dot" title="Unread" />}{n.title}</strong>
+                    <span className="vn-time">{new Date(n.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+                    {n.body && <span className="small" style={{ gridColumn: "2 / -1" }}>{n.body}</span>}
+                    {!n.read && <span className="small muted" style={{ gridColumn: "2 / -1" }}>Not read yet</span>}
                   </li>
                 ))}
               </ul>
