@@ -10,7 +10,7 @@ import { CHAT_SOUNDS_EVENT, playChatSound, setSoundsOn, soundsOn } from "@/lib/c
 export type ChatPerson = { id: string; name: string; photo_path: string | null; photo_url?: string | null };
 export type ChatRoomRow = {
   id: string; kind: "DM" | "GROUP"; auto: boolean; name: string | null; photo_path: string | null; photo_url?: string | null;
-  other_id: string | null; last_at: string; members: number; unread: number; mgmt_unread?: number; mention_unread?: number;
+  other_id: string | null; icon_path?: string | null; face_ids?: string[] | null; last_at: string; members: number; unread: number; mgmt_unread?: number; mention_unread?: number;
   last: { sender: string; mine: boolean; text: string; mgmt?: boolean } | null;
 };
 type Member = { id: string; name: string; photo_path: string | null; last_read_at: string };
@@ -92,6 +92,7 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
   const activeRef = useRef(active);
   activeRef.current = active;
   const faces = useMemo(() => new Map(people.map((p) => [p.id, p.photo_url ?? null])), [people]);
+  const peopleNames = useMemo(() => new Map([...people.map((p) => [p.id, p.name] as const), [me.id, me.name] as const]), [people, me.id, me.name]);
 
   const refreshList = useCallback(async () => {
     const { data } = await supabase.rpc("chat_list");
@@ -112,6 +113,12 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
     for (const d of data ?? []) if (d.path && d.signedUrl) add[d.path] = d.signedUrl;
     setPhotos((p) => ({ ...p, ...add }));
   }, [supabase]);
+
+  // Group icons (update-0058) live in the private chat folder: sign any not signed yet.
+  useEffect(() => {
+    const need = rooms.map((r) => r.icon_path).filter((p): p is string => !!p && !photos[p]);
+    if (need.length) void signPhotos(need.map((photo_path) => ({ photo_path })));
+  }, [rooms, photos, signPhotos]);
 
   const markRead = useCallback((room: string) => {
     void supabase.rpc("chat_mark_read", { p_room: room });
@@ -371,7 +378,7 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
           {rooms.map((r) => (
             <li key={r.id}>
               <button type="button" className={`chat-room-btn ${r.id === active ? "on" : ""} ${r.unread ? "unread" : ""} ${r.mgmt_unread ? "mgmt" : ""}`} onClick={() => open(r.id)}>
-                {r.kind === "DM" ? <Avatar name={r.name ?? "?"} url={r.photo_url} size={44} /> : <span className="chat-group-face" aria-hidden>{r.auto ? "#" : (r.name ?? "?").slice(0, 1).toUpperCase()}</span>}
+                <RoomFace r={r} name={r.name} icon={r.icon_path ? photos[r.icon_path] : undefined} faces={faces} names={peopleNames} size={44} />
                 <span className="chat-room-text">
                   <span className="chat-room-top"><strong>{r.name ?? "Chat"}</strong>{r.last && <span className="chat-time">{listTime(r.last_at)}</span>}</span>
                   <span className="chat-room-last">
@@ -395,11 +402,12 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
           <>
             <header className="chat-head">
               <button type="button" className="icon-btn chat-back" aria-label="Back to chats" onClick={() => open(null)}><IconBack /></button>
-              {room?.kind === "DM" ? <Avatar name={info?.name ?? room?.name ?? "?"} url={room?.photo_url} size={36} /> : <span className="chat-group-face small" aria-hidden>{room?.auto ? "#" : (info?.name ?? room?.name ?? "?").slice(0, 1).toUpperCase()}</span>}
+              {room ? <RoomFace r={room} name={info?.name ?? room.name} icon={room.icon_path ? photos[room.icon_path] : undefined} faces={faces} names={peopleNames} size={36} />
+                : <span className="chat-group-face small" aria-hidden>{(info?.name ?? "?").slice(0, 1).toUpperCase()}</span>}
               <span className="chat-head-text"><strong>{info?.name ?? room?.name ?? "Chat"}</strong>{group && <span className="small muted">{info?.members.length} people</span>}</span>
               {info && <button type="button" className="icon-btn" aria-label={group ? "Group details" : "Chat details"} title={group ? "Group details" : "Chat details"} onClick={() => setPanel(panel === "info" ? null : "info")}><IconInfo /></button>}
             </header>
-            {panel === "info" && info && <GroupInfo key={info.id} info={info} me={me.id} canAdd={info.kind === "GROUP" && (!info.auto || management)} people={people} supabase={supabase}
+            {panel === "info" && info && <GroupInfo key={info.id} info={info} me={me.id} icon={room?.icon_path ?? null} canAdd={info.kind === "GROUP" && (!info.auto || management)} people={people} supabase={supabase}
               onCleared={() => { setMsgs([]); setPanel(null); void refreshList(); }}
               onChanged={async (left) => { if (left) { await refreshList(); open(null); return; } const { data } = await supabase.rpc("chat_room", { p_room: info.id }); if (data?.ok) setInfo(data as RoomInfo); void refreshList(); }} />}
             <div className="chat-scroll" ref={scroller} onClick={() => { setPicked(null); setPicker((p) => (p && typeof p === "object" ? null : p)); }}>
@@ -665,7 +673,38 @@ function NewChat({ people, supabase, onDone, onClose }: { people: ChatPerson[]; 
   );
 }
 
-function GroupInfo({ info, me, canAdd, people, supabase, onChanged, onCleared }: { info: RoomInfo; me: string; canAdd: boolean; people: ChatPerson[]; supabase: Sb; onChanged: (left: boolean) => void; onCleared: () => void }) {
+/** A chat's picture: 1-on-1 = the other person's photo; group = its icon, else a combo of members' faces, else # / first letter. */
+function RoomFace({ r, name, icon, faces, names, size }: { r: ChatRoomRow; name: string | null; icon?: string; faces: Map<string, string | null>; names: Map<string, string>; size: number }) {
+  if (r.kind === "DM") return <Avatar name={name ?? "?"} url={r.photo_url} size={size} />;
+  const cls = `chat-group-face ${size < 40 ? "small" : ""}`;
+  // eslint-disable-next-line @next/next/no-img-element
+  if (r.icon_path) return icon ? <img className={`${cls} chat-icon`} src={icon} alt="" /> : <span className={cls} aria-hidden />;
+  const ids = (r.face_ids ?? []).slice(0, 2);
+  if (!r.auto && ids.length >= 2) {
+    const s = Math.round(size * 0.68);
+    return (
+      <span className="chat-combo" style={{ width: size, height: size }} aria-hidden>
+        {ids.map((id) => <Avatar key={id} name={names.get(id) ?? "?"} url={faces.get(id) ?? null} size={s} />)}
+      </span>
+    );
+  }
+  return <span className={cls} aria-hidden>{r.auto ? "#" : (name ?? "?").slice(0, 1).toUpperCase()}</span>;
+}
+
+/** Group icons are small: centre-crop to a 512px square JPEG. */
+async function squareIcon(file: File): Promise<Blob> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = url; });
+    const side = Math.min(img.naturalWidth, img.naturalHeight), out = Math.min(512, side);
+    const c = document.createElement("canvas");
+    c.width = out; c.height = out;
+    c.getContext("2d")!.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, out, out);
+    return await new Promise<Blob>((ok, bad) => c.toBlob((b) => (b ? ok(b) : bad(new Error("photo"))), "image/jpeg", 0.85));
+  } finally { URL.revokeObjectURL(url); }
+}
+
+function GroupInfo({ info, me, icon, canAdd, people, supabase, onChanged, onCleared }: { info: RoomInfo; me: string; icon: string | null; canAdd: boolean; people: ChatPerson[]; supabase: Sb; onChanged: (left: boolean) => void; onCleared: () => void }) {
   const [name, setName] = useState(info.name);
   const [canDelete, setCanDelete] = useState(false);
   useEffect(() => { void supabase.rpc("chat_can_delete", { p_room: info.id }).then(({ data }) => setCanDelete(data === true)); }, [supabase, info.id]);
@@ -685,6 +724,28 @@ function GroupInfo({ info, me, canAdd, people, supabase, onChanged, onCleared }:
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [err, setErr] = useState<string | null>(null);
   const inGroup = new Set(info.members.map((m) => m.id));
+  const iconInput = useRef<HTMLInputElement>(null);
+  const [iconBusy, setIconBusy] = useState(false);
+  // Group icon (update-0058): upload to <room>/<me>/, then point the group at it; tidy up our own old file.
+  const setIcon = async (file: File | null) => {
+    setErr(null); setIconBusy(true);
+    try {
+      let path: string | null = null;
+      if (file) {
+        if (!file.type.startsWith("image/")) { setErr("Pick a photo."); return; }
+        path = `${info.id}/${me}/icon-${uuid()}.jpg`;
+        const { error: e } = await supabase.storage.from("chat").upload(path, await squareIcon(file), { contentType: "image/jpeg" });
+        if (e) { setErr("The photo didn't upload. Try again."); return; }
+      }
+      const { data, error: e } = await supabase.rpc("chat_set_icon", { p_room: info.id, p_path: path });
+      if (e || !data?.ok) { setErr(e?.code === "PGRST202" ? "Group photos need database update-0058." : ERR[data?.error] ?? "That didn't work."); return; }
+      if (data.old && String(data.old).startsWith(`${info.id}/${me}/`)) void supabase.storage.from("chat").remove([data.old]);
+      onChanged(false);
+    } catch { setErr("The photo didn't upload. Try again."); } finally {
+      setIconBusy(false);
+      if (iconInput.current) iconInput.current.value = "";
+    }
+  };
   const call = async (fn: string, args: Record<string, unknown>, left = false) => {
     const { data } = await supabase.rpc(fn, args);
     if (data?.ok) { setAdding(false); setChosen(new Set()); onChanged(left); } else setErr(ERR[data?.error] ?? "That didn't work.");
@@ -696,6 +757,13 @@ function GroupInfo({ info, me, canAdd, people, supabase, onChanged, onCleared }:
           <input value={name} maxLength={60} aria-label="Group name" onChange={(e) => setName(e.target.value)} />
           <button type="submit" className="secondary" disabled={!name.trim() || name.trim() === info.name}>Rename</button>
         </form>
+      )}
+      {group && canAdd && (
+        <div className="chat-panel-actions chat-icon-row">
+          <input ref={iconInput} type="file" accept="image/*" hidden onChange={(e) => void setIcon(e.target.files?.[0] ?? null)} />
+          <button type="button" className="secondary" disabled={iconBusy} onClick={() => iconInput.current?.click()}>{iconBusy ? "Saving…" : icon ? "Change group photo" : "Add group photo"}</button>
+          {icon && <button type="button" className="secondary" disabled={iconBusy} onClick={() => void setIcon(null)}>Remove photo</button>}
+        </div>
       )}
       <ul className="chat-people">
         {info.members.map((m) => <li key={m.id}><span><Avatar name={m.name} url={people.find((p) => p.id === m.id)?.photo_url ?? null} size={28} /> {m.name}{m.id === me ? " (you)" : ""}</span></li>)}

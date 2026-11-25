@@ -1261,3 +1261,9 @@ body:has(.notify-required) main { padding-bottom: 80px; }
 /* Client archive / Social media: day > branch (v0.55.13) */
 .folder-branch { margin: 6px 0 14px; }
 .folder-branch h3 { margin: 10px 0 8px; font-size: 1rem; border-left: 3px solid var(--gold); padding-left: 8px; }
+/* Group chat icons (update-0058): a photo, or a combo of two members' faces. */
+.chat-icon { object-fit: cover; padding: 0; }
+.chat-combo { position: relative; flex: none; display: block; }
+.chat-combo > .avatar { position: absolute; border: 2px solid var(--surface, #fff); box-sizing: border-box; }
+.chat-combo > .avatar:first-child { top: 0; left: 0; }
+.chat-combo > .avatar:last-child { right: 0; bottom: 0; }

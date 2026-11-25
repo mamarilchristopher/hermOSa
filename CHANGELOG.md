@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.58.0 | Nov 26, 2026 | update-0058 | Chat: groups can have a photo (Group details > Add group photo; any member of a group someone made, owners and the GM for All staff and branch groups). Groups without a photo show two members' profile pictures; 1-on-1 chats show the other person's photo |
 | 0.57.0 | Nov 26, 2026 | update-0057 | Client archive and Social media: every employee can view and download all branches' client folders; owners and the GM get a Delete button on each folder (removes the service log entry, its commission and its photos; asks first; refused if the commission is already on a final payslip). Home: today's red "Not entered yet" branch boxes are hidden from 12:00 AM to 9:59 AM |
 | 0.55.13 | Nov 26, 2026 | none | Client archive and Social media: each day is split by branch (QC Main, Fairview, Sta. Maria, Marikina) with a count per branch |
 | 0.55.12 | Nov 26, 2026 | none | Add a service: the "still needs photos" note shows only once a new entry is started (it was showing on the empty form and looked like it was about the saved entries) |
