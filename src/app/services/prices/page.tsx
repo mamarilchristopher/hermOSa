@@ -1,3 +1,4 @@
+import { sortServices } from "@/lib/serviceOrder";
 import Link from "next/link";
 import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
@@ -11,7 +12,7 @@ export default async function PricesPage() {
   const edit = can(access, ["OWNER"], null) || can(access, ["MANAGER"], null);
   const look = edit || access.grants.some((g) => ["MANAGER", "FINANCE", "AUDITOR"].includes(g.role));
   const { data, error } = look ? await supabase.from("services").select("id, name, price_cents, commission_cents, active").order("name") : { data: [], error: null };
-  const list = (data ?? []) as Svc[];
+  const list = sortServices((data ?? []) as Svc[]);
   return (
     <>
       <TopBar access={access} />

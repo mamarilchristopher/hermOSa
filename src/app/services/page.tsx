@@ -1,3 +1,4 @@
+import { sortServices } from "@/lib/serviceOrder";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireAccess, branchesFor, can } from "@/lib/access";
@@ -95,7 +96,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 {(services ?? []).length === 0 ? "Add your services below first." : null}
               </div>
             ) : (
-              <EntryForm branch={branch.id} date={date} services={(services ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
+              <EntryForm branch={branch.id} date={date} services={sortServices(services ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
             )}
             {isManager && <p className="small" style={{ marginTop: 12 }}><Link href="/services/prices">Price list and commissions</Link> (add a service, set its price and commission)</p>}
           </div>

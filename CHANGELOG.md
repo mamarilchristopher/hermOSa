@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.54.5 | Nov 26, 2026 | none | Services are listed in CHRIS's price-list order (Hiko Deluxe, Hiko Pro, Ultra Max Hiko, ... Barbie Arms Trio after Ultra VLift, ... Diode last) in Add a service, the Price list and Bookings; services added later come after, A to Z |
 | 0.54.3 | Nov 26, 2026 | none | View as: the Notifications card redesigned (each notice in its own row with an icon, gold highlight and dot for unread, small count badge instead of the stretched red bar). Tapping the Hermosa logo (sidebar or phone top bar) goes to Home |
 | 0.54.1 | Nov 26, 2026 | none | Chat GIFs look like Messenger: a sheet from the bottom on phones with a GIPHY search bar and Done, trending GIFs first, 3 columns that keep each GIF's own shape (no square crops), and more GIFs load as you scroll |
 | 0.54.0 | Nov 26, 2026 | update-0054 | Owners and the GM can log a service without the client photos and waiver. The lead and assist then get an urgent "Add client photos and waiver" box at the top of Home and a notification; their commission for that entry is held (not in totals or payroll) until the before/after photos and both waiver pages are added from the Service log ("Add photos" on the entry). Held commission shows as its own figure on Home. Only staff timed in today (and not yet timed out) can add Service log entries; owners and the GM always can |
