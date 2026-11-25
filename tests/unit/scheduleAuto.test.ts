@@ -52,6 +52,15 @@ describe("checkWeek and rules", () => {
     expect(w.some((x) => x.includes("no plan for Bea"))).toBe(true);
     expect(w.some((x) => x.includes("Ana works all 7 days"))).toBe(true);
   });
+  it("asks to confirm a short week (absences count as scheduled days)", () => {
+    const dates = ["2026-11-23", "2026-11-24", "2026-11-25", "2026-11-26", "2026-11-27", "2026-11-28", "2026-11-29"];
+    const plan: [boolean, string | null][] = [[true, null], [false, null], [true, "ABSENT"], [false, null], [false, null], [true, null], [false, null]];
+    const shifts = dates.map((d, i) => ({ employee_id: "a", date: d, off: plan[i][0], branch_id: plan[i][0] ? null : "main", leave: plan[i][1] }));
+    const w = checkWeek({ dates, people: [{ id: "a", name: "Jas" }], branches: [{ id: "main", name: "Main" }], shifts, rules: defaultRules(["main"]), dayLabel: (d) => d });
+    expect(w).toContain("Jas only has 5 working days this week. Confirm?");
+    const six = shifts.map((s, i) => (i === 5 ? { ...s, off: false, branch_id: "main" } : s));
+    expect(checkWeek({ dates, people: [{ id: "a", name: "Jas" }], branches: [{ id: "main", name: "Main" }], shifts: six, rules: defaultRules(["main"]), dayLabel: (d) => d }).some((x) => x.includes("Confirm"))).toBe(false);
+  });
   it("falls back to defaults for bad saved rules", () => {
     expect(normalizeRules({ days_off: 9, min: { main: [1] } }, ["main"])).toEqual(defaultRules(["main"]));
   });

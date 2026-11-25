@@ -137,8 +137,10 @@ export function checkWeek(input: { dates: string[]; people: { id: string; name: 
   for (const p of people) {
     const mine = shifts.filter((s) => s.employee_id === p.id);
     if (mine.length === 7 && mine.every((s) => !s.off)) out.push(`${p.name} works all 7 days with no day off.`);
-    const offs = mine.filter((s) => s.off && !s.leave).length;
-    if (mine.length === 7 && offs > rules.days_off + 1) out.push(`${p.name} has ${offs} days off this week.`);
+    // Scheduled working days (leave and absences count as scheduled). Fewer than usual is sometimes on purpose
+    // (CHRIS: some staff have a 5-day arrangement), so ask instead of assuming (Nov 25).
+    const work = mine.filter((s) => !s.off || s.leave).length;
+    if (mine.length === 7 && work < 7 - rules.days_off) out.push(`${p.name} only has ${work} working day${work === 1 ? "" : "s"} this week. Confirm?`);
   }
   return out;
 }
