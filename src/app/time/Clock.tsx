@@ -63,7 +63,7 @@ function Now() {
   return <div className="clock-now" suppressHydrationWarning>{t ?? " "}</div>;
 }
 
-export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { userId: string; isIn: boolean; branches: B[]; defaultBranch: string; status: string }) {
+export function TimeClock({ userId, isIn, branches, defaultBranch, status, managerShot = false }: { userId: string; isIn: boolean; branches: B[]; defaultBranch: string; status: string; managerShot?: boolean }) {
   const router = useRouter();
   const [branch, setBranch] = useState(defaultBranch);
   const [busy, setBusy] = useState<string | null>(null);
@@ -146,7 +146,8 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status }: { u
       <button className={`clock-btn ${isIn ? "out" : ""}`} disabled={!!busy || !branch} onClick={() => file.current?.click()}>
         {busy ?? (isIn ? "Time out" : "Time in")}
       </button>
-      {online && <>
+      {/* Screenshots: WFH staff for in and out; management (owners and the GM) for time out too (CHRIS Nov 25). */}
+      {(online || (managerShot && isIn)) && <>
         <input ref={shot} type="file" accept="image/*" hidden onChange={(e) => onPhoto(e.target.files?.[0], true)} />
         <button type="button" className="secondary" disabled={!!busy || !branch} onClick={() => shot.current?.click()}>
           {isIn ? "Time out" : "Time in"} with a screenshot

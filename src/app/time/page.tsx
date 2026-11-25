@@ -73,7 +73,7 @@ export default async function TimePage() {
         <p className="muted small">Time in when you arrive and time out when you leave by taking a photo of the clinic clock. No more posting it in the group chat.</p>
 
         {me ? (
-          <TimeClock userId={access.user_id} isIn={isIn} branches={short} defaultBranch={defaultBranch} status={status} />
+          <TimeClock userId={access.user_id} isIn={isIn} branches={short} defaultBranch={defaultBranch} status={status} managerShot={canApprove(access, null)} />
         ) : (
           <div className="notice info">Your login isn&apos;t linked to an employee record yet, so you can&apos;t time in. Ask the owner to link it on the Employees page.</div>
         )}
