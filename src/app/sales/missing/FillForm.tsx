@@ -1,4 +1,5 @@
 "use client";
+import { pick } from "@/lib/decision";
 import { useActionState } from "react";
 import { decideDay, fillDay } from "./actions";
 
@@ -27,8 +28,8 @@ export function DecideForm({ mark, label, by, canDecide }: { mark: string; label
       <span className="small"><strong>{label}</strong> · marked by {by} · needs a second person</span>
       {canDecide && (
         <>
-          <button type="submit" name="decision" value="confirm" disabled={pending}>Confirm</button>
-          <button type="submit" name="decision" value="reject" className="secondary" disabled={pending}>Reject</button>
+          <button type="submit" onClick={pick("confirm")} disabled={pending}>Confirm</button>
+          <button type="submit" onClick={pick("reject")} className="secondary" disabled={pending}>Reject</button>
         </>
       )}
       {state?.error && <span className="small" style={{ color: "var(--bad)" }}>{state.error}</span>}

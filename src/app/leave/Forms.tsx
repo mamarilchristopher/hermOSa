@@ -1,4 +1,5 @@
 "use client";
+import { pick } from "@/lib/decision";
 import { useActionState, useState } from "react";
 import { cancelLeave, decideLeave, fileLeave } from "./actions";
 
@@ -50,11 +51,11 @@ export function DecideLeaveForm({ id }: { id: string }) {
       <label className="field">{decline ? "Why not?" : "Note (optional)"}<input name="note" maxLength={300} required={decline} placeholder={decline ? "e.g. Short-staffed that week, please choose other dates" : ""} /></label>
       <div className="field row-buttons">
         {decline ? (
-          <><button name="decision" value="decline" className="danger" disabled={pending}>Decline</button>
+          <><button onClick={pick("decline")} className="danger" disabled={pending}>Decline</button>
             <button type="button" className="secondary" onClick={() => setDecline(false)}>Back</button></>
         ) : (
-          <><button name="decision" value="paid" disabled={pending}>{pending ? "Saving…" : "Approve with pay"}</button>
-            <button name="decision" value="unpaid" className="secondary" disabled={pending}>Approve without pay</button>
+          <><button onClick={pick("paid")} disabled={pending}>{pending ? "Saving…" : "Approve with pay"}</button>
+            <button onClick={pick("unpaid")} className="secondary" disabled={pending}>Approve without pay</button>
             <button type="button" className="secondary" onClick={() => setDecline(true)}>Decline</button></>
         )}
       </div>

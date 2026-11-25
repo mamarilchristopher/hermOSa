@@ -1,4 +1,5 @@
 "use client";
+import { pick } from "@/lib/decision";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { addService, decideLog, logService, type ActionState } from "./actions";
 import { previewCommission, type CommissionType } from "@/lib/commission";
@@ -159,12 +160,12 @@ export function DecideButtons({ id }: { id: string }) {
       {rejecting ? (
         <>
           <input name="note" placeholder="Reason" required minLength={3} maxLength={300} autoFocus />
-          <button type="submit" name="decision" value="reject" className="danger small" disabled={pending}>Reject</button>
+          <button type="submit" onClick={pick("reject")} className="danger small" disabled={pending}>Reject</button>
           <button type="button" className="secondary small" onClick={() => setRejecting(false)}>Cancel</button>
         </>
       ) : (
         <>
-          <button type="submit" name="decision" value="approve" className="small" disabled={pending}>Approve</button>
+          <button type="submit" onClick={pick("approve")} className="small" disabled={pending}>Approve</button>
           <button type="button" className="secondary small" onClick={() => setRejecting(true)}>Reject</button>
         </>
       )}

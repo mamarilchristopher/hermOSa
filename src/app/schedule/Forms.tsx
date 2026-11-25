@@ -1,4 +1,5 @@
 "use client";
+import { pick } from "@/lib/decision";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { saveRules, suggestWeekAction } from "./actions";
 import type { Rules } from "@/lib/scheduleAuto";
@@ -267,12 +268,12 @@ export function RespondSwapForm({ id }: { id: string }) {
       {no ? (
         <>
           <input name="note" placeholder="Why not? (optional)" maxLength={300} />
-          <button name="decision" value="decline" className="danger small" disabled={pending}>Decline</button>
+          <button onClick={pick("decline")} className="danger small" disabled={pending}>Decline</button>
           <button type="button" className="secondary small" onClick={() => setNo(false)}>Back</button>
         </>
       ) : (
         <>
-          <button name="decision" value="accept" className="small" disabled={pending}>Accept</button>
+          <button onClick={pick("accept")} className="small" disabled={pending}>Accept</button>
           <button type="button" className="secondary small" onClick={() => setNo(true)}>Decline</button>
         </>
       )}
@@ -290,12 +291,12 @@ export function DecideForm({ id }: { id: string }) {
       {no ? (
         <>
           <input name="note" placeholder="Why not?" required minLength={3} maxLength={300} />
-          <button name="decision" value="reject" className="danger small" disabled={pending}>Don&apos;t approve</button>
+          <button onClick={pick("reject")} className="danger small" disabled={pending}>Don&apos;t approve</button>
           <button type="button" className="secondary small" onClick={() => setNo(false)}>Back</button>
         </>
       ) : (
         <>
-          <button name="decision" value="approve" className="small" disabled={pending}>Approve</button>
+          <button onClick={pick("approve")} className="small" disabled={pending}>Approve</button>
           <button type="button" className="secondary small" onClick={() => setNo(true)}>Don&apos;t approve</button>
         </>
       )}

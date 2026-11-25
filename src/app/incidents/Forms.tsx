@@ -1,4 +1,5 @@
 "use client";
+import { pick } from "@/lib/decision";
 import { useActionState, useState } from "react";
 import { acknowledgeIr, closeIr, issueIr, type ActionState } from "./actions";
 
@@ -19,10 +20,10 @@ export function IssueForm({ id }: { id: string }) {
         <textarea name="note" rows={2} maxLength={1000} required={dismiss} /></label>
       <div className="field row-buttons">
         {dismiss ? (
-          <><button name="decision" value="dismiss" className="danger" disabled={pending}>Dismiss IR</button>
+          <><button onClick={pick("dismiss")} className="danger" disabled={pending}>Dismiss IR</button>
             <button type="button" className="secondary" onClick={() => setDismiss(false)}>Back</button></>
         ) : (
-          <><button name="decision" value="issue" disabled={pending}>{pending ? "Issuing…" : "Issue to employee"}</button>
+          <><button onClick={pick("issue")} disabled={pending}>{pending ? "Issuing…" : "Issue to employee"}</button>
             <button type="button" className="secondary" onClick={() => setDismiss(true)}>Dismiss</button></>
         )}
       </div>

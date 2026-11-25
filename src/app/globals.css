@@ -766,3 +766,8 @@ h1 .uid { font-size: 0.9rem; }
 /* Leave requests (update-0035) */
 .leave-review { padding: 14px 0; border-top: 1px solid var(--line); }
 .leave-review:first-of-type { border-top: 0; }
+.photo-frame { position: relative; overflow: hidden; border-radius: 50%; border: 3px solid var(--gold-line); background: var(--pearl); touch-action: none; cursor: grab; user-select: none; flex: none; }
+.photo-frame:active { cursor: grabbing; }
+.photo-frame img { position: absolute; max-width: none; pointer-events: none; }
+.photo-zoom { display: flex; align-items: center; gap: 10px; width: 260px; max-width: 100%; }
+.photo-zoom input { flex: 1; accent-color: var(--gold); }
