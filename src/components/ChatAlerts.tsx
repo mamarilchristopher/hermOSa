@@ -28,9 +28,10 @@ export function ChatAlerts({ me, management }: { me: string; management: boolean
   useEffect(() => {
     const ch = supabase.channel(`chat-alerts-${me}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, (p) => {
-        const m = p.new as { sender_id: string; from_management: boolean };
+        const m = p.new as { sender_id: string; from_management: boolean; mentions?: string[]; mention_all?: boolean };
         if (m.sender_id === me) return;
         if (m.from_management && !management) { playChatSound("management"); setLater(null); void load(); }
+        else if (m.mention_all || m.mentions?.includes(me)) playChatSound("mention");
         else playChatSound("message");
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "chat_members", filter: `user_id=eq.${me}` }, () => { void load(); })

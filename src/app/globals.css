@@ -1105,3 +1105,21 @@ main.chat-main { --page: 1280px; padding-top: 20px; padding-bottom: 20px; }
 }
 .chat-danger { border-top: 1px solid var(--line); padding-top: 10px; }
 .chat-danger .danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
+/* Chat on Home (v0.51) */
+.chat-home { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.chat-home-mgmt { display: grid; gap: 10px; border: 2px solid var(--gold); background: var(--warn-bg); }
+.chat-home-mgmt .mgmt-alert-tag { justify-self: start; }
+.chat-home-mgmt .button { justify-self: start; }
+.chat-home-line { display: grid; gap: 2px; color: var(--ink); text-decoration: none; padding: 8px 10px; border-radius: 12px; background: var(--surface); }
+.chat-home-line span { white-space: pre-wrap; overflow-wrap: anywhere; }
+/* @mentions (v0.51) */
+.chat-compose { position: relative; }
+.chat-tags-pop { position: absolute; left: 60px; right: 60px; bottom: calc(100% + 6px); z-index: 5; list-style: none; margin: 0; padding: 6px; max-height: 260px; overflow-y: auto; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 14px; box-shadow: var(--shadow-lift); }
+.chat-tags-pop button { display: flex; align-items: center; gap: 8px; width: 100%; justify-content: flex-start; text-align: left; min-height: 0; padding: 7px 10px; margin: 0; border: 0; border-radius: 10px; background: transparent; color: var(--ink); box-shadow: none; font-weight: 500; font-size: 0.9rem; }
+.chat-tags-pop button.on, .chat-tags-pop button:hover { background: var(--gold-soft); }
+.chat-tag { font-weight: 700; color: var(--brown); background: var(--gold-soft); border-radius: 6px; padding: 0 3px; }
+.chat-msg.mine .chat-tag { color: #fff; background: rgba(255, 255, 255, 0.18); }
+.chat-tag.me { background: #ffe7a8; color: #6b4400; }
+.chat-msg.tagged:not(.mgmt) .chat-bubble { box-shadow: 0 0 0 2px #e9bf55; }
+.chat-at { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--gold); color: #fff; font-size: 0.72rem; font-weight: 800; flex: none; }
+@media (max-width: 900px) { .chat-tags-pop { left: 8px; right: 8px; } }

@@ -91,6 +91,13 @@ export default async function Me() {
     ownerLevel ? supabase.rpc("late_nte_list", { p_month: `${today.slice(0, 7)}-01`, p_employee: null }) : Promise.resolve({ data: null }),
   ]);
   const myNtes = (myNteData ?? []) as { id: string; nte_no: number; work_date: string; shift_start: string; time_in: string; late_minutes: number; respond_by?: string | null; ir_id?: string | null }[];
+  // Team chat on Home (update-0049+, CHRIS Nov 26): messages from management stand out; other unread messages are counted.
+  const [{ data: mgmtChat }, { data: chatUnread }] = await Promise.all([
+    ownerLevel ? Promise.resolve({ data: [] }) : supabase.rpc("chat_mgmt_unread"),
+    supabase.rpc("chat_unread"),
+  ]);
+  const fromMgmt = Array.isArray(mgmtChat) ? (mgmtChat as { id: string; room_id: string; sender: string; room_name: string | null; text: string }[]) : [];
+  const otherUnread = Math.max(0, (typeof chatUnread === "number" ? chatUnread : 0) - fromMgmt.length);
   const tardy = trackData ? tracker((trackData as NteList).ntes, (trackData as NteList).ir_minutes) : [];
 
   return (
@@ -111,6 +118,24 @@ export default async function Me() {
                 <NteExplainForm id={n.id} prompt={`Why were you late, ${first}?`} />
               </div>
             ))}
+          </div>
+        )}
+        {fromMgmt.length > 0 && (
+          <div className="card chat-home-mgmt">
+            <span className="mgmt-alert-tag"><span aria-hidden>📣</span> Message from management</span>
+            {fromMgmt.slice(0, 3).map((m) => (
+              <Link key={m.id} href={`/chat/${m.room_id}`} className="chat-home-line">
+                <strong>{m.sender}{m.room_name ? ` in ${m.room_name}` : ""}</strong>
+                <span>{m.text}</span>
+              </Link>
+            ))}
+            <Link className="button" href={`/chat/${fromMgmt[0].room_id}`}>Open and reply</Link>
+          </div>
+        )}
+        {otherUnread > 0 && (
+          <div className="card chat-home">
+            <span><strong>{otherUnread} unread chat {otherUnread === 1 ? "message" : "messages"}</strong></span>
+            <Link className="button secondary small" href="/chat">Open Chat</Link>
           </div>
         )}
                 {home && <ManagerHome g={home.g} duty={home.duty} faces={home.faces} branches={branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: branchShort(b.name) }))} />}

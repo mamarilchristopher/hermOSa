@@ -29,7 +29,11 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
   if (!access.grants.some((g) => (g.role === "OWNER" || g.role === "MANAGER") && g.branch_id === null)) redirect("/me");
   const id = z.uuid().safeParse((await searchParams).u);
   if (!id.success) redirect("/me");
-  const { data } = await supabase.rpc("view_as", { p_user: id.data });
+  const [{ data }, { data: chatData }] = await Promise.all([
+    supabase.rpc("view_as", { p_user: id.data }),
+    supabase.rpc("view_as_chat", { p_user: id.data }), // counts only; chats stay private (update-0051)
+  ]);
+  const chat = (chatData ?? null) as { ok: boolean; unread: number; mgmt_unread: number; tagged_unread: number } | null;
   const v = (data ?? { ok: false, error: "UNKNOWN" }) as ViewAs;
   const today = manilaToday();
   const branchName = Object.fromEntries(branches.map((b) => [b.id, b.name]));
@@ -44,6 +48,8 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
   else if (v.details_state === "PENDING") todos.push({ text: "Employee details sent, waiting for the owner to review", href: "/admin/details" });
   if (v.sent_back.count) todos.push({ text: `${v.sent_back.count} service log ${v.sent_back.count === 1 ? "entry was" : "entries were"} sent back in the last 30 days`, href: `/services?date=${v.sent_back.latest}`, urgent: true });
   if (v.unsigned.count) todos.push({ text: `${v.unsigned.count} commission ${v.unsigned.count === 1 ? "entry" : "entries"} not signed yet (oldest ${dayLabel(v.unsigned.oldest!)}, ${centsToPhp(v.unsigned.cents)}). Not paid in this cutoff (closes ${dayLabel(cutoffEnd(today))}) unless signed`, href: `/services?date=${v.unsigned.oldest}`, urgent: true });
+  if (chat?.ok && chat.mgmt_unread) todos.push({ text: `📣 ${chat.mgmt_unread} unread chat ${chat.mgmt_unread === 1 ? "message" : "messages"} from management`, href: "/chat", urgent: true });
+  if (chat?.ok && chat.unread - chat.mgmt_unread > 0) todos.push({ text: `${chat.unread - chat.mgmt_unread} other unread chat ${chat.unread - chat.mgmt_unread === 1 ? "message" : "messages"}${chat.tagged_unread ? ` (tagged in ${chat.tagged_unread})` : ""}`, href: "/chat" });
   if (v.roles.some((r) => LOGGERS.includes(r.role)) && !v.logged_today) todos.push({ text: "Nothing logged today yet", href: "/services" });
   const scope = v.roles.map((r) => `${ROLE_LABEL[r.role] ?? r.role}, ${r.branch_id ? branchName[r.branch_id] ?? "branch" : "all branches"}`);
   const seen = v.last_seen ? new Date(v.last_seen).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null;

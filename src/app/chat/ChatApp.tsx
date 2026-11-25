@@ -10,17 +10,17 @@ import { CHAT_SOUNDS_EVENT, playChatSound, setSoundsOn, soundsOn } from "@/lib/c
 export type ChatPerson = { id: string; name: string; photo_path: string | null; photo_url?: string | null };
 export type ChatRoomRow = {
   id: string; kind: "DM" | "GROUP"; auto: boolean; name: string | null; photo_path: string | null; photo_url?: string | null;
-  other_id: string | null; last_at: string; members: number; unread: number; mgmt_unread?: number;
+  other_id: string | null; last_at: string; members: number; unread: number; mgmt_unread?: number; mention_unread?: number;
   last: { sender: string; mine: boolean; text: string; mgmt?: boolean } | null;
 };
 type Member = { id: string; name: string; photo_path: string | null; last_read_at: string };
 type RoomInfo = { id: string; kind: "DM" | "GROUP"; auto: boolean; name: string; members: Member[] };
-type Msg = { id: string; room_id: string; sender_id: string; body: string | null; photo_path: string | null; gif_url: string | null; from_management?: boolean; created_at: string; deleted_at: string | null };
+type Msg = { id: string; room_id: string; sender_id: string; body: string | null; photo_path: string | null; gif_url: string | null; from_management?: boolean; mentions?: string[]; mention_all?: boolean; created_at: string; deleted_at: string | null };
 
 const PAGE = 50;
 const ERR: Record<string, string> = {
   FORBIDDEN: "You can't do that in this chat.", EMPTY_MESSAGE: "Type a message or add a photo.", MESSAGE_TOO_LONG: "That message is too long.",
-  NAME_REQUIRED: "Give the group a name.", NOT_FOUND: "That chat isn't available.", BAD_REQUEST: "That didn't work. Try again.",
+  NAME_REQUIRED: "Give the group a name.", ALL_NOT_ALLOWED: "Only owners and the GM can use @all.", NOT_FOUND: "That chat isn't available.", BAD_REQUEST: "That didn't work. Try again.",
 };
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
 const dayKey = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
@@ -66,6 +66,11 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
   const scroller = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const [sounds, setSounds] = useState(true);
+  // @mentions (update-0051): the open picker and who was picked.
+  const [tagQuery, setTagQuery] = useState<string | null>(null);
+  const [tagIndex, setTagIndex] = useState(0);
+  const tagged = useRef(new Map<string, string>()); // id -> name
+  const box = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     const sync = () => setSounds(soundsOn());
     sync(); addEventListener(CHAT_SOUNDS_EVENT, sync);
@@ -180,10 +185,13 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
     const body = photo ? null : text.trim();
     if (!photo && !body) return;
     setBusy(true); setError(null);
-    const { data, error: e } = await supabase.rpc("chat_send", { p_room: active, p_body: body, p_photo_path: photo ?? null, p_gif_url: null });
+    const isGroup = info?.kind === "GROUP";
+    const ids = isGroup && body ? [...tagged.current].filter(([, n]) => body.includes(`@${n}`)).map(([id]) => id) : [];
+    const all = isGroup && management && !!body && /(^|\s)@all\b/i.test(body);
+    const { data, error: e } = await supabase.rpc("chat_send", { p_room: active, p_body: body, p_photo_path: photo ?? null, p_gif_url: null, p_mentions: ids, p_all: all });
     setBusy(false);
     if (e || !data?.ok) { setError(ERR[data?.error] ?? "Couldn't send. Check your connection and try again."); return; }
-    if (!photo) setText("");
+    if (!photo) { setText(""); tagged.current.clear(); setTagQuery(null); }
     playChatSound("sent");
     const m = data.message as Msg;
     setMsgs((list) => (list.some((x) => x.id === m.id) ? list : [...list, m]));
@@ -222,6 +230,39 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
     void refreshList();
   };
 
+  // People you can tag: the chat's members A to Z (not you), plus @all for owners and the GM.
+  const tagOptions = useMemo(() => {
+    if (tagQuery === null || info?.kind !== "GROUP") return [];
+    const q = tagQuery.toLowerCase();
+    const list = info.members.filter((m) => m.id !== me.id && m.name.toLowerCase().split(/\s+/).some((w) => w.startsWith(q)) || (q === "" && m.id !== me.id))
+      .sort((a, b) => a.name.localeCompare(b.name)).map((m) => ({ id: m.id, name: m.name }));
+    const uniq = [...new Map(list.map((x) => [x.id, x])).values()];
+    return management && "all".startsWith(q) ? [{ id: "all", name: "all" }, ...uniq] : uniq;
+  }, [tagQuery, info, me.id, management]);
+  const onType = (value: string, caret: number) => {
+    setText(value);
+    const m = /(^|\s)@([^\s@]{0,30})$/.exec(value.slice(0, caret));
+    if (m && info?.kind === "GROUP") { setTagQuery(m[2]); setTagIndex(0); } else setTagQuery(null);
+  };
+  const pickTag = (opt: { id: string; name: string }) => {
+    const el = box.current;
+    const caret = el?.selectionStart ?? text.length;
+    const before = text.slice(0, caret).replace(/@([^\s@]{0,30})$/, `@${opt.name} `);
+    const next = before + text.slice(caret);
+    if (opt.id !== "all") tagged.current.set(opt.id, opt.name);
+    setText(next); setTagQuery(null);
+    requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(before.length, before.length); });
+  };
+  // Show @names in a message as highlighted tags.
+  const renderBody = (m: Msg) => {
+    const body = m.body ?? "";
+    const tagNames = [...(m.mentions ?? []).map((id) => names.get(id)?.name).filter((x): x is string => !!x), ...(m.mention_all ? ["all"] : [])];
+    if (!tagNames.length) return body;
+    const esc = tagNames.sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    const parts = body.split(new RegExp(`(@(?:${esc.join("|")}))`, "g"));
+    return parts.map((p, i) => (i % 2 ? <span key={i} className={`chat-tag ${p === `@${me.name}` || p === "@all" ? "me" : ""}`}>{p}</span> : p));
+  };
+
   const room = rooms.find((r) => r.id === active);
   const names = new Map((info?.members ?? []).map((m) => [m.id, m]));
   const group = info?.kind === "GROUP";
@@ -248,6 +289,7 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
                   <span className="chat-room-last">
                     <span>{r.last ? `${r.last.mine ? "You: " : r.kind === "GROUP" ? `${r.last.sender.split(" ")[0]}: ` : ""}${r.last.text}` : r.kind === "GROUP" ? `${r.members} people` : "Say hi"}</span>
                     {!!r.mgmt_unread && <span className="mgmt-chip">Management</span>}
+                    {!!r.mention_unread && <span className="chat-at" title="You were tagged">@</span>}
                     {r.unread > 0 && <span className="nav-badge">{r.unread > 99 ? "99+" : r.unread}</span>}
                   </span>
                 </span>
@@ -286,7 +328,7 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
                 return (
                   <div key={m.id}>
                     {newDay && <div className="chat-day"><span>{dayLabel(m.created_at)}</span></div>}
-                    <div className={`chat-msg ${mine ? "mine" : ""} ${first ? "first" : ""} ${m.from_management && !m.deleted_at ? "mgmt" : ""}`}>
+                    <div className={`chat-msg ${mine ? "mine" : ""} ${first ? "first" : ""} ${m.from_management && !m.deleted_at ? "mgmt" : ""} ${!mine && !m.deleted_at && (m.mention_all || m.mentions?.includes(me.id)) ? "tagged" : ""}`}>
                       {!mine && group && (first ? <Avatar name={who?.name ?? "?"} url={faces.get(m.sender_id) ?? null} size={30} /> : <span className="chat-face-gap" />)}
                       <div className="chat-bubble-wrap">
                         {!mine && group && first && <span className="chat-name">{who?.name ?? "Former member"}</span>}
@@ -301,7 +343,7 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
                                 : <span className="chat-photo loading">Photo</span>)}
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               {m.gif_url && <img src={m.gif_url} alt="GIF" className="chat-photo" />}
-                              {m.body && <span className="chat-text">{m.body}</span>}
+                              {m.body && <span className="chat-text">{renderBody(m)}</span>}
                             </>
                           )}
                         </div>
@@ -323,10 +365,29 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
             <form className="chat-compose" onSubmit={(e) => { e.preventDefault(); void send(); }}>
               <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => void sendPhoto(e.target.files?.[0])} />
               <button type="button" className="icon-btn" aria-label="Send a photo" title="Send a photo" disabled={busy} onClick={() => fileInput.current?.click()}><IconImage /></button>
-              <textarea value={text} rows={1} maxLength={4000} placeholder="Message" aria-label="Message"
-                onChange={(e) => setText(e.target.value)}
+              {tagOptions.length > 0 && (
+                <ul className="chat-tags-pop" role="listbox" aria-label="Tag someone">
+                  {tagOptions.map((o, i) => (
+                    <li key={o.id}><button type="button" role="option" aria-selected={i === tagIndex} className={i === tagIndex ? "on" : undefined}
+                      onMouseDown={(e) => { e.preventDefault(); pickTag(o); }}>
+                      {o.id === "all" ? <><strong>@all</strong> <span className="muted small">tag everyone in this group</span></> : <><Avatar name={o.name} url={faces.get(o.id) ?? null} size={24} /> {o.name}</>}
+                    </button></li>
+                  ))}
+                </ul>
+              )}
+              <textarea ref={box} value={text} rows={1} maxLength={4000} placeholder={group ? "Message · type @ to tag" : "Message"} aria-label="Message"
+                onChange={(e) => onType(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+                onBlur={() => setTimeout(() => setTagQuery(null), 150)}
                 onPaste={(e) => { const f = [...e.clipboardData.files].find((x) => x.type.startsWith("image/")); if (f) { e.preventDefault(); void sendPhoto(f); } }}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !("ontouchstart" in window)) { e.preventDefault(); void send(); } }} />
+                onKeyDown={(e) => {
+                  if (tagOptions.length) {
+                    if (e.key === "ArrowDown") { e.preventDefault(); setTagIndex((i) => (i + 1) % tagOptions.length); return; }
+                    if (e.key === "ArrowUp") { e.preventDefault(); setTagIndex((i) => (i - 1 + tagOptions.length) % tagOptions.length); return; }
+                    if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pickTag(tagOptions[Math.min(tagIndex, tagOptions.length - 1)]); return; }
+                    if (e.key === "Escape") { setTagQuery(null); return; }
+                  }
+                  if (e.key === "Enter" && !e.shiftKey && !("ontouchstart" in window)) { e.preventDefault(); void send(); }
+                }} />
               <button type="submit" className="chat-send" aria-label="Send" disabled={busy || !text.trim()}><IconSend /></button>
             </form>
           </>

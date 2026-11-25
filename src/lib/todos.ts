@@ -79,6 +79,15 @@ export async function loadTodos(supabase: SupabaseClient, access: Access, today:
     todos.push({ text: detailState === "RETURNED" ? "The owner sent your employee details back. Please fix them" : "Fill in your employee details (needed for payroll and government reports)", href: "/me/details" });
   }
   // Urgent first, keeping each group's order.
+  // Team chat (update-0049+): unread messages from management come first and are urgent; then other unread messages.
+  const [{ data: mgmtChat }, { data: chatUnread }] = await Promise.all([
+    ownerLevel ? Promise.resolve({ data: [] }) : supabase.rpc("chat_mgmt_unread"),
+    supabase.rpc("chat_unread"),
+  ]);
+  const fromMgmt = Array.isArray(mgmtChat) ? (mgmtChat as { room_id: string; sender: string }[]) : [];
+  if (fromMgmt.length) todos.unshift({ text: `📣 ${plural(fromMgmt.length, "message", "messages")} from management (${fromMgmt[0].sender}). Open Chat and read ${fromMgmt.length === 1 ? "it" : "them"}`, href: `/chat/${fromMgmt[0].room_id}`, urgent: true });
+  const others = (typeof chatUnread === "number" ? chatUnread : 0) - fromMgmt.length;
+  if (others > 0) todos.push({ text: `${plural(others, "unread chat message", "unread chat messages")}`, href: "/chat" });
   return [...todos.filter((t) => t.urgent), ...todos.filter((t) => !t.urgent)];
 
   async function timeIn(empId: string): Promise<Todo | null> {

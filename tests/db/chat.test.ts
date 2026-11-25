@@ -147,3 +147,32 @@ describe("update-0050: deleting conversations", () => {
     expect((await db.rpc(ana, "aal1", "chat_room", [all])).ok).toBe(true); // the group stays
   });
 });
+
+describe("update-0051: @mentions", () => {
+  it("tags people in groups, @all for owners/GM only, bell notices and unread @ counts", async () => {
+    const g = (await db.rpc(ana, "aal1", "chat_create_group", ["DEMO Tag test", [bea.appUserId, cy.appUserId, gm.appUserId]])).id;
+    const r = await db.rpc(ana, "aal1", "chat_send", [g, "@DEMO Bea please check", null, null, [bea.appUserId, ana.appUserId, owner.appUserId], false]);
+    expect(r.ok).toBe(true);
+    expect(r.message.mentions).toEqual([bea.appUserId]); // not yourself, not outsiders
+    expect((await db.rpc(ana, "aal1", "chat_send", [g, "@all hi", null, null, null, true])).error).toBe("ALL_NOT_ALLOWED");
+    expect((await db.rpc(gm, "aal1", "chat_send", [g, "@all meeting at 6", null, null, null, true])).ok).toBe(true);
+    const n = await db.sql("select title, link from public.notifications where kind = 'CHAT_MENTION' and user_id = $1 order by created_at", [bea.appUserId]);
+    expect(n.rows.map((x) => x.title)).toEqual(["DEMO Ana tagged you in DEMO Tag test", "DEMO General Manager tagged everyone in DEMO Tag test"]);
+    expect(n.rows[0].link).toBe(`/chat/${g}`);
+    const row = ((await db.rpc(cy, "aal1", "chat_list", [])) as { id: string; mention_unread: number }[]).find((x) => x.id === g)!;
+    expect(row.mention_unread).toBe(1);
+    expect((await db.rpc(ana, "aal1", "chat_send", [g, "old style still works", null, null])).ok).toBe(true);
+  });
+});
+
+describe("update-0051: View as shows chat counts only", () => {
+  it("owners see how many unread (and from management) without the messages; staff can't", async () => {
+    const dm = (await db.rpc(owner, "aal2", "chat_start_dm", [bea.appUserId])).id;
+    await db.rpc(owner, "aal2", "chat_send", [dm, "DEMO test", null, null]);
+    const v = await db.rpc(owner, "aal2", "view_as_chat", [bea.appUserId]);
+    expect(v.ok).toBe(true);
+    expect(v.mgmt_unread).toBeGreaterThanOrEqual(1);
+    expect(Object.keys(v).sort()).toEqual(["mgmt_unread", "ok", "tagged_unread", "unread"]);
+    expect((await db.rpc(ana, "aal1", "view_as_chat", [bea.appUserId])).ok).toBe(false);
+  });
+});
