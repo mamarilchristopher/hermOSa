@@ -336,8 +336,26 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
   const room = rooms.find((r) => r.id === active);
   const names = new Map((info?.members ?? []).map((m) => [m.id, m]));
   const group = info?.kind === "GROUP";
-  const lastMine = [...msgs].reverse().find((m) => m.sender_id === me.id && !m.deleted_at);
-  const seenBy = lastMine ? (info?.members ?? []).filter((m) => m.id !== me.id && m.last_read_at >= lastMine.created_at) : [];
+  // Read receipts (v0.55, CHRIS Nov 26): each person is shown under the last message they've read.
+  // Chats of 3 or more: "Read by Ana, Bea, Cy". 1-on-1: "Read 3:58 AM" (when they opened it).
+  const manyMembers = (info?.members.length ?? 0) >= 3;
+  const readAt = new Map<string, Member[]>();
+  for (const mem of info?.members ?? []) {
+    if (mem.id === me.id || !mem.last_read_at) continue;
+    let at: Msg | undefined;
+    for (let k = msgs.length - 1; k >= 0; k--) { if (msgs[k].created_at <= mem.last_read_at) { at = msgs[k]; break; } }
+    if (!at || at.sender_id === mem.id) continue; // they sent it: no need to say they read it
+    readAt.set(at.id, [...(readAt.get(at.id) ?? []), mem]);
+  }
+  const readLabel = (list: Member[]) => {
+    if (!manyMembers) {
+      const t = new Date(list[0].last_read_at);
+      const sameDay = t.toDateString() === new Date().toDateString();
+      return `Read ${t.toLocaleString("en-PH", { timeZone: "Asia/Manila", ...(sameDay ? {} : { month: "short", day: "numeric" }), hour: "numeric", minute: "2-digit" })}`;
+    }
+    const first = list.map((x) => (names.get(x.id)?.name ?? x.name).split(" ")[0]);
+    return `Read by ${first.length > 6 ? `${first.slice(0, 5).join(", ")} and ${first.length - 5} others` : first.join(", ")}`;
+  };
 
   return (
     <div className={`chat-wrap ${active ? "room-open" : ""}`}>
@@ -429,8 +447,8 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
                           {time(m.created_at)}
                           {mine && !m.deleted_at && <button type="button" className={`link-like chat-del ${picked === m.id ? "show" : ""}`} onClick={(e) => { e.stopPropagation(); void remove(m); }}>Delete</button>}
                         </span>
-                        {lastMine?.id === m.id && seenBy.length > 0 && (
-                          <span className="chat-seen">{group ? `Seen by ${seenBy.length === 1 ? seenBy[0].name.split(" ")[0] : `${seenBy.length}`}` : "Seen"}</span>
+                        {readAt.has(m.id) && (
+                          <span className="chat-seen" title={readAt.get(m.id)!.map((x) => x.name).join(", ")}>{readLabel(readAt.get(m.id)!)}</span>
                         )}
                       </div>
                     </div>

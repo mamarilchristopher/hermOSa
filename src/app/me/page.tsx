@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HermosappCard } from "@/components/Hermosapp";
 import { requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { Reveal } from "@/components/Reveal";
@@ -112,6 +113,7 @@ export default async function Me() {
         <h1>Hi, {first}</h1>
         <p className="muted small">{emp?.position ?? (isOwner ? "Owner" : "Staff")}{emp && ` · ${branchName[emp.branch_id]}`} · {dayLabel(today)}</p>
 
+        <HermosappCard />
         {photosDue.length > 0 && (
           <div className="card nte-urgent">
             <h2>Urgent: add client photos and waiver<span className="nav-badge inline">{photosDue.length}</span></h2>
