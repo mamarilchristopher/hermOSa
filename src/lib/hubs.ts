@@ -29,12 +29,13 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
     { key: "chat", label: "Chat", short: "Chat", icon: "chat", tabs: [{ href: "/chat", label: "Chat", badge: n(c.chat) }] },
     { key: "sales", label: "Sales", short: "Sales", icon: "chart", tabs: [
       ...(management ? [{ href: "/", label: "Dashboard" }] : []),
-      ...(filler ? [{ href: "/sales/daily", label: "Daily sales" }, { href: "/sales/missing", label: "Missing days" }] : []),
+      ...(filler ? [{ href: "/sales/daily", label: "Daily sales" }] : []),
+      // update-0086 (CHRIS Nov 27): promo ideas every Monday, and the builder; beside Daily sales. Owners and the GM.
+      ...(owner || gm ? [{ href: "/promos", label: "Promos" }] : []),
+      ...(filler ? [{ href: "/sales/missing", label: "Missing days" }] : []),
       ...(importer ? [{ href: "/imports", label: "Imports" }] : []),
       // update-0081 (CHRIS Nov 26): Unresponsive bookings to call or message again. CSRs, owners and the GM.
       ...(owner || gm || has(["CSR"]) ? [{ href: "/bookings/followups", label: "Follow-ups" }] : []),
-      // update-0086 (CHRIS Nov 27): promo ideas every Monday, and the builder. Owners and the GM.
-      ...(owner || gm ? [{ href: "/promos", label: "Promos" }] : []),
     ] },
     { key: "clinic", label: "Clinic", short: "Clinic", icon: "clipboard", tabs: [
       ...(logger ? [{ href: "/services", label: "Service log", badge: n(c.overdue) }] : []),

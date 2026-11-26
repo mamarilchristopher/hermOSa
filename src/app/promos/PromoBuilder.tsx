@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
-  captions, commissionPerSession, defaultPrice, isBundle, peso, safetyFor, safetyIssues, sessionsOf, titleIdeas,
-  valueOf, SEASONS, type PromoItem, type Suggestion,
+  adIssues, organicOnly, captions, commissionPerSession, defaultPrice, isBundle, peso, safetyFor, safetyIssues, sessionsOf, thinItems, titleIdeas, usualCount,
+  valueOf, SEASONS, type Pkg, type PromoItem, type Suggestion,
 } from "@/lib/promoRules";
 import { modelSrc, modelsFor } from "@/lib/promoModels";
 import { drawPromo } from "@/lib/promoImage";
@@ -26,8 +26,8 @@ function blank(today: string): Draft {
 const php = (c: number) => String(Math.round(c / 100));
 
 /** The promo builder (update-0086): +/− sessions, live price and images, captions, save and approve. */
-export function PromoBuilder({ services, ideas, seasons, today, saved, serif, serifClass }: {
-  services: Svc[]; ideas: Suggestion[]; seasons: string[]; today: string; saved: SavedPromo[]; serif: string; serifClass: string;
+export function PromoBuilder({ services, ideas, seasons, today, saved, serif, serifClass, pkgs = [] }: {
+  pkgs?: Pkg[]; services: Svc[]; ideas: Suggestion[]; seasons: string[]; today: string; saved: SavedPromo[]; serif: string; serifClass: string;
 }) {
   const [d, setD] = useState<Draft>(() => blank(today));
   const [story, setStory] = useState<string | null>(null);
@@ -39,7 +39,7 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
 
   const n = sessionsOf(d.items);
   const value = valueOf(d.items);
-  const price = d.auto ? defaultPrice(d.items) : d.price;
+  const price = d.auto ? defaultPrice(d.items, pkgs) : d.price;
   const season = SEASONS.find((s) => s.name === d.season);
   const models = useMemo(() => modelsFor(d.items.map((i) => i.name), d.season), [d.items, d.season]);
   const model = d.model || models[0]?.m || "M01";
@@ -47,6 +47,8 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
   const off = value > 0 ? 1 - price / value : 0;
   const ideasForTitle = titleIdeas(d.items, season);
   const caps = d.items.length ? captions({ title: d.title || "Your promo title", tagline: d.tagline, items: d.items, price, months: d.months, endsOn: d.endsOn || null }) : null;
+  const thin = thinItems(d.items, d.months);
+  const ads = caps ? [...organicOnly(d.items), ...adIssues(d.title, d.tagline, caps.story, caps.feed)] : [];
   const change = (p: Partial<Draft>) => { setD((x) => ({ ...x, ...p })); setMsg(null); };
 
   // Live images: redrawn a moment after every change.
@@ -71,11 +73,11 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
     setTimeout(() => builderRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }
   function openIdea(s: Suggestion) {
-    open({ ...blank(today), title: s.title, tagline: s.tagline, items: s.items.map((i) => ({ ...i })), price: s.price, auto: true, months: s.months, season: s.season ?? "", source: "SUGGESTED" });
+    open({ ...blank(today), title: s.title, tagline: s.tagline, items: s.items.map((i) => ({ ...i })), price: s.price, auto: s.price === defaultPrice(s.items, pkgs), months: s.months, season: s.season ?? "", source: "SUGGESTED" });
   }
   function openSaved(p: SavedPromo) {
     const items = p.items.map((i) => ({ service_id: i.service_id, name: i.name, unit: i.unit_cents, paid: i.paid, free: i.free }));
-    open({ id: p.state === "DRAFT" ? p.id : null, title: p.title, tagline: p.tagline ?? "", items, price: p.price_cents, auto: p.price_cents === defaultPrice(items),
+    open({ id: p.state === "DRAFT" ? p.id : null, title: p.title, tagline: p.tagline ?? "", items, price: p.price_cents, auto: p.price_cents === defaultPrice(items, pkgs),
       months: p.valid_months, endsOn: p.ends_on ?? "", model: p.model ?? "", season: "", source: p.source });
   }
   function setItem(k: number, p: Partial<PromoItem>) {
@@ -168,7 +170,12 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
                   <span className="promo-count-box"><span className="small">Paid</span><Stepper label="Paid sessions" v={it.paid} min={1} max={50} onChange={(v) => setItem(k, { paid: v })} /></span>
                   <span className="promo-plus">+</span>
                   <span className="promo-count-box"><span className="small">FREE</span><Stepper label="Free sessions" v={it.free} min={0} max={50} onChange={(v) => setItem(k, { free: v })} /></span>
-                  <span className="small muted promo-note">{peso(it.unit)} each on the price list · {safetyFor(it.name).note}</span>
+                  <span className="small muted promo-note"><strong>Usual: {safetyFor(it.name).usual}.</strong> {peso(it.unit)} each on the price list · {safetyFor(it.name).note}</span>
+                  {usualCount(it.name, d.months) > it.paid + it.free && (
+                    <button type="button" className="secondary small" onClick={() => setItem(k, { paid: Math.max(1, usualCount(it.name, d.months) - it.free) })}>
+                      Match the usual pace: {usualCount(it.name, d.months)} in {d.months} month{d.months === 1 ? "" : "s"}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -183,7 +190,7 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
                       <button type="button" className="secondary" onClick={() => change({ auto: false, price: Math.min(value, price + 50000) })} aria-label="₱500 more">+</button>
                     </span>
                   </label>
-                  {!d.auto && <button type="button" className="link-button small" onClick={() => change({ auto: true })}>Use the suggested price ({peso(defaultPrice(d.items))})</button>}
+                  {!d.auto && <button type="button" className="link-button small" onClick={() => change({ auto: true })}>Use the suggested price ({peso(defaultPrice(d.items, pkgs))})</button>}
                   <p className="small">
                     <strong>{n} sessions</strong> for <strong>{peso(price)}</strong> = {peso(Math.round(price / Math.max(1, n)))} per session.
                     {" "}The sessions are worth {peso(value)} on the price list, so the client saves {Math.round(off * 100)}% <span className="muted">(for you only; posts never show a regular price)</span>.
@@ -208,6 +215,14 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
                       {SEASONS.map((s) => <option key={s.key} value={s.name}>{s.name}</option>)}
                     </select>
                   </label>
+                </div>
+                {thin.length > 0 && (
+                  <div className="notice warn small"><strong>Not enticing enough:</strong><ul>{thin.map((t) => <li key={t}>{t}</li>)}</ul></div>
+                )}
+                <div className={`notice ${ads.length ? "warn" : "ok"} small`}>
+                  <strong>Ad rules check (Meta, PH FDA, Ad Standards):</strong>{" "}
+                  {ads.length ? <ul>{ads.map((t) => <li key={t}>{t}</li>)}</ul> : "title, tagline and captions look OK."}
+                  <div className="muted">When boosting: set the audience to ages 18+, and don&apos;t use before/after photos for body or skin-tone results.</div>
                 </div>
                 {issues.length > 0 && (
                   <div className="notice warn small"><strong>Check for the client&apos;s safety:</strong><ul>{issues.map((t) => <li key={t}>{t}</li>)}</ul></div>

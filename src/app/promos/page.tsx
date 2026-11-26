@@ -2,7 +2,7 @@ import { Playfair_Display } from "next/font/google";
 import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { manilaToday } from "@/lib/dates";
-import { suggest, upcomingSeasons, type SvcStat } from "@/lib/promoRules";
+import { suggest, upcomingSeasons, type Pkg, type SvcStat } from "@/lib/promoRules";
 import { PromoBuilder, type SavedPromo, type Svc } from "./PromoBuilder";
 
 const serif = Playfair_Display({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
@@ -35,7 +35,11 @@ export default async function PromosPage() {
     const st = by.get(s.id);
     return { id: s.id, name: s.name, price: s.price, recent: st?.recent ?? 0, before: st?.before ?? 0, recentCents: st?.recent_cents ?? 0 };
   });
-  const ideas = suggest(svcStats, today);
+  // Existing packages (price 0, payment schedule in session_prices): their total, so a matching bundle is never pricier.
+  const pkgs: Pkg[] = ((svcData ?? []) as Row[])
+    .filter((s) => Array.isArray(s.session_prices) && s.session_prices.length > 0)
+    .map((s) => ({ name: s.name, total: (s.session_prices ?? []).reduce((a, b) => a + Number(b || 0), 0) }));
+  const ideas = suggest(svcStats, today, pkgs);
   const seasons = upcomingSeasons(today).map((s) => s.name);
   return (
     <>
@@ -43,7 +47,7 @@ export default async function PromosPage() {
       <main className="promos">
         <h1>Promos</h1>
         <p className="muted small">Ideas are worked out from the last 8 weeks of the Service log, slow services and the coming season. Open one, change the sessions with + and −, and the price, captions and post images update as you go. Approving adds the promo to the Service log so staff can log it.</p>
-        <PromoBuilder services={services} ideas={ideas} seasons={seasons} today={today} saved={(promos.data ?? []) as SavedPromo[]} serif={serif.style.fontFamily} serifClass={serif.className} />
+        <PromoBuilder services={services} ideas={ideas} seasons={seasons} today={today} saved={(promos.data ?? []) as SavedPromo[]} serif={serif.style.fontFamily} serifClass={serif.className} pkgs={pkgs} />
       </main>
     </>
   );
