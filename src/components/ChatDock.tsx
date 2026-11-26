@@ -26,6 +26,8 @@ const HEADS = 4;
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 const listTime = (iso: string) => (day(iso) === day(new Date().toISOString()) ? time(iso) : new Date(iso).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" }));
+/** OnlineNow asks the dock to open a chat: detail { room, handled }. */
+export const OPEN_CHAT_EVENT = "hermosa:open-chat";
 const isPhone = () => typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches;
 
 export function ChatDock({ me }: { me: string }) {
@@ -66,7 +68,26 @@ export function ChatDock({ me }: { me: string }) {
   }, [supabase]);
 
   const onChatPage = path.startsWith("/chat");
-  useEffect(() => { setSheet(false); }, [path]);
+  // Tapping someone in "Online now" opens your chat with them here (CHRIS Nov 26). Off the Chat page only.
+  useEffect(() => {
+    if (onChatPage) return;
+    const on = (ev: Event) => {
+      const d = (ev as CustomEvent<{ room: string; handled: boolean }>).detail;
+      d.handled = true;
+      void load().then(() => { setSheet(false); setOpen((o) => (isPhone() ? [d.room] : [d.room, ...o.filter((x) => x !== d.room)].slice(0, 2))); });
+    };
+    window.addEventListener(OPEN_CHAT_EVENT, on);
+    return () => window.removeEventListener(OPEN_CHAT_EVENT, on);
+  }, [onChatPage, load]);
+  // Phone (CHRIS Nov 26): while a chat window is open, the page behind stays still so scrolling moves only the chat.
+  useEffect(() => {
+    if (!open.length || !isPhone()) return;
+    const html = document.documentElement, body = document.body;
+    const prev = [html.style.overflow, body.style.overflow];
+    html.style.overflow = "hidden"; body.style.overflow = "hidden";
+    return () => { html.style.overflow = prev[0]; body.style.overflow = prev[1]; };
+  }, [open.length]);
+  useEffect(() => { setSheet(false); if (isPhone()) setOpen([]); }, [path]);
   useEffect(() => { if (!onChatPage) void load(); }, [load, onChatPage, path]);
   useEffect(() => {
     void loadOnline();
@@ -144,6 +165,8 @@ export function ChatDock({ me }: { me: string }) {
         </button>
       )}
       {sheet && <><div className="dock-backdrop" aria-hidden onClick={() => setSheet(false)} />{list}</>}
+      {/* Phone: tapping outside the open chat closes it. Hidden on PC. */}
+      {open.length > 0 && <div className="dock-backdrop dock-win-backdrop" aria-hidden onClick={() => setOpen([])} />}
       <div className="dock-windows">
         {open.map((id) => byId.get(id) && (
           <MiniChat key={id} room={byId.get(id)!} me={me} face={face(byId.get(id)!, 30)} online={isOn(byId.get(id)!)} incoming={incoming} sign={sign} photos={faces}

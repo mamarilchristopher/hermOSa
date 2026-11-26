@@ -23,6 +23,8 @@ describe("online now", () => {
     const names = (r: any[]) => r.map((x) => x.name);
     expect(names(await db.rpc(owner, "aal2", "online_now", []))).toEqual(["DEMO General Manager", "DEMO Jesel"]);
     expect(names(await db.rpc(fvManager, "aal1", "online_now", []))).toEqual(["DEMO Owner", "DEMO General Manager", "DEMO Jesel"]);
+    // update-0078: each person's account id, so tapping them opens a chat.
+    expect((await db.rpc(fvManager, "aal1", "online_now", []))[0].id).toBe(owner.appUserId);
     await db.sql("UPDATE public.app_users SET photo_path = $2 WHERE id = $1", [owner.appUserId, `${owner.appUserId}/00000000-0000-4000-8000-000000000001.jpg`]);
     const seen = await db.rpc(cma, "aal1", "online_now", []);
     expect(names(seen)).toEqual(["DEMO Owner", "DEMO General Manager"]);
