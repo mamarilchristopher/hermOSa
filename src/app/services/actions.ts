@@ -28,11 +28,12 @@ const Log = z.object({
   share: z.literal("1").optional(),
   session: z.coerce.number().int().min(1).max(15).default(1),
   meds: z.union([z.uuid(), z.string().regex(/^free:[0-9a-f-]{36}$/), z.literal("")]).optional(),
+  addons: z.string().max(2000).optional(),
 });
 const Photos = z.array(z.object({ kind: z.enum(["WAIVER", "BEFORE", "AFTER"]), path: z.string().max(300), thumb: z.string().max(300).nullable() })).max(20);
 
 export async function logService(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session", "meds", "proofs"].map((k) => [k, fd.get(k) ?? undefined])));
+  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session", "meds", "proofs", "addons"].map((k) => [k, fd.get(k) ?? undefined])));
   if (!p.success) return { error: "Fill in the client's name, the service, the amount paid and who did it." };
   let photos;
   try { photos = Photos.parse(JSON.parse(p.data.photos || "[]")); } catch { return { error: "The photos didn't attach. Remove them and add them again." }; }
@@ -55,6 +56,15 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     const due = sessions?.[p.data.session - 1];
     if (sessions && due === undefined) return { error: `This bundle has ${sessions.length} sessions. Pick a session from 1 to ${sessions.length}.` };
     if (due !== undefined && cents !== due && (p.data.price_note ?? "").length < 3) return { error: "Write why this session's amount is different from the bundle's schedule." };
+  }
+  // CHRIS Nov 26 (update-0080): add-ons, each its own line of this visit at 5% commission. Checked before anything is saved.
+  let addons: { service: string; cents: number }[] = [];
+  if (paid && p.data.addons) {
+    try {
+      addons = z.array(z.object({ service: z.uuid(), amount: z.string().max(20) })).max(5).parse(JSON.parse(p.data.addons))
+        .map((a) => ({ service: a.service, cents: phpToCents(a.amount.replace(/[,₱\s]/g, "")) }));
+    } catch { return { error: "Enter what the client paid for each add-on, e.g. 500." }; }
+    if (addons.some((a) => !(a.cents > 0))) return { error: "Enter what the client paid for each add-on, e.g. 500." };
   }
   // CHRIS Nov 26: "already logged?" checks the same client and service today (not staff and amount).
   if (fd.get("confirm") !== "1") {
@@ -87,6 +97,14 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     const { data: m, error: mErr } = await supabase.rpc("log_meds", { p_log: data.id, p_service: free ? p.data.meds.slice(5) : p.data.meds, p_free: free });
     medsNote = mErr || !m?.ok ? " The meds didn't save: add them again as their own entry." : free ? " Free meds package added." : " Meds added.";
   }
+  let addonsOk = 0;
+  for (const a of addons) {
+    const { data: ad, error: adErr } = await supabase.rpc("log_addon", { p_log: data.id, p_service: a.service, p_amount_cents: a.cents });
+    if (!adErr && ad?.ok) { addonsOk++; continue; }
+    medsNote += adErr?.code === "PGRST202" ? " Add-ons need database update-0080: ask the owner to run it, then log the add-on as its own entry."
+      : ` An add-on didn't save${ad?.error ? ` (${errorText(ad.error)})` : ""}: log it again as its own entry.`;
+  }
+  if (addonsOk) medsNote += addonsOk === 1 ? " Add-on added." : ` ${addonsOk} add-ons added.`;
   // CHRIS Nov 26 (update-0075): optional proof of payment, kept in its own folder.
   let proofs: { path: string; thumb: string | null }[] = [];
   try { proofs = z.array(z.object({ path: z.string().max(300), thumb: z.string().max(300).nullable() })).max(5).parse(JSON.parse(p.data.proofs || "[]")); } catch { proofs = []; }

@@ -1501,3 +1501,11 @@ button.chat-with:hover .avatar { box-shadow: 0 0 0 3px var(--gold-soft); }
 .photo-viewer img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45); cursor: default; }
 .photo-viewer-x { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 12px; width: 44px; height: 44px; min-height: 0; padding: 0; border-radius: 50%; border: 0; background: rgba(255, 255, 255, 0.92); color: #2f241d; font-size: 1.6rem; line-height: 1; box-shadow: none; }
 .photo-viewer-x:hover { background: #fff; color: #2f241d; }
+
+/* Add-ons on the service log (update-0080) */
+.addons { display: grid; gap: 10px; justify-items: start; }
+.addon-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 14px; align-items: end; width: 100%; }
+.addon-row > label { min-width: 0; }
+.addon-row select, .addon-row input { width: 100%; min-width: 0; height: 46px; box-sizing: border-box; }
+.addon-row .addon-remove { height: 46px; min-width: 46px; }
+@media (max-width: 560px) { .addon-row { grid-template-columns: minmax(0, 1fr) 96px auto; gap: 8px; } }

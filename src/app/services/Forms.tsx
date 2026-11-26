@@ -64,7 +64,11 @@ function medsChoices(meds: MedsOpt[]): { v: string; label: string }[] {
   return out;
 }
 
-export function EntryForm({ branch, date, today, services, employees, noCommission = false, photosOptional = false, meds = [] }: { branch: string; date: string; today?: string; services: Opt[]; employees: Opt[]; noCommission?: boolean; photosOptional?: boolean; meds?: MedsOpt[] }) {
+/** Add-ons (CHRIS Nov 26, update-0080): extras sold with a service, e.g. L-Carnitine with a Lux Queen drip. */
+export type AddonOpt = { id: string; name: string; price: number | null };
+type AddonRow = { service: string; amount: string };
+
+export function EntryForm({ branch, date, today, services, employees, noCommission = false, photosOptional = false, meds = [], addons = [] }: { branch: string; date: string; today?: string; services: Opt[]; employees: Opt[]; noCommission?: boolean; photosOptional?: boolean; meds?: MedsOpt[]; addons?: AddonOpt[] }) {
   // CHRIS Nov 26: owners and the GM pick the service date (default today) to batch-log older days; it stays set between saves.
   const [day, setDay] = useState(today ?? date);
   const [state, action, pending] = useActionState(logService, undefined);
@@ -82,6 +86,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const [note, setNote] = useState("");
   const [session, setSession] = useState("1");
   const [med, setMed] = useState("");
+  const [extras, setExtras] = useState<AddonRow[]>([]);
   const photos = usePhotoSlots(branch);
   const proofs = useProofSlots(branch); // update-0075: optional proof of payment
   const form = useRef<HTMLFormElement>(null);
@@ -92,7 +97,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       setAmount("");
       setKind("PAID");
       setWho("");
-      setService(""); setPartner(""); setClient(""); setPriceNote(""); setShare(false); setNote(""); setSession("1"); setMed("");
+      setService(""); setPartner(""); setClient(""); setPriceNote(""); setShare(false); setNote(""); setSession("1"); setMed(""); setExtras([]);
       photos.reset();
       proofs.reset();
     }
@@ -111,7 +116,18 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
     assist: assistEmp?.eligible === false ? 0 : raw.assist,
     solo: person?.eligible === false ? 0 : raw.solo,
   };
-  const p = { ...raw, total: shown.lead + shown.assist + shown.solo };
+  // Add-ons pay 5% of what was paid for each, split like the main service (CHRIS Nov 26).
+  const toCents = (t: string) => Math.round(Number(t.replace(/[,₱\s]/g, "")) * 100) || 0;
+  const extraRows = paid ? extras.filter((x) => x.service) : [];
+  const extra = extraRows.reduce((acc, x) => {
+    const c = previewCommission(toCents(x.amount), effType, null, null);
+    return { lead: acc.lead + (leadEmp?.eligible === false ? 0 : c.lead), assist: acc.assist + (assistEmp?.eligible === false ? 0 : c.assist), solo: acc.solo + (person?.eligible === false ? 0 : c.solo) };
+  }, { lead: 0, assist: 0, solo: 0 });
+  const mainTotal = shown.lead + shown.assist + shown.solo;
+  const extraTotal = extra.lead + extra.assist + extra.solo;
+  const p = { ...raw, lead: raw.lead + extra.lead, assist: raw.assist + extra.assist, total: mainTotal + extraTotal };
+  shown.lead += extra.lead; shown.assist += extra.assist; shown.solo += extra.solo;
+  const addonsJson = JSON.stringify(extraRows.map((x) => ({ service: x.service, amount: x.amount.trim() })));
   // A bundle session's amount comes from its schedule (update-0068); anything else from the list price.
   const scheduled = svc?.sessions?.length ? svc.sessions[Number(session) - 1] ?? null : null;
   const listPrice = scheduled ?? svc?.price ?? null;
@@ -144,6 +160,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       <input type="hidden" name="folder" value={photos.folder} />
       <input type="hidden" name="photos" value={photos.json} />
       <input type="hidden" name="proofs" value={proofs.json} />
+      <input type="hidden" name="addons" value={addonsJson} />
       <div className="field">
         <span className="field-label">Did the client pay?</span>
         <div className="segmented choice" role="radiogroup" aria-label="Did the client pay?">
@@ -209,6 +226,28 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
             </select>
           </label>
         )}
+        {paid && addons.length > 0 && (
+          <div className="span2 addons">
+            {extras.map((x, i) => (
+              <div className="addon-row" key={i}>
+                <label><span>Add-on{!noCommission && <span className="muted"> (5% commission)</span>}</span>
+                  <select value={x.service} aria-label="Add-on" onChange={(e) => {
+                    const a = addons.find((o) => o.id === e.target.value);
+                    setExtras(extras.map((y, j) => j === i ? { service: e.target.value, amount: a?.price ? String(a.price / 100) : "" } : y));
+                  }}>
+                    <option value="" disabled>Choose an add-on…</option>
+                    {addons.map((o) => <option key={o.id} value={o.id}>{o.name}{o.price ? ` ${centsToPhp(o.price)}` : ""}</option>)}
+                  </select>
+                </label>
+                <label>Add-on paid (₱)
+                  <input inputMode="decimal" placeholder="e.g. 500" value={x.amount} required={!!x.service} onChange={(e) => setExtras(extras.map((y, j) => j === i ? { ...y, amount: e.target.value } : y))} />
+                </label>
+                <button type="button" className="secondary small addon-remove" aria-label="Remove add-on" onClick={() => setExtras(extras.filter((_, j) => j !== i))}>✕</button>
+              </div>
+            ))}
+            <button type="button" className="secondary small" onClick={() => setExtras([...extras, { service: addons.length === 1 ? addons[0].id : "", amount: addons.length === 1 && addons[0].price ? String(addons[0].price / 100) : "" }])}>+ Add-on{extras.length ? " (another)" : ""}</button>
+          </div>
+        )}
         {priceDiffers && (
           <label className="span2"><span>Reason for the different price <span className="muted">({scheduled != null ? `session ${session} of this bundle is ${centsToPhp(scheduled)}` : `list price ${centsToPhp(listPrice!)}`})</span></span>
             <input name="price_note" required minLength={3} maxLength={300} placeholder="e.g. 10% promo, loyalty discount" value={priceNote} onChange={(e) => setPriceNote(e.target.value)} />
@@ -248,6 +287,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
           {noCommission ? null : p.total > 0 ? (
             <>
               <span>Commission {centsToPhp(p.total)}</span>
+              {extraTotal > 0 && <span className="muted">{svc?.name ?? "service"} {centsToPhp(mainTotal)} + add-on{extraRows.length > 1 ? "s" : ""} {centsToPhp(extraTotal)}</span>}
               {effType === "SOLO" && <span className="muted">all to the performer (no assistant)</span>}
               {needsPartner && effType !== "SOLO" && shown.lead > 0 && shown.assist === 0 && <span className="muted">lead {centsToPhp(shown.lead)}</span>}
               {needsPartner && effType !== "SOLO" && shown.lead === 0 && shown.assist > 0 && <span className="muted">assist {centsToPhp(shown.assist)}</span>}

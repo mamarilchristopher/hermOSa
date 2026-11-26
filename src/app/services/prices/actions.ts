@@ -31,3 +31,15 @@ export async function saveService(prev: PriceState, fd: FormData): Promise<Price
   revalidatePath("/services/prices"); revalidatePath("/services"); revalidatePath("/bookings");
   return { ok: id ? "Saved." : `Added "${name}".`, n };
 }
+
+/** Mark a service as an add-on (update-0080), or not. Owners and the GM (the database checks). */
+export async function setAddon(_prev: PriceState, fd: FormData): Promise<PriceState> {
+  const id = z.uuid().safeParse(String(fd.get("id") ?? ""));
+  if (!id.success) return { error: "Refresh the page and try again." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_service_addon", { p_id: id.data, p_on: fd.get("on") === "1" });
+  if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0080 in Supabase first." : "Could not save. Try again." };
+  if (!data?.ok) return { error: errorText(data?.error) };
+  revalidatePath("/services/prices"); revalidatePath("/services");
+  return { ok: "Saved." };
+}
