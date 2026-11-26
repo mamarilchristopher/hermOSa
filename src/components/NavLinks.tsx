@@ -2,9 +2,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { IconCalendar, IconChart, IconClipboard, IconCoins, IconHome, IconIdCard, IconPen, IconPeople, IconUpload, IconUsers, IconWeek, IconClock, IconMore, IconSettings, IconChat } from "./Icons";
+import { IconCalendar, IconChart, IconClipboard, IconCoins, IconHome, IconIdCard, IconPen, IconPeople, IconUpload, IconUsers, IconWeek, IconClock, IconMore, IconSettings, IconChat, IconBriefcase } from "./Icons";
 
-const ICONS = { chart: IconChart, calendar: IconCalendar, upload: IconUpload, users: IconUsers, clipboard: IconClipboard, people: IconPeople, coins: IconCoins, home: IconHome, idcard: IconIdCard, pen: IconPen, week: IconWeek, clock: IconClock, settings: IconSettings, chat: IconChat };
+const ICONS = { chart: IconChart, calendar: IconCalendar, upload: IconUpload, users: IconUsers, clipboard: IconClipboard, people: IconPeople, coins: IconCoins, home: IconHome, idcard: IconIdCard, pen: IconPen, week: IconWeek, clock: IconClock, settings: IconSettings, chat: IconChat, briefcase: IconBriefcase };
 
 /** One page inside a hub (shown as a tab across the top of the page). */
 export type HubTab = { href: string; label: string; badge?: number };
@@ -23,8 +23,8 @@ export function activeOf(hubs: Hub[], path: string): { hub: string | null; tab: 
 }
 const badgeOf = (h: Hub) => h.tabs.reduce((n, t) => n + (t.badge ?? 0), 0);
 
-// Phone bottom bar: Home and Time clock always (v0.49: Chat comes next), then these hubs in this order; the rest go under More.
-const PHONE_ORDER = ["chat", "clinic", "team", "sales", "pay", "people", "settings"];
+// Phone bottom bar: Home and Time clock always (v0.49: Chat comes next; v0.89.1: Business for management), then these hubs in this order; the rest go under More.
+const PHONE_ORDER = ["chat", "business", "clinic", "team", "sales", "pay", "people", "settings"];
 
 export function NavLinks({ hubs, variant }: { hubs: Hub[]; variant: "side" | "tabs" }) {
   const path = usePathname();

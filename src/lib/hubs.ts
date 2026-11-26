@@ -23,19 +23,19 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
   const booker = has(["CSR", "OWNER", "MANAGER", "CLINICIAN", "CASHIER"]);
   const n = (x?: number) => (x && x > 0 ? x : undefined);
   return ([
-    { key: "home", label: "Home", short: "Home", icon: "home", tabs: [{ href: "/me", label: "Home" }] },
+    // CHRIS Nov 27 (v0.89.1): My day sits on Home for the GM and the owners.
+    { key: "home", label: "Home", short: "Home", icon: "home", tabs: [{ href: "/me", label: "Home" }, ...(owner || gm ? [{ href: "/focus", label: "My day" }] : [])] },
     { key: "time", label: "Time clock", short: "Clock", icon: "clock", tabs: [{ href: "/time", label: "Time clock" }] },
     // Team chat (v0.49, update-0049): private 1-on-1 and group chats; the badge counts unread messages.
     { key: "chat", label: "Chat", short: "Chat", icon: "chat", tabs: [{ href: "/chat", label: "Chat", badge: n(c.chat) }] },
-    { key: "sales", label: "Sales", short: "Sales", icon: "chart", tabs: [
-      // CHRIS Nov 27 (v0.87.1): the Business dashboard (sales, trends, team patterns, today's promo picks) for all management.
-      // CHRIS Nov 27 (v0.88): My day, the GM's daily reminders with live counts; first for the GM, owners can open it too.
-      ...(gm ? [{ href: "/focus", label: "My day" }] : []),
+    // CHRIS Nov 27 (v0.89.1): its own Business hub: the Business page, the Dashboard and the promo generator.
+    { key: "business", label: "Business", short: "Business", icon: "briefcase", tabs: [
       ...(management ? [{ href: "/business", label: "Business" }, { href: "/", label: "Dashboard" }] : []),
-      ...(owner ? [{ href: "/focus", label: "My day" }] : []),
-      ...(filler ? [{ href: "/sales/daily", label: "Daily sales" }] : []),
-      // update-0086 (CHRIS Nov 27): promo ideas every Monday, and the builder; beside Daily sales. Owners and the GM.
+      // update-0086 (CHRIS Nov 27): promo ideas every Monday, and the builder. Owners and the GM.
       ...(owner || gm ? [{ href: "/promos", label: "Promos" }] : []),
+    ] },
+    { key: "sales", label: "Sales", short: "Sales", icon: "chart", tabs: [
+      ...(filler ? [{ href: "/sales/daily", label: "Daily sales" }] : []),
       ...(filler ? [{ href: "/sales/missing", label: "Missing days" }] : []),
       ...(importer ? [{ href: "/imports", label: "Imports" }] : []),
       // update-0081 (CHRIS Nov 26): Unresponsive bookings to call or message again. CSRs, owners and the GM.
