@@ -8,6 +8,9 @@ import { manilaToday } from "@/lib/dates";
 import { cutoffEnd, dayLabel } from "@/lib/homeGlance";
 import { TodoCard, type Todo } from "../ManagerHome";
 import { StaticMenu } from "@/components/NavLinks";
+import { HomeBookings, loadHomeBookings } from "../HomeBookings";
+import { sortBranches } from "@/lib/insights";
+import { branchShort } from "@/lib/schedule";
 import { menuFor } from "@/lib/hubs";
 
 type ViewAs = {
@@ -31,10 +34,11 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
   if (!access.grants.some((g) => (g.role === "OWNER" || g.role === "MANAGER") && g.branch_id === null)) redirect("/me");
   const id = z.uuid().safeParse((await searchParams).u);
   if (!id.success) redirect("/me");
-  const [{ data }, { data: chatData }, { data: noticeData }] = await Promise.all([
+  const [{ data }, { data: chatData }, { data: noticeData }, bookings] = await Promise.all([
     supabase.rpc("view_as", { p_user: id.data }),
     supabase.rpc("view_as_chat", { p_user: id.data }), // counts only; chats stay private (update-0051)
     supabase.rpc("view_as_notices", { p_user: id.data }), // their bell; chat notices without the message (update-0052)
+    loadHomeBookings(supabase, manilaToday(), false), // everyone's Home has the live Bookings board (CHRIS Nov 26)
   ]);
   const notices = (noticeData ?? null) as { ok: boolean; unread: number; latest: { title: string; body: string | null; created_at: string; read: boolean; kind?: string }[] } | null;
   const chat = (chatData ?? null) as { ok: boolean; unread: number; mgmt_unread: number; tagged_unread: number } | null;
@@ -78,9 +82,11 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
         {/* Phones have no side menu: show the person's menu as a card (CHRIS Nov 26). */}
         <div className="card view-menu-card"><StaticMenu hubs={menuFor(v.roles)} title={`${first}'s menu`} /></div>
         {notices?.ok && (
-          <div className="card">
-            <h2 className="notices-head">Notifications{notices.unread > 0 && <span className="nav-badge inline">{notices.unread}</span>}
+          // CHRIS Nov 26: folded by default, so the live Bookings board sits right under it.
+          <details className="card notices-fold">
+            <summary><h2 className="notices-head">Notifications{notices.unread > 0 && <span className="nav-badge inline">{notices.unread}</span>}
               {notices.unread > 0 && <span className="count">unread</span>}</h2>
+              {notices.latest[0] && <span className="small muted nf-latest">Latest: {notices.latest[0].title}</span>}</summary>
             {notices.latest.length === 0 ? <p className="muted small">None yet.</p> : (
               <ul className="view-notices">
                 {notices.latest.map((n, i) => (
@@ -94,8 +100,10 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
                 ))}
               </ul>
             )}
-          </div>
+          </details>
         )}
+        {bookings && <HomeBookings rows={bookings.rows} who={bookings.who} toFollow={0}
+          branches={sortBranches(branches.filter((b) => b.kind === "CLINIC")).map((b) => ({ id: b.id, name: branchShort(b.name), code: b.code }))} />}
         {v.employee?.commission_eligible && (
           <div className="grid">
             <div className="card stat"><div className="label">Commission today</div><div className="value">{centsToPhp(todayCents)}</div><div className="note">Approved or waiting sign-off</div></div>

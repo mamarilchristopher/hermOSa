@@ -1547,3 +1547,9 @@ button.chat-with:hover .avatar { box-shadow: 0 0 0 3px var(--gold-soft); }
   .nte-track-wide { display: none; }
   .nte-track-list { display: block; }
 }
+/* View as: Notifications fold up (CHRIS Nov 26) */
+details.notices-fold > summary { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0; }
+details.notices-fold > summary::after { margin-left: auto; }
+details.notices-fold > summary h2 { margin: 0; }
+details.notices-fold .nf-latest { flex: 1 1 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+details.notices-fold[open] > summary { margin-bottom: 12px; }

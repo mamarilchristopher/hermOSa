@@ -1,5 +1,20 @@
 import Link from "next/link";
 import { LiveBookings } from "../bookings/LiveBookings";
+import type { requireAccess } from "@/lib/access";
+
+type Db = Awaited<ReturnType<typeof requireAccess>>["supabase"];
+/** Today's bookings at every branch, names for "Arrived by Ana", and (for CSRs, owners, the GM) the follow-up count. */
+export async function loadHomeBookings(supabase: Db, today: string, booker: boolean) {
+  const [{ data: bk }, { data: ppl }, { count }] = await Promise.all([
+    supabase.from("bookings").select("id, branch_id, client_name, services, appointment_time, status, status_by, status_at")
+      .eq("appointment_date", today).order("appointment_time", { ascending: true, nullsFirst: false }).order("created_at").limit(300),
+    supabase.rpc("chat_people"),
+    booker ? supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "UNRESPONSIVE") : Promise.resolve({ count: 0 }),
+  ]);
+  if (!bk) return null; // bookings not set up (before update-0040) or not readable
+  const who = Object.fromEntries(((Array.isArray(ppl) ? ppl : []) as { id: string; name: string }[]).map((x) => [x.id, x.name]));
+  return { rows: bk as HomeBooking[], who, toFollow: count ?? 0 };
+}
 
 /** One booking on the management Home's live board (today's visits at every branch). */
 export type HomeBooking = {
