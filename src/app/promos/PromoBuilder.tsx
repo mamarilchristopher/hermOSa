@@ -1,21 +1,22 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
-  adIssues, organicOnly, captions, commissionPerSession, defaultPrice, isBundle, peso, safetyFor, safetyIssues, sessionsOf, thinItems, titleIdeas, usualCount,
-  valueOf, SEASONS, type Pkg, type PromoItem, type Suggestion,
+  adIssues, organicOnly, captions, commissionsOf, defaultPrice, isBundle, peso, planVisits, promoSchedule, safetyFor, safetyIssues, sessionsOf, shortName, thinItems, titleIdeas, usualCount,
+  justify, valueOf, SEASONS, type Pkg, type PromoItem, type Suggestion,
 } from "@/lib/promoRules";
 import { modelSrc, modelsFor } from "@/lib/promoModels";
 import { drawPromo } from "@/lib/promoImage";
+import { COPY_FAIL, copyCanvas, fontsOf, saveCanvas } from "@/lib/canvasShare";
 import { approvePromo, endPromo, savePromo, type PromoInput } from "./actions";
 
-export type Svc = { id: string; name: string; price: number };
+export type Svc = { id: string; name: string; price: number; commission?: number | null; cost?: number | null };
 export type SavedPromo = {
   id: string; title: string; tagline: string | null; items: { service_id: string; name: string; paid: number; free: number; unit_cents: number }[];
   price_cents: number; value_cents: number; sessions: number; valid_months: number; ends_on: string | null; model: string | null;
   source: "MANUAL" | "SUGGESTED"; state: "DRAFT" | "APPROVED" | "ENDED"; created_at: string; approved_at: string | null;
 };
 
-type Draft = { id: string | null; title: string; tagline: string; items: PromoItem[]; price: number; auto: boolean; months: number; endsOn: string; model: string; season: string; source: "MANUAL" | "SUGGESTED" };
+type Draft = { why?: string; id: string | null; title: string; tagline: string; items: PromoItem[]; price: number; auto: boolean; months: number; endsOn: string; model: string; season: string; source: "MANUAL" | "SUGGESTED" };
 
 const addDays = (d: string, n: number) => new Date(new Date(`${d}T00:00:00Z`).getTime() + n * 86400000).toISOString().slice(0, 10);
 const KIND: Record<Suggestion["kind"], string> = { SEASON: "Season", SLOW: "Slow seller", PROGRAM: "Year-long program" };
@@ -26,8 +27,8 @@ function blank(today: string): Draft {
 const php = (c: number) => String(Math.round(c / 100));
 
 /** The promo builder (update-0086): +/− sessions, live price and images, captions, save and approve. */
-export function PromoBuilder({ services, ideas, seasons, today, saved, serif, serifClass, pkgs = [] }: {
-  pkgs?: Pkg[]; services: Svc[]; ideas: Suggestion[]; seasons: string[]; today: string; saved: SavedPromo[]; serif: string; serifClass: string;
+export function PromoBuilder({ services, ideas, seasons, today, saved, serif, serifClass, pkgs = [], clients = {} }: {
+  pkgs?: Pkg[]; clients?: Record<string, { active: number; all: number }>; services: Svc[]; ideas: Suggestion[]; seasons: string[]; today: string; saved: SavedPromo[]; serif: string; serifClass: string;
 }) {
   const [d, setD] = useState<Draft>(() => blank(today));
   const [story, setStory] = useState<string | null>(null);
@@ -50,6 +51,14 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
   const thin = thinItems(d.items, d.months);
   const ads = caps ? [...organicOnly(d.items), ...adIssues(d.title, d.tagline, caps.story, caps.feed)] : [];
   const change = (p: Partial<Draft>) => { setD((x) => ({ ...x, ...p })); setMsg(null); };
+  // update-0087: commission per session for each service (scaled by the discount) and the recommended schedule.
+  const usualComm = useMemo(() => Object.fromEntries(services.map((s) => [s.id, s.commission ?? null])), [services]);
+  const comms = commissionsOf(d.items, price, usualComm);
+  const plan = useMemo(() => promoSchedule(d.items.map((i) => ({ id: i.service_id, name: i.name, sessions: i.paid + i.free })), today, d.months), [d.items, d.months, today]);
+  const visits = planVisits(plan);
+  // CHRIS Nov 27: every proposed price comes with its justification (management only: this page is owners and the GM).
+  const costs = useMemo(() => Object.fromEntries(services.map((s) => [s.id, s.cost ?? null])), [services]);
+  const why = d.items.length ? justify(d.items, price, { pkgs, usual: usualComm, cost: costs, why: d.why }) : null;
 
   // Live images: redrawn a moment after every change.
   useEffect(() => {
@@ -73,7 +82,7 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
     setTimeout(() => builderRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }
   function openIdea(s: Suggestion) {
-    open({ ...blank(today), title: s.title, tagline: s.tagline, items: s.items.map((i) => ({ ...i })), price: s.price, auto: s.price === defaultPrice(s.items, pkgs), months: s.months, season: s.season ?? "", source: "SUGGESTED" });
+    open({ ...blank(today), why: s.why, title: s.title, tagline: s.tagline, items: s.items.map((i) => ({ ...i })), price: s.price, auto: s.price === defaultPrice(s.items, pkgs), months: s.months, season: s.season ?? "", source: "SUGGESTED" });
   }
   function openSaved(p: SavedPromo) {
     const items = p.items.map((i) => ({ service_id: i.service_id, name: i.name, unit: i.unit_cents, paid: i.paid, free: i.free }));
@@ -94,7 +103,7 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
     price, months: d.months, endsOn: d.endsOn || null, model, source: d.source,
   });
   function save(approve: boolean) {
-    if (approve && !confirm(`Approve "${d.title}" at ${peso(price)}? It will be added to the Service log so staff can log it.`)) return;
+    if (approve && !confirm(`Approve "${d.title}" at ${peso(price)}? It will be added to the Service log with its per-session commission, and each client who buys it gets a schedule.`)) return;
     start(async () => {
       const r = approve ? await approvePromo(input()) : await savePromo(input());
       setMsg(r);
@@ -103,7 +112,7 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
     });
   }
   function end(p: SavedPromo) {
-    if (!confirm(p.state === "DRAFT" ? `Delete the draft "${p.title}"?` : `End "${p.title}"? Its Service log item will be hidden.`)) return;
+    if (!confirm(p.state === "DRAFT" ? `Delete the draft "${p.title}"?` : `End "${p.title}"? No new clients can start it. Clients who already bought it can still use their sessions.`)) return;
     start(async () => setMsg(await endPromo(p.id)));
   }
   const fileName = (title: string, kind: "story" | "feed") => `${(title || "Promo").replace(/[^A-Za-z0-9]+/g, "-")}-${kind === "story" ? "Story" : "FB-post"}.png`;
@@ -141,6 +150,7 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
               <span className="small">{s.items.length === 1 ? `${s.items[0].name} ${s.items[0].paid}+${s.items[0].free}` : s.items.map((i) => `${i.paid} ${i.name}`).join(", ")}</span>
               <span className="small"><strong>{peso(s.price)}</strong> · {sessionsOf(s.items)} sessions · {peso(Math.round(s.price / sessionsOf(s.items)))} each</span>
               <span className="small muted">{s.why}</span>
+              <span className="small promo-why-line">{justify(s.items, s.price, { pkgs, usual: Object.fromEntries(services.map((x) => [x.id, x.commission ?? null])), cost: Object.fromEntries(services.map((x) => [x.id, x.cost ?? null])) }).headline}</span>
               <button type="button" className="secondary small" onClick={() => openIdea(s)}>Open in builder</button>
             </div>
           ))}
@@ -195,9 +205,16 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
                     <strong>{n} sessions</strong> for <strong>{peso(price)}</strong> = {peso(Math.round(price / Math.max(1, n)))} per session.
                     {" "}The sessions are worth {peso(value)} on the price list, so the client saves {Math.round(off * 100)}% <span className="muted">(for you only; posts never show a regular price)</span>.
                   </p>
-                  <p className="small">Commission: {isBundle(d.items)
-                    ? `${peso(commissionPerSession(d.items, price))} per session, every session (5% of the bundle price spread over ${n})`
-                    : `${peso(commissionPerSession(d.items, price))} once, when it's sold (5% of the program price)`}.</p>
+                  <div className="small">
+                    <strong>Staff commission per session done</strong> (5% of each service&apos;s price per session in this promo, free sessions included, split 60/40 when assisted):
+                    <ul className="promo-comm">
+                      {d.items.map((it, k) => {
+                        const solo = usualComm[it.service_id] ?? Math.round(it.unit * 0.05);
+                        return <li key={it.service_id}>{shortName(it.name)}: <strong>₱{(comms[k] / 100).toFixed(2)}</strong> <span className="muted">(solo ₱{(solo / 100).toFixed(2)})</span></li>;
+                      })}
+                    </ul>
+                    {!isBundle(d.items) && <span className="muted">Payments go on the promo&apos;s payment line, with no commission.</span>}
+                  </div>
                   {price > value && <div className="notice warn small">The price is more than the sessions are worth. Lower it.</div>}
                   {off > 0.3 && <div className="notice warn small">That&apos;s {Math.round(off * 100)}% off. Over 30% cuts deep into profit: try fewer free sessions, or a free add-on (like L-Carnitine) instead of a lower price.</div>}
                 </div>
@@ -226,6 +243,28 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
                 </div>
                 {issues.length > 0 && (
                   <div className="notice warn small"><strong>Check for the client&apos;s safety:</strong><ul>{issues.map((t) => <li key={t}>{t}</li>)}</ul></div>
+                )}
+                {why && (
+                  <div className={`notice ${why.warnings.length ? "warn" : "info"} small promo-why`}>
+                    <strong>Why this price</strong> <span className="muted">(management only)</span>
+                    <div>{why.headline}</div>
+                    <ul>{why.lines.map((t) => <li key={t}>{t}</li>)}</ul>
+                    {why.warnings.length > 0 && <><strong>Check:</strong><ul>{why.warnings.map((t) => <li key={t}>{t}</li>)}</ul></>}
+                  </div>
+                )}
+                {visits.length > 0 && (
+                  <details className="promo-sample">
+                    <summary className="small"><strong>Recommended schedule:</strong> {visits.length} visits over {d.months} month{d.months === 1 ? "" : "s"}, at each service&apos;s usual pace (sample from today)</summary>
+                    <ol className="small">
+                      {visits.map((v) => (
+                        <li key={v.d}>{new Date(`${v.d}T00:00:00Z`).toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}: {v.steps.map((st) => {
+                          const it = d.items.find((i) => i.service_id === st.s);
+                          return `${shortName(it?.name ?? "")} ${st.n} of ${(it?.paid ?? 0) + (it?.free ?? 0)}`;
+                        }).join(" + ")}</li>
+                      ))}
+                    </ol>
+                    <p className="small muted">Each client who buys it gets their own copy from the day they start, to send as a photo or text.</p>
+                  </details>
                 )}
 
                 <label>Title
@@ -301,6 +340,9 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
                   <div><strong>{p.title}</strong></div>
                   <div className="small muted">{p.items.map((i) => `${i.paid}${i.free ? `+${i.free}` : ""} ${i.name}`).join(", ")}</div>
                   <div className="small"><strong>{peso(p.price_cents)}</strong> · {p.sessions} sessions{p.ends_on ? ` · ends ${p.ends_on}` : ""}</div>
+                  {p.state !== "DRAFT" && (
+                    <div className="small"><a href={`/promos/${p.id}`}><strong>Clients and profit →</strong></a>{clients[p.id] ? ` ${clients[p.id].all} client${clients[p.id].all === 1 ? "" : "s"}, ${clients[p.id].active} active` : " No clients yet"}</div>
+                  )}
                   {p.state === "APPROVED" && <PromoPhotos p={p} serif={serif} fileName={fileName} />}
                   <span className="row-buttons">
                     <button type="button" className="secondary small" onClick={() => openSaved(p)}>{p.state === "DRAFT" ? "Open" : "Copy into builder"}</button>
@@ -314,28 +356,6 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
       </div>
     </div>
   );
-}
-
-const COPY_FAIL = "This browser can't copy photos. Use Save as photo instead.";
-const fontsOf = async (serif: string) => {
-  await document.fonts.load(`700 80px ${serif}`).catch(() => null);
-  await document.fonts.ready;
-  return { sans: getComputedStyle(document.body).fontFamily || "sans-serif", serif };
-};
-const pngOf = (c: HTMLCanvasElement) => new Promise<Blob>((ok, bad) => c.toBlob((b) => (b ? ok(b) : bad(new Error("no image"))), "image/png"));
-async function saveCanvas(c: Promise<HTMLCanvasElement>, name: string) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(await pngOf(await c));
-  a.download = name; document.body.append(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-}
-/** Safari needs the clipboard write to start right away, so it gets a promise of the image. */
-async function copyCanvas(c: Promise<HTMLCanvasElement>): Promise<boolean> {
-  try {
-    if (!navigator.clipboard || typeof ClipboardItem === "undefined") return false;
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": c.then(pngOf) })]);
-    return true;
-  } catch { return false; }
 }
 
 /** Save as photo / Copy as photo (story and FB post) and Copy caption for an approved, running promo (CHRIS Nov 27). */

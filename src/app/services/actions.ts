@@ -7,8 +7,9 @@ import { centsToPhp, phpToCents } from "@/lib/csv";
 import { errorText } from "@/lib/access";
 import { isTestService } from "@/lib/serviceOrder";
 import { testResult } from "@/lib/serviceTest";
+import { firstPlan, promoOf, type PromoOptions } from "@/lib/promoTrack";
 
-export type ActionState = { error?: string; ok?: string; at?: number; duplicate?: string } | undefined;
+export type ActionState = { error?: string; ok?: string; at?: number; duplicate?: string; link?: string } | undefined;
 
 const Log = z.object({
   branch: z.uuid(),
@@ -29,11 +30,13 @@ const Log = z.object({
   session: z.coerce.number().int().min(1).max(15).default(1),
   meds: z.union([z.uuid(), z.string().regex(/^free:[0-9a-f-]{36}$/), z.literal("")]).optional(),
   addons: z.string().max(2000).optional(),
+  promo_client: z.union([z.uuid(), z.literal("new"), z.literal("")]).optional(),
+  promo_contact: z.string().trim().max(40).optional(),
 });
 const Photos = z.array(z.object({ kind: z.enum(["WAIVER", "BEFORE", "AFTER"]), path: z.string().max(300), thumb: z.string().max(300).nullable() })).max(20);
 
 export async function logService(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session", "meds", "proofs", "addons"].map((k) => [k, fd.get(k) ?? undefined])));
+  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session", "meds", "proofs", "addons", "promo_client", "promo_contact"].map((k) => [k, fd.get(k) ?? undefined])));
   if (!p.success) return { error: "Fill in the client's name, the service, the amount paid and who did it." };
   let photos;
   try { photos = Photos.parse(JSON.parse(p.data.photos || "[]")); } catch { return { error: "The photos didn't attach. Remove them and add them again." }; }
@@ -66,6 +69,12 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     } catch { return { error: "Enter what the client paid for each add-on, e.g. 500." }; }
     if (addons.some((a) => !(a.cents > 0))) return { error: "Enter what the client paid for each add-on, e.g. 500." };
   }
+  // update-0087: a promo item needs the client's promo (or "new" to start it); price 0 / no price = bundles, promo items.
+  const mayBePromo = !!svcRow && !Number(svcRow.price_cents ?? 0);
+  const { data: promoData } = mayBePromo ? await supabase.rpc("promo_log_options") : { data: null };
+  const pm = promoData?.ok ? promoOf(p.data.service, promoData as PromoOptions) : null;
+  if (pm && !p.data.promo_client) return { error: `Pick the client's promo for ${pm.promo.title}, or "New client" if they're buying it today.` };
+  if (pm && !paid) return { error: "Promo sessions are logged as Paid (₱0 when the client already paid). For a backjob or check-up, pick the usual service." };
   // CHRIS Nov 26: "already logged?" checks the same client and service today (not staff and amount).
   if (fd.get("confirm") !== "1") {
     const like = p.data.client.trim().replace(/[\\%_]/g, (c) => "\\" + c);
@@ -76,7 +85,17 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
       return { duplicate: `${p.data.client.trim()} already has this service logged today (at ${at}). Is this a separate visit?`, at: Date.now() };
     }
   }
-  const { data, error } = await supabase.rpc("log_client_visit", {
+  const promoArgs = pm ? {
+    p_promo_client: p.data.promo_client === "new" ? null : p.data.promo_client,
+    p_new: p.data.promo_client === "new" ? { promo_id: pm.promo.id, contact: p.data.promo_contact || null, schedule: firstPlan(pm.promo, p.data.date) } : null,
+    p_session: pm.part && !pm.promo.pay_service_id ? p.data.session : null,
+  } : null;
+  const { data, error } = pm ? await supabase.rpc("log_promo_visit", {
+    ...promoArgs,
+    p_branch: p.data.branch, p_date: p.data.date, p_service: p.data.service, p_amount_cents: cents, p_type: p.data.type === "LEAD" && !p.data.partner ? "SOLO" : p.data.type,
+    p_employee: p.data.employee, p_partner: p.data.partner || null, p_note: p.data.note || null,
+    p_client: p.data.client, p_price_note: p.data.price_note || null, p_folder: p.data.folder, p_photos: photos, p_share: p.data.share === "1",
+  }) : await supabase.rpc("log_client_visit", {
     p_branch: p.data.branch, p_date: p.data.date, p_service: p.data.service, p_amount_cents: cents, p_type: !paid ? "NONCOMMI" : p.data.type === "LEAD" && !p.data.partner ? "SOLO" : p.data.type,
     p_employee: p.data.employee, p_partner: paid ? p.data.partner || null : null, p_note: p.data.note || null,
     p_kind: p.data.kind, p_confirm: true, // the client + service check above replaces the old staff + amount check
@@ -89,6 +108,7 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     const at = new Date(data.existing.at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
     return { duplicate: `${data.existing.by} already logged this service for the same staff and amount today at ${at}. Is this a different client?`, at: Date.now() };
   }
+  if (!data.ok && pm) return { error: promoError(data) };
   if (!data.ok) return { error: errorText(data.error) };
   // CHRIS Nov 26 (update-0069): meds go in as their own line of this visit, no commission.
   let medsNote = "";
@@ -126,10 +146,31 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
   if (isTestService(svc?.name)) {
     return { ok: testResult({ kind: p.data.kind, cents, type: !paid ? "NONCOMMI" : p.data.type === "LEAD" && !p.data.partner ? "SOLO" : p.data.type, eligible: emp?.commission_eligible ?? null, photos, photosDue: !!data.photos_due }), at: Date.now() };
   }
-  if (data.photos_due) return { ok: ("Saved. The lead and assist were asked to add the client photos and waiver; their commission is held until they do.") + medsNote, at: Date.now() };
+  if (pm) {
+    medsNote = (data.payment ? ` Payment for ${pm.promo.title}.` : ` ${pm.promo.title}: session ${data.session} of ${data.of}.`) + (data.new ? " Their promo has started: send them the schedule below." : "") + medsNote;
+    revalidatePath("/promos");
+  }
+  const link = pm && data.promo_client ? `/promos/client/${data.promo_client}` : undefined;
+  if (data.photos_due) return { link, ok: ("Saved. The lead and assist were asked to add the client photos and waiver; their commission is held until they do.") + medsNote, at: Date.now() };
   const on = p.data.date === manilaToday() ? "" : ` for ${new Date(`${p.data.date}T00:00:00Z`).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`;
-  if (data.state === "APPROVED") return { ok: (paid ? `Saved and approved${on}.` : `Saved${on}. Unpaid visit logged (no commission).`) + medsNote, at: Date.now() };
-  return { ok: (paid ? "Saved. Waiting for manager sign-off." : "Saved. Unpaid visit logged (no commission).") + medsNote, at: Date.now() };
+  if (data.state === "APPROVED") return { link, ok: (paid ? `Saved and approved${on}.` : `Saved${on}. Unpaid visit logged (no commission).`) + medsNote, at: Date.now() };
+  return { link, ok: (paid ? "Saved. Waiting for manager sign-off." : "Saved. Unpaid visit logged (no commission).") + medsNote, at: Date.now() };
+}
+
+/** update-0087: what went wrong with a promo session, in plain words. */
+function promoError(d: { error: string; of?: number; session?: number; balance?: number; ends_on?: string }): string {
+  switch (d.error) {
+    case "PROMO_USED_UP": return `This client has used all ${d.of} sessions of this item.`;
+    case "PROMO_SESSION": return `This client is on session ${d.session} of ${d.of}. Pick that session.`;
+    case "PROMO_PAY_LINE": return "Program sessions are already paid for, so they're ₱0. Log any payment on the promo's payment line.";
+    case "PROMO_OVERPAID": return `That's more than the client owes. Balance: ${centsToPhp(d.balance ?? 0)}.`;
+    case "PROMO_EXPIRED": return `This client's promo ended on ${d.ends_on}. Ask an owner or the GM to extend it on the client's schedule page.`;
+    case "PROMO_CLIENT_CLOSED": return "This client's promo is finished or cancelled.";
+    case "PROMO_CLIENT_EXISTS": return "This client already has this promo. Pick their name in the list instead of New client.";
+    case "PROMO_NOT_RUNNING": return "This promo has ended, so no new clients can start it.";
+    case "NOT_PROMO_SERVICE": return "That item isn't part of this client's promo.";
+    default: return errorText(d.error);
+  }
 }
 
 export async function decideLog(_prev: ActionState, fd: FormData): Promise<ActionState> {

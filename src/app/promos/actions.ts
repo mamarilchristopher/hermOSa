@@ -59,6 +59,9 @@ export async function approvePromo(input: PromoInput): Promise<PromoResult> {
   const { data, error } = await r.supabase.rpc("approve_promo", { p_id: r.id });
   if (error || !data?.ok) return { error: fail(error, data?.error), id: r.id };
   revalidatePath("/promos"); revalidatePath("/services"); revalidatePath("/services/prices");
+  revalidatePath(`/promos/${r.id}`);
+  // update-0087: set up per service with scaled commission; before it, one item.
+  if (Array.isArray(data.parts)) return { ok: `Approved. It's in the Service log under Promos (${data.parts.length === 1 ? "1 item" : `${data.parts.length} items and a payment line`}). When a client buys it, log their first visit with "New client" to start their schedule.`, id: r.id };
   return { ok: `Approved. "${data.service}" is now on the Service log.`, id: r.id, service: data.service };
 }
 
@@ -70,5 +73,45 @@ export async function endPromo(id: string): Promise<PromoResult> {
   const { data, error } = await supabase.rpc("end_promo", { p_id: p.data });
   if (error || !data?.ok) return { error: fail(error, data?.error) };
   revalidatePath("/promos"); revalidatePath("/services"); revalidatePath("/services/prices");
-  return { ok: data.deleted ? "Draft deleted." : "Promo ended. Its Service log item is hidden." };
+  if (data.deleted) return { ok: "Draft deleted." };
+  return { ok: data.active_clients ? `Promo ended: no new clients. ${data.active_clients} client${data.active_clients === 1 ? " still has" : "s still have"} sessions left, so its items stay in the Service log until they finish.` : "Promo ended. Its Service log items are hidden." };
+}
+
+// ---------- update-0087: client promos and product costs ----------
+const TRACK_MSG: Record<string, string> = {
+  NOT_ALLOWED: "Only owners and the GM can do that.",
+  PROMO_CLIENT_CLOSED: "This client's promo is already finished or cancelled.",
+  NOT_FOUND: "That client's promo wasn't found. Refresh the page.",
+};
+const trackFail = (error: { code?: string } | null, code?: string) =>
+  error?.code === "PGRST202" || error?.code === "42P01" ? "The owner needs to run update-0087 in Supabase first." : error ? "Could not save. Try again." : (code && TRACK_MSG[code]) || errorText(code);
+
+const Step = z.object({ d: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), s: z.uuid(), n: z.number().int().min(1).max(100) });
+
+/** SCHEDULE (a new plan), CONTACT, EXTEND (months), CANCEL or REOPEN a client's promo. */
+export async function updatePromoClient(id: string, action: "SCHEDULE" | "CONTACT" | "EXTEND" | "CANCEL" | "REOPEN", opts: { schedule?: unknown; months?: number; contact?: string } = {}): Promise<PromoResult> {
+  if (!z.uuid().safeParse(id).success) return { error: "Try again." };
+  const schedule = opts.schedule === undefined ? null : z.array(Step).max(400).safeParse(opts.schedule);
+  if (schedule && !schedule.success) return { error: "That schedule didn't look right. Try again." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("update_promo_client", {
+    p_id: id, p_action: action, p_schedule: schedule?.data ?? null, p_months: opts.months ?? null, p_contact: opts.contact ?? null,
+  });
+  if (error || !data?.ok) return { error: trackFail(error, data?.error) };
+  revalidatePath(`/promos/client/${id}`);
+  revalidatePath("/promos");
+  return { ok: action === "SCHEDULE" ? "Schedule saved." : action === "EXTEND" ? `Extended by ${opts.months} month${opts.months === 1 ? "" : "s"}.` : action === "CANCEL" ? "Cancelled. Their remaining sessions are closed." : action === "REOPEN" ? "Reopened." : "Saved." };
+}
+
+/** Product cost of one session of a service (owners and the GM), for the promo profit. */
+export async function setServiceCost(serviceId: string, pesos: string, promoId: string): Promise<PromoResult> {
+  if (!z.uuid().safeParse(serviceId).success) return { error: "Try again." };
+  const t = pesos.replace(/[,₱\s]/g, "");
+  const cents = t === "" ? null : Math.round(Number(t) * 100);
+  if (cents !== null && !(cents >= 0 && cents <= 100000000)) return { error: "Type the cost in pesos, e.g. 450." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_service_cost", { p_service: serviceId, p_cost_cents: cents });
+  if (error || !data?.ok) return { error: trackFail(error, data?.error) };
+  revalidatePath(`/promos/${promoId}`);
+  return { ok: "Cost saved." };
 }

@@ -105,9 +105,18 @@ export const defaultPrice = (items: PromoItem[], pkgs: Pkg[] = []) => {
   return pk != null ? Math.min(pk, paidValueOf(items)) : paidValueOf(items);
 };
 
-/** Commission in cents: a bundle pays 5% of its price spread over every session; a program pays 5% once, when sold. */
-export const commissionPerSession = (items: PromoItem[], price: number) =>
-  isBundle(items) ? Math.round((price * 0.05) / Math.max(1, sessionsOf(items))) : Math.round(price * 0.05);
+/** Commission per session done (CHRIS Nov 27, update-0087): the service's usual commission for one session (its set
+ *  commission, else 5% of its list price), lowered by the promo's discount. Free sessions are included, unused sessions pay
+ *  nothing, so a promo never pays more than the usual 5% of what the client actually paid. Same math as approve_promo. */
+export function partCommission(unit: number, usualCommission: number | null | undefined, price: number, value: number): number {
+  const base = usualCommission ?? Math.round(unit * 0.05);
+  return value > 0 ? Math.round((base * Math.min(price, value)) / value) : 0;
+}
+/** Per-session commission for each item, in item order. `usual` maps a service id to its set commission (null = 5%). */
+export const commissionsOf = (items: PromoItem[], price: number, usual: Record<string, number | null> = {}) =>
+  items.map((i) => partCommission(i.unit, usual[i.service_id], price, valueOf(items)));
+/** Kept for older callers: the first item's per-session commission. */
+export const commissionPerSession = (items: PromoItem[], price: number, usual: Record<string, number | null> = {}) => commissionsOf(items, price, usual)[0] ?? 0;
 
 export const peso = (c: number) => `₱${Math.round(c / 100).toLocaleString("en-PH")}`;
 
@@ -293,4 +302,132 @@ export function suggest(stats: SvcStat[], today: string, pkgs: Pkg[] = []): Sugg
     added++;
   }
   return out;
+}
+
+// ---------- Recommended schedule (CHRIS Nov 27: every bundle and program comes with a plan for the client and the clinic) ----------
+/** One planned session: date, the Service log item (or service) id, and its number for that item. */
+export type PlanStep = { d: string; s: string; n: number };
+export type PlanPart = { id: string; name: string; sessions: number; from?: number };
+const addD = (d: string, n: number) => new Date(new Date(`${d}T00:00:00Z`).getTime() + n * 86400000).toISOString().slice(0, 10);
+const addM = (d: string, m: number) => { const x = new Date(`${d}T00:00:00Z`); x.setUTCMonth(x.getUTCMonth() + m); return x.toISOString().slice(0, 10); };
+export const promoEnds = (start: string, months: number) => addD(addM(start, months), -1);
+
+/** Spread each item's sessions over the months at its usual pace (weekly drips, monthly facials, face HIFU every 6 months),
+ *  never closer than the safe gap. The most frequent item sets the visit rhythm; the others land on those visit days
+ *  (second visit, third visit...) so the client comes in as few times as possible. `from` = sessions already done. */
+export function promoSchedule(parts: PlanPart[], start: string, months: number, end?: string): PlanStep[] {
+  const last = end ?? promoEnds(start, months);
+  const span = Math.max(0, Math.round((new Date(`${last}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) / 86400000) - 7);
+  const plan = parts.map((p) => {
+    const s = safetyFor(p.name);
+    const left = Math.max(0, p.sessions - (p.from ?? 0));
+    const usual = Math.max(s.gapDays, Math.round(28 / Math.max(s.perMonth, 1 / 12)));
+    const fit = left > 1 ? Math.floor(span / (left - 1)) : usual;
+    return { p, left, every: Math.max(s.gapDays, Math.min(usual, fit)) };
+  }).filter((x) => x.left > 0).sort((a, b) => a.every - b.every);
+  const out: PlanStep[] = [];
+  const rhythm = plan[0]?.every ?? 30;
+  plan.forEach((x, k) => {
+    // Later items start on the (k+1)th visit of the main rhythm, if they still fit.
+    let every = x.every, offset = 0;
+    if (k > 0 && rhythm > 0) {
+      const up = Math.ceil(every / rhythm) * rhythm, down = Math.floor(every / rhythm) * rhythm;
+      every = (x.left - 1) * up <= span ? up : down >= safetyFor(x.p.name).gapDays ? down : every;
+      offset = Math.min(k * rhythm, Math.max(0, span - (x.left - 1) * every));
+      offset = Math.floor(offset / rhythm) * rhythm;
+    }
+    for (let i = 0; i < x.left; i++) out.push({ d: addD(start, offset + i * every), s: x.p.id, n: (x.p.from ?? 0) + i + 1 });
+  });
+  return out.sort((a, b) => (a.d === b.d ? 0 : a.d < b.d ? -1 : 1));
+}
+
+/** Visits: the plan grouped by day. */
+export function planVisits(plan: PlanStep[]): { d: string; steps: PlanStep[] }[] {
+  const by = new Map<string, PlanStep[]>();
+  for (const st of plan) by.set(st.d, [...(by.get(st.d) ?? []), st]);
+  return [...by.entries()].map(([d, steps]) => ({ d, steps }));
+}
+
+/** Short service names for the client's schedule: "Brilliant drip", "Signature facial". */
+export const shortName = (name: string) => name.replace(/\s*\((?:single session|program)\)\s*$/i, "").replace(/\s+single session$/i, "").replace(/\s*·.*$/, "").trim();
+
+/** Shortest clear name for the client's schedule photo: "Facial", "HIFU face", "Carbon laser". */
+export function tinyName(name: string): string {
+  const n = shortName(name);
+  if (/hifu.*(face|neck)/i.test(n)) return "HIFU face";
+  if (/hifu/i.test(n)) return n.replace(/^hifu/i, "HIFU");
+  if (/hydra/i.test(n)) return "Hydrafacial";
+  if (/facial/i.test(n)) return "Facial";
+  if (/carbon/i.test(n)) return "Carbon laser";
+  if (/diode/i.test(n)) return "Diode laser";
+  return n;
+}
+
+/** Copy-paste text of a schedule for Messenger. */
+export function scheduleText(p: { title: string; client: string; ends: string; plan: PlanStep[]; names: Record<string, string>; totals: Record<string, number> }) {
+  const day = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  const lines = planVisits(p.plan).map((v) => `${day(v.d)}: ${v.steps.map((s) => `${p.names[s.s] ?? "Session"} ${s.n} of ${p.totals[s.s] ?? s.n}`).join(" + ")}`);
+  return [`${p.title}: your schedule`, p.client, `Use all sessions by ${day(p.ends)}.`, "", ...lines, "",
+    "Message us a day before each visit to confirm your slot. You can move a date; just keep the spacing.", BRANCH_LINE].join("\n");
+}
+
+// ---------- Price justification (CHRIS Nov 27: every proposed price comes with its reasons) ----------
+/** Per-session price of the client's existing packages for a service, e.g. Brilliant 10+3 at ₱10,000 → ₱769. */
+export function packageRate(name: string, pkgs: Pkg[]): { name: string; perSession: number } | null {
+  const want = baseName(name);
+  let best: { name: string; perSession: number } | null = null;
+  for (const p of pkgs) {
+    const m = /^(.*?)\s+(\d+)\s*\+\s*(\d+)\s*$/.exec(p.name.trim());
+    if (!m || m[1].trim().toLowerCase() !== want || !(p.total > 0)) continue;
+    const per = Math.round(p.total / (Number(m[2]) + Number(m[3])));
+    if (!best || per < best.perSession) best = { name: p.name.trim(), perSession: per };
+  }
+  return best;
+}
+
+export type Justification = {
+  headline: string; lines: string[]; warnings: string[];
+  value: number; off: number; commission: number; cost: number | null; margin: number | null;
+};
+/** Why the price is what it is: against single prices, against your own packages, the commission it carries and the
+ *  product cost (when set), plus the research or sales reason behind the idea. Shown in the builder and on the promo page. */
+export function justify(items: PromoItem[], price: number, o: { pkgs?: Pkg[]; usual?: Record<string, number | null>; cost?: Record<string, number | null>; why?: string } = {}): Justification {
+  const value = valueOf(items), n = sessionsOf(items);
+  const off = value > 0 ? 1 - price / value : 0;
+  const lines: string[] = [], warnings: string[] = [];
+  if (o.why) lines.push(`Why this idea: ${o.why}`);
+  lines.push(`${n} sessions are worth ${peso(value)} at single prices; ${peso(price)} is ${Math.round(off * 100)}% off that.`);
+  const freeValue = items.reduce((s, i) => s + i.unit * i.free, 0);
+  if (freeValue > 0) {
+    const extra = Math.max(0, value - freeValue - price);
+    lines.push(`Where the discount comes from: ${peso(freeValue)} in free sessions${extra > 0 ? ` and ${peso(extra)} off the paid ones` : ", the paid sessions are at full price"}.`);
+  }
+  for (const it of items) {
+    const per = value > 0 ? Math.round((it.unit * Math.min(price, value)) / value) : 0;
+    const pk = packageRate(it.name, o.pkgs ?? []);
+    let t = `${shortName(it.name)}: ${peso(per)} per session here (single ${peso(it.unit)})`;
+    if (pk) {
+      const vs = per / pk.perSession - 1;
+      t += `; your ${pk.name} is ${peso(pk.perSession)} per session, so this is ${Math.abs(Math.round(vs * 100))}% ${vs >= 0 ? "above" : "below"} it`;
+      if (vs < -0.1) warnings.push(`${shortName(it.name)} is ${Math.round(-vs * 100)}% cheaper per session than your ${pk.name}. Clients may skip the package for this; keep the gap under 10% or add value instead of lowering the price.`);
+    }
+    lines.push(`${t}.`);
+  }
+  const comms = commissionsOf(items, price, o.usual ?? {});
+  const commission = items.reduce((s, it, k) => s + comms[k] * (it.paid + it.free), 0);
+  lines.push(`Staff commission if every session is used: ${peso(commission)} (${price > 0 ? ((commission / price) * 100).toFixed(1) : "0"}% of the price, the same 5% rule as your packages).`);
+  const missing = items.filter((it) => o.cost?.[it.service_id] == null).map((it) => shortName(it.name));
+  let cost: number | null = null, margin: number | null = null;
+  if (!missing.length) {
+    cost = items.reduce((s, it) => s + (o.cost![it.service_id] ?? 0) * (it.paid + it.free), 0);
+    const left = price - commission - cost;
+    margin = price > 0 ? left / price : null;
+    lines.push(`Product cost for all sessions: about ${peso(cost)}. Left after commission and product: ${peso(left)} (${margin === null ? "–" : Math.round(margin * 100)}% of the price), before rent and salaries.`);
+    if (margin !== null && margin < 0.35) warnings.push(`Only ${Math.round(margin * 100)}% is left after commission and product. Consider fewer free sessions or a higher price.`);
+  } else {
+    lines.push(`Product cost per session isn't set yet for ${missing.join(", ")}, so the true margin can't be shown. Type it on the promo's Clients and profit page.`);
+  }
+  if (off > 0.3 && !items.some((it) => packageRate(it.name, o.pkgs ?? []))) warnings.push(`${Math.round(off * 100)}% off single prices with no existing package to compare: check the product cost before approving.`);
+  const headline = `${Math.round(off * 100)}% off single prices · ${peso(Math.round(price / Math.max(1, n)))} per session on average · commission ${peso(commission)}${margin !== null ? ` · about ${Math.round(margin * 100)}% left after commission and product` : ""}`;
+  return { headline, lines, warnings, value, off, commission, cost, margin };
 }

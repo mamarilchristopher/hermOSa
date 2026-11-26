@@ -1639,3 +1639,25 @@ a.hb-row:hover strong { text-decoration: underline; }
 .promo-list { display: flex; flex-direction: column; gap: 10px; }
 .promo-saved { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--pearl); min-width: 0; }
 .promo-photos > .row-buttons { gap: 6px; }
+
+/* update-0087: promo tracking (client's promo in the Service log, schedule, tracker) */
+.promo-pick { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--gold-line); border-radius: var(--radius-sm); background: var(--gold-soft); min-width: 0; }
+.promo-pick select, .promo-pick input { width: 100%; max-width: 100%; }
+.promo-session { display: inline-flex; align-items: center; min-height: 42px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.promo-progress { display: grid; gap: 2px; margin-top: 6px; }
+.promo-progress .bar { display: block; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.promo-progress .bar span { display: block; height: 100%; border-radius: 3px; background: var(--gold); }
+.promo-plan td { vertical-align: top; }
+.promo-plan tr.month th { text-align: left; padding-top: 14px; color: var(--brown); font-size: 0.9rem; }
+.promo-plan tr.done td { color: var(--muted); }
+.promo-plan tr.late td:last-child { color: var(--bad); }
+.cost-form { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cost-form input { width: 96px; }
+.promo-follow { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.promo-comm { margin: 4px 0; padding-left: 18px; }
+.promo-sample ol { margin: 6px 0; padding-left: 22px; max-height: 260px; overflow-y: auto; }
+.promo-sample summary { cursor: pointer; }
+.promo-why ul { margin: 6px 0; padding-left: 18px; }
+.promo-why-line { color: var(--ink-2); }
+.promo-plan td.nowrap, .promo-plan .nowrap { white-space: nowrap; }
+.promo-all summary { cursor: pointer; margin: 10px 0 4px; }

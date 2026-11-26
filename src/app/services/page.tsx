@@ -15,6 +15,7 @@ import { DeclaredCheck, diffText } from "./DeclaredCheck";
 import { CHECK_FROM, CHECK_TO, checkBranches, inCheckWindow, type StatusDay } from "@/lib/declaredCheck";
 import { AddPhotosLater } from "./PhotoSlots";
 import { AttachProof } from "./PaymentProof";
+import type { PromoOptions } from "@/lib/promoTrack";
 
 type Log = {
   id: string; service_date: string; amount_paid_cents: number; commission_type: string; performer_id: string; assistant_id: string | null;
@@ -80,6 +81,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const list = all.filter((l) => l.service_date === date); // the chosen day, for the cards on top
   // update-0054 (CHRIS Nov 26): only staff timed in today add entries; owners and the GM always can.
   const { data: onDuty } = canLog && !topMgmt ? await supabase.rpc("can_log_services_now") : { data: true };
+  // update-0087: promo items and the clients with sessions left (errors before the update mean no promo tracking yet).
+  const { data: promoData } = canLog ? await supabase.rpc("promo_log_options") : { data: null };
+  const promoOpts = (promoData as (PromoOptions & { ok: boolean }) | null)?.ok ? (promoData as PromoOptions) : null;
   const { data: lineRows } = all.length
     ? await supabase.from("commission_lines").select("service_log_id, employee_id, role, amount_cents").in("service_log_id", all.map((l) => l.id))
     : { data: [] as Line[] };
@@ -160,7 +164,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 {(services ?? []).length === 0 ? "Add your services below first." : null}
               </div>
             ) : (
-              <BranchEntryForm key={here} branches={logBranches.map((b) => ({ id: b.id, name: b.name }))} start={logBranches.find((b) => b.id === myEmp?.branch_id)?.id ?? (logBranches.length === 1 ? logBranches[0].id : "")} date={date} today={today} meds={(services ?? []).filter((s) => s.is_meds).map((s) => ({ id: s.id, name: s.name, price: Number(s.price_cents ?? 0) }))} services={sortServices((services ?? []).filter((s) => !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null, sessions: Array.isArray(s.session_prices) ? (s.session_prices as (number | string)[]).map(Number) : null }))} addons={sortServices((services ?? []).filter((s) => s.is_addon && !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
+              <BranchEntryForm key={here} branches={logBranches.map((b) => ({ id: b.id, name: b.name }))} start={logBranches.find((b) => b.id === myEmp?.branch_id)?.id ?? (logBranches.length === 1 ? logBranches[0].id : "")} date={date} today={today} meds={(services ?? []).filter((s) => s.is_meds).map((s) => ({ id: s.id, name: s.name, price: Number(s.price_cents ?? 0) }))} services={sortServices((services ?? []).filter((s) => !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null, sessions: Array.isArray(s.session_prices) ? (s.session_prices as (number | string)[]).map(Number) : null }))} promos={promoOpts} addons={sortServices((services ?? []).filter((s) => s.is_addon && !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
             )}
             {isManager && <p className="small" style={{ marginTop: 12 }}><Link href="/services/prices">Price list and commissions</Link> (add a service, set its price and commission)</p>}
           </div>

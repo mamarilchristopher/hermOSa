@@ -7,7 +7,7 @@ import { PromoBuilder, type SavedPromo, type Svc } from "./PromoBuilder";
 
 const serif = Playfair_Display({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
-type Row = { id: string; name: string; price_cents: number | null; active: boolean; is_meds?: boolean; session_prices?: number[] | null };
+type Row = { id: string; name: string; price_cents: number | null; commission_cents?: number | null; cost_cents?: number | null; active: boolean; is_meds?: boolean; session_prices?: number[] | null };
 type Stat = { service_id: string; recent: number; before: number; recent_cents: number };
 
 /** Sales › Promos (update-0086, CHRIS Nov 27): this week's promo ideas and the builder. Owners and the GM. */
@@ -27,10 +27,18 @@ export default async function PromosPage() {
     return (<><TopBar access={access} /><main><h1>Promos</h1><div className="notice info">The owner needs to run update-0086 in Supabase first.</div></main></>);
   }
   await supabase.rpc("promo_week_notice"); // Mondays: one "promo ideas are ready" notice for management
+  // update-0087: clients per promo (none before the update).
+  const { data: pcData } = await supabase.from("promo_clients").select("promo_id, state");
+  const clientCount: Record<string, { active: number; all: number }> = {};
+  for (const c of (pcData ?? []) as { promo_id: string; state: string }[]) {
+    const x = (clientCount[c.promo_id] ??= { active: 0, all: 0 });
+    if (c.state !== "CANCELLED") x.all++;
+    if (c.state === "ACTIVE") x.active++;
+  }
   const by = new Map(((stats.data ?? []) as Stat[]).map((s) => [s.service_id, s]));
   const services: Svc[] = ((svcData ?? []) as Row[])
     .filter((s) => !s.is_meds && (s.price_cents ?? 0) > 0 && !s.session_prices)
-    .map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? 0 }));
+    .map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? 0, commission: s.commission_cents ?? null, cost: s.cost_cents == null ? null : Number(s.cost_cents) }));
   const svcStats: SvcStat[] = services.map((s) => {
     const st = by.get(s.id);
     return { id: s.id, name: s.name, price: s.price, recent: st?.recent ?? 0, before: st?.before ?? 0, recentCents: st?.recent_cents ?? 0 };
@@ -46,8 +54,8 @@ export default async function PromosPage() {
       <TopBar access={access} />
       <main className="promos">
         <h1>Promos</h1>
-        <p className="muted small">Ideas are worked out from the last 8 weeks of the Service log, slow services and the coming season. Open one, change the sessions with + and −, and the price, captions and post images update as you go. Approving adds the promo to the Service log so staff can log it.</p>
-        <PromoBuilder services={services} ideas={ideas} seasons={seasons} today={today} saved={(promos.data ?? []) as SavedPromo[]} serif={serif.style.fontFamily} serifClass={serif.className} pkgs={pkgs} />
+        <p className="muted small">Ideas are worked out from the last 8 weeks of the Service log, slow services and the coming season. Open one, change the sessions with + and −, and the price, captions and post images update as you go. Approving adds the promo to the Service log with its per-session commission; each client who buys it gets a recommended schedule, and the promo&apos;s page tracks their sessions and the running profit.</p>
+        <PromoBuilder services={services} ideas={ideas} seasons={seasons} today={today} saved={(promos.data ?? []) as SavedPromo[]} serif={serif.style.fontFamily} serifClass={serif.className} pkgs={pkgs} clients={clientCount} />
       </main>
     </>
   );

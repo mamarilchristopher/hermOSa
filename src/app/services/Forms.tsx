@@ -6,6 +6,7 @@ import { previewCommission, type CommissionType } from "@/lib/commission";
 import { centsToPhp } from "@/lib/csv";
 import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
 import { ProofGroup, useProofSlots } from "./PaymentProof";
+import { promoItemLabel, promoOf, promoServiceIds, type PromoOptions } from "@/lib/promoTrack";
 
 type Opt = { id: string; name: string; eligible?: boolean; here?: boolean; price?: number | null; commission?: number | null; sessions?: number[] | null };
 
@@ -95,7 +96,7 @@ export function BranchEntryForm({ branches, start, employees, ...rest }: Omit<Pa
 export type AddonOpt = { id: string; name: string; price: number | null };
 type AddonRow = { service: string; amount: string };
 
-export function EntryForm({ branch, date, today, services, employees, noCommission = false, photosOptional = false, meds = [], addons = [] }: { branch: string; date: string; today?: string; services: Opt[]; employees: Opt[]; noCommission?: boolean; photosOptional?: boolean; meds?: MedsOpt[]; addons?: AddonOpt[] }) {
+export function EntryForm({ branch, date, today, services, employees, noCommission = false, photosOptional = false, meds = [], addons = [], promos = null }: { branch: string; date: string; today?: string; services: Opt[]; employees: Opt[]; noCommission?: boolean; photosOptional?: boolean; meds?: MedsOpt[]; addons?: AddonOpt[]; promos?: PromoOptions | null }) {
   // CHRIS Nov 26: owners and the GM pick the service date (default today) to batch-log older days; it stays set between saves.
   const [day, setDay] = useState(today ?? date);
   const [state, action, pending] = useActionState(logService, undefined);
@@ -115,6 +116,9 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const [med, setMed] = useState("");
   const [extras, setExtras] = useState<AddonRow[]>([]);
   const [afterDp, setAfterDp] = useState(false); // update-0085: balance paid after a down payment
+  // update-0087: the client's promo for a promo item ("" = not picked, "new" = starts the promo with this visit).
+  const [promoClient, setPromoClient] = useState("");
+  const [contact, setContact] = useState("");
   const photos = usePhotoSlots(branch);
   const proofs = useProofSlots(branch); // update-0075: optional proof of payment
   const form = useRef<HTMLFormElement>(null);
@@ -125,7 +129,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       setAmount("");
       setKind("PAID");
       setWho("");
-      setService(""); setPartner(""); setClient(""); setPriceNote(""); setShare(false); setNote(""); setSession("1"); setMed(""); setExtras([]); setAfterDp(false);
+      setService(""); setPartner(""); setClient(""); setPriceNote(""); setShare(false); setNote(""); setSession("1"); setMed(""); setExtras([]); setAfterDp(false); setPromoClient(""); setContact("");
       photos.reset();
       proofs.reset();
     }
@@ -134,6 +138,26 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const partnerEmp = employees.find((e) => e.id === partner);
   const cents = Math.round(Number(amount.replace(/[,₱\s]/g, "")) * 100) || 0;
   const svc = services.find((x) => x.id === service);
+  // update-0087: a promo item (a session or the payment line) and the clients on that promo.
+  const pm = svc ? promoOf(svc.id, promos) : null;
+  const promoIds = promoServiceIds(promos);
+  const pmClients = pm ? (promos?.clients ?? []).filter((c) => c.promo_id === pm.promo.id) : [];
+  const pc = pmClients.find((c) => c.id === promoClient) ?? null;
+  const pmUsed = pc && svc ? pc.used[svc.id] ?? 0 : 0;
+  const pmBalance = pm ? (pc ? Math.max(0, pc.price_cents - pc.paid_cents) : pm.promo.price_cents) : 0;
+  const pmDone = pm?.part ? pmUsed >= pm.part.sessions : false;
+  /** Picking the client's promo fills in their name, their next session and its amount. */
+  function pickPromoClient(v: string, sv = svc) {
+    setPromoClient(v);
+    const m = sv ? promoOf(sv.id, promos) : null;
+    if (!m || !sv) return;
+    const c = (promos?.clients ?? []).find((x) => x.id === v);
+    if (c) setClient(c.client);
+    const used = c ? c.used[sv.id] ?? 0 : 0;
+    if (m.pay) { const bal = c ? Math.max(0, c.price_cents - c.paid_cents) : m.promo.price_cents; setAmount(bal > 0 ? String(bal / 100) : ""); return; }
+    if (sv.sessions?.length) { const n = Math.min(sv.sessions.length, used + 1); setSession(String(n)); setAmount(String((sv.sessions[n - 1] ?? 0) / 100)); return; }
+    setSession("1"); setAmount("0");
+  }
   // Lead with "Assisted by: None" is saved as Solo; the 60/40 split applies only once an assistant is chosen (CHRIS Nov 26).
   const effType: CommissionType = person?.eligible === false ? "NONCOMMI" : partner ? "LEAD" : "SOLO";
   // CHRIS Nov 27 (update-0085): a balance paid after a DP earns 5% of the whole package (list) price.
@@ -185,6 +209,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   return (
     <form ref={form} action={action} className="entry-form">
       <Msg s={state} />
+      {state?.link && <p className="small"><a className="button secondary small" href={state.link}>Open the client&apos;s schedule to send them</a></p>}
       <input type="hidden" name="branch" value={branch} />
       {!photosOptional && <input type="hidden" name="date" value={date} />}
       <input type="hidden" name="type" value={effType} />
@@ -214,6 +239,12 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
         </label>
         {/* CHRIS Nov 26: Session No. – Service – Amount paid on one row. Most services are session 1; packages (e.g. Gluta) go up to 15. */}
         <div className={`span2 service-row ${paid ? "" : "unpaid"} ${svc?.sessions?.length ? "bundle" : ""}`}>
+        {pm ? (
+          <label className="session-field">Session No.
+            <input type="hidden" name="session" value={pm.part && svc?.sessions?.length ? session : "1"} />
+            <span className="promo-session">{pm.pay ? "Payment" : promoClient === "new" || pc ? `${pmUsed + 1} of ${pm.part!.sessions}` : "–"}</span>
+          </label>
+        ) : (
         <label className="session-field">Session No.
           <select name="session" value={session} onChange={(e) => {
             setSession(e.target.value);
@@ -226,10 +257,20 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
               : Array.from({ length: 15 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
           </select>
         </label>
+        )}
         <label>Service
           <select name="service" required value={service} onChange={(e) => {
             setService(e.target.value);
             const next = services.find((x) => x.id === e.target.value);
+            // A promo item: the client's promo decides the session and amount (update-0087).
+            setPromoClient("");
+            const nm = next ? promoOf(next.id, promos) : null;
+            if (nm) {
+              const list = (promos?.clients ?? []).filter((c) => c.promo_id === nm.promo.id);
+              if (list.length === 0 && nm.promo.state === "APPROVED") pickPromoClient("new", next);
+              else { setAmount(nm.pay ? "" : nm.part && next?.sessions?.length ? "" : "0"); }
+              return;
+            }
             // A bundle: keep the session if it exists in the bundle, else session 1, and fill in that session's amount.
             if (next?.sessions?.length) {
               const n = Number(session) <= next.sessions.length ? Number(session) : 1;
@@ -242,15 +283,51 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
             if (pr != null) setAmount(pr > 0 ? String(pr / 100) : "");
           }}>
             <option value="" disabled>Choose a service…</option>
-            {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {services.filter((s) => !promoIds.has(s.id)).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {services.some((s) => promoIds.has(s.id)) && (
+              <optgroup label="Promos">
+                {services.filter((s) => promoIds.has(s.id)).map((s) => <option key={s.id} value={s.id}>{promoItemLabel(s.id, promos) ?? s.name}</option>)}
+              </optgroup>
+            )}
           </select>
         </label>
         {paid && (
           <label>Amount paid (₱)
-            <input name="amount" inputMode="decimal" placeholder="e.g. 2500" required value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <input name="amount" inputMode="decimal" placeholder="e.g. 2500" required value={amount} readOnly={!!pm?.part && !!pm.promo.pay_service_id} onChange={(e) => setAmount(e.target.value)} />
           </label>
         )}
         </div>
+        {pm && (
+          <div className="span2 promo-pick">
+            <input type="hidden" name="promo_client" value={promoClient} />
+            <input type="hidden" name="promo_contact" value={contact} />
+            <label>Client&apos;s promo ({pm.promo.title})
+              <select value={promoClient} required onChange={(e) => pickPromoClient(e.target.value)}>
+                <option value="" disabled>Choose the client…</option>
+                {pm.promo.state === "APPROVED" && <option value="new">New client: starts {pm.promo.title} today</option>}
+                {pmClients.map((c) => {
+                  const done = pm.part ? c.used[pm.part.service_id] ?? 0 : null;
+                  return <option key={c.id} value={c.id}>{c.client}{done !== null ? ` · ${done} of ${pm.part!.sessions} done` : ` · ${centsToPhp(Math.max(0, c.price_cents - c.paid_cents))} left to pay`} · until {c.ends_on}</option>;
+                })}
+              </select>
+            </label>
+            {!paid && <span className="small" style={{ color: "var(--bad)" }}>Promo sessions are logged as Paid (₱0 when the client already paid). For a backjob or check-up, pick the usual service instead.</span>}
+            {promoClient === "new" && (
+              <>
+                <label>Client&apos;s mobile number <span className="muted">(optional, for reminders)</span>
+                  <input inputMode="tel" maxLength={40} value={contact} onChange={(e) => setContact(e.target.value)} placeholder="09xx xxx xxxx" />
+                </label>
+                <span className="small muted">
+                  Starts {pm.promo.title} for {client.trim() || "this client"} today: {pm.promo.parts.map((x) => `${x.sessions} ${x.name.replace(/\s*single session$/i, "")}`).join(", ")}, {centsToPhp(pm.promo.price_cents)}, valid {pm.promo.months} month{pm.promo.months === 1 ? "" : "s"}.
+                  {" "}After saving you get their recommended schedule to send them.
+                  {pm.promo.pay_service_id && !pm.pay ? " Log what they pay today on the payment line too." : ""}
+                </span>
+              </>
+            )}
+            {pc && pm.part && <span className="small muted">{pmDone ? <span style={{ color: "var(--bad)" }}>All {pm.part.sessions} sessions are used.</span> : `Session ${pmUsed + 1} of ${pm.part.sessions} for ${pc.client}.`}{pm.promo.pay_service_id ? " Already paid in the promo, so ₱0." : ""} {centsToPhp(Math.max(0, pc.price_cents - pc.paid_cents))} left to pay. <a href={`/promos/client/${pc.id}`}>Schedule</a></span>}
+            {pc && pm.pay && <span className="small muted">{centsToPhp(pmBalance)} left to pay of {centsToPhp(pc.price_cents)}. <a href={`/promos/client/${pc.id}`}>Schedule</a></span>}
+          </div>
+        )}
         {meds.length > 0 && (
           <label className="span2"><span>Meds{!noCommission && <span className="muted"> (no commission)</span>}</span>
             <select name="meds" value={med} onChange={(e) => setMed(e.target.value)}>

@@ -162,3 +162,69 @@ export async function drawPromo(kind: "story" | "feed", a: PromoArt, f: Fonts): 
   g.font = S(700, 26); g.fillStyle = INK; g.fillText("Message us to book", M, H - 44);
   return c;
 }
+
+/** The client's schedule as a photo to send on Messenger (update-0087): every visit grouped by month, ticks on the ones done. */
+export type ScheduleArt = {
+  title: string; client: string; ends: string;
+  visits: { d: string; items: { name: string; n: number; of: number; done: boolean }[] }[];
+};
+export async function drawSchedule(a: ScheduleArt, f: Fonts): Promise<HTMLCanvasElement> {
+  const W = 1080, M = 70, colW = (W - M * 2 - 40) / 2, rowH = 44, monthH = 64;
+  const S = (w: number, s: number) => `${w} ${s}px ${f.sans}`;
+  const R = (w: number, s: number) => `${w} ${s}px ${f.serif}`;
+  const months: { label: string; rows: ScheduleArt["visits"] }[] = [];
+  for (const v of a.visits) {
+    const label = new Date(`${v.d}T00:00:00Z`).toLocaleDateString("en-PH", { month: "long", year: "numeric", timeZone: "UTC" });
+    if (months.at(-1)?.label !== label) months.push({ label, rows: [] });
+    months.at(-1)!.rows.push(v);
+  }
+  // Two columns, split at a month so each month stays together.
+  // Each visit's text, wrapped to the column; a long visit takes two lines.
+  const meas = document.createElement("canvas").getContext("2d")!;
+  meas.font = S(500, 26);
+  const textOf = (v: ScheduleArt["visits"][number]) => v.items.map((i) => `${i.name} ${i.n}/${i.of}`).join(" + ");
+  const linesOf = (v: ScheduleArt["visits"][number]) => wrap(meas, textOf(v), colW - 120).slice(0, 2);
+  const rowSize = (v: ScheduleArt["visits"][number]) => rowH + (linesOf(v).length - 1) * 32;
+  const size = (m: (typeof months)[number]) => monthH + m.rows.reduce((s, v) => s + rowSize(v), 0);
+  const total = months.reduce((s, m) => s + size(m), 0);
+  const cols: (typeof months)[] = [[], []];
+  let acc = 0;
+  for (const m of months) { (m === months[0] || acc + size(m) / 2 <= total / 2 ? cols[0] : cols[1]).push(m); acc += size(m); }
+  const colH = Math.max(...cols.map((c) => c.reduce((s, m) => s + size(m), 0)));
+  const top = 560, H = Math.max(1350, top + colH + 220);
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const g = c.getContext("2d")!;
+  satin(g, 0, 0, W, H);
+  const logo = await load("/hermosa-logo-transparent.png");
+  if (logo) { const lw = 280, lh = (logo.height / logo.width) * lw; g.drawImage(logo, (W - lw) / 2, 50, lw, lh); }
+  g.textAlign = "center"; g.fillStyle = INK;
+  const ts = fitSize(g, (s) => R(700, s), a.title, W - 160, 1, 76, 44);
+  g.font = R(700, ts); g.fillText(a.title, W / 2, 250);
+  g.font = S(600, 34); g.fillStyle = INK2; g.fillText("Your recommended schedule", W / 2, 306);
+  g.font = S(700, 38); g.fillStyle = INK; g.fillText(a.client, W / 2, 362);
+  goldBand(g, 0, 400, W, 96);
+  const sessions = a.visits.reduce((s, v) => s + v.items.length, 0);
+  const ends = new Date(`${a.ends}T00:00:00Z`).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+  g.fillStyle = "#fff"; g.font = S(800, 34);
+  g.fillText(`${a.visits.length} VISITS · ${sessions} SESSIONS · UNTIL ${ends.toUpperCase()}`, W / 2, 460);
+  g.textAlign = "left";
+  cols.forEach((col, k) => {
+    let y = top, x = M + k * (colW + 40);
+    for (const m of col) {
+      g.font = R(700, 34); g.fillStyle = GOLD_DARK; g.fillText(m.label, x, y + 40); y += monthH;
+      for (const v of m.rows) {
+        const day = new Date(`${v.d}T00:00:00Z`).toLocaleDateString("en-PH", { weekday: "short", day: "numeric", timeZone: "UTC" });
+        const allDone = v.items.every((i) => i.done);
+        g.font = S(700, 26); g.fillStyle = allDone ? GOLD : INK; g.fillText(allDone ? `✓ ${day}` : day, x, y + 30);
+        g.font = S(500, 26); g.fillStyle = allDone ? "#9a8b80" : INK2;
+        linesOf(v).forEach((t, k) => g.fillText(t, x + 120, y + 30 + k * 32));
+        y += rowSize(v);
+      }
+    }
+  });
+  g.textAlign = "center"; g.font = S(600, 28); g.fillStyle = INK;
+  g.fillText("Message us a day before each visit to confirm your slot.", W / 2, H - 120);
+  g.font = S(500, 24); g.fillStyle = INK2;
+  g.fillText(`You can move a date; just keep the spacing. ${BRANCH_LINE}`, W / 2, H - 76);
+  return c;
+}
