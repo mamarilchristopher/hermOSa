@@ -6,6 +6,15 @@ import { IconCalendar, IconChart, IconClipboard, IconCoins, IconHome, IconIdCard
 
 const ICONS = { chart: IconChart, calendar: IconCalendar, upload: IconUpload, users: IconUsers, clipboard: IconClipboard, people: IconPeople, coins: IconCoins, home: IconHome, idcard: IconIdCard, pen: IconPen, week: IconWeek, clock: IconClock, settings: IconSettings, chat: IconChat, briefcase: IconBriefcase };
 
+/** Colored menu icons (CHRIS Nov 27, v0.90.1): emoji per hub, same on the side menu and the phone bar. */
+const EMOJI: Record<string, string> = { home: "🏠", business: "💼", clinic: "📋", sales: "📈", chat: "💬", time: "⏰", team: "📅", pay: "💰", people: "👥", settings: "⚙️" };
+const HubIcon = ({ hub }: { hub: Hub }) => {
+  const e = EMOJI[hub.key];
+  if (e) return <span className="nav-emoji" aria-hidden>{e}</span>;
+  const Icon = ICONS[hub.icon];
+  return <Icon />;
+};
+
 /** One page inside a hub (shown as a tab across the top of the page). */
 export type HubTab = { href: string; label: string; badge?: number };
 /** A menu item: a group of related pages (v0.48: Home, Time clock, Sales, Clinic, Team, Pay, People, Settings; v0.49 adds Chat). */
@@ -34,12 +43,11 @@ export function NavLinks({ hubs, variant }: { hubs: Hub[]; variant: "side" | "ta
   const { hub: active } = activeOf(hubs, path);
 
   const link = (h: Hub, short: boolean) => {
-    const Icon = ICONS[h.icon];
     const on = h.key === active;
     const badge = badgeOf(h);
     return (
       <Link key={h.key} href={h.tabs[0].href} className={on ? "active" : undefined} aria-current={on ? "page" : undefined}>
-        <Icon />
+        <HubIcon hub={h} />
         <span>{short ? h.short : h.label}</span>
         {badge ? <span className="nav-badge" aria-label={`${badge} waiting`}>{badge}</span> : null}
       </Link>
@@ -101,10 +109,9 @@ export function StaticMenu({ hubs, title }: { hubs: Hub[]; title: string }) {
     <nav className="side-nav static-menu" aria-label={title}>
       <span className="static-menu-title">{title}</span>
       {hubs.map((h) => {
-        const Icon = ICONS[h.icon];
         return (
           <div key={h.key} className="static-hub">
-            <span className="static-hub-row"><Icon /><span>{h.label}</span></span>
+            <span className="static-hub-row"><HubIcon hub={h} /><span>{h.label}</span></span>
             {h.tabs.length > 1 && <ul>{h.tabs.map((t) => <li key={t.href}>{t.label}</li>)}</ul>}
           </div>
         );
