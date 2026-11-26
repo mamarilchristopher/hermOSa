@@ -8,7 +8,7 @@ import { centsToPhp } from "@/lib/csv";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { addDays, sortBranches, WEEKDAYS, weekday } from "@/lib/insights";
 import { ROLE_TEXT, TYPE_TEXT } from "@/lib/commission";
-import { BatchApprove, DecideButtons, EntryForm } from "./Forms";
+import { BatchApprove, ChangeDateForm, DecideButtons, EntryForm } from "./Forms";
 import { DeclaredCheck, diffText } from "./DeclaredCheck";
 import { CHECK_FROM, CHECK_TO, checkBranches, inCheckWindow, type StatusDay } from "@/lib/declaredCheck";
 import { AddPhotosLater } from "./PhotoSlots";
@@ -215,6 +215,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                         </span>
                       )}
                       {l.state === "REJECTED" && l.decision_note && <div className="small muted">{l.decision_note}</div>}
+                      {topMgmt && <ChangeDateForm id={l.id} date={l.service_date} max={today} />}
                     </td>
                   </tr>
                 );

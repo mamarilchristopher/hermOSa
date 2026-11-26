@@ -1364,3 +1364,5 @@ input.batch-tick { width: 20px; height: 20px; margin: 0 8px 0 0; float: left; cu
 a.glance-link { color: inherit; text-decoration: none; transition: transform .15s ease, box-shadow .15s ease; }
 a.glance-link:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
 a.glance-link strong::after { content: " →"; font-size: .9rem; color: var(--muted); }
+.change-date { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.change-date input[type="date"] { width: auto; min-width: 140px; }

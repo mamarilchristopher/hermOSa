@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.73.0 | Nov 26, 2026 | update-0073 | Service log: owners and the GM can change an entry's date ("Change date" under its status) when it was logged on the wrong day; only the date moves, commission stays; blocked once on a final payslip |
 | 0.71.0 | Nov 26, 2026 | update-0071 | Bookings open to every employee (all branches, read only; each branch still marks its own visits), listed by visit date; a booking rescheduled more than once still shows on every day it was booked for, with its new date ("Logged" = the day the CSR entered it) |
 | 0.69.2 | Nov 26, 2026 | none | Home "Today so far": tapping a branch with sales opens that branch's Service log for the day |
 | 0.69.1 | Nov 26, 2026 | none | Home "Today so far": a branch's service log total now reads "₱1,100 Sales Logged" |

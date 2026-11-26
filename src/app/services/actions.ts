@@ -139,3 +139,17 @@ export async function addService(_prev: ActionState, fd: FormData): Promise<Acti
   revalidatePath("/services");
   return { ok: data.duplicate ? "That service is already in the list." : `Added "${name.data}".` };
 }
+
+/** CHRIS Nov 26 (update-0073): management moves an entry to the right date. */
+export async function changeDate(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const id = z.uuid().safeParse(fd.get("id"));
+  const date = z.iso.date().safeParse(fd.get("date"));
+  if (!id.success || !date.success) return { error: "Pick the correct date." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("change_service_date", { p_log: id.data, p_date: date.data });
+  if (error) return { error: error.code === "PGRST202" ? "Changing dates needs database update-0073. Run it from your To-Do first." : "Could not save. Try again." };
+  if (!data.ok) return { error: data.error === "ALREADY_PAID" ? "This entry's commission is already on a final payslip, so its date can't change." : data.error === "INVALID_DATE" ? "Pick today or an earlier day." : errorText(data.error) };
+  revalidatePath("/services");
+  revalidatePath("/me");
+  return { ok: `Moved to ${new Date(`${date.data}T00:00:00Z`).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}.`, at: Date.now() };
+}

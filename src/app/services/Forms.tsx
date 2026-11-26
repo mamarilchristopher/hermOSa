@@ -1,7 +1,7 @@
 "use client";
 import { pick } from "@/lib/decision";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { addService, approveMany, decideLog, logService, type ActionState } from "./actions";
+import { addService, approveMany, changeDate, decideLog, logService, type ActionState } from "./actions";
 import { previewCommission, type CommissionType } from "@/lib/commission";
 import { centsToPhp } from "@/lib/csv";
 import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
@@ -320,6 +320,23 @@ export function AddServiceForm() {
       <button type="submit" className="secondary small" disabled={pending}>Add service</button>
       {state?.error && <span className="small" style={{ color: "var(--bad)" }}>{state.error}</span>}
       {state?.ok && <span className="small" style={{ color: "var(--good)" }}>{state.ok}</span>}
+    </form>
+  );
+}
+
+/** CHRIS Nov 26 (update-0073): owners and the GM fix an entry's date when it was logged on the wrong day. */
+export function ChangeDateForm({ id, date, max }: { id: string; date: string; max: string }) {
+  const [s, action, pending] = useActionState(changeDate, undefined);
+  const [open, setOpen] = useState(false);
+  if (s?.ok) return <div className="small ok-text">{s.ok}</div>;
+  if (!open) return <button type="button" className="link-button small" onClick={() => setOpen(true)}>Change date</button>;
+  return (
+    <form action={action} className="change-date">
+      <input type="hidden" name="id" value={id} />
+      <input type="date" name="date" defaultValue={date} max={max} required aria-label="Correct date" />
+      <button className="small" disabled={pending}>Save</button>
+      <button type="button" className="secondary small" onClick={() => setOpen(false)}>Cancel</button>
+      {s?.error && <span className="field-error">{s.error}</span>}
     </form>
   );
 }
