@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 // Tardiness: Late NTEs (0030) and the IRs issued from them. All people are DEMO fixtures.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Person, TestDb } from "./harness";
@@ -51,10 +52,16 @@ describe("Late NTEs and IRs", () => {
   it("the employee sees and explains their own; coworkers see nothing", async () => {
     expect((await db.as(ana, "aal1", "SELECT count(*)::int n FROM public.late_ntes")).rows[0].n).toBe(2);
     expect((await db.as(bea, "aal1", "SELECT count(*)::int n FROM public.late_ntes")).rows[0].n).toBe(0);
-    expect((await db.rpc(bea, "aal1", "explain_nte", [ntes[0], "Not mine"])).ok).toBe(false);
-    expect((await db.rpc(ana, "aal1", "explain_nte", [ntes[0], ""])).error).toBe("REASON_REQUIRED");
-    expect((await db.rpc(ana, "aal1", "explain_nte", [ntes[0], "Heavy traffic on EDSA"])).ok).toBe(true);
-    expect((await db.rpc(ana, "aal1", "explain_nte", [ntes[0], "Again"])).error).toBe("NOT_PENDING");
+    expect((await db.rpc(bea, "aal1", "explain_nte", [ntes[0], "Not mine", [`${ntes[0]}/${randomUUID()}.jpg`]])).ok).toBe(false);
+    expect((await db.rpc(ana, "aal1", "explain_nte", [ntes[0], "", [`${ntes[0]}/${randomUUID()}.jpg`]])).error).toBe("REASON_REQUIRED");
+    // update-0065: photo proof is required, at most 3, and must be in this NTE's folder.
+    expect((await db.rpc(ana, "aal1", "explain_nte", [ntes[0], "Heavy traffic on EDSA"])).error).toBe("PROOF_REQUIRED");
+    expect((await db.rpc(ana, "aal1", "explain_nte", [ntes[0], "Heavy traffic on EDSA", []])).error).toBe("PROOF_REQUIRED");
+    expect((await db.rpc(ana, "aal1", "explain_nte", [ntes[0], "Heavy traffic on EDSA", [`${ntes[1] ?? randomUUID()}/${randomUUID()}.jpg`]])).error).toBe("BAD_REQUEST");
+    expect((await db.rpc(ana, "aal1", "explain_nte", [ntes[0], "Heavy traffic on EDSA", [1, 2, 3, 4].map(() => `${ntes[0]}/${randomUUID()}.jpg`)])).error).toBe("BAD_REQUEST");
+    const proof = `${ntes[0]}/${randomUUID()}.jpg`;
+    expect((await db.rpc(ana, "aal1", "explain_nte", [ntes[0], "Heavy traffic on EDSA", [proof]])).ok).toBe(true);
+    expect((await db.rpc(ana, "aal1", "explain_nte", [ntes[0], "Again", [`${ntes[0]}/${randomUUID()}.jpg`]])).error).toBe("NOT_PENDING");
   });
 
   it("the tracker counts this month's NTEs per person for management", async () => {
@@ -63,6 +70,14 @@ describe("Late NTEs and IRs", () => {
     expect(list.ntes).toHaveLength(2);
     expect(list.ntes[0]).toMatchObject({ name: "DEMO Ana", can_manage: true });
     expect((await db.rpc(bea, "aal1", "late_nte_list", [today(), null])).ntes).toHaveLength(0);
+    // update-0065: the explained NTE carries its photo proof; only Ana and her managers may open it.
+    const done = list.ntes.find((n: { id: string }) => n.id === ntes[0]);
+    expect(done.proof_paths).toHaveLength(1);
+    const can = async (p: Person, write: boolean) => (await db.as(p, "aal1", "SELECT private.nte_proof_access($1, $2) ok", [done.proof_paths[0], write])).rows[0].ok;
+    expect(await can(ana, false)).toBe(true);
+    expect(await can(gm, false)).toBe(true);
+    expect(await can(bea, false)).toBe(false);
+    expect(await can(ana, true)).toBe(false); // already explained: no more uploads
   });
 
   it("management voids a mistaken NTE with a reason", async () => {

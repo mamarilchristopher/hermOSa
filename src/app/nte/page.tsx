@@ -6,7 +6,8 @@ import { monthLabel } from "@/lib/insights";
 import { dayLabel } from "@/lib/homeGlance";
 import { timeLabel } from "@/lib/schedule";
 import { firstName, times, tracker, type NteList } from "@/lib/nte";
-import { NteDeadline, NteExplainForm } from "./Forms";
+import { NteDeadline, NteExplainForm, NteProofs } from "./Forms";
+import { photoUrls } from "@/lib/photos";
 import { Uid } from "@/components/Uid";
 
 const shiftMonth = (ym: string, n: number) => {
@@ -28,6 +29,7 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
   }
   const list = data as NteList;
   const mine = list.ntes.filter((n) => n.mine);
+  const proofs = await photoUrls(supabase, mine.flatMap((n) => n.proof_paths ?? []), "nte-proofs");
   const rows = tracker(list.ntes, list.ir_minutes);
   const manager = access.grants.some((g) => g.role === "OWNER" || g.role === "MANAGER");
 
@@ -75,6 +77,7 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
                         <br /><span className="small muted">Shift starts {timeLabel(n.shift_start)}, timed in {timeLabel(n.time_in)} ({n.late_minutes} minutes late){n.branch ? ` · ${n.branch}` : ""}</span></span>
                       {n.state === "OPEN" && <><NteDeadline n={n} /><NteExplainForm id={n.id} prompt={`Why were you late, ${firstName(n.name)}?`} /></>}
                       {n.state === "EXPLAINED" && <p className="small" style={{ margin: 0 }}>Your explanation: {n.explanation}</p>}
+                      {n.state === "EXPLAINED" && <NteProofs urls={(n.proof_paths ?? []).map((p) => proofs.get(p)).filter((u): u is string => !!u)} />}
                       {n.state === "VOID" && <p className="small muted" style={{ margin: 0 }}>Cancelled by management: {n.void_reason}</p>}
                     </div>
                   </li>

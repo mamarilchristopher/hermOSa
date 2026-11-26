@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.65.0 | Nov 26, 2026 | update-0065 | Late NTE: the explanation needs 1 to 3 proof photos (heavy traffic: a photo of the traffic; hard to book a ride: a screenshot of the ride app booking made before 10 AM); management sees the photos on the person's NTE page, staff on My Late NTEs |
 | 0.64.0 | Nov 26, 2026 | update-0064 | Service log: Session No. (1 by default, 1 to 15 for packages like Gluta) before the service, shown as "Session N" on entries; Session No. / Service / Amount paid on one row on PC; "Did the client pay?" fits phones as a 2 x 2 grid |
 | 0.62.1 | Nov 26, 2026 | none | Service log (owners and the GM): running Nov 1–24 check of service log totals vs declared Daily sales, per branch and day by day, plus a matches / short / over note on each Nov 1–24 day |
 | 0.62.0 | Nov 26, 2026 | update-0062 | Chat: double-tap a message to heart it; reply to a chosen message (quote shows in the bubble, tap to jump to it); management messages say "Message from <first name>"; opening the chat clears the management label and notice at once; every group starts with the Hermosa logo and only owners and the GM change group photos; chat list no longer scrolls sideways |

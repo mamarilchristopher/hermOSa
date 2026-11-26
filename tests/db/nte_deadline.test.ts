@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 // update-0032: a Late NTE must be explained within 2 scheduled working days (counting the late day), or an IR is issued automatically.
 // All people are DEMO fixtures.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -58,14 +59,14 @@ describe("Late NTE deadline", () => {
     expect(mgmt).toEqual([owner.appUserId, gm.appUserId].sort());
     expect((await db.rpc(gm, "aal1", "run_nte_deadlines", [])).issued).toBe(0); // only once
     const nte = (await db.sql("SELECT id FROM public.late_ntes WHERE employee_id = $1", [anaE])).rows[0].id;
-    expect((await db.rpc(ana, "aal1", "explain_nte", [nte, "DEMO forgot"])).ok).toBe(true); // can still explain; the IR stays
+    expect((await db.rpc(ana, "aal1", "explain_nte", [nte, "DEMO forgot", [`${nte}/${randomUUID()}.jpg`]])).ok).toBe(true); // can still explain; the IR stays
   });
 
   it("today's late time-in tells the employee the date; explained in time or still waiting means no IR", async () => {
     const d = addDays(today(), -4);
     await shift(beaE, d);
     const n = await lateIn(beaE, bea, d);
-    expect((await db.rpc(bea, "aal1", "explain_nte", [n.id, "DEMO traffic"])).ok).toBe(true);
+    expect((await db.rpc(bea, "aal1", "explain_nte", [n.id, "DEMO traffic", [`${n.id}/${randomUUID()}.jpg`]])).ok).toBe(true);
     await db.sql("UPDATE public.late_ntes SET explained_at = ($2 || ' 18:00')::timestamp AT TIME ZONE 'Asia/Manila' WHERE id = $1", [n.id, d]); // explained the same day
     await shift(beaE, addDays(d, 1));
     const t = today();

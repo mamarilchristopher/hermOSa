@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/browser";
 import { nteDeadline } from "@/lib/nte";
 import { explainNte, issueLateIr, voidNte, type ActionState } from "./actions";
 
@@ -20,17 +21,76 @@ export function NteDeadline({ n }: { n: { respond_by?: string | null; ir_id?: st
 }
 
 /** The employee's explanation box. Shown on Home, the time clock and My Late NTEs until it's answered. */
+const PROOF_EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic", "image/heif": "heif" };
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
+  (Number(c) ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (Number(c) / 4)))).toString(16)));
+type Proof = { key: string; preview: string; path?: string; status: "uploading" | "done" | "error" };
+
+/**
+ * The employee's explanation box. Shown on Home, the time clock and My Late NTEs until it's answered.
+ * CHRIS Nov 26 (update-0065): a photo proof is required (1 to 3 photos, uploaded as picked, original file).
+ */
 export function NteExplainForm({ id, prompt }: { id: string; prompt: string }) {
   const [s, action, pending] = useActionState(explainNte, undefined);
+  const [proofs, setProofs] = useState<Proof[]>([]);
+  const pickRef = useRef<HTMLInputElement>(null);
   if (s?.ok) return <Msg s={s} />;
+  const done = proofs.filter((p) => p.status === "done");
+  const uploading = proofs.some((p) => p.status === "uploading");
+  const add = async (files: FileList | null) => {
+    for (const file of Array.from(files ?? []).slice(0, 3 - proofs.length)) {
+      const ext = PROOF_EXT[file.type] ?? (/\.(heic|heif)$/i.test(file.name) ? file.name.split(".").pop()!.toLowerCase() : null);
+      if (!ext) { alert("Only photos or screenshots (JPG, PNG, WEBP or HEIC) can be added."); continue; }
+      const key = uuid();
+      setProofs((l) => [...l, { key, preview: URL.createObjectURL(file), status: "uploading" }]);
+      const path = `${id}/${key}.${ext}`;
+      const { error } = await createClient().storage.from("nte-proofs").upload(path, file, { contentType: file.type || `image/${ext}` });
+      setProofs((l) => l.map((p) => (p.key === key ? { ...p, status: error ? "error" : "done", path } : p)));
+    }
+  };
+  const remove = (key: string) => setProofs((l) => { const p = l.find((x) => x.key === key); if (p) URL.revokeObjectURL(p.preview); return l.filter((x) => x.key !== key); });
   return (
     <form action={action} className="field-grid">
       <Msg s={s} />
       <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="proof" value={JSON.stringify(done.map((p) => p.path))} />
       <label className="field">{prompt}
         <textarea name="explanation" rows={3} maxLength={2000} required placeholder="Example: Heavy traffic on Commonwealth Ave." /></label>
-      <div className="field"><button disabled={pending}>{pending ? "Sending…" : "Send explanation"}</button></div>
+      <div className="field nte-proof">
+        <span className="field-label">Photo proof <span className="muted">(required)</span></span>
+        <ul className="small muted nte-proof-help">
+          <li><strong>Heavy traffic:</strong> a photo of the traffic.</li>
+          <li><strong>Hirap mag-book (hard to book a ride):</strong> a screenshot of your ride app booking made <strong>before 10 AM</strong>, with the time showing.</li>
+        </ul>
+        <div className="nte-proof-row">
+          {proofs.map((p) => (
+            <span key={p.key} className={`nte-proof-thumb ${p.status}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.preview} alt="Proof photo" />
+              <span className="nte-proof-status">{p.status === "uploading" ? "Uploading…" : p.status === "error" ? "Didn't upload" : "✓"}</span>
+              <button type="button" className="nte-proof-x" aria-label="Remove photo" onClick={() => remove(p.key)}>✕</button>
+            </span>
+          ))}
+          {proofs.length < 3 && (
+            <button type="button" className="nte-proof-add" onClick={() => pickRef.current?.click()}><span aria-hidden>+</span> Add photo</button>
+          )}
+          <input ref={pickRef} type="file" accept="image/*" multiple hidden onChange={(e) => { void add(e.target.files); e.target.value = ""; }} />
+        </div>
+      </div>
+      <div className="field"><button disabled={pending || uploading || done.length === 0}>{pending ? "Sending…" : uploading ? "Uploading photo…" : "Send explanation"}</button>
+        {done.length === 0 && !uploading && <span className="small muted"> Add a photo to send.</span>}</div>
     </form>
+  );
+}
+
+/** Proof photos on an explained NTE (signed links made by the page). */
+export function NteProofs({ urls }: { urls: string[] }) {
+  if (!urls.length) return null;
+  return (
+    <div className="nte-proof-row">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {urls.map((u, i) => <a key={u} href={u} target="_blank" rel="noreferrer" className="nte-proof-thumb done"><img src={u} alt={`Proof photo ${i + 1}`} /></a>)}
+    </div>
   );
 }
 

@@ -11,6 +11,8 @@ const MORE: Record<string, string> = {
   REASON_REQUIRED: "Write a few words first.",
   NOT_PENDING: "This was already answered or changed. Refresh the page.",
   NOTHING_TO_ISSUE: "There are no Late NTEs this month that aren't in an IR yet.",
+  PROOF_REQUIRED: "Add a photo as proof first (a photo of the traffic, or a screenshot of your ride booking).",
+  PHOTO_NOT_UPLOADED: "A photo didn't finish uploading. Remove it and add it again.",
 };
 const text = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 const msg = (code: string | undefined) => (code && MORE[code]) || errorText(code);
@@ -23,8 +25,12 @@ export async function explainNte(_p: ActionState, fd: FormData): Promise<ActionS
   const t = text(fd, "explanation").slice(0, 2000);
   if (!id.success) return { error: "Refresh the page and try again." };
   if (t.length < 3) return { error: "Write why you were late." };
-  const { data, error } = await (await createClient()).rpc("explain_nte", { p_id: id.data, p_text: t });
-  if (error) return { error: error.code === "PGRST202" ? NEEDS_SQL : "Could not send. Try again." };
+  // CHRIS Nov 26 (update-0065): photo proof is required, 1 to 3 photos already uploaded to nte-proofs/<nte id>/.
+  let proof: string[] = [];
+  try { proof = z.array(z.string().max(200)).max(3).parse(JSON.parse(String(fd.get("proof") ?? "[]"))); } catch { return { error: "The photos didn't attach. Remove them and add them again." }; }
+  if (proof.length === 0) return { error: MORE.PROOF_REQUIRED };
+  const { data, error } = await (await createClient()).rpc("explain_nte", { p_id: id.data, p_text: t, p_proof: proof });
+  if (error) return { error: error.code === "PGRST202" ? "Photo proof needs database update-0065. Ask the owner to run it." : "Could not send. Try again." };
   if (!data?.ok) return { error: msg(data?.error) };
   refresh();
   return { ok: "Sent. Thank you.", at: Date.now() };

@@ -2,7 +2,7 @@
 export type Nte = {
   id: string; nte_no: number; employee_id: string; name: string; uid?: string; position: string | null; branch: string | null;
   work_date: string; shift_start: string; time_in: string; late_minutes: number; respond_by?: string | null;
-  state: "OPEN" | "EXPLAINED" | "VOID"; explanation: string | null; explained_at: string | null; void_reason: string | null;
+  state: "OPEN" | "EXPLAINED" | "VOID"; explanation: string | null; proof_paths?: string[] | null; explained_at: string | null; void_reason: string | null;
   ir_id: string | null; mine: boolean; can_manage: boolean;
 };
 /** ir_minutes = monthly late-minutes limit (organizations.ir_late_minutes, default 60). */

@@ -8,7 +8,8 @@ import { monthLabel } from "@/lib/insights";
 import { dayLabel } from "@/lib/homeGlance";
 import { timeLabel } from "@/lib/schedule";
 import { firstName, irReason, IR_MINUTES_DEFAULT, IR_NTE_COUNT, nteCount, type NteList } from "@/lib/nte";
-import { IssueLateIrForm, NteDeadline, VoidNteForm } from "../../Forms";
+import { IssueLateIrForm, NteDeadline, NteProofs, VoidNteForm } from "../../Forms";
+import { photoUrls } from "@/lib/photos";
 import { Uid } from "@/components/Uid";
 
 const STATE: Record<string, { label: string; cls: string }> = {
@@ -33,6 +34,7 @@ export default async function StaffNtePage({ params, searchParams }: { params: P
   const list = data as NteList | null;
   if (!list || !emp) notFound();
   const ntes = list.ntes.filter((n) => n.can_manage);
+  const proofs = await photoUrls(supabase, ntes.flatMap((n) => n.proof_paths ?? []), "nte-proofs");
   if (list.ntes.length > 0 && ntes.length === 0) notFound();
   const counted = ntes.filter((n) => n.state !== "VOID");
   const notInIr = counted.filter((n) => !n.ir_id);
@@ -77,6 +79,7 @@ export default async function StaffNtePage({ params, searchParams }: { params: P
                     <span><strong>NTE no. {n.nte_no} · {dayLabel(n.work_date)}</strong> <span className={`pill ${STATE[n.state].cls}`}>{STATE[n.state].label}</span>
                       <br /><span className="small muted">Shift starts {timeLabel(n.shift_start)}, timed in {timeLabel(n.time_in)} ({n.late_minutes} minutes late){n.branch ? ` · ${n.branch}` : ""}{n.ir_id ? " · in an IR" : ""}</span></span>
                     {n.explanation && <p className="small" style={{ margin: 0 }}>Explanation: {n.explanation}</p>}
+                    <NteProofs urls={(n.proof_paths ?? []).map((p) => proofs.get(p)).filter((u): u is string => !!u)} />
                     {n.state === "OPEN" && !n.ir_id && <NteDeadline n={n} />}
                     {n.state === "VOID" && <p className="small muted" style={{ margin: 0 }}>Doesn&apos;t count: {n.void_reason}</p>}
                   </div>
