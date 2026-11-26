@@ -4,11 +4,14 @@ import { TopBar } from "@/components/TopBar";
 import { manilaToday } from "@/lib/dates";
 import { addDays } from "@/lib/insights";
 import { adName } from "@/lib/promoRules";
-import { clientKey, rate, reasonText, tally, topReason, type BackjobRow } from "@/lib/backjobs";
+import { caseStatus, clientKey, daysBetween, isClosed, rate, reasonText, sortCases, tally, topReason, type BackjobRow } from "@/lib/backjobs";
 import { every } from "../../business/load";
 import { Retag } from "./Retag";
+import { CaseUpdate } from "./CaseUpdate";
 
 type Log = { id: string; service_date: string; client_name: string | null; service_id: string; performer_id: string; branch_id: string };
+type Case = { id: string; client_name: string; branch_id: string | null; service_id: string | null; staff_id: string | null; status: string;
+  resolution: string | null; refund_cents: number | null; opened_on: string; closed_on: string | null };
 type Tag = { service_log_id: string; staff_id: string | null; reason: string | null; original_log_id: string | null };
 
 const DAYS = 90;
@@ -31,6 +34,19 @@ export default async function Backjobs() {
     supabase.from("services").select("id, name"),
     supabase.from("employees").select("id, full_name, active, position").order("full_name"),
   ]);
+  // update-0090: cases per client. Open ones whatever their age, closed ones from the same 90 days.
+  const caseRes = await supabase.from("backjob_cases").select("id, client_name, branch_id, service_id, staff_id, status, resolution, refund_cents, opened_on, closed_on")
+    .or(`status.in.(OPEN,IN_PROGRESS),closed_on.gte.${from}`).order("opened_on", { ascending: false }).limit(300);
+  const casesMissing = !!caseRes.error;
+  const cases = sortCases((caseRes.data ?? []) as Case[]);
+  const { data: caseTags } = !casesMissing && cases.length ? await supabase.from("backjob_tags").select("service_log_id, case_id").in("case_id", cases.map((c) => c.id)) : { data: [] };
+  const visits = new Map<string, number>();
+  for (const t of (caseTags ?? []) as { case_id: string }[]) visits.set(t.case_id, (visits.get(t.case_id) ?? 0) + 1);
+  const caseOfLog = new Map(((caseTags ?? []) as { service_log_id: string; case_id: string }[]).map((t) => [t.service_log_id, t.case_id]));
+  const caseById = new Map(cases.map((c) => [c.id, c]));
+  const openCases = cases.filter((c) => !isClosed(c.status));
+  const closedCases = cases.filter((c) => isClosed(c.status));
+  const refunded = closedCases.reduce((n, c) => n + (c.status === "REFUNDED" ? c.refund_cents ?? 0 : 0), 0);
   const tagsMissing = !!tagRes.error;
   const tags = new Map(((tagRes.data ?? []) as Tag[]).map((t) => [t.service_log_id, t]));
   const svc = Object.fromEntries(((svcData ?? []) as { id: string; name: string }[]).map((s) => [s.id, adName(s.name)]));
@@ -66,8 +82,40 @@ export default async function Backjobs() {
           <div className="card biz-kpi"><div className="label">Backjobs</div><div className="value">{rows.length}</div><div className="sub muted">{paid.length} paid treatments</div></div>
           <div className="card biz-kpi"><div className="label">Backjob rate</div><div className="value">{pct(allRate)}</div><div className="sub muted">of paid treatments</div></div>
           <div className="card biz-kpi"><div className="label">Top reason</div><div className="value bj-reason-val">{overall ? topReason(overall) || "Not given" : "–"}</div></div>
-          <div className="card biz-kpi"><div className="label">Repeat clients</div><div className="value">{byClient.length}</div><div className="sub muted">2+ backjobs</div></div>
+          <div className="card biz-kpi"><div className="label">Open cases</div><div className="value">{casesMissing ? "–" : openCases.length}</div><div className="sub muted">{casesMissing ? "after update-0090" : `${closedCases.length} closed · ${byClient.length} repeat client${byClient.length === 1 ? "" : "s"}`}</div></div>
         </div>
+
+        {casesMissing ? (
+          <div className="notice warn">Cases per client (status, what was done, closing by fix, refund or quitclaim) start once the owner runs database update-0090.</div>
+        ) : (
+          <div className="card">
+            <h2>Cases per client <small>{openCases.length} open</small></h2>
+            {cases.length === 0 && <p className="small muted">No cases yet. A case opens with a client&apos;s first backjob for a treatment.</p>}
+            <div className="bj-cases">
+              {cases.map((c) => {
+                const st = caseStatus(c.status);
+                const waited = daysBetween(c.opened_on, c.closed_on ?? today);
+                return (
+                  <div key={c.id} className={`bj-case${st.closed ? " closed" : ""}`}>
+                    <div className="bj-case-top">
+                      <b className="bj-case-client">{c.client_name}</b>
+                      <span className={`chg ${st.tone}`}>{st.label}</span>
+                    </div>
+                    <div className="small">{(c.service_id && svc[c.service_id]) || "Service"} · First treatment: <b>{c.staff_id ? ename[c.staff_id] ?? "Staff" : "not found"}</b>{c.branch_id && bName[c.branch_id] ? ` · ${bName[c.branch_id]}` : ""}</div>
+                    <div className="small muted">
+                      {visits.get(c.id) ?? 0} backjob visit{(visits.get(c.id) ?? 0) === 1 ? "" : "s"} · opened {short(c.opened_on)}
+                      {st.closed ? ` · closed ${c.closed_on ? short(c.closed_on) : ""} after ${waited} day${waited === 1 ? "" : "s"}` : ` · open ${waited} day${waited === 1 ? "" : "s"}`}
+                      {c.status === "REFUNDED" && c.refund_cents ? ` · ₱${(c.refund_cents / 100).toLocaleString("en-PH")} refunded` : ""}
+                    </div>
+                    {c.resolution && <div className="bj-case-note small">{c.resolution}</div>}
+                    <CaseUpdate id={c.id} status={c.status} resolution={c.resolution} refund={c.refund_cents} />
+                  </div>
+                );
+              })}
+            </div>
+            {refunded > 0 && <p className="small muted">Refunds in the last {DAYS} days: ₱{(refunded / 100).toLocaleString("en-PH")}.</p>}
+          </div>
+        )}
 
         <div className="biz-row">
           <div className="card">
@@ -127,7 +175,8 @@ export default async function Backjobs() {
               <div key={r.id} className="bj-row">
                 <span className="bj-date">{short(r.date)}</span>
                 <span className="bj-main"><b>{r.client || "Client"}</b> · {svc[r.serviceId] ?? "Service"}<span className="small muted"> · {bName[r.log.branch_id] ?? ""}</span></span>
-                <span className="bj-who small">First treatment: <b>{r.staffId ? ename[r.staffId] ?? "Staff" : "not found"}</b> · {reasonText(r.reason)}</span>
+                <span className="bj-who small">First treatment: <b>{r.staffId ? ename[r.staffId] ?? "Staff" : "not found"}</b> · {reasonText(r.reason)}
+                  {(() => { const c = caseById.get(caseOfLog.get(r.id) ?? ""); return c ? <> · <span className={`chg ${caseStatus(c.status).tone}`}>{caseStatus(c.status).label}</span></> : null; })()}</span>
                 {!tagsMissing && <Retag log={r.id} staff={r.staffId} reason={r.reason} people={people} />}
               </div>
             ))}

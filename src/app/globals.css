@@ -1880,6 +1880,19 @@ a.hb-row:hover strong { text-decoration: underline; }
 .bj-list li:first-child { border-top: 0; }
 .bj-list li b { flex: 1; min-width: 0; font-size: 0.92rem; }
 .bj-list li .small { flex-basis: 100%; }
+.bj-cases { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.bj-case { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); min-width: 0; }
+.bj-case.closed { opacity: 0.85; background: transparent; }
+.bj-case-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bj-case-client { font-size: 0.98rem; min-width: 0; overflow-wrap: anywhere; }
+.bj-case-note { padding: 6px 10px; border-left: 3px solid var(--gold); background: var(--viz-track); border-radius: 0 8px 8px 0; overflow-wrap: anywhere; }
+.bj-case-actions { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.bj-case-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 4px; }
+.bj-case-form label { display: grid; gap: 3px; font-size: 0.82rem; font-weight: 600; min-width: 0; }
+.bj-case-form label.wide, .bj-case-form .bj-case-buttons, .bj-case-form .notice { grid-column: 1 / -1; }
+.bj-case-form select, .bj-case-form input, .bj-case-form textarea { width: 100%; min-width: 0; }
+.bj-case-buttons { display: flex; gap: 8px; }
+@media (max-width: 600px) { .bj-cases { grid-template-columns: minmax(0, 1fr); } }
 .bj-recent { display: flex; flex-direction: column; }
 .bj-row { display: grid; grid-template-columns: 64px minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
 .bj-row:first-child { border-top: 0; }
