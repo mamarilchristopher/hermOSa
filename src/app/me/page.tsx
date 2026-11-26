@@ -17,9 +17,10 @@ import { noticeButton, noticeHref } from "@/lib/noticeLink";
 import { computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
 import { addDays, sortBranches } from "@/lib/insights";
 import { missingRequired, type Details } from "@/lib/employeeDetails";
-import { firstName, times, tracker, type NteList } from "@/lib/nte";
+import { tracker, type NteList } from "@/lib/nte";
 import { NteDeadline, NteExplainForm } from "../nte/Forms";
-import { Uid } from "@/components/Uid";
+import { HomeBookings, type HomeBooking } from "./HomeBookings";
+import { HomeTardiness } from "./HomeTardiness";
 
 type Signoffs = { to_sign: { count: number; oldest: string | null }; mine: { count: number; oldest: string | null } };
 type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: string }[]; days?: StatusDay[];
@@ -27,16 +28,23 @@ type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: s
 
 /** The management Home: today's and yesterday's sales, the month, and who's on duty. To-dos live in the bell (src/lib/todos.ts). */
 async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>>["supabase"], today: string) {
-  const [{ data: st }, { data: dutyData }] = await Promise.all([
+  const [{ data: st }, { data: dutyData }, { data: bk }, { data: ppl }, { count: toFollow }] = await Promise.all([
     supabase.rpc("daily_sales_status", { p_start: glanceFetchStart(today), p_end: today }),
     supabase.rpc("on_duty", { p_date: today }), // errors (before update-0022) mean no On Duty card
+    // CHRIS Nov 26: today's bookings at every branch, live on Home.
+    supabase.from("bookings").select("id, branch_id, client_name, services, appointment_time, status, status_by, status_at")
+      .eq("appointment_date", today).order("appointment_time", { ascending: true, nullsFirst: false }).order("created_at").limit(300),
+    supabase.rpc("chat_people"),
+    supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "UNRESPONSIVE"),
   ]);
   const s = (st ?? { ok: false }) as DailyStatus;
   if (!s.ok) return null;
   const g = computeGlance(today, sortBranches(s.branches ?? []), s.days ?? []);
   const duty = Array.isArray(dutyData) ? (dutyData as DutyRow[]) : null;
   const faces = duty?.length ? await loadFaces(supabase, duty) : {};
-  return { g, duty, faces };
+  const who = Object.fromEntries(((Array.isArray(ppl) ? ppl : []) as { id: string; name: string }[]).map((x) => [x.id, x.name]));
+  const bookings = bk ? { rows: bk as HomeBooking[], who, toFollow: toFollow ?? 0 } : null;
+  return { g, duty, faces, bookings };
 }
 
 type Notice = { id: string; kind?: string; title: string; body: string | null; link: string | null; created_at: string; read_at: string | null };
@@ -108,6 +116,7 @@ export default async function Me() {
   // Client photos and waivers I still owe (update-0054): always urgent on Home.
   const { data: dueData } = emp ? await supabase.rpc("my_photos_due") : { data: null };
   const photosDue = (Array.isArray(dueData) ? dueData : []) as { id: string; date: string; client: string | null; service: string | null; branch: string; amount: number }[];
+  const homeBranches = branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: branchShort(b.name), code: b.code }));
   const tardy = trackData ? tracker((trackData as NteList).ntes, (trackData as NteList).ir_minutes) : [];
 
   return (
@@ -161,25 +170,9 @@ export default async function Me() {
             <a className="button secondary small" href="/chat">Open Chat</a>
           </div>
         )}
-                {home && <ManagerHome me={access.user_id} g={home.g} duty={home.duty} faces={home.faces} branches={branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: branchShort(b.name), code: b.code }))} />}
-        {ownerLevel && trackData != null && (
-          <div className="card">
-            <div className="card-head"><h2>Tardiness tracker, {monthLabel(today.slice(0, 7))}</h2><Link className="small" href="/nte">All Late NTEs</Link></div>
-            {tardy.length === 0 ? <p className="muted" style={{ margin: 0 }}>No Late NTEs this month.</p> : (
-              <ul className="plain-list">
-                {tardy.slice(0, 8).map((r) => (
-                  <li key={r.employee_id} className={r.due ? "ir-due" : undefined}>
-                    <span><strong>{firstName(r.name)}</strong><Uid v={r.uid} /> has been issued Late NTEs <strong>{times(r.count)}</strong> this month
-                      {r.open > 0 && <span className="small muted"> · {r.open} not explained yet</span>}
-                      {r.toReview > 0 && <span className="small" style={{ color: "var(--bad)" }}> · {r.toReview} reason{r.toReview === 1 ? "" : "s"} to accept or reject</span>}
-                      {r.due && <><br /><span className="small ir-due-tag">IR suggested: {r.due}</span></>}</span>
-                    <Link className="button secondary small" href={`/nte/staff/${r.employee_id}`}>Open</Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
+                {home && <ManagerHome me={access.user_id} g={home.g} duty={home.duty} faces={home.faces} branches={homeBranches}
+          bookings={home.bookings && <HomeBookings rows={home.bookings.rows} who={home.bookings.who} toFollow={home.bookings.toFollow} branches={home.g.branches.map((x) => homeBranches.find((b) => b.id === x.id) ?? { id: x.id, name: x.name })} />}
+          tardiness={ownerLevel && trackData != null && <HomeTardiness month={monthLabel(today.slice(0, 7))} ntes={(trackData as NteList).ntes} people={tardy} />} />}
         {emp?.commission_eligible && (
           <>
             <div className="grid">

@@ -1527,3 +1527,23 @@ button.chat-with:hover .avatar { box-shadow: 0 0 0 3px var(--gold-soft); }
 .fu-form input[name="note"] { flex: 1 1 180px; min-width: 0; }
 .fu-history { margin: 6px 0 0; padding-left: 18px; }
 .title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* Home: live Bookings board and Tardiness tracker (CHRIS Nov 26) */
+.home-bookings .glance-branch { gap: 8px; }
+.home-bookings .glance-branch > a { text-decoration: none; }
+.hb-row { display: flex; flex-direction: column; gap: 2px; padding-top: 8px; border-top: 1px solid var(--line); }
+.hb-row .hb-name strong { font-size: 0.95rem; }
+.hb-row .hb-svc { overflow-wrap: anywhere; }
+.nte-track td { vertical-align: top; }
+.nte-track .nowrap { white-space: nowrap; }
+.nte-st { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+.nte-st.good { background: var(--good-bg, #e7f4ea); color: var(--good); }
+.nte-st.bad { background: var(--bad-bg); color: var(--bad); }
+.nte-st.wait { background: var(--cream); color: var(--ink, inherit); border: 1px solid var(--line); }
+.nte-st.muted { color: var(--muted, #888); border: 1px solid var(--line); }
+.nte-track-list { display: none; }
+.nte-track-list li { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
+@media (max-width: 640px) {
+  .nte-track-wide { display: none; }
+  .nte-track-list { display: block; }
+}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { centsToPhp } from "@/lib/csv";
 import { monthLabel } from "@/lib/insights";
 import { dayLabel, type DayCell, type Glance } from "@/lib/homeGlance";
@@ -42,7 +43,7 @@ export function TodoCard({ todos }: { todos: Todo[] }) {
 }
 
 /** Home for owners, finance and managers: what needs doing, yesterday per branch, and how the month is going. */
-export function ManagerHome({ g, duty, faces = {}, branches, me }: { me?: string; g: Glance; duty: DutyRow[] | null; faces?: Record<string, DutyFace>; branches: { id: string; name: string; code?: string }[] }) {
+export function ManagerHome({ g, duty, faces = {}, branches, me, bookings, tardiness }: { me?: string; bookings?: ReactNode; tardiness?: ReactNode; g: Glance; duty: DutyRow[] | null; faces?: Record<string, DutyFace>; branches: { id: string; name: string; code?: string }[] }) {
   const ym = g.today.slice(0, 7);
   const hm = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" });
   const entered = g.branches.filter((b) => b.todayCell.kind !== "empty").length;
@@ -73,6 +74,8 @@ export function ManagerHome({ g, duty, faces = {}, branches, me }: { me?: string
         </div>}
       </div>
 
+      {/* CHRIS Nov 26: Today so far > live Bookings > On duty today > Yesterday > month so far > Tardiness tracker. */}
+      {bookings}
 
       {duty && (
         <div className="card">
@@ -151,6 +154,8 @@ export function ManagerHome({ g, duty, faces = {}, branches, me }: { me?: string
           </>
         )}
       </div>
+
+      {tardiness}
     </>
   );
 }
