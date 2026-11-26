@@ -1,6 +1,6 @@
 "use client";
 import { useActionState, useState } from "react";
-import { approveJoin, createInvite } from "./actions";
+import { approveJoin, createInvite, moveLogin } from "./actions";
 
 export const LEVEL_TEXT: Record<string, string> = {
   OWNER: "Owner (everything, needs 2-step sign-in)",
@@ -74,5 +74,29 @@ export function NewInviteForm() {
       <button type="submit" disabled={pending}>{pending ? "Making…" : "Make invite link"}</button>
       {state?.error && <div className="notice error">{state.error}</div>}
     </form>
+  );
+}
+
+/** "She registered again": move this new login onto her existing staff account, keeping all her records. */
+export function SamePersonForm({ pending, staff, guess }: { pending: string; staff: { id: string; label: string }[]; guess?: string | null }) {
+  const [state, action, busy] = useActionState(moveLogin, undefined);
+  if (state?.ok) return <div className="notice ok">{state.ok}</div>;
+  return (
+    <details className="same-person" open={!!guess}>
+      <summary>Already on staff? Use this as their new login</summary>
+      <form action={action} className="same-person-form">
+        <input type="hidden" name="pending" value={pending} />
+        <label>
+          <span>Same person as</span>
+          <select name="target" required defaultValue={guess ?? ""}>
+            <option value="" disabled>Choose the staff member…</option>
+            {staff.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+        </label>
+        <button type="submit" className="secondary" disabled={busy}>{busy ? "Moving…" : "Move login to this staff"}</button>
+        <p className="small muted">Keeps their AC/ST number, roles, PIN, payroll and records. Their old login stops working.</p>
+        {state?.error && <div className="notice error">{state.error}</div>}
+      </form>
+    </details>
   );
 }

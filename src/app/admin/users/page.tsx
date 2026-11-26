@@ -5,7 +5,7 @@ import { requireAccess, can } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { GrantForm } from "./GrantForm";
 import { rejectJoin, revokeInvite, revokeRole, setActive } from "./actions";
-import { ApproveForm, CopyLink, NewInviteForm } from "./JoinForms";
+import { ApproveForm, CopyLink, NewInviteForm, SamePersonForm } from "./JoinForms";
 import Link from "next/link";
 import { byRankThenName, staffRank } from "@/lib/staffOrder";
 import { PositionCell } from "../../people/PositionCell";
@@ -40,6 +40,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
   const branchName = Object.fromEntries(branches.map((b) => [b.id, b.name]));
   const others = (users ?? []).filter((u) => u.id !== access.user_id && u.active);
+  const isOwner = (id: string) => grantsOf(id).some((g) => g.role_code === "OWNER");
+  const movable = [...users].filter((u) => u.id !== access.user_id && !isOwner(u.id))
+    .sort((a, b) => a.display_name.localeCompare(b.display_name))
+    .map((u) => ({ id: u.id, label: `${u.display_name} (${[u.uid, staffUidOf.get(u.id)].filter(Boolean).join(" · ")}${u.active ? "" : ", turned off"})` }));
 
   const photos = await photoUrls(supabase, (all ?? []).map((u) => u.photo_path));
   const activeUsers = users.filter((u) => u.active), inactiveUsers = users.filter((u) => !u.active);
@@ -102,9 +106,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
               {sameNameAccounts(u, all ?? []).length > 0 && (
                 <p className="small join-dupe">
                   Already has an account? {sameNameAccounts(u, all ?? []).map((x) => `${x.display_name} (${x.uid}${x.active === false ? ", turned off" : ""})`).join(", ")}.
-                  If it&apos;s the same person, Reject this one and have them sign in with that account instead.
+                  If it&apos;s the same person, use &ldquo;Same person as&rdquo; below so they keep their records.
                 </p>
               )}
+              {movable.length > 0 && <SamePersonForm pending={u.id} staff={movable} guess={sameNameAccounts(u, all ?? []).find((x) => movable.some((m) => m.id === x.id))?.id ?? null} />}
               <ApproveForm user={u.id} branchId={u.requested_branch_id} branches={clinics} asked={u.requested_level} />
               <form action={rejectJoin}>
                 <input type="hidden" name="user" value={u.id} />

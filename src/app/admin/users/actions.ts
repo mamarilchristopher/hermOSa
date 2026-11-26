@@ -84,6 +84,20 @@ export async function rejectJoin(fd: FormData) {
   revalidatePath("/admin/joins");
 }
 
+const Move = z.object({ pending: z.uuid(), target: z.uuid() });
+
+/** A staff member registered again (new email/password): put that new login on their existing account (update-0089). */
+export async function moveLogin(_prev: FormState, fd: FormData): Promise<FormState> {
+  const p = Move.safeParse({ pending: fd.get("pending"), target: fd.get("target") });
+  if (!p.success) return { error: "Choose which staff member this is." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("move_login_to_staff", { p_pending: p.data.pending, p_target: p.data.target });
+  if (error) return { error: errorText(error.code === "PGRST202" ? "NEEDS_UPDATE_0089" : undefined) };
+  if (!data.ok) return { error: errorText(data.error) };
+  revalidatePath("/admin/users");
+  return { ok: `Done. ${data.name} now signs in with the new email. The old login no longer works.` };
+}
+
 export async function createInvite(_prev: FormState, fd: FormData): Promise<FormState> {
   const days = z.coerce.number().int().min(1).max(90).safeParse(fd.get("days") ?? 14);
   const supabase = await createClient();
