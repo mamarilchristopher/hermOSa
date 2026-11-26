@@ -12,6 +12,7 @@ import { BatchApprove, ChangeDateForm, DecideButtons, EntryForm } from "./Forms"
 import { DeclaredCheck, diffText } from "./DeclaredCheck";
 import { CHECK_FROM, CHECK_TO, checkBranches, inCheckWindow, type StatusDay } from "@/lib/declaredCheck";
 import { AddPhotosLater } from "./PhotoSlots";
+import { AttachProof } from "./PaymentProof";
 
 type Log = {
   id: string; service_date: string; amount_paid_cents: number; commission_type: string; performer_id: string; assistant_id: string | null;
@@ -46,6 +47,10 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
     supabase.rpc("chat_people"), // names of everyone in the company, for "Entered by"
   ]);
   const all = (logs ?? []) as unknown as Log[];
+  // Proof of payment (update-0075): how many each entry has (only the ones this person may see; none before 0075).
+  const { data: proofRows } = all.length ? await supabase.from("payment_proofs").select("service_log_id").in("service_log_id", all.map((l) => l.id)) : { data: [] };
+  const proofCount = new Map<string, number>();
+  for (const r of (proofRows ?? []) as { service_log_id: string }[]) proofCount.set(r.service_log_id, (proofCount.get(r.service_log_id) ?? 0) + 1);
   // CHRIS Nov 26: owners and the GM see a running Nov 1–24 check against the declared sales.
   const { data: declaredData } = topMgmt ? await supabase.rpc("daily_sales_status", { p_start: CHECK_FROM, p_end: CHECK_TO }) : { data: null };
   const declared = declaredData as { ok: boolean; branches: { id: string; code: string; name: string }[]; days: StatusDay[] } | null;
@@ -185,6 +190,8 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                         visit: (l.client_name ? dayList.filter((x) => x.state !== "REJECTED" && (x.client_name ?? "").trim().toLowerCase() === l.client_name!.trim().toLowerCase()) : [l])
                           .slice().reverse().map((x) => ({ service: x.services?.name ?? "Service", session: x.session_no ?? 1, amount: Number(x.amount_paid_cents), kind: x.visit_kind ?? "PAID" })),
                       }} />
+                      {proofCount.get(l.id) ? <div className="small"><Link href={`/clinic/payments?month=${l.service_date.slice(0, 7)}#${l.id}`}>💳 Proof of payment ({proofCount.get(l.id)})</Link></div> : null}
+                      {l.state !== "REJECTED" && <AttachProof log={l.id} branch={l.branch_id ?? branch.id} have={proofCount.get(l.id) ?? 0} />}
                       {l.photo_folder && l.client_name && <div className="small"><Link href={`/clinic/archive?month=${l.service_date.slice(0, 7)}#${l.id}`}>Photos</Link>{l.share_ok ? <span className="muted"> · sharing OK</span> : null}</div>}</td>
                     <td className="num">{centsToPhp(l.amount_paid_cents)}</td>
                     <td>{l.visit_kind && l.visit_kind !== "PAID"

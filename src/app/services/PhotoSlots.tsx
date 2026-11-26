@@ -12,7 +12,7 @@ const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-400
   (Number(c) ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (Number(c) / 4)))).toString(16)));
 
 /** A ~400px JPEG preview. Returns null when the browser can't read the format (e.g. HEIC outside Safari). */
-async function thumbOf(file: File): Promise<Blob | null> {
+export async function thumbOf(file: File): Promise<Blob | null> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = url; });

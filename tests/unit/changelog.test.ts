@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseChangelog, releaseText } from "@/lib/changelog";
+import { parseChangelog, releaseText } from "../../src/lib/changelog";
 
 describe("parseChangelog", () => {
   const md = `| Version | Date (Manila) | Needs SQL | What changed |

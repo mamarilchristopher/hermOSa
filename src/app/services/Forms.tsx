@@ -5,6 +5,7 @@ import { addService, approveMany, changeDate, decideLog, logService, type Action
 import { previewCommission, type CommissionType } from "@/lib/commission";
 import { centsToPhp } from "@/lib/csv";
 import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
+import { ProofGroup, useProofSlots } from "./PaymentProof";
 
 type Opt = { id: string; name: string; eligible?: boolean; here?: boolean; price?: number | null; commission?: number | null; sessions?: number[] | null };
 
@@ -82,6 +83,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const [session, setSession] = useState("1");
   const [med, setMed] = useState("");
   const photos = usePhotoSlots(branch);
+  const proofs = useProofSlots(branch); // update-0075: optional proof of payment
   const form = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (state?.ok) {
@@ -92,6 +94,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       setWho("");
       setService(""); setPartner(""); setClient(""); setPriceNote(""); setShare(false); setNote(""); setSession("1"); setMed("");
       photos.reset();
+      proofs.reset();
     }
   }, [state]);
   const person = employees.find((e) => e.id === who);
@@ -140,6 +143,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="folder" value={photos.folder} />
       <input type="hidden" name="photos" value={photos.json} />
+      <input type="hidden" name="proofs" value={proofs.json} />
       <div className="field">
         <span className="field-label">Did the client pay?</span>
         <div className="segmented choice" role="radiogroup" aria-label="Did the client pay?">
@@ -219,6 +223,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       </label>
       <PhotoGroup api={photos} title="Waiver (2 pages)" hint={needsPhotos ? "A clear photo of each page of the signed waiver." : "Optional for this visit."}
         kinds={[{ kind: "WAIVER", label: "Add waiver page" }]} />
+      <ProofGroup api={proofs} />
       <div className="entry-grid">
         <label className={needsPartner ? "" : "span2"}>{!paid ? "Handled by" : "Done by"}
           <select name="employee" required value={who} onChange={(e) => { setWho(e.target.value); if (e.target.value === partner || employees.find((x) => x.id === e.target.value)?.eligible === false) setPartner(""); }}>{people}</select>
@@ -252,8 +257,8 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
             <span className="muted">{!paid ? "Unpaid visit: no commission" : effType === "NONCOMMI" ? "" : cents > 0 ? "" : "Enter the amount paid to see the commission"}</span>
           )}
         </div>
-        <button type="submit" disabled={pending || photos.uploading || !!missing} title={missing ?? undefined}>
-          {pending ? "Saving…" : photos.uploading ? "Uploading photos…" : "Add to today's log"}
+        <button type="submit" disabled={pending || photos.uploading || proofs.uploading || !!missing} title={missing ?? undefined}>
+          {pending ? "Saving…" : photos.uploading || proofs.uploading ? "Uploading photos…" : "Add to today's log"}
         </button>
       </div>
       {missing && !photos.uploading && (!!service || !!client || photos.slots.length > 0) && <p className="small muted entry-missing">{missing}</p>}

@@ -77,6 +77,8 @@ export async function TopBar({ access }: { access: Access }) {
       // Client photos (v0.53, update-0053): waivers and before/after per client; shared ones also in Social media.
       ...(archiver ? [{ href: "/clinic/archive", label: "Client archive" }] : []),
       ...(socialTeam ? [{ href: "/clinic/social", label: "Social media" }] : []),
+      // update-0075: proof of payment in its own folder (staff see their own entries, management sees all).
+      ...(archiver ? [{ href: "/clinic/payments", label: "Proof of payment" }] : []),
     ] },
     { key: "team", label: "Team", short: "Team", icon: "week", tabs: [
       { href: "/schedule", label: "Schedule" },

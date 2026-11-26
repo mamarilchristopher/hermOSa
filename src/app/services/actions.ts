@@ -24,6 +24,7 @@ const Log = z.object({
   price_note: z.string().trim().max(300).optional(),
   folder: z.uuid(),
   photos: z.string().max(20000),
+  proofs: z.string().max(5000).optional(),
   share: z.literal("1").optional(),
   session: z.coerce.number().int().min(1).max(15).default(1),
   meds: z.union([z.uuid(), z.string().regex(/^free:[0-9a-f-]{36}$/), z.literal("")]).optional(),
@@ -31,7 +32,7 @@ const Log = z.object({
 const Photos = z.array(z.object({ kind: z.enum(["WAIVER", "BEFORE", "AFTER"]), path: z.string().max(300), thumb: z.string().max(300).nullable() })).max(20);
 
 export async function logService(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session", "meds"].map((k) => [k, fd.get(k) ?? undefined])));
+  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session", "meds", "proofs"].map((k) => [k, fd.get(k) ?? undefined])));
   if (!p.success) return { error: "Fill in the client's name, the service, the amount paid and who did it." };
   let photos;
   try { photos = Photos.parse(JSON.parse(p.data.photos || "[]")); } catch { return { error: "The photos didn't attach. Remove them and add them again." }; }
@@ -85,6 +86,13 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     const free = p.data.meds.startsWith("free:");
     const { data: m, error: mErr } = await supabase.rpc("log_meds", { p_log: data.id, p_service: free ? p.data.meds.slice(5) : p.data.meds, p_free: free });
     medsNote = mErr || !m?.ok ? " The meds didn't save: add them again as their own entry." : free ? " Free meds package added." : " Meds added.";
+  }
+  // CHRIS Nov 26 (update-0075): optional proof of payment, kept in its own folder.
+  let proofs: { path: string; thumb: string | null }[] = [];
+  try { proofs = z.array(z.object({ path: z.string().max(300), thumb: z.string().max(300).nullable() })).max(5).parse(JSON.parse(p.data.proofs || "[]")); } catch { proofs = []; }
+  if (proofs.length) {
+    const { data: pr, error: prErr } = await supabase.rpc("add_payment_proof", { p_log: data.id, p_photos: proofs });
+    medsNote += prErr || !pr?.ok ? " The proof of payment didn't save: attach it again on the entry." : " Proof of payment attached.";
   }
   revalidatePath("/services");
   revalidatePath("/me");
