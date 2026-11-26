@@ -28,7 +28,8 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
     // Team chat (v0.49, update-0049): private 1-on-1 and group chats; the badge counts unread messages.
     { key: "chat", label: "Chat", short: "Chat", icon: "chat", tabs: [{ href: "/chat", label: "Chat", badge: n(c.chat) }] },
     { key: "sales", label: "Sales", short: "Sales", icon: "chart", tabs: [
-      ...(management ? [{ href: "/", label: "Dashboard" }] : []),
+      // CHRIS Nov 27 (v0.87.1): the Business dashboard (sales, trends, team patterns, today's promo picks) for all management.
+      ...(management ? [{ href: "/business", label: "Business" }, { href: "/", label: "Dashboard" }] : []),
       ...(filler ? [{ href: "/sales/daily", label: "Daily sales" }] : []),
       // update-0086 (CHRIS Nov 27): promo ideas every Monday, and the builder; beside Daily sales. Owners and the GM.
       ...(owner || gm ? [{ href: "/promos", label: "Promos" }] : []),

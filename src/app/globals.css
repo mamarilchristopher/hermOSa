@@ -1661,3 +1661,10 @@ a.hb-row:hover strong { text-decoration: underline; }
 .promo-why-line { color: var(--ink-2); }
 .promo-plan td.nowrap, .promo-plan .nowrap { white-space: nowrap; }
 .promo-all summary { cursor: pointer; margin: 10px 0 4px; }
+
+/* Business dashboard (v0.87.1) */
+.business .biz-tips { margin: 0 0 14px; padding-left: 20px; display: grid; gap: 6px; font-size: 0.9rem; color: var(--ink-2); }
+.business .biz-tips strong { color: var(--ink); }
+.business .promo-idea .button { align-self: flex-start; margin-top: auto; }
+.business h3.small { margin: 18px 0 6px; color: var(--ink-2); }
+.business .grid .stat .value .delta { font-size: 0.8rem; vertical-align: middle; }

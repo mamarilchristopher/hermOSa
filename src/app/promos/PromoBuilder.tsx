@@ -27,8 +27,8 @@ function blank(today: string): Draft {
 const php = (c: number) => String(Math.round(c / 100));
 
 /** The promo builder (update-0086): +/− sessions, live price and images, captions, save and approve. */
-export function PromoBuilder({ services, ideas, seasons, today, saved, serif, serifClass, pkgs = [], clients = {} }: {
-  pkgs?: Pkg[]; clients?: Record<string, { active: number; all: number }>; services: Svc[]; ideas: Suggestion[]; seasons: string[]; today: string; saved: SavedPromo[]; serif: string; serifClass: string;
+export function PromoBuilder({ services, ideas, seasons, today, saved, serif, serifClass, pkgs = [], clients = {}, initialIdea }: {
+  initialIdea?: string; pkgs?: Pkg[]; clients?: Record<string, { active: number; all: number }>; services: Svc[]; ideas: Suggestion[]; seasons: string[]; today: string; saved: SavedPromo[]; serif: string; serifClass: string;
 }) {
   const [d, setD] = useState<Draft>(() => blank(today));
   const [story, setStory] = useState<string | null>(null);
@@ -84,6 +84,15 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
   function openIdea(s: Suggestion) {
     open({ ...blank(today), why: s.why, title: s.title, tagline: s.tagline, items: s.items.map((i) => ({ ...i })), price: s.price, auto: s.price === defaultPrice(s.items, pkgs), months: s.months, season: s.season ?? "", source: "SUGGESTED" });
   }
+  // Business dashboard's "Open in builder" (/promos?idea=<id>): open that idea once.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current || !initialIdea) return;
+    opened.current = true;
+    const s = ideas.find((x) => x.id === initialIdea);
+    if (s) openIdea(s);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialIdea, ideas]);
   function openSaved(p: SavedPromo) {
     const items = p.items.map((i) => ({ service_id: i.service_id, name: i.name, unit: i.unit_cents, paid: i.paid, free: i.free }));
     open({ id: p.state === "DRAFT" ? p.id : null, title: p.title, tagline: p.tagline ?? "", items, price: p.price_cents, auto: p.price_cents === defaultPrice(items, pkgs),

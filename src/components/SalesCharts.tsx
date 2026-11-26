@@ -9,11 +9,13 @@ const compact = (cents: number) => {
   return `₱${Math.round(p)}`;
 };
 
-/** Monthly totals as bars. The current (partial) month is drawn hatched and labelled "so far". */
-export function MonthBars({ months, height = 180, title }: { months: { ym: string; cents: number; partial: boolean }[]; height?: number; title: string }) {
+type BarDatum = { key: string; tip: string; label: string | null; cents: number; partial: boolean };
+
+/** Bars with a recessive grid; the current (partial) period is hatched. Hover shows the value. */
+function Bars({ data, height, title, id }: { data: BarDatum[]; height: number; title: string; id: string }) {
   const W = 640, padL = 44, padB = 22, padT = 10;
-  const max = Math.max(1, ...months.map((m) => m.cents));
-  const step = (W - padL) / months.length;
+  const max = Math.max(1, ...data.map((m) => m.cents));
+  const step = (W - padL) / data.length;
   const bw = Math.max(4, step - 6);
   const y = (c: number) => padT + (height - padT - padB) * (1 - c / max);
   const ticks = [0, 0.5, 1].map((t) => Math.round(max * t));
@@ -21,7 +23,7 @@ export function MonthBars({ months, height = 180, title }: { months: { ym: strin
     <figure className="chart" aria-label={title}>
       <svg viewBox={`0 0 ${W} ${height}`} role="img" aria-label={title}>
         <defs>
-          <pattern id="partial" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <pattern id={id} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <rect width="6" height="6" fill="var(--chart-fill-soft)" />
             <line x1="0" y1="0" x2="0" y2="6" stroke="var(--chart-fill)" strokeWidth="2" />
           </pattern>
@@ -32,24 +34,42 @@ export function MonthBars({ months, height = 180, title }: { months: { ym: strin
             <text x={padL - 6} y={y(t) + 4} textAnchor="end" className="axis">{compact(t)}</text>
           </g>
         ))}
-        {months.map((m, i) => {
+        {data.map((m, i) => {
           const x = padL + i * step + (step - bw) / 2;
           const top = y(m.cents);
           const h = Math.max(0, height - padB - top);
           return (
-            <g key={m.ym} className="bar">
-              <title>{`${monthLabel(m.ym)}${m.partial ? " (so far)" : ""}: ${centsToPhp(m.cents)}`}</title>
+            <g key={m.key} className="bar">
+              <title>{`${m.tip}${m.partial ? " (so far)" : ""}: ${centsToPhp(m.cents)}`}</title>
               <rect x={padL + i * step} y={padT} width={step} height={height - padT - padB} fill="transparent" />
-              {h > 0 && <rect x={x} y={top} width={bw} height={h} rx={Math.min(4, bw / 2)} fill={m.partial ? "url(#partial)" : "var(--chart-fill)"} />}
-              {(i % 2 === months.length % 2 || months.length <= 7) && (
-                <text x={x + bw / 2} y={height - 6} textAnchor="middle" className="axis">{monthLabel(m.ym).slice(0, 3)}{m.ym.endsWith("-01") ? ` ${m.ym.slice(2, 4)}` : ""}</text>
-              )}
+              {h > 0 && <rect x={x} y={top} width={bw} height={h} rx={Math.min(4, bw / 2)} fill={m.partial ? `url(#${id})` : "var(--chart-fill)"} />}
+              {m.label && <text x={x + bw / 2} y={height - 6} textAnchor="middle" className="axis">{m.label}</text>}
             </g>
           );
         })}
       </svg>
     </figure>
   );
+}
+
+/** Monthly totals as bars. The current (partial) month is drawn hatched and labelled "so far". */
+export function MonthBars({ months, height = 180, title }: { months: { ym: string; cents: number; partial: boolean }[]; height?: number; title: string }) {
+  const data = months.map((m, i) => ({
+    key: m.ym, tip: monthLabel(m.ym), cents: m.cents, partial: m.partial,
+    label: i % 2 === months.length % 2 || months.length <= 7 ? `${monthLabel(m.ym).slice(0, 3)}${m.ym.endsWith("-01") ? ` ${m.ym.slice(2, 4)}` : ""}` : null,
+  }));
+  return <Bars data={data} height={height} title={title} id="partial" />;
+}
+
+const MO = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const short = (d: string) => `${MO[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}`;
+/** Weekly totals (Monday to Sunday) as bars; the current week is hatched. */
+export function WeekBars({ weeks, height = 170, title }: { weeks: { start: string; cents: number; partial: boolean }[]; height?: number; title: string }) {
+  const data = weeks.map((w, i) => ({
+    key: w.start, tip: `Week of ${short(w.start)}`, cents: w.cents, partial: w.partial,
+    label: (weeks.length - 1 - i) % 3 === 0 ? short(w.start) : null,
+  }));
+  return <Bars data={data} height={height} title={title} id="partialw" />;
 }
 
 /** Tiny 13-month bar strip for a branch card. */
