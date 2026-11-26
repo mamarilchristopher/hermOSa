@@ -71,7 +71,7 @@ export async function TopBar({ access }: { access: Access }) {
     ] },
     { key: "clinic", label: "Clinic", short: "Clinic", icon: "clipboard", tabs: [
       ...(logger ? [{ href: "/services", label: "Service log", badge: overdue.length || undefined }] : []),
-      ...(booker ? [{ href: "/bookings", label: "Bookings" }] : []),
+      ...(booker || archiver ? [{ href: "/bookings", label: "Bookings" }] : []),
       ...(owner || gm ? [{ href: "/services/prices", label: "Price list" }] : []),
       // Client photos (v0.53, update-0053): waivers and before/after per client; shared ones also in Social media.
       ...(archiver ? [{ href: "/clinic/archive", label: "Client archive" }] : []),

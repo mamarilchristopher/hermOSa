@@ -30,18 +30,25 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
   const today = manilaToday();
   const day = isIsoDate(sp.d) ? sp.d : today;
   const booker = can(access, ["CSR", "OWNER"], null) || can(access, ["MANAGER"], null);
-  const clinics = branches.filter((b) => b.kind === "CLINIC" && (booker || can(access, ["MANAGER", "CLINICIAN", "CASHIER"], b.id)));
+  // CHRIS Nov 26 (update-0071): every employee sees every branch's bookings; marking stays with bookers and that branch's staff.
+  const clinics = branches.filter((b) => b.kind === "CLINIC");
+  const canMark = (branchId: string) => booker || can(access, ["MANAGER", "CLINICIAN", "CASHIER"], branchId);
   const only = clinics.find((b) => b.code === sp.b);
   const shown = only ? [only] : clinics;
 
-  const [{ data, error }, { data: emps }, { data: madeToday }, { data: svcs }] = await Promise.all([
-    supabase.from("bookings")
-      .select("id, booked_on, csr_employee_id, client_name, contact, platform, services, appointment_date, appointment_time, branch_id, deposit_cents, expected_cents, follow_up, note, status, resched_count, rescheduled_from, status_note")
-      .or(`appointment_date.eq.${day},rescheduled_from.eq.${day}`).order("appointment_time", { ascending: true, nullsFirst: false }).order("created_at").limit(500),
+  // Bookings FOR this day (the visit date), plus any that were moved away from it (CHRIS Nov 26).
+  const cols = "id, booked_on, csr_employee_id, client_name, contact, platform, services, appointment_date, appointment_time, branch_id, deposit_cents, expected_cents, follow_up, note, status, resched_count, rescheduled_from, status_note";
+  const forDay = (withMoves: boolean) => supabase.from("bookings").select(cols)
+    .or(`appointment_date.eq.${day},rescheduled_from.eq.${day}${withMoves ? `,moved_from.cs.{${day}}` : ""}`)
+    .order("appointment_time", { ascending: true, nullsFirst: false }).order("created_at").limit(500);
+  const [first, { data: emps }, { data: madeToday }, { data: svcs }] = await Promise.all([
+    forDay(true),
     supabase.from("employees").select("id, full_name"),
     booker ? supabase.from("bookings").select("csr_employee_id, expected_cents").eq("booked_on", day).limit(2000) : Promise.resolve({ data: [] }),
     booker ? supabase.from("services").select("name, price_cents").eq("active", true).order("name") : Promise.resolve({ data: [] }),
   ]);
+  // moved_from comes with update-0071; until it runs, fall back to the last move only.
+  const { data, error } = first.error?.code === "42703" ? await forDay(false) : first;
   const rows = (data ?? []) as Booking[];
   const name = new Map(((emps ?? []) as { id: string; full_name: string }[]).map((e) => [e.id, e.full_name]));
   const perCsr = new Map<string, number>(), perCsrValue = new Map<string, number>();
@@ -79,7 +86,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
       <TopBar access={access} />
       <main>
         <h1>Bookings</h1>
-        <p className="muted small">{booker ? "Log each booking here, from Facebook, calls, texts or walk-ins. The branch marks Arrived or Done, and you see it right away." : "Today's online bookings for your branch. Tap Arrived when they come in and Done when finished."}</p>
+        <p className="muted small">{booker ? "Log each booking here, from Facebook, calls, texts or walk-ins. The branch marks Arrived or Done, and you see it right away." : "Who is booked for this day at every branch, and their status. Your branch taps Arrived when they come in and Done when finished."}</p>
         {error && <div className="notice info">{error.code === "42P01" ? "The owner needs to run update-0040 in Supabase first." : "Could not load. Try again."}</div>}
 
         <div className="card">
@@ -137,10 +144,10 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
                 <p className="small muted" style={{ margin: "0 0 6px" }}>
                   {r.note && <>“{r.note}” · </>}
                   {r.status_note && <>{r.status_note} · </>}
-                  Booked {fmt(r.booked_on)}{r.csr_employee_id && name.get(r.csr_employee_id) ? ` by ${name.get(r.csr_employee_id)}` : r.csr_employee_id ? "" : " by owner / GM"}
+                  Logged {fmt(r.booked_on)}{r.csr_employee_id && name.get(r.csr_employee_id) ? ` by ${name.get(r.csr_employee_id)}` : r.csr_employee_id ? "" : " by owner / GM"}
                   {r.platform !== "FACEBOOK" && ` · ${r.platform.replace("_", "-").toLowerCase()}`}
                 </p>
-                {!moved(r) && <><StatusForm id={r.id} status={r.status} booker={booker} today={today} /> <NoteForm id={r.id} note={r.status_note} /></>}
+                {!moved(r) && canMark(r.branch_id) && <><StatusForm id={r.id} status={r.status} booker={booker} today={today} /> <NoteForm id={r.id} note={r.status_note} /></>}
               </div>
             ))}
           </div>

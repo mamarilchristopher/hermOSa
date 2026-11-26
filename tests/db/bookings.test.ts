@@ -38,11 +38,11 @@ describe("bookings", () => {
     expect(row.status).toBe("BOOKED");
   });
 
-  it("each branch sees only its own visits; CSRs see all", async () => {
+  it("everyone in the organization sees every branch's visits (update-0071)", async () => {
     const n = async (p: Person) => (await db.as(p, "aal1", "SELECT count(*)::int n FROM public.bookings")).rows[0].n;
     expect(await n(csr)).toBe(3);
-    expect(await n(fvCma)).toBe(2);
-    expect(await n(mkCma)).toBe(1);
+    expect(await n(fvCma)).toBe(3);
+    expect(await n(mkCma)).toBe(3);
   });
 
   it("branch staff mark Arrived / Done / Re-sched; only bookers cancel", async () => {
@@ -58,5 +58,23 @@ describe("bookings", () => {
     expect(r).toEqual({ status: "BOOKED", d: to, f: today(), resched_count: 1 });
     expect((await db.rpc(csr, "aal1", "set_booking_status", [mk, "CANCELLED", null, "DEMO changed mind"])).ok).toBe(true);
     expect((await db.rpc(csr, "aal1", "set_booking_status", [mk, "LOST", null, null])).error).toBe("BAD_REQUEST");
+  });
+});
+
+describe("update-0071: everyone sees bookings; moves are remembered", () => {
+  it("staff of another branch can read (not mark) a branch's bookings", async () => {
+    const r = await book(csr, "aal1", { client: "DEMO Seen" });
+    const seen = await db.as(mkCma, "aal1", "SELECT count(*)::int n FROM public.bookings WHERE id = $1", [r.id]);
+    expect(seen.rows[0].n).toBe(1);
+    expect((await db.rpc(mkCma, "aal1", "set_booking_status", [r.id, "ARRIVED", null, null])).ok).toBe(false);
+  });
+  it("a booking moved twice still lists both days it left", async () => {
+    const r = await book(csr, "aal1", { client: "DEMO Moved" });
+    const d1 = addDays(today(), 2), d2 = addDays(today(), 5);
+    expect((await db.rpc(csr, "aal1", "set_booking_status", [r.id, "RESCHEDULED", d1, null])).ok).toBe(true);
+    expect((await db.rpc(csr, "aal1", "set_booking_status", [r.id, "RESCHEDULED", d2, null])).ok).toBe(true);
+    const row = (await db.sql("SELECT moved_from::text[] m, appointment_date::text d FROM public.bookings WHERE id = $1", [r.id])).rows[0];
+    expect(row.d).toBe(d2);
+    expect(row.m).toEqual([today(), d1]);
   });
 });
