@@ -25,7 +25,7 @@ const time12 = (t: string) => { const [h, m] = t.split(":").map(Number); return 
 const peso = (c: number) => `₱${(c / 100).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`;
 
 /** Online bookings (update-0040): CSRs log Facebook bookings; each branch marks its visits; everyone sees the day live. */
-export default async function BookingsPage({ searchParams }: { searchParams: Promise<{ d?: string; b?: string }> }) {
+export default async function BookingsPage({ searchParams }: { searchParams: Promise<{ d?: string; b?: string; focus?: string }> }) {
   const sp = await searchParams;
   const { supabase, access, branches } = await requireAccess();
   const today = manilaToday();
@@ -135,7 +135,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
             <h2>{b.name} ({list.filter((r) => !moved(r)).length}){seesValue && worth(open(list)) > 0 && <span className="small muted" style={{ fontWeight: 500 }}> · expected {peso(worth(open(list)))}</span>}</h2>
             {list.length === 0 && <p className="muted small" style={{ margin: 0 }}>No bookings.</p>}
             {list.map((r) => (
-              <div key={r.id} className="booking-row">
+              <div key={r.id} id={`bk-${r.id}`} className={`booking-row${sp.focus === r.id ? " focused" : ""}`}>
                 <p style={{ margin: "0 0 2px" }}>
                   <strong>{r.client_name}</strong>{" "}
                   {r.contact ? <a className="small" href={`tel:${r.contact.replace(/\s/g, "")}`}>{r.contact}</a> : <span className="small muted">no number</span>}{" "}
