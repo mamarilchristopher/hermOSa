@@ -15,7 +15,7 @@ function Delta({ v, title }: { v: number | null; title?: string }) {
 }
 function Cell({ c }: { c: DayCell }) {
   switch (c.kind) {
-    case "sales": return <>{php(c.cents)}{c.log && <span className="muted small glance-log"> service log</span>}</>;
+    case "sales": return <>{php(c.cents)}{c.log && <span className="muted small glance-log"> Sales Logged</span>}</>;
     case "zero": return <span className="muted">Zero sales</span>;
     case "closed": return <span className="muted">Closed</span>;
     case "waiting": return <span className="pill STAGED">Waiting sign-off</span>;
