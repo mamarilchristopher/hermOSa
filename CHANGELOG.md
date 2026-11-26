@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.60.1 | Nov 26, 2026 | none | Service log: entries grouped by day (last 7 days up to the chosen day, "Show 7 more days" for older), each day with its count, total and waiting; the approve tick box sits at the start of each waiting entry |
 | 0.60.0 | Nov 26, 2026 | update-0060 | Service log: each entry shows who entered it and when. Owners and the GM add entries with no photos needed and no second sign-off (approved at once); their earlier "Photos missing" entries are cleared. Management can tick entries and approve them together, or approve all waiting |
 | 0.59.0 | Nov 26, 2026 | update-0059 | "Online now" shows each person's approved nickname (else first name without a "Ma." prefix) |
 | 0.58.0 | Nov 26, 2026 | update-0058 | Chat: groups can have a photo (Group details > Add group photo; any member of a group someone made, owners and the GM for All staff and branch groups). Groups without a photo show two members' profile pictures; 1-on-1 chats show the other person's photo |

@@ -18,7 +18,7 @@ type Log = {
 const VISIT_TEXT: Record<string, string> = { BACKJOB: "Backjob (unpaid)", CHECKUP: "Check-up (unpaid)", NO_CHARGE: "No charge" };
 type Line = { service_log_id: string; employee_id: string; role: string; amount_cents: number };
 
-export default async function ServiceLog({ searchParams }: { searchParams: Promise<{ date?: string; branch?: string; entry?: string }> }) {
+export default async function ServiceLog({ searchParams }: { searchParams: Promise<{ date?: string; branch?: string; entry?: string; days?: string }> }) {
   const { supabase, access, branches } = await requireAccess();
   const sp = await searchParams;
   const viewable = branchesFor(access, branches, ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"]);
@@ -26,6 +26,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const branch = viewable.find((b) => b.code === sp.branch) ?? viewable[0];
   const today = manilaToday();
   const date = isIsoDate(sp.date) && sp.date <= today ? sp.date : today;
+  // CHRIS Nov 26: entries grouped by day, the last 7 days up to the chosen day, with "Show 7 more days".
+  const days = Math.min(91, Math.max(7, Math.round(Number(sp.days) / 7) * 7 || 7));
+  const from = addDays(date, -(days - 1));
   const canLog = can(access, ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN"], branch.id);
   const approver = can(access, ["OWNER", "MANAGER"], branch.id);
   // Owners and the GM (update-0054) may log without photos; the lead and assist add them later.
@@ -36,14 +39,15 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
     supabase.from("services").select("id, name, price_cents, commission_cents").eq("active", true).order("name"),
     supabase.from("employees").select("id, full_name, branch_id, commission_eligible, app_user_id, position").eq("active", true).order("full_name"),
     supabase.from("service_logs").select("*, services(name)")
-      .eq("branch_id", branch.id).eq("service_date", date).order("created_at"),
+      .eq("branch_id", branch.id).gte("service_date", from).lte("service_date", date).order("service_date", { ascending: false }).order("created_at"),
     supabase.rpc("chat_people"), // names of everyone in the company, for "Entered by"
   ]);
-  const list = (logs ?? []) as unknown as Log[];
+  const all = (logs ?? []) as unknown as Log[];
+  const list = all.filter((l) => l.service_date === date); // the chosen day, for the cards on top
   // update-0054 (CHRIS Nov 26): only staff timed in today add entries; owners and the GM always can.
   const { data: onDuty } = canLog && !topMgmt ? await supabase.rpc("can_log_services_now") : { data: true };
-  const { data: lineRows } = list.length
-    ? await supabase.from("commission_lines").select("service_log_id, employee_id, role, amount_cents").in("service_log_id", list.map((l) => l.id))
+  const { data: lineRows } = all.length
+    ? await supabase.from("commission_lines").select("service_log_id, employee_id, role, amount_cents").in("service_log_id", all.map((l) => l.id))
     : { data: [] as Line[] };
   const lines = (lineRows ?? []) as Line[];
   const name = Object.fromEntries((emps ?? []).map((e) => [e.id, e.full_name]));
@@ -70,6 +74,8 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const paid = list.filter((l) => l.state !== "REJECTED").reduce((s, l) => s + Number(l.amount_paid_cents), 0);
   const commission = lines.filter((x) => list.find((l) => l.id === x.service_log_id)?.state !== "REJECTED").reduce((s, x) => s + Number(x.amount_cents), 0);
   const pendingCount = list.filter((l) => l.state === "PENDING").length;
+  const pendingAll = all.filter((l) => l.state === "PENDING").length;
+  const groups = [...new Set(all.map((l) => l.service_date))].map((d) => [d, all.filter((l) => l.service_date === d)] as const);
   const link = (d: string, b = branch.code) => `/services?date=${d}&branch=${b}`;
   const dayLabel = `${WEEKDAYS[weekday(date)]}, ${new Date(`${date}T00:00:00Z`).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}`;
 
@@ -118,19 +124,32 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
         )}
 
         <h2>Entries</h2>
-        {approver && pendingCount > 1 && <BatchApprove ids={list.filter((l) => l.state === "PENDING").map((l) => l.id)} />}
+        {approver && pendingAll > 1 && <BatchApprove ids={all.filter((l) => l.state === "PENDING").map((l) => l.id)} />}
+        {groups.length === 0 && <p className="muted">Nothing logged in these {days} days.</p>}
+        {groups.map(([d, dayList]) => {
+          const ok = dayList.filter((l) => l.state !== "REJECTED");
+          const waiting = dayList.filter((l) => l.state === "PENDING").length;
+          return (
+            <section key={d} className="log-day">
+              <h3 className="log-day-head">
+                <span>{d === today ? "Today" : d === addDays(today, -1) ? "Yesterday" : WEEKDAYS[weekday(d)]}, {new Date(`${d}T00:00:00Z`).toLocaleDateString("en-PH", { month: "short", day: "numeric", timeZone: "UTC" })}</span>
+                <span className="small muted">{ok.length} entr{ok.length === 1 ? "y" : "ies"} · {centsToPhp(ok.reduce((x, l) => x + Number(l.amount_paid_cents), 0))}{waiting ? ` · ${waiting} waiting` : ""}</span>
+              </h3>
         <div className="table-wrap">
           <table className="log-table">
             <thead>
               <tr><th>Service</th><th className="num">Paid</th><th>Type</th><th>Staff</th><th className="num">{noCommission ? "Role" : "Commission"}</th><th>Status</th></tr>
             </thead>
             <tbody>
-              {list.map((l) => {
+              {dayList.map((l) => {
                 const ls = lines.filter((x) => x.service_log_id === l.id);
                 const staff = [l.performer_id, l.assistant_id].filter(Boolean) as string[];
                 return (
                   <tr key={l.id} id={`entry-${l.id}`} className={[l.state === "REJECTED" ? "rejected" : "", sp.entry === l.id ? "entry-focus" : ""].join(" ").trim() || undefined}>
-                    <td>{l.client_name && <div className="log-client">{l.client_name}</div>}<strong>{l.services?.name}</strong>
+                    <td>{l.state === "PENDING" && approver && pendingAll > 1 && (
+                        <input type="checkbox" className="batch-tick" name="pick" value={l.id} form="batch-approve" aria-label={`Tick ${l.client_name ?? "entry"} to approve`} />
+                      )}
+                      {l.client_name && <div className="log-client">{l.client_name}</div>}<strong>{l.services?.name}</strong>
                       {l.receipt_no && <div className="small muted">Waiver / OR {l.receipt_no}</div>}
                       {l.price_note && <div className="small muted">Price: {l.price_note}</div>}
                       {l.note && <div className="small muted">{l.note}</div>}
@@ -168,9 +187,6 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                       })}
                     </td>
                     <td>
-                      {l.state === "PENDING" && approver && pendingCount > 1 && (
-                        <label className="batch-tick small"><input type="checkbox" name="pick" value={l.id} form="batch-approve" /> Tick</label>
-                      )}
                       {l.state === "PENDING" && approver ? <DecideButtons id={l.id} /> : (
                         <span className={`pill ${l.state === "APPROVED" ? "PUBLISHED" : l.state === "REJECTED" ? "REVERSED" : "STAGED"}`}>
                           {l.state === "APPROVED" ? "Approved" : l.state === "REJECTED" ? "Rejected" : "Waiting"}
@@ -181,10 +197,14 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                   </tr>
                 );
               })}
-              {list.length === 0 && <tr><td colSpan={6} className="muted">Nothing logged for this day yet.</td></tr>}
             </tbody>
           </table>
         </div>
+            </section>
+          );
+        })}
+        <p className="log-more">{days < 91 && <Link className="button secondary" href={`${link(date)}&days=${days + 7}`} scroll={false}>Show 7 more days</Link>}
+          <span className="small muted"> Showing the {days} days up to {date === today ? "today" : dayLabel}.</span></p>
       </main>
     </>
   );

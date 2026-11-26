@@ -1271,5 +1271,7 @@ body:has(.notify-required) main { padding-bottom: 80px; }
 .log-by { margin-top: 4px; display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 2px 8px; border-radius: 999px; background: var(--gold-soft); border: 1px solid var(--gold-line); }
 .batch-approve { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
 .batch-approve > span:first-child { flex: 1 1 220px; }
-.batch-tick { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 6px; cursor: pointer; }
-.batch-tick input { width: 18px; height: 18px; }
+input.batch-tick { width: 20px; height: 20px; margin: 0 8px 0 0; float: left; cursor: pointer; accent-color: var(--brown); }
+.log-day { margin-bottom: 18px; }
+.log-day-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 14px 2px 8px; font-size: 1rem; }
+.log-more { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
