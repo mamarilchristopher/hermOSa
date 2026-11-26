@@ -124,9 +124,18 @@ export async function loadTodos(supabase: SupabaseClient, access: Access, today:
     const overdue = (Array.isArray(overdueData) ? overdueData : []) as { name: string; date: string; code?: string }[];
     if (overdue.length) todos.push({ text: `Commission sign-off overdue: ${overdue.slice(0, 4).map((o) => `${o.name.replace(/ \(.*\)$/, "")} ${dayLabel(o.date).slice(5)}`).join(", ")}${overdue.length > 4 ? ", and more" : ""}`, href: `/services?date=${overdue[0].date}${overdue[0].code ? `&branch=${overdue[0].code}` : ""}`, urgent: true });
     const toSign = (signData as Signoffs | null)?.to_sign;
+    // Open the oldest waiting entry in its own branch (without a branch the page showed the first branch, often empty).
+    let signHref = `/services?date=${toSign?.oldest}`;
+    if (toSign?.count) {
+      const { data: first } = await supabase.from("service_logs").select("id, service_date, branch_id").eq("state", "PENDING")
+        .order("service_date").order("created_at").limit(1).maybeSingle();
+      const f = first as { id: string; service_date: string; branch_id: string } | null;
+      const code = f && s.ok ? (s.branches ?? []).find((b) => b.id === f.branch_id)?.code : undefined;
+      if (f) signHref = `/services?date=${f.service_date}${code ? `&branch=${code}` : ""}&entry=${f.id}#entry-${f.id}`;
+    }
     if (toSign?.count) todos.push({
       text: `Sign off ${plural(toSign.count, "commission entry", "commission entries")} (oldest ${dayLabel(toSign.oldest!)}). Anything unsigned by ${dayLabel(cutoffEnd(today))} isn't paid in this cutoff`,
-      href: `/services?date=${toSign.oldest}`, urgent: !overdue.length });
+      href: signHref, urgent: !overdue.length });
     if (uploads) todos.push({ text: `${plural(uploads, "upload is", "uploads are")} waiting for sign-off`, href: "/imports" });
     if (details) todos.push({ text: `${plural(details, "staff member sent", "staff members sent")} employee details to review`, href: "/admin/details" });
     if (joins) todos.push({ text: `${plural(joins, "person is", "people are")} asking to join the app`, href: isOwner ? "/admin/users" : "/admin/joins" });
