@@ -141,7 +141,7 @@ describe("payroll", () => {
     expect(amt(b.earnings, "Special day worked")).toBeUndefined();
   });
 
-  it("13th month: a month's pay for the full year, prorated from a start date in the year, less unpaid absences; CSRs excluded", async () => {
+  it("13th month: a month's pay for the full year, prorated from a start date in the year, less unpaid absences; only CMAs (CSRs, the GM and others excluded)", async () => {
     await db.sql("UPDATE public.employees SET hire_date = '2025-03-01' WHERE id = $1", [anaE]);
     await db.sql("UPDATE public.employees SET hire_date = '2026-07-01' WHERE id = $1", [beaE]);
     const list = await db.rpc(gm, "aal1", "thirteenth_month", [2026]);
@@ -159,6 +159,12 @@ describe("payroll", () => {
     expect(amt(s.earnings, "13th month pay 2026")).toBe(a.amount);
     await db.sql("UPDATE public.employees SET position = 'CSR' WHERE id = $1", [beaE]);
     expect((await db.rpc(gm, "aal1", "thirteenth_month", [2026])).find((x: { employee_id: string }) => x.employee_id === beaE)).toBeUndefined();
+    for (const pos of ["General Manager", "Trainee", "Owner"]) {
+      await db.sql("UPDATE public.employees SET position = $2 WHERE id = $1", [beaE, pos]);
+      expect((await db.rpc(gm, "aal1", "thirteenth_month", [2026])).find((x: { employee_id: string }) => x.employee_id === beaE)).toBeUndefined();
+    }
+    await db.sql("UPDATE public.employees SET position = 'Senior CMA' WHERE id = $1", [beaE]);
+    expect((await db.rpc(gm, "aal1", "thirteenth_month", [2026])).find((x: { employee_id: string }) => x.employee_id === beaE)).toBeDefined();
     await db.sql("UPDATE public.employees SET position = 'CMA' WHERE id = $1", [beaE]);
   });
 

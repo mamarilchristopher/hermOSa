@@ -199,7 +199,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
             <h2>13th month pay ({year})</h2>
             <p className="muted small">
               A month&apos;s basic pay for the whole year, prorated from the start date for anyone who started after Jan 1, less unpaid absences on final payslips,
-              divided the same way (÷ 12). Not taxed. Due by Dec 24. CSRs (contractors) aren&apos;t included. Set start dates on each employee&apos;s page.
+              divided the same way (÷ 12). Not taxed. Due by Dec 24. Only CMAs and Senior CMAs get it (by job title); the GM, trainees and CSRs aren&apos;t included. Set start dates on each employee&apos;s page.
             </p>
             <div className="table-wrap">
               <table>
