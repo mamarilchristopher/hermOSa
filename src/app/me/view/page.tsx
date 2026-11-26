@@ -7,6 +7,8 @@ import { centsToPhp } from "@/lib/csv";
 import { manilaToday } from "@/lib/dates";
 import { cutoffEnd, dayLabel } from "@/lib/homeGlance";
 import { TodoCard, type Todo } from "../ManagerHome";
+import { StaticMenu } from "@/components/NavLinks";
+import { menuFor } from "@/lib/hubs";
 
 type ViewAs = {
   ok: boolean; error?: string; name: string; email: string; joined_at: string | null;
@@ -58,7 +60,7 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <TopBar access={access} />
+      <TopBar access={access} viewing={{ name: v.name, grants: v.roles.map((r) => ({ role: r.role, branch_id: r.branch_id })) }} />
       <main>
         <div className="notice info view-as-bar">
           <span>Viewing <strong>{first}&apos;s</strong> Home. Read only: nothing can be changed here.</span>
@@ -67,6 +69,8 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
         <h1>Hi, {first}</h1>
         <p className="muted small">{v.employee?.position ?? "Staff"}{v.employee && ` · ${branchName[v.employee.branch_id] ?? ""}`} · {dayLabel(today)}{seen && ` · last in the app ${seen}`}</p>
         <TodoCard todos={todos} />
+        {/* Phones have no side menu: show the person's menu as a card (CHRIS Nov 26). */}
+        <div className="card view-menu-card"><StaticMenu hubs={menuFor(v.roles)} title={`${first}'s menu`} /></div>
         {notices?.ok && (
           <div className="card">
             <h2 className="notices-head">Notifications{notices.unread > 0 && <span className="nav-badge inline">{notices.unread}</span>}

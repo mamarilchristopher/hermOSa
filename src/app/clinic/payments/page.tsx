@@ -9,15 +9,19 @@ import { dayLabel } from "@/lib/homeGlance";
 import { branchShort } from "@/lib/schedule";
 import { centsToPhp } from "@/lib/csv";
 import { RemoveProof } from "./RemoveProof";
+import { ConfirmPayment, FocusFolder } from "./ConfirmPayment";
 
 type Proof = { id: string; path: string; thumb: string | null; by: string | null; at: string };
-type Folder = { id: string; date: string; client: string | null; service: string | null; branch_id: string; branch: string | null; amount_cents: number; kind: string; state: string; proofs: Proof[] };
+type Check = { state: "PENDING" | "RECEIVED" | "NOT_RECEIVED"; note: string | null; by: string | null; at: string | null };
+type Folder = { id: string; date: string; client: string | null; service: string | null; branch_id: string; branch: string | null; amount_cents: number; kind: string; state: string; check?: Check | null; proofs: Proof[] };
+const CHECK_TEXT = { PENDING: "Waiting for confirmation", RECEIVED: "Payment received", NOT_RECEIVED: "Not received" } as const;
+const CHECK_PILL = { PENDING: "STAGED", RECEIVED: "PUBLISHED", NOT_RECEIVED: "REVERSED" } as const;
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const shiftMonth = (m: string, by: number) => new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1 + by, 1)).toISOString().slice(0, 7);
 const at = (iso: string) => new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-export default async function PaymentProofs({ searchParams }: { searchParams: Promise<{ month?: string; branch?: string; q?: string }> }) {
+export default async function PaymentProofs({ searchParams }: { searchParams: Promise<{ month?: string; branch?: string; q?: string; entry?: string; wait?: string }> }) {
   const { supabase, access, branches } = await requireAccess();
   if (!access.grants.length) redirect("/");
   const mgmt = can(access, ["OWNER"], null) || can(access, ["MANAGER"], null);
@@ -30,7 +34,9 @@ export default async function PaymentProofs({ searchParams }: { searchParams: Pr
 
   const { data, error } = await supabase.rpc("payment_proof_folders", { p_month: `${month}-01`, p_branch: branch });
   const all = (Array.isArray(data) ? data : []) as Folder[];
-  const folders = q ? all.filter((f) => `${f.client ?? ""} ${f.service ?? ""}`.toLowerCase().includes(q)) : all;
+  const waitOnly = sp.wait === "1";
+  const folders = all.filter((f) => (!q || `${f.client ?? ""} ${f.service ?? ""}`.toLowerCase().includes(q)) && (!waitOnly || f.check?.state === "PENDING"));
+  const waiting = all.filter((f) => f.check?.state === "PENDING").length;
   const files = folders.flatMap((f) => f.proofs.flatMap((p) => [p.path, p.thumb].filter((x): x is string => !!x)));
   const view: Record<string, string> = {};
   for (let i = 0; i < files.length; i += 200) {
@@ -75,13 +81,15 @@ export default async function PaymentProofs({ searchParams }: { searchParams: Pr
         {error ? <div className="notice error">{error.code === "PGRST202" ? "The owner needs to run update-0075 in Supabase first." : "Could not load the proofs. Try again."}</div>
           : folders.length === 0 ? <p className="muted">No proof of payment in {label}{q ? " for that search" : ""}. Attach one from an entry in the Service log.</p> : (
           <>
-            <p className="small muted">{folders.length} client folder{folders.length === 1 ? "" : "s"} in {label}.</p>
+            <p className="small muted">{folders.length} client folder{folders.length === 1 ? "" : "s"} in {label}.
+              {waiting > 0 && <> <strong className="warn-text">{waiting} waiting for confirmation.</strong> {waitOnly ? <Link href={link(month)}>Show all</Link> : <Link href={`${link(month)}&wait=1`}>Show only these</Link>}</>}</p>
+            {sp.entry && <FocusFolder id={sp.entry} />}
             {days.map((d) => (
               <section key={d} className="folder-day">
                 <h2>{dayLabel(d)}</h2>
                 <div className="client-folders">
                   {folders.filter((f) => f.date === d).map((f) => (
-                    <details key={f.id} className="client-folder" id={f.id}>
+                    <details key={f.id} className="client-folder" id={f.id} open={f.id === sp.entry || undefined}>
                       <summary>
                         <span className="folder-icon" aria-hidden>💳</span>
                         <span className="folder-main">
@@ -89,6 +97,7 @@ export default async function PaymentProofs({ searchParams }: { searchParams: Pr
                           <span className="small muted">{[f.service, branchShort(f.branch ?? ""), centsToPhp(f.amount_cents)].filter(Boolean).join(" · ")}</span>
                         </span>
                         <span className="folder-side small muted">{f.proofs.length} proof{f.proofs.length === 1 ? "" : "s"}
+                          {f.check && <span className={`pill ${CHECK_PILL[f.check.state]}`}>{CHECK_TEXT[f.check.state]}</span>}
                           {f.state === "REJECTED" && <span className="pill REVERSED">Rejected entry</span>}</span>
                       </summary>
                       <ul className="plain-list folder-photos">
@@ -106,6 +115,13 @@ export default async function PaymentProofs({ searchParams }: { searchParams: Pr
                           );
                         })}
                       </ul>
+                      {f.check && (
+                        <div className="pay-check">
+                          <span className={`pill ${CHECK_PILL[f.check.state]}`}>{CHECK_TEXT[f.check.state]}</span>
+                          {f.check.state !== "PENDING" && <span className="small muted">{f.check.by ? `by ${f.check.by.split(" ")[0]}` : ""}{f.check.at ? ` · ${at(f.check.at)}` : ""}{f.check.note ? ` · ${f.check.note}` : ""}</span>}
+                          {mgmt && <ConfirmPayment log={f.id} state={f.check.state} />}
+                        </div>
+                      )}
                       <div className="folder-foot"><Link className="small" href={`/services?date=${f.date}&branch=${branches.find((b) => b.id === f.branch_id)?.code ?? ""}&entry=${f.id}#entry-${f.id}`}>Open the entry</Link></div>
                     </details>
                   ))}

@@ -8,6 +8,8 @@ export function noticeButton(kind: string | null | undefined): string {
   if (kind === "LEAVE_DECLINED") return "See my leave";
   if (kind === "SWAP_ASKED") return "Accept or decline";
   if (kind === "SWAP_TO_APPROVE") return "Review swap";
+  if (kind === "PAYMENT_PROOF") return "Confirm payment";
+  if (kind === "PAYMENT_RECEIVED" || kind === "PAYMENT_NOT_RECEIVED") return "Open the entry";
   return "Open";
 }
 

@@ -46,3 +46,23 @@ describe("payment proofs", () => {
     expect(await db.rpc(owner, "aal2", "remove_payment_proof", [id])).toMatchObject({ ok: true });
   });
 });
+
+describe("payment confirmation (update-0076)", () => {
+  it("attaching a proof sends management an urgent notice; the GM marks it received and the uploader is told", async () => {
+    const gm = await db.person("General Manager", [["MANAGER", null]]);
+    const f = randomUUID();
+    expect(await db.rpc(other, "aal1", "add_payment_proof", [log, JSON.stringify([proof(db.branches.FAIRVIEW, f)])])).toMatchObject({ ok: true });
+    const n = await db.sql("SELECT count(*)::int c FROM public.notifications WHERE kind = 'PAYMENT_PROOF' AND read_at IS NULL AND user_id IN ($1, $2)", [owner.appUserId, gm.appUserId]);
+    expect(n.rows[0].c).toBe(2);
+    expect((await db.sql("SELECT state FROM public.payment_checks WHERE service_log_id = $1", [log])).rows[0].state).toBe("PENDING");
+    expect(await db.rpc(staff, "aal1", "confirm_payment", [log, true, null])).toMatchObject({ ok: false, error: "FORBIDDEN" });
+    expect(await db.rpc(gm, "aal1", "confirm_payment", [log, true, "In BPI"])).toMatchObject({ ok: true });
+    expect((await db.sql("SELECT state FROM public.payment_checks WHERE service_log_id = $1", [log])).rows[0].state).toBe("RECEIVED");
+    const left = await db.sql("SELECT count(*)::int c FROM public.notifications WHERE kind = 'PAYMENT_PROOF' AND read_at IS NULL", []);
+    expect(left.rows[0].c).toBe(0);
+    const told = await db.sql("SELECT count(*)::int c FROM public.notifications WHERE kind = 'PAYMENT_RECEIVED' AND user_id = $1", [other.appUserId]);
+    expect(told.rows[0].c).toBe(1);
+    const folders = (await db.rpc(owner, "aal2", "payment_proof_folders", [today().slice(0, 8) + "01", null])) as { check: { state: string } }[];
+    expect(folders[0].check.state).toBe("RECEIVED");
+  });
+});

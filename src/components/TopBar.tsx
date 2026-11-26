@@ -3,7 +3,7 @@ import type { Access } from "@/lib/access";
 import { createClient } from "@/lib/supabase/server";
 import { can } from "@/lib/access";
 import { IconLogout, IconShield } from "./Icons";
-import { HubTabs, NavLinks, type Hub } from "./NavLinks";
+import { HubTabs, NavLinks, StaticMenu, type Hub } from "./NavLinks";
 import { ThemeToggle } from "./ThemeToggle";
 import { OnlineNow } from "./OnlineNow";
 import { ViewAsButton } from "./ViewAsButton";
@@ -15,6 +15,7 @@ import { ChatAlerts } from "./ChatAlerts";
 import { ChatDock } from "./ChatDock";
 import { NotifyRequired } from "./Hermosapp";
 import { manilaToday } from "@/lib/dates";
+import { menuFor, type MenuGrant } from "@/lib/hubs";
 
 const ROLE_LABEL: Record<string, string> = {
   OWNER: "Owner", FINANCE: "Finance", MANAGER: "Manager", CASHIER: "Cashier", HR: "HR",
@@ -22,7 +23,7 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 /** App navigation: a sidebar on wide screens, a top bar plus bottom tabs on phones. */
-export async function TopBar({ access }: { access: Access }) {
+export async function TopBar({ access, viewing }: { access: Access; viewing?: { name: string; grants: MenuGrant[] } }) {
   const supabase = await createClient();
   const approver = access.grants.some((g) => g.role === "OWNER" || g.role === "MANAGER");
   const owner = can(access, ["OWNER"], null);
@@ -49,57 +50,11 @@ export async function TopBar({ access }: { access: Access }) {
   const viewList = byRankThenName(Array.isArray(viewPeople) ? (viewPeople as { id: string; name: string; position: string | null }[]) : [],
     (p) => staffRank([], p.position), (p) => p.name);
   const overdue = (Array.isArray(overdueData) ? overdueData : []) as { code: string; name: string; date: string; pending: number }[];
-  const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
-  const people = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "HR", "AUDITOR"].includes(g.role));
-  const importer = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
-  const filler = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER"].includes(g.role));
-  const management = access.grants.some((g) => ["OWNER", "FINANCE", "AUDITOR", "MANAGER"].includes(g.role));
-  // update-0057: every employee sees both photo tabs.
-  const archiver = access.grants.length > 0;
-  const socialTeam = archiver;
-  // Bookings (update-0040): CSRs, owners and the GM book; branch staff see their branch's visits.
-  const booker = access.grants.some((g) => ["CSR", "OWNER", "MANAGER", "CLINICIAN", "CASHIER"].includes(g.role));
-  // Menu grouped into hubs (v0.48, CHRIS Nov 25): related pages become tabs inside one menu item. Time clock stays its own item.
-  const hubs: Hub[] = ([
-    { key: "home", label: "Home", short: "Home", icon: "home", tabs: [{ href: "/me", label: "Home" }] },
-    { key: "time", label: "Time clock", short: "Clock", icon: "clock", tabs: [{ href: "/time", label: "Time clock" }] },
-    // Team chat (v0.49, update-0049): private 1-on-1 and group chats; the badge counts unread messages.
-    { key: "chat", label: "Chat", short: "Chat", icon: "chat", tabs: [{ href: "/chat", label: "Chat", badge: typeof chatUnread === "number" && chatUnread > 0 ? chatUnread : undefined }] },
-    { key: "sales", label: "Sales", short: "Sales", icon: "chart", tabs: [
-      ...(management ? [{ href: "/", label: "Dashboard" }] : []),
-      ...(filler ? [{ href: "/sales/daily", label: "Daily sales" }, { href: "/sales/missing", label: "Missing days" }] : []),
-      ...(importer ? [{ href: "/imports", label: "Imports" }] : []),
-    ] },
-    { key: "clinic", label: "Clinic", short: "Clinic", icon: "clipboard", tabs: [
-      ...(logger ? [{ href: "/services", label: "Service log", badge: overdue.length || undefined }] : []),
-      ...(booker || archiver ? [{ href: "/bookings", label: "Bookings" }] : []),
-      ...(owner || gm ? [{ href: "/services/prices", label: "Price list" }] : []),
-      // Client photos (v0.53, update-0053): waivers and before/after per client; shared ones also in Social media.
-      ...(archiver ? [{ href: "/clinic/archive", label: "Client archive" }] : []),
-      ...(socialTeam ? [{ href: "/clinic/social", label: "Social media" }] : []),
-      // update-0075: proof of payment in its own folder (staff see their own entries, management sees all).
-      ...(archiver ? [{ href: "/clinic/payments", label: "Proof of payment" }] : []),
-    ] },
-    { key: "team", label: "Team", short: "Team", icon: "week", tabs: [
-      { href: "/schedule", label: "Schedule" },
-      { href: "/leave", label: "Leave", badge: leaveWaiting || undefined },
-      ...(approver ? [{ href: "/nte", label: "Late NTEs" }, { href: "/incidents", label: "Incident reports" }] : []),
-    ] },
-    { key: "pay", label: "Pay", short: "Pay", icon: "coins", tabs: [
-      ...(owner || gm ? [{ href: "/payroll", label: "Payroll" }] : []),
-      { href: "/payslips", label: "My payslips" },
-    ] },
-    { key: "people", label: "People", short: "People", icon: "people", tabs: [
-      ...(people ? [{ href: "/people", label: "Employees" }] : []),
-      ...(detailsApprover ? [{ href: "/admin/details", label: "Staff details", badge: detailsWaiting || undefined },
-                             { href: "/admin/photos", label: "Profile pictures", badge: photosWaiting || undefined }] : []),
-      ...(gm ? [{ href: "/admin/joins", label: "Join requests", badge: joinsWaiting || undefined }] : []),
-    ] },
-    { key: "settings", label: "Settings", short: "Settings", icon: "settings", tabs: [
-      ...(owner ? [{ href: "/admin/users", label: "Users and roles" }] : []),
-      ...(owner || gm ? [{ href: "/updates", label: "Updates" }] : []),
-    ] },
-  ] as Hub[]).filter((h) => h.tabs.length > 0);
+  // Menu (v0.48 hubs; moved to lib/hubs so View as can show someone else's menu, CHRIS Nov 26). Role checks use only
+  // grants that are in effect (owner-level roles need 2-step sign-in), as before.
+  const live = access.grants.filter((g) => can(access, [g.role], g.branch_id));
+  const hubs: Hub[] = menuFor(live, { chat: typeof chatUnread === "number" ? chatUnread : 0, overdue: overdue.length, leave: leaveWaiting ?? 0,
+    details: detailsWaiting ?? 0, photos: photosWaiting ?? 0, joins: joinsWaiting ?? 0 });
   const role = [...new Set(access.grants.map((g) => ROLE_LABEL[g.role] ?? g.role))].join(", ") || "No role yet";
 
   return (
@@ -113,7 +68,12 @@ export async function TopBar({ access }: { access: Access }) {
         </Link>
         {/* View as sits above the menu so a long menu on a short laptop screen never pushes it out of sight. */}
         {viewList.length > 0 && <ViewAsButton people={viewList} variant="side" />}
-        <NavLinks hubs={hubs} variant="side" />
+        {viewing ? (
+          <>
+            <Link href="/me" className="static-menu-back small">← Back to my menu</Link>
+            <StaticMenu hubs={menuFor(viewing.grants)} title={`${viewing.name.split(" ")[0]}'s menu`} />
+          </>
+        ) : <NavLinks hubs={hubs} variant="side" />}
         <div className="side-mode"><ThemeToggle variant="pill" /></div>
         <div className="me">
           <Avatar name={access.display_name} url={myPhotoUrl} />

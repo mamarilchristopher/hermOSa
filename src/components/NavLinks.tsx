@@ -95,3 +95,22 @@ export function HubTabs({ hubs }: { hubs: Hub[] }) {
     </div>
   );
 }
+
+/** View as (CHRIS Nov 26): the side menu exactly as the viewed person sees it, with each item's tabs listed under it.
+ *  Read only: the items aren't links, so nothing opens as you by mistake. */
+export function StaticMenu({ hubs, title }: { hubs: Hub[]; title: string }) {
+  return (
+    <nav className="side-nav static-menu" aria-label={title}>
+      <span className="static-menu-title">{title}</span>
+      {hubs.map((h) => {
+        const Icon = ICONS[h.icon];
+        return (
+          <div key={h.key} className="static-hub">
+            <span className="static-hub-row"><Icon /><span>{h.label}</span></span>
+            {h.tabs.length > 1 && <ul>{h.tabs.map((t) => <li key={t.href}>{t.label}</li>)}</ul>}
+          </div>
+        );
+      })}
+    </nav>
+  );
+}

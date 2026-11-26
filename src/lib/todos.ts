@@ -136,6 +136,12 @@ export async function loadTodos(supabase: SupabaseClient, access: Access, today:
     if (toSign?.count) todos.push({
       text: `Sign off ${plural(toSign.count, "commission entry", "commission entries")} (oldest ${dayLabel(toSign.oldest!)}). Anything unsigned by ${dayLabel(cutoffEnd(today))} isn't paid in this cutoff`,
       href: signHref, urgent: !overdue.length });
+    // update-0076 (CHRIS Nov 26): every proof of payment needs owners or the GM to confirm the transfer came in.
+    if (ownerLevel) {
+      const { data: pay, error: payErr } = await supabase.from("payment_checks").select("service_log_id, updated_at").eq("state", "PENDING").order("updated_at").limit(50);
+      const rows = (pay ?? []) as { service_log_id: string }[];
+      if (!payErr && rows.length) todos.unshift({ text: `💳 ${plural(rows.length, "proof of payment", "proofs of payment")} to confirm. Check that the transfer came in`, href: `/clinic/payments?wait=1&entry=${rows[0].service_log_id}`, urgent: true });
+    }
     if (uploads) todos.push({ text: `${plural(uploads, "upload is", "uploads are")} waiting for sign-off`, href: "/imports" });
     if (details) todos.push({ text: `${plural(details, "staff member sent", "staff members sent")} employee details to review`, href: "/admin/details" });
     if (joins) todos.push({ text: `${plural(joins, "person is", "people are")} asking to join the app`, href: isOwner ? "/admin/users" : "/admin/joins" });
