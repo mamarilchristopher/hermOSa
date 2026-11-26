@@ -64,5 +64,8 @@ describe("payment confirmation (update-0076)", () => {
     expect(told.rows[0].c).toBe(1);
     const folders = (await db.rpc(owner, "aal2", "payment_proof_folders", [today().slice(0, 8) + "01", null])) as { check: { state: string } }[];
     expect(folders[0].check.state).toBe("RECEIVED");
+    // update-0078: who made the entry, as a short first name.
+    expect(typeof (folders[0] as unknown as { staff: string }).staff).toBe("string");
+    expect((folders[0] as unknown as { staff: string }).staff.length).toBeGreaterThan(0);
   });
 });

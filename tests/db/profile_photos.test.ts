@@ -42,7 +42,10 @@ describe("profile pictures", () => {
     expect((await db.sql("SELECT body FROM public.notifications WHERE kind = 'PHOTO_RETURNED'")).rows[0].body).toContain("DEMO face not clear");
     expect(await photo(staff)).toBeNull();
     await db.rpc(staff, "aal1", "submit_profile_photo", [file(staff, 3)]);
+    const unreadNotices = async () => (await db.sql("SELECT count(*)::int n FROM public.notifications WHERE kind = 'PHOTO_SUBMITTED' AND read_at IS NULL")).rows[0].n;
+    expect(await unreadNotices()).toBe(2); // owner and GM, for the photo now waiting
     expect((await db.rpc(gm, "aal1", "decide_profile_photo", [await pendingOf(staff), true, null])).ok).toBe(true);
+    expect(await unreadNotices()).toBe(0); // update-0078: the GM decided, so the owner's notice clears too
     expect(await photo(staff)).toBe(file(staff, 3));
     expect((await db.sql("SELECT count(*)::int n FROM public.notifications WHERE kind = 'PHOTO_APPROVED' AND user_id = $1", [staff.appUserId])).rows[0].n).toBe(1);
   });

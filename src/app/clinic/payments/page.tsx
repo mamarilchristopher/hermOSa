@@ -11,9 +11,9 @@ import { centsToPhp } from "@/lib/csv";
 import { RemoveProof } from "./RemoveProof";
 import { ConfirmPayment, FocusFolder } from "./ConfirmPayment";
 
-type Proof = { id: string; path: string; thumb: string | null; by: string | null; at: string };
+type Proof = { id: string; path: string; thumb: string | null; by: string | null; by_short?: string | null; at: string };
 type Check = { state: "PENDING" | "RECEIVED" | "NOT_RECEIVED"; note: string | null; by: string | null; at: string | null };
-type Folder = { id: string; date: string; client: string | null; service: string | null; branch_id: string; branch: string | null; amount_cents: number; kind: string; state: string; check?: Check | null; proofs: Proof[] };
+type Folder = { id: string; date: string; client: string | null; service: string | null; branch_id: string; branch: string | null; amount_cents: number; kind: string; state: string; staff?: string | null; check?: Check | null; proofs: Proof[] };
 const CHECK_TEXT = { PENDING: "Waiting for confirmation", RECEIVED: "Payment received", NOT_RECEIVED: "Not received" } as const;
 const CHECK_PILL = { PENDING: "STAGED", RECEIVED: "PUBLISHED", NOT_RECEIVED: "REVERSED" } as const;
 
@@ -35,7 +35,7 @@ export default async function PaymentProofs({ searchParams }: { searchParams: Pr
   const { data, error } = await supabase.rpc("payment_proof_folders", { p_month: `${month}-01`, p_branch: branch });
   const all = (Array.isArray(data) ? data : []) as Folder[];
   const waitOnly = sp.wait === "1";
-  const folders = all.filter((f) => (!q || `${f.client ?? ""} ${f.service ?? ""}`.toLowerCase().includes(q)) && (!waitOnly || f.check?.state === "PENDING"));
+  const folders = all.filter((f) => (!q || `${f.client ?? ""} ${f.service ?? ""} ${f.staff ?? ""}`.toLowerCase().includes(q)) && (!waitOnly || f.check?.state === "PENDING"));
   const waiting = all.filter((f) => f.check?.state === "PENDING").length;
   const files = folders.flatMap((f) => f.proofs.flatMap((p) => [p.path, p.thumb].filter((x): x is string => !!x)));
   const view: Record<string, string> = {};
@@ -93,7 +93,7 @@ export default async function PaymentProofs({ searchParams }: { searchParams: Pr
                       <summary>
                         <span className="folder-icon" aria-hidden>💳</span>
                         <span className="folder-main">
-                          <strong>{f.client ?? "No client name"}</strong>
+                          <strong>{f.client ?? "No client name"}{f.staff && <span className="folder-staff"> – {f.staff}</span>}</strong>
                           <span className="small muted">{[f.service, branchShort(f.branch ?? ""), centsToPhp(f.amount_cents)].filter(Boolean).join(" · ")}</span>
                         </span>
                         <span className="folder-side small muted">{f.proofs.length} proof{f.proofs.length === 1 ? "" : "s"}
@@ -109,7 +109,7 @@ export default async function PaymentProofs({ searchParams }: { searchParams: Pr
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 {src ? <img src={src} alt={`Proof of payment, ${f.client ?? "client"}`} loading="lazy" /> : <span className="folder-nothumb">Open proof</span>}
                               </a>
-                              <span className="small muted">{p.by ? `${p.by.split(" ")[0]} · ` : ""}{at(p.at)}</span>
+                              <span className="small muted">{p.by_short || p.by ? `${p.by_short ?? p.by!.split(" ")[0]} · ` : ""}{at(p.at)}</span>
                               {(mgmt || p.by === access.display_name) && <RemoveProof id={p.id} />}
                             </li>
                           );

@@ -58,6 +58,9 @@ describe("leave requests", () => {
     expect((await db.rpc(gm, "aal1", "decide_leave", [r.id, true, null, null])).error).toBe("PAY_CHOICE_REQUIRED");
     const ok = await db.rpc(gm, "aal1", "decide_leave", [r.id, true, true, null]);
     expect(ok).toMatchObject({ ok: true, days: 2 });
+    // update-0078: the GM decided, so every manager's notice for this leave is cleared.
+    expect((await db.sql("SELECT count(*)::int n FROM public.notifications n JOIN public.leave_requests l ON l.filed_by = n.created_by AND l.filed_at = n.created_at WHERE l.id = $1 AND n.kind = 'LEAVE_FILED' AND n.read_at IS NULL", [r.id])).rows[0].n).toBe(0);
+    expect((await db.sql("SELECT count(*)::int n FROM public.notifications n JOIN public.leave_requests l ON l.filed_by = n.created_by AND l.filed_at = n.created_at WHERE l.id = $1 AND n.kind = 'LEAVE_FILED'", [r.id])).rows[0].n).toBeGreaterThan(0);
     expect(await shiftOn(anaE, a)).toMatchObject({ is_off: true, leave_type: "VL", state: "PUBLISHED", branch_id: null });
     expect(await shiftOn(anaE, b)).toMatchObject({ is_off: true, leave_type: null });
     expect(await shiftOn(anaE, c)).toMatchObject({ is_off: true, leave_type: "VL", state: "PUBLISHED" });
