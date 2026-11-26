@@ -12,6 +12,7 @@ import { Avatar } from "./Avatar";
 import { photoUrls } from "@/lib/photos";
 import { NotifBell } from "./NotifBell";
 import { ChatAlerts } from "./ChatAlerts";
+import { ChatDock } from "./ChatDock";
 import { NotifyRequired } from "./Hermosapp";
 import { manilaToday } from "@/lib/dates";
 
@@ -94,6 +95,7 @@ export async function TopBar({ access }: { access: Access }) {
     ] },
     { key: "settings", label: "Settings", short: "Settings", icon: "settings", tabs: [
       ...(owner ? [{ href: "/admin/users", label: "Users and roles" }] : []),
+      ...(owner || gm ? [{ href: "/updates", label: "Updates" }] : []),
     ] },
   ] as Hub[]).filter((h) => h.tabs.length > 0);
   const role = [...new Set(access.grants.map((g) => ROLE_LABEL[g.role] ?? g.role))].join(", ") || "No role yet";
@@ -153,6 +155,8 @@ export async function TopBar({ access }: { access: Access }) {
       <HubTabs hubs={hubs} />
       {/* v0.49: chat sounds, and the can't-miss notice when management messages staff. */}
       <ChatAlerts me={access.user_id} management={viewAs} />
+      {/* v0.73.1: Facebook-style chat heads (PC) and chat bubble (phone) on every page except Chat. */}
+      <ChatDock me={access.user_id} />
       {timedIn && <NotifyRequired />}
     </>
   );

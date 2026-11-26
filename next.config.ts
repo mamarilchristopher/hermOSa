@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 /** Which code this build is, shown in the footer so you can tell when a deploy is live. */
 function buildInfo() {
@@ -20,7 +21,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  env: buildInfo(),
+  // The Updates page (management) reads the version log from CHANGELOG.md at build time (CHRIS Nov 26).
+  env: { ...buildInfo(), HERMOSA_CHANGELOG: (() => { try { return readFileSync("CHANGELOG.md", "utf8"); } catch { return ""; } })() },
   experimental: { serverActions: { bodySizeLimit: "5mb" } },
   async headers() {
     return [
