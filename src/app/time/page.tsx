@@ -22,6 +22,8 @@ export default async function TimePage() {
   const clinics = branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH"); // WFH: CSRs working from home (update-0038)
   const short = clinics.map((b) => ({ id: b.id, name: branchShort(b.name), wfh: b.kind === "WFH" }));
   const manager = can(access, ["OWNER", "MANAGER"], null) || access.grants.some((g) => g.role === "MANAGER");
+  // CHRIS Nov 27: CSRs and management (owners, GM) aren't checked against the weekly schedule.
+  const noSchedule = can(access, ["OWNER", "MANAGER"], null) || access.grants.some((g) => g.role === "CSR");
   const cutStart = Number(today.slice(8)) <= 15 ? `${today.slice(0, 7)}-01` : `${today.slice(0, 7)}-16`;
 
   const { data: me } = await supabase.from("employees").select("id, branch_id").eq("app_user_id", access.user_id).eq("active", true).order("created_at").limit(1).maybeSingle();
@@ -42,6 +44,7 @@ export default async function TimePage() {
   const start = shift?.start_time?.slice(0, 5);
   const status = !me ? "" : isIn ? `You're in since ${clock(mine.filter((p) => p.kind === "IN").at(-1)!.punched_at)}.`
     : firstIn ? "You're timed out." : shift?.is_off ? "You're on a day off today." : start ? `Today: ${branchShort(clinics.find((b) => b.id === shift?.branch_id)?.name ?? "")}, ${timeLabel(start)} – ${timeLabel(shift?.end_time)}.`
+    : noSchedule ? "Time in when you start work. You don't need to be on the weekly schedule."
     : "You're not on today's published schedule.";
 
   const rows = (Array.isArray(duty.data) ? duty.data : []) as DutyRow[];
