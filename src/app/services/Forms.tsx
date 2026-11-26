@@ -69,7 +69,9 @@ function medsChoices(meds: MedsOpt[]): { v: string; label: string }[] {
 export function BranchEntryForm({ branches, start, employees, ...rest }: Omit<Parameters<typeof EntryForm>[0], "branch" | "employees"> & {
   branches: { id: string; name: string }[]; start: string; employees: (Opt & { branch: string })[];
 }) {
-  const [b, setB] = useState(start);
+  const [picked, setB] = useState(start);
+  // One branch to log for: always that one (the state can be stale after switching from All branches).
+  const b = branches.length === 1 ? branches[0].id : branches.some((x) => x.id === picked) ? picked : "";
   const people = employees.map(({ branch, ...e }) => ({ ...e, here: branch === b }));
   return (
     <>
