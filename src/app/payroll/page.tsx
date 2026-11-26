@@ -199,11 +199,11 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
             <h2>13th month pay ({year})</h2>
             <p className="muted small">
               A month&apos;s basic pay for the whole year, prorated from the start date for anyone who started after Jan 1, less unpaid absences on final payslips,
-              divided the same way (÷ 12). Not taxed. Due by Dec 24. Only CMAs and Senior CMAs get it (by job title); the GM, trainees and CSRs aren&apos;t included. Set start dates on each employee&apos;s page.
+              divided the same way (÷ 12). Not taxed. Due by Dec 24. Only CMAs and Senior CMAs get it (by job title). Basic pay is the monthly rate. Set start dates on each employee&apos;s page.
             </p>
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Name</th><th>Started</th><th className="num">Months</th><th className="num">Absences</th><th className="num">13th month</th></tr></thead>
+                <thead><tr><th>Name</th><th>Started</th><th className="num">Months</th><th className="num">Absences</th><th className="num">Basic pay</th><th className="num">13th month</th></tr></thead>
                 <tbody>
                   {thirteenth.map((t) => (
                     <tr key={t.employee_id}>
@@ -211,10 +211,11 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
                       <td>{t.hire_date ? new Date(`${t.hire_date}T00:00:00Z`).toLocaleDateString("en-PH", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" }) : <span className="small muted">no start date (full year)</span>}</td>
                       <td className="num">{Number(t.months).toFixed(t.prorated ? 2 : 0)}</td>
                       <td className="num">{Number(t.absences) ? peso(t.absences) : ""}</td>
+                      <td className="num">{peso(t.monthly)}</td>
                       <td className="num"><strong>{peso(t.amount)}</strong></td>
                     </tr>
                   ))}
-                  <tr className="total"><td>Total</td><td></td><td></td><td></td><td className="num"><strong>{peso(thirteenth.reduce((a, t) => a + Number(t.amount), 0))}</strong></td></tr>
+                  <tr className="total"><td>Total</td><td></td><td></td><td></td><td></td><td className="num"><strong>{peso(thirteenth.reduce((a, t) => a + Number(t.amount), 0))}</strong></td></tr>
                 </tbody>
               </table>
             </div>
