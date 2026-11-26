@@ -6,6 +6,7 @@ import {
 } from "@/lib/promoRules";
 import { modelSrc, modelsFor } from "@/lib/promoModels";
 import { drawPromo } from "@/lib/promoImage";
+import { PromoMockup } from "@/components/PromoMockup";
 import { COPY_FAIL, copyCanvas, fontsOf, saveCanvas } from "@/lib/canvasShare";
 import { approvePromo, endPromo, savePromo, type PromoInput } from "./actions";
 
@@ -154,6 +155,7 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
         <div className="promo-ideas">
           {ideas.map((s) => (
             <div key={s.id} className="promo-idea">
+              <PromoMockup idea={s} endsOn={addDays(today, 13)} serif={serif} />
               <span className="tag">{KIND[s.kind]}</span>
               <strong>{s.title}</strong>
               <span className="small">{s.items.length === 1 ? `${s.items[0].name} ${s.items[0].paid}+${s.items[0].free}` : s.items.map((i) => `${i.paid} ${i.name}`).join(", ")}</span>

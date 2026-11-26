@@ -1,9 +1,11 @@
+import { Playfair_Display } from "next/font/google";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { BarRows, Chg, compact, DayColumns, Donut, GoldArea, GoldBars, GoldSpark, HeatCalendar, Ring } from "@/components/BizCharts";
 import { CountUp } from "@/components/CountUp";
+import { PromoMockup } from "@/components/PromoMockup";
 import { manilaToday } from "@/lib/dates";
 import { computeGlance, dayLabel, type StatusDay } from "@/lib/homeGlance";
 import { addDays, addMonths, monthLabel, monthStart, sortBranches, WEEKDAYS } from "@/lib/insights";
@@ -64,6 +66,9 @@ async function promoDue(supabase: Supa, today: string) {
   const active = (id: string) => clients.filter((c) => c.promo_id === id).length;
   return { promos: promos.map((p) => ({ id: p.id, title: p.title, active: active(p.id) })), due, names };
 }
+
+// The serif the promo photos use (same as Sales › Promos).
+const serif = Playfair_Display({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
 /** Business dashboard (CHRIS Nov 27): sales and trends, employee patterns and today's promo picks, for all management. */
 export default async function Business() {
@@ -188,12 +193,15 @@ export default async function Business() {
 
         <div className="card biz-picks">
           <h2>Today&apos;s promo picks</h2>
+          {/* loads the serif used on the promo photos */}
+          <span className={serif.className} aria-hidden style={{ position: "absolute", opacity: 0, pointerEvents: "none" }}>Aa</span>
           {signals.length > 0 && <div className="biz-signals">{signals.map((x) => <span key={x.text} className={x.tone ?? ""} title={x.title}>{x.text}</span>)}</div>}
           {ideas.missing && <p className="small muted">Promo ideas start once update-0086 is run.</p>}
           {!ideas.missing && picks.length === 0 && <p className="small muted">No ideas yet: the Service log needs a few more weeks.</p>}
           <div className="biz-pickgrid">
             {picks.map(({ idea, today: why, badge }) => (
               <div key={idea.id} className="biz-pick">
+                <PromoMockup idea={idea} endsOn={addDays(today, 13)} serif={serif.style.fontFamily} />
                 <span className="tag">{KIND[idea.kind]}</span>
                 <b>{idea.title}</b>
                 <span className="m">{idea.items.length === 1 ? `${shortName(idea.items[0].name)} ${idea.items[0].paid}+${idea.items[0].free}` : idea.items.map((i) => `${i.paid} ${shortName(i.name)}`).join(" + ")}</span>
