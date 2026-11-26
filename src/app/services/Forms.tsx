@@ -43,7 +43,9 @@ function Msg({ s }: { s: ActionState }) {
   return null;
 }
 
-export function EntryForm({ branch, date, services, employees, noCommission = false, photosOptional = false }: { branch: string; date: string; services: Opt[]; employees: Opt[]; noCommission?: boolean; photosOptional?: boolean }) {
+export function EntryForm({ branch, date, today, services, employees, noCommission = false, photosOptional = false }: { branch: string; date: string; today?: string; services: Opt[]; employees: Opt[]; noCommission?: boolean; photosOptional?: boolean }) {
+  // CHRIS Nov 26: owners and the GM pick the service date (default today) to batch-log older days; it stays set between saves.
+  const [day, setDay] = useState(today ?? date);
   const [state, action, pending] = useActionState(logService, undefined);
   // CHRIS Nov 26: no Lead/Assist/Solo choice. "Done by" is the lead; a commission-based lead may add an assistant (default None).
   const [kind, setKind] = useState<Kind>("PAID");
@@ -109,7 +111,7 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
     <form ref={form} action={action} className="entry-form">
       <Msg s={state} />
       <input type="hidden" name="branch" value={branch} />
-      <input type="hidden" name="date" value={date} />
+      {!photosOptional && <input type="hidden" name="date" value={date} />}
       <input type="hidden" name="type" value={effType} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="folder" value={photos.folder} />
@@ -124,6 +126,12 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
         {!paid && <span className="small muted">{noCommission ? "Logged at ₱0, so you can see every client handled." : "Logged at ₱0 with no commission, so you can see every client handled."}</span>}
       </div>
       <div className="entry-grid">
+        {photosOptional && (
+          <label className="span2">Date of service
+            <input type="date" name="date" required value={day} max={today ?? date} onChange={(e) => setDay(e.target.value)} />
+            {today && day !== today && <span className="small" style={{ color: "var(--bad)" }}>Logging for an earlier day ({new Date(`${day}T00:00:00Z`).toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}).</span>}
+          </label>
+        )}
         <label className="span2">Client name
           <input name="client" required minLength={2} maxLength={120} autoComplete="off" placeholder="Full name, as on the waiver" value={client} onChange={(e) => setClient(e.target.value)} />
         </label>

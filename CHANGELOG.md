@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.60.2 | Nov 26, 2026 | none | Service log: owners and the GM get a "Date of service" field (default today, can pick an earlier day) to batch-log older entries; the date stays set between saves |
 | 0.60.1 | Nov 26, 2026 | none | Service log: entries grouped by day (last 7 days up to the chosen day, "Show 7 more days" for older), each day with its count, total and waiting; the approve tick box sits at the start of each waiting entry |
 | 0.60.0 | Nov 26, 2026 | update-0060 | Service log: each entry shows who entered it and when. Owners and the GM add entries with no photos needed and no second sign-off (approved at once); their earlier "Photos missing" entries are cleared. Management can tick entries and approve them together, or approve all waiting |
 | 0.59.0 | Nov 26, 2026 | update-0059 | "Online now" shows each person's approved nickname (else first name without a "Ma." prefix) |
