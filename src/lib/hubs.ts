@@ -33,6 +33,8 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
       ...(importer ? [{ href: "/imports", label: "Imports" }] : []),
       // update-0081 (CHRIS Nov 26): Unresponsive bookings to call or message again. CSRs, owners and the GM.
       ...(owner || gm || has(["CSR"]) ? [{ href: "/bookings/followups", label: "Follow-ups" }] : []),
+      // update-0086 (CHRIS Nov 27): promo ideas every Monday, and the builder. Owners and the GM.
+      ...(owner || gm ? [{ href: "/promos", label: "Promos" }] : []),
     ] },
     { key: "clinic", label: "Clinic", short: "Clinic", icon: "clipboard", tabs: [
       ...(logger ? [{ href: "/services", label: "Service log", badge: n(c.overdue) }] : []),

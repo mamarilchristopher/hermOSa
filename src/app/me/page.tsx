@@ -95,6 +95,7 @@ export default async function Me() {
   const staffBookings = management ? null : await loadHomeBookings(supabase, today, can(access, ["CSR", "OWNER", "MANAGER"], null));
   // Late NTEs waiting for my explanation (shown as boxes at the top), and the owner/GM tardiness tracker.
   const ownerLevel = isOwner || access.grants.some((g) => g.role === "MANAGER" && g.branch_id === null);
+  if (ownerLevel) await supabase.rpc("promo_week_notice"); // Mondays: "promo ideas are ready" (errors before update-0086 are ignored)
   await supabase.rpc("run_nte_deadlines"); // issues the automatic IRs that are due (errors before update-0032 are ignored)
   const [{ data: myNteData }, { data: trackData }] = await Promise.all([
     emp ? supabase.from("late_ntes").select("id, nte_no, work_date, shift_start, time_in, late_minutes, respond_by, ir_id").eq("employee_id", emp.id).eq("state", "OPEN").order("work_date")
