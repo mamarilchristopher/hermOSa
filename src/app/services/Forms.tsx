@@ -50,7 +50,20 @@ function Msg({ s }: { s: ActionState }) {
   return null;
 }
 
-export function EntryForm({ branch, date, today, services, employees, noCommission = false, photosOptional = false }: { branch: string; date: string; today?: string; services: Opt[]; employees: Opt[]; noCommission?: boolean; photosOptional?: boolean }) {
+/** Meds dropdown (CHRIS Nov 26, update-0069): None, the package free, the package, Clindamycin only, Mupirocin only. */
+export type MedsOpt = { id: string; name: string; price: number };
+function medsChoices(meds: MedsOpt[]): { v: string; label: string }[] {
+  const find = (re: RegExp) => meds.find((m) => re.test(m.name));
+  const find1 = (re: RegExp) => meds.find((m) => re.test(m.name) && !/package/i.test(m.name));
+  const pack = find(/package/i), clinda = find1(/clinda/i), mupi = find1(/mupi/i);
+  const out = [{ v: "", label: "None" }];
+  if (pack) out.push({ v: `free:${pack.id}`, label: "Meds Package Free" }, { v: pack.id, label: `Meds Package ${centsToPhp(pack.price)}` });
+  if (clinda) out.push({ v: clinda.id, label: `Clindamycin only ${centsToPhp(clinda.price)}` });
+  if (mupi) out.push({ v: mupi.id, label: `Mupirocin only ${centsToPhp(mupi.price)}` });
+  return out;
+}
+
+export function EntryForm({ branch, date, today, services, employees, noCommission = false, photosOptional = false, meds = [] }: { branch: string; date: string; today?: string; services: Opt[]; employees: Opt[]; noCommission?: boolean; photosOptional?: boolean; meds?: MedsOpt[] }) {
   // CHRIS Nov 26: owners and the GM pick the service date (default today) to batch-log older days; it stays set between saves.
   const [day, setDay] = useState(today ?? date);
   const [state, action, pending] = useActionState(logService, undefined);
@@ -67,6 +80,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const [share, setShare] = useState(false);
   const [note, setNote] = useState("");
   const [session, setSession] = useState("1");
+  const [med, setMed] = useState("");
   const photos = usePhotoSlots(branch);
   const form = useRef<HTMLFormElement>(null);
   useEffect(() => {
@@ -76,7 +90,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       setAmount("");
       setKind("PAID");
       setWho("");
-      setService(""); setPartner(""); setClient(""); setPriceNote(""); setShare(false); setNote(""); setSession("1");
+      setService(""); setPartner(""); setClient(""); setPriceNote(""); setShare(false); setNote(""); setSession("1"); setMed("");
       photos.reset();
     }
   }, [state]);
@@ -184,6 +198,13 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
           </label>
         )}
         </div>
+        {meds.length > 0 && (
+          <label className="span2"><span>Meds{!noCommission && <span className="muted"> (no commission)</span>}</span>
+            <select name="meds" value={med} onChange={(e) => setMed(e.target.value)}>
+              {medsChoices(meds).map((m) => <option key={m.v} value={m.v}>{m.label}</option>)}
+            </select>
+          </label>
+        )}
         {priceDiffers && (
           <label className="span2"><span>Reason for the different price <span className="muted">({scheduled != null ? `session ${session} of this bundle is ${centsToPhp(scheduled)}` : `list price ${centsToPhp(listPrice!)}`})</span></span>
             <input name="price_note" required minLength={3} maxLength={300} placeholder="e.g. 10% promo, loyalty discount" value={priceNote} onChange={(e) => setPriceNote(e.target.value)} />

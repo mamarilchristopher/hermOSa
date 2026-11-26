@@ -26,11 +26,12 @@ const Log = z.object({
   photos: z.string().max(20000),
   share: z.literal("1").optional(),
   session: z.coerce.number().int().min(1).max(15).default(1),
+  meds: z.union([z.uuid(), z.string().regex(/^free:[0-9a-f-]{36}$/), z.literal("")]).optional(),
 });
 const Photos = z.array(z.object({ kind: z.enum(["WAIVER", "BEFORE", "AFTER"]), path: z.string().max(300), thumb: z.string().max(300).nullable() })).max(20);
 
 export async function logService(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session"].map((k) => [k, fd.get(k) ?? undefined])));
+  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session", "meds"].map((k) => [k, fd.get(k) ?? undefined])));
   if (!p.success) return { error: "Fill in the client's name, the service, the amount paid and who did it." };
   let photos;
   try { photos = Photos.parse(JSON.parse(p.data.photos || "[]")); } catch { return { error: "The photos didn't attach. Remove them and add them again." }; }
@@ -78,6 +79,13 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     return { duplicate: `${data.existing.by} already logged this service for the same staff and amount today at ${at}. Is this a different client?`, at: Date.now() };
   }
   if (!data.ok) return { error: errorText(data.error) };
+  // CHRIS Nov 26 (update-0069): meds go in as their own line of this visit, no commission.
+  let medsNote = "";
+  if (p.data.meds) {
+    const free = p.data.meds.startsWith("free:");
+    const { data: m, error: mErr } = await supabase.rpc("log_meds", { p_log: data.id, p_service: free ? p.data.meds.slice(5) : p.data.meds, p_free: free });
+    medsNote = mErr || !m?.ok ? " The meds didn't save: add them again as their own entry." : free ? " Free meds package added." : " Meds added.";
+  }
   revalidatePath("/services");
   revalidatePath("/me");
   const [{ data: svc }, { data: emp }] = await Promise.all([
@@ -87,10 +95,10 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
   if (isTestService(svc?.name)) {
     return { ok: testResult({ kind: p.data.kind, cents, type: !paid ? "NONCOMMI" : p.data.type === "LEAD" && !p.data.partner ? "SOLO" : p.data.type, eligible: emp?.commission_eligible ?? null, photos, photosDue: !!data.photos_due }), at: Date.now() };
   }
-  if (data.photos_due) return { ok: "Saved. The lead and assist were asked to add the client photos and waiver; their commission is held until they do.", at: Date.now() };
+  if (data.photos_due) return { ok: ("Saved. The lead and assist were asked to add the client photos and waiver; their commission is held until they do.") + medsNote, at: Date.now() };
   const on = p.data.date === manilaToday() ? "" : ` for ${new Date(`${p.data.date}T00:00:00Z`).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`;
-  if (data.state === "APPROVED") return { ok: paid ? `Saved and approved${on}.` : `Saved${on}. Unpaid visit logged (no commission).`, at: Date.now() };
-  return { ok: paid ? "Saved. Waiting for manager sign-off." : "Saved. Unpaid visit logged (no commission).", at: Date.now() };
+  if (data.state === "APPROVED") return { ok: (paid ? `Saved and approved${on}.` : `Saved${on}. Unpaid visit logged (no commission).`) + medsNote, at: Date.now() };
+  return { ok: (paid ? "Saved. Waiting for manager sign-off." : "Saved. Unpaid visit logged (no commission).") + medsNote, at: Date.now() };
 }
 
 export async function decideLog(_prev: ActionState, fd: FormData): Promise<ActionState> {

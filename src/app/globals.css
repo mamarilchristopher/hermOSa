@@ -1349,3 +1349,15 @@ input.batch-tick { width: 20px; height: 20px; margin: 0 8px 0 0; float: left; cu
 .page-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 50vh; }
 .page-spinner { width: 36px; height: 36px; border-radius: 50%; border: 3px solid var(--line-strong); border-top-color: var(--gold); animation: page-spin 0.8s linear infinite; }
 @keyframes page-spin { to { transform: rotate(360deg); } }
+
+/* Service record (CHRIS Nov 26): Details sheet for one service log entry. */
+.details-btn { margin-top: 6px; }
+.record-sheet .record-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.record-list { margin: 0; }
+.record-list > div { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-top: 1px solid var(--line, #eadcc2); }
+.record-list > div:first-child { border-top: 0; }
+.record-list dt { color: var(--muted, #8a776b); font-size: .9rem; }
+.record-list dd { margin: 0; font-weight: 600; text-align: right; }
+.record-visit { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2, #faf4ea); }
+.record-visit > div { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
+.record-visit .record-total { border-top: 1px solid var(--line, #eadcc2); margin-top: 6px; padding-top: 8px; font-weight: 800; }

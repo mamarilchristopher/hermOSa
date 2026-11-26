@@ -1,5 +1,6 @@
 import { sortServices } from "@/lib/serviceOrder";
 import Link from "next/link";
+import { EntryDetails } from "./EntryDetails";
 import { redirect } from "next/navigation";
 import { requireAccess, branchesFor, can } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
@@ -128,7 +129,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 {(services ?? []).length === 0 ? "Add your services below first." : null}
               </div>
             ) : (
-              <EntryForm branch={branch.id} date={date} today={today} services={sortServices(services ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null, sessions: Array.isArray(s.session_prices) ? (s.session_prices as (number | string)[]).map(Number) : null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
+              <EntryForm branch={branch.id} date={date} today={today} meds={(services ?? []).filter((s) => s.is_meds).map((s) => ({ id: s.id, name: s.name, price: Number(s.price_cents ?? 0) }))} services={sortServices((services ?? []).filter((s) => !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null, sessions: Array.isArray(s.session_prices) ? (s.session_prices as (number | string)[]).map(Number) : null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
             )}
             {isManager && <p className="small" style={{ marginTop: 12 }}><Link href="/services/prices">Price list and commissions</Link> (add a service, set its price and commission)</p>}
           </div>
@@ -175,6 +176,15 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                         </div>
                       )}
                       <div className="log-by small"><span className="muted">Entered by</span> {l.created_by === access.user_id ? "you" : userName.get(l.created_by) ?? "a former user"} <span className="muted">· {enteredAt(l.created_at, l.service_date)}</span></div>
+                      <EntryDetails r={{
+                        id: l.id, branch: branch.name, date: l.service_date, client: l.client_name ?? "No client name",
+                        service: l.services?.name ?? "Service", session: l.session_no ?? 1, amount: Number(l.amount_paid_cents), kind: l.visit_kind ?? "PAID",
+                        priceNote: l.price_note ?? null, doneBy: name[l.performer_id] ?? null, assistedBy: l.assistant_id ? name[l.assistant_id] ?? null : null,
+                        status: l.state === "APPROVED" ? "Approved" : l.state === "REJECTED" ? "Rejected" : "Waiting for sign-off",
+                        enteredBy: userName.get(l.created_by) ?? "Staff", enteredAt: enteredAt(l.created_at, l.service_date),
+                        visit: (l.client_name ? dayList.filter((x) => x.state !== "REJECTED" && (x.client_name ?? "").trim().toLowerCase() === l.client_name!.trim().toLowerCase()) : [l])
+                          .slice().reverse().map((x) => ({ service: x.services?.name ?? "Service", session: x.session_no ?? 1, amount: Number(x.amount_paid_cents), kind: x.visit_kind ?? "PAID" })),
+                      }} />
                       {l.photo_folder && l.client_name && <div className="small"><Link href={`/clinic/archive?month=${l.service_date.slice(0, 7)}#${l.id}`}>Photos</Link>{l.share_ok ? <span className="muted"> · sharing OK</span> : null}</div>}</td>
                     <td className="num">{centsToPhp(l.amount_paid_cents)}</td>
                     <td>{l.visit_kind && l.visit_kind !== "PAID"

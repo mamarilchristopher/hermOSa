@@ -7,6 +7,7 @@ import { HubTabs, NavLinks, type Hub } from "./NavLinks";
 import { ThemeToggle } from "./ThemeToggle";
 import { OnlineNow } from "./OnlineNow";
 import { ViewAsButton } from "./ViewAsButton";
+import { byRankThenName, staffRank } from "@/lib/staffOrder";
 import { Avatar } from "./Avatar";
 import { photoUrls } from "@/lib/photos";
 import { NotifBell } from "./NotifBell";
@@ -43,7 +44,9 @@ export async function TopBar({ access }: { access: Access }) {
   const timedIn = (lastPunch as { kind?: string } | null)?.kind === "IN";
   const myPhoto = (meRow as { photo_path?: string | null } | null)?.photo_path ?? null;
   const myPhotoUrl = myPhoto ? (await photoUrls(supabase, [myPhoto])).get(myPhoto) ?? null : null;
-  const viewList = Array.isArray(viewPeople) ? (viewPeople as { id: string; name: string; position: string | null }[]) : [];
+  // CHRIS Nov 26: View as lists people by seniority (General Manager first, CSRs last), then by name.
+  const viewList = byRankThenName(Array.isArray(viewPeople) ? (viewPeople as { id: string; name: string; position: string | null }[]) : [],
+    (p) => staffRank([], p.position), (p) => p.name);
   const overdue = (Array.isArray(overdueData) ? overdueData : []) as { code: string; name: string; date: string; pending: number }[];
   const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
   const people = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "HR", "AUDITOR"].includes(g.role));

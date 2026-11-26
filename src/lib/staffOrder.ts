@@ -14,6 +14,7 @@ export function staffRank(grants: Grant[], position?: string | null): number {
   if (pos.includes("seniorcma")) return 3;
   if (pos.includes("cma")) return 4;
   if (pos.includes("trainee")) return 5;
+  if (pos.includes("csr")) return 7; // CHRIS Nov 26: CSRs (online bookings) are the lowest level
   if (roles.has("CLINICIAN")) return 6;
   return roles.size ? 7 : 8; // no role yet goes last
 }
