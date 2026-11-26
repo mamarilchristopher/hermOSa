@@ -4,4 +4,4 @@
  * P = app-only releases since that update (no SQL). Launch becomes v1.0.0.
  * Bump on every release and add a line to CHANGELOG.md.
  */
-export const VERSION = "0.87.4";
+export const VERSION = "0.88.0";

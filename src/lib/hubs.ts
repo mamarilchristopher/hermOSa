@@ -45,6 +45,8 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
       ...(logger ? [{ href: "/services", label: "Service log", badge: n(c.overdue) }] : []),
       ...(booker || archiver ? [{ href: "/bookings", label: "Bookings" }] : []),
       ...(owner || gm ? [{ href: "/services/prices", label: "Price list" }] : []),
+      // update-0088 (CHRIS Nov 27): backjobs per staff, client and service.
+      ...(owner || gm ? [{ href: "/clinic/backjobs", label: "Backjobs" }] : []),
       // Client photos (v0.53, update-0053): waivers and before/after per client; shared ones also in Social media.
       ...(archiver ? [{ href: "/clinic/archive", label: "Client archive" }, { href: "/clinic/social", label: "Social media" }] : []),
       // update-0075: proof of payment in its own folder (staff see their own entries, management sees all).

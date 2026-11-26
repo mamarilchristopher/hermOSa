@@ -1,5 +1,6 @@
 "use client";
 import { pick } from "@/lib/decision";
+import { BACKJOB_REASONS } from "@/lib/backjobs";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { addService, approveMany, changeDate, renumberMonth, decideLog, logService, toggleAfterDp, type ActionState } from "./actions";
 import { previewCommission, type CommissionType } from "@/lib/commission";
@@ -103,6 +104,8 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   // CHRIS Nov 26: no Lead/Assist/Solo choice. "Done by" is the lead; a commission-based lead may add an assistant (default None).
   const [kind, setKind] = useState<Kind>("PAID");
   const paid = kind === "PAID";
+  const [bjReason, setBjReason] = useState("");
+  const [bjStaff, setBjStaff] = useState("");
   const [amount, setAmount] = useState("");
   const [who, setWho] = useState("");
   // Controlled so the fields survive a "log it anyway?" round trip (React resets uncontrolled fields after an action).
@@ -227,6 +230,27 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
         </div>
         {!paid && <span className="small muted">{noCommission ? "Logged at ₱0, so you can see every client handled." : "Logged at ₱0 with no commission, so you can see every client handled."}</span>}
       </div>
+      {/* update-0088 (CHRIS Nov 27): what the backjob fixes and who did the first treatment, for backjob tracking. */}
+      {kind === "BACKJOB" && (
+        <div className="backjob-box">
+          <div className="field">
+            <span className="field-label">What needs fixing?</span>
+            <div className="chip-pick" role="radiogroup" aria-label="What needs fixing?">
+              {BACKJOB_REASONS.map((r) => (
+                <button type="button" key={r.v} role="radio" aria-checked={bjReason === r.v} className={bjReason === r.v ? "on" : ""} onClick={() => setBjReason(bjReason === r.v ? "" : r.v)}>{r.label}</button>
+              ))}
+            </div>
+          </div>
+          <label>First treatment done by
+            <select name="bj_staff" value={bjStaff} onChange={(e) => setBjStaff(e.target.value)}>
+              <option value="">Find it from the client&apos;s last visit</option>
+              {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+            <span className="small muted">Leave it to find it automatically from the client&apos;s earlier entry of this service.</span>
+          </label>
+          <input type="hidden" name="bj_reason" value={bjReason} />
+        </div>
+      )}
       <div className="entry-grid">
         {photosOptional && (
           <label className="span2">Date of service

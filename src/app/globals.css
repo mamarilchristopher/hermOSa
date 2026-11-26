@@ -1865,3 +1865,27 @@ a.hb-row:hover strong { text-decoration: underline; }
 [data-mode="dark"] .promo-idea-chips span:first-child { background: #3d3626; color: var(--viz-gold-hi); }
 .promo-idea-why { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .promo-idea .promo-mock, .biz-pick .promo-mock { margin: 0 0 6px; }
+
+/* Backjobs (update-0088, CHRIS Nov 27). PC: two columns; phone: one. */
+.bj-reason-val { font-size: 1.05rem !important; line-height: 1.25; }
+.bj-list { list-style: none; margin: 0; padding: 0; }
+.bj-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+.bj-list li:first-child { border-top: 0; }
+.bj-list li b { flex: 1; min-width: 0; font-size: 0.92rem; }
+.bj-list li .small { flex-basis: 100%; }
+.bj-recent { display: flex; flex-direction: column; }
+.bj-row { display: grid; grid-template-columns: 64px minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.bj-row:first-child { border-top: 0; }
+.bj-date { font-weight: 700; font-size: 0.85rem; color: var(--muted); }
+.bj-retag { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.bj-retag select { min-width: 0; flex: 1 1 180px; }
+.backjob-box { display: grid; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--viz-track); margin-bottom: 10px; }
+.chip-pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-pick button, [data-mode="dark"] .chip-pick button { background: var(--surface); color: var(--ink); border: 1px solid var(--line); font-size: 0.8rem; font-weight: 600; padding: 6px 12px; min-height: 34px; }
+.chip-pick button.on, [data-mode="dark"] .chip-pick button.on { background: var(--viz-gold); border-color: var(--viz-gold); color: #fff; }
+@media (max-width: 700px) {
+  .bj-row { grid-template-columns: 56px minmax(0, 1fr); }
+  .bj-row .bj-who { grid-column: 2; }
+  .bj-row .link-button { grid-column: 2; justify-self: start; }
+}
+@media (max-width: 700px) { .backjobs .biz-kpis > :nth-child(3) { grid-column: auto; } }

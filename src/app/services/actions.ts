@@ -125,6 +125,15 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
       : ` An add-on didn't save${ad?.error ? ` (${errorText(ad.error)})` : ""}: log it again as its own entry.`;
   }
   if (addonsOk) medsNote += addonsOk === 1 ? " Add-on added." : ` ${addonsOk} add-ons added.`;
+  // update-0088 (CHRIS Nov 27): tag the backjob (what needed fixing, first treatment and who did it) for tracking.
+  if (p.data.kind === "BACKJOB") {
+    const staff = String(fd.get("bj_staff") ?? "");
+    const reason = String(fd.get("bj_reason") ?? "");
+    const { data: bj, error: bjErr } = await supabase.rpc("tag_backjob", {
+      p_log: data.id, p_staff: /^[0-9a-f-]{36}$/.test(staff) ? staff : null, p_reason: /^[A-Z_]{2,20}$/.test(reason) ? reason : null, p_note: null, p_original: null,
+    });
+    if (bjErr?.code !== "PGRST202" && (bjErr || !bj?.ok)) medsNote += " The backjob details didn't save: the owner or GM can add them on Clinic › Backjobs.";
+  }
   // CHRIS Nov 27 (update-0085): a balance after a DP earns 5% of the whole package price.
   if (paid && fd.get("after_dp") === "1") {
     const { data: dp, error: dpErr } = await supabase.rpc("set_after_dp", { p_log: data.id, p_on: true });

@@ -32,7 +32,7 @@ export default async function MyDay() {
     supabase.from("service_logs").select("id", { count: "exact", head: true }).eq("state", "PENDING"),
     supabase.from("payment_checks").select("service_log_id", { count: "exact", head: true }).eq("state", "PENDING"),
     supabase.from("late_ntes").select("employee_id, late_minutes").gte("work_date", from28).lte("work_date", today).neq("state", "VOID"),
-    supabase.from("service_logs").select("performer_id").eq("visit_kind", "BACKJOB").gte("service_date", from28).neq("state", "REJECTED"),
+    supabase.from("service_logs").select("id, performer_id").eq("visit_kind", "BACKJOB").gte("service_date", from28).neq("state", "REJECTED"),
     supabase.from("employees").select("id, full_name").eq("active", true),
     loadIdeas(supabase, today),
     promoDue(supabase, today),
@@ -63,7 +63,12 @@ export default async function MyDay() {
   const cut = cutoffInfo(today);
   const near = paydayNear(today);
   const people = ((empData ?? []) as { id: string; full_name: string }[]).map((e) => ({ id: e.id, name: e.full_name }));
-  const checkins = staffCheckins(people, (lateData ?? []) as { employee_id: string; late_minutes: number }[], (bjData ?? []) as { performer_id: string }[]);
+  // update-0088: a backjob counts for whoever did the first treatment (its tag), else whoever did the backjob.
+  const bjRows = (bjData ?? []) as { id: string; performer_id: string }[];
+  const { data: tagData } = bjRows.length ? await supabase.from("backjob_tags").select("service_log_id, staff_id").in("service_log_id", bjRows.map((b) => b.id)) : { data: [] };
+  const tagStaff = new Map(((tagData ?? []) as { service_log_id: string; staff_id: string | null }[]).map((t) => [t.service_log_id, t.staff_id]));
+  const checkins = staffCheckins(people, (lateData ?? []) as { employee_id: string; late_minutes: number }[],
+    bjRows.map((b) => ({ performer_id: (tagStaff.has(b.id) ? tagStaff.get(b.id) : b.performer_id) ?? "" })));
   const unsettled = count(signoff) + count(payments);
   void branches;
 
