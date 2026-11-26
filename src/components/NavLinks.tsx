@@ -23,8 +23,9 @@ export function activeOf(hubs: Hub[], path: string): { hub: string | null; tab: 
 }
 const badgeOf = (h: Hub) => h.tabs.reduce((n, t) => n + (t.badge ?? 0), 0);
 
-// Phone bottom bar: Home and Time clock always (v0.49: Chat comes next; v0.89.1: Business for management), then these hubs in this order; the rest go under More.
-const PHONE_ORDER = ["chat", "business", "clinic", "team", "sales", "pay", "people", "settings"];
+// Phone bottom bar (CHRIS Nov 27, v0.89.1): the first hubs in menu order (lib/hubs sets it per person: management gets
+// Home, Business, Clinic, Sales; other staff Home, Clinic, Chat, Time clock); the rest go under More.
+const PHONE_SLOTS = 5;
 
 export function NavLinks({ hubs, variant }: { hubs: Hub[]; variant: "side" | "tabs" }) {
   const path = usePathname();
@@ -47,11 +48,9 @@ export function NavLinks({ hubs, variant }: { hubs: Hub[]; variant: "side" | "ta
 
   if (variant === "side") return <nav className="side-nav" aria-label="Main">{hubs.map((h) => link(h, false))}</nav>;
 
-  const fixed = hubs.filter((h) => h.key === "home" || h.key === "time");
-  const rest = PHONE_ORDER.map((k) => hubs.find((h) => h.key === k)).filter((h): h is Hub => !!h);
-  const fitsAll = fixed.length + rest.length <= 5;
-  const shown = fitsAll ? rest : rest.slice(0, 2);
-  const hidden = fitsAll ? [] : rest.slice(2);
+  const fitsAll = hubs.length <= PHONE_SLOTS;
+  const shown = fitsAll ? hubs : hubs.slice(0, PHONE_SLOTS - 1);
+  const hidden = fitsAll ? [] : hubs.slice(PHONE_SLOTS - 1);
   const moreOn = hidden.some((h) => h.key === active);
   const moreBadge = hidden.reduce((n, h) => n + badgeOf(h), 0);
   return (
@@ -62,7 +61,6 @@ export function NavLinks({ hubs, variant }: { hubs: Hub[]; variant: "side" | "ta
         </div>
       )}
       <nav className="tab-nav" aria-label="Main">
-        {fixed.map((h) => link(h, true))}
         {shown.map((h) => link(h, true))}
         {hidden.length > 0 && (
           <button type="button" className={`tab-more${moreOn || more ? " active" : ""}`} aria-expanded={more} onClick={() => setMore((v) => !v)}>

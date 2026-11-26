@@ -73,5 +73,14 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
       ...(owner ? [{ href: "/admin/users", label: "Users and roles" }] : []),
       ...(owner || gm ? [{ href: "/updates", label: "Updates" }] : []),
     ] },
-  ] as Hub[]).filter((h) => h.tabs.length > 0);
+  ] as Hub[]).filter((h) => h.tabs.length > 0).sort((a, b) => hubRank(a.key, management) - hubRank(b.key, management));
+}
+
+/** Menu order (CHRIS Nov 27, v0.89.1). Management: Home, Business, Clinic, Sales, then the rest, Time clock last (they
+ *  don't clock in). Everyone else: Home, Clinic, Chat, Time clock (4th on the phone bar), then the rest. */
+const MGMT_ORDER = ["home", "business", "clinic", "sales", "chat", "team", "pay", "people", "settings", "time"];
+const STAFF_ORDER = ["home", "clinic", "chat", "time", "team", "sales", "pay", "people", "settings", "business"];
+export function hubRank(key: string, management: boolean): number {
+  const i = (management ? MGMT_ORDER : STAFF_ORDER).indexOf(key);
+  return i < 0 ? 99 : i;
 }
