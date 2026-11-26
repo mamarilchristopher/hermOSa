@@ -1495,3 +1495,9 @@ img.dock-group[src="/hermosa-logo.png"] { object-fit: contain; padding: 4px; }
 button.chat-with { all: unset; cursor: pointer; border-radius: 50%; display: inline-grid; }
 button.chat-with:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 button.chat-with:hover .avatar { box-shadow: 0 0 0 3px var(--gold-soft); }
+/* Photo viewer (CHRIS Nov 26): chat photos open over the page. Above the chat window and the menus. */
+.zoomable { cursor: zoom-in; }
+.photo-viewer { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 24px; background: rgba(20, 15, 11, 0.88); cursor: zoom-out; }
+.photo-viewer img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45); cursor: default; }
+.photo-viewer-x { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 12px; width: 44px; height: 44px; min-height: 0; padding: 0; border-radius: 50%; border: 0; background: rgba(255, 255, 255, 0.92); color: #2f241d; font-size: 1.6rem; line-height: 1; box-shadow: none; }
+.photo-viewer-x:hover { background: #fff; color: #2f241d; }

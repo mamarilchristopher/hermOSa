@@ -1,4 +1,5 @@
 "use client";
+import { viewPhoto } from "@/components/PhotoViewer";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { Avatar } from "@/components/Avatar";
@@ -462,10 +463,10 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
                               })()}
                               {m.photo_path && (photos[m.photo_path]
                                 // eslint-disable-next-line @next/next/no-img-element
-                                ? <a href={photos[m.photo_path]} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><img src={photos[m.photo_path]} alt="Photo" className="chat-photo" /></a>
+                                ? <img src={photos[m.photo_path]} alt="Photo" className="chat-photo zoomable" onClick={(e) => { e.stopPropagation(); viewPhoto(photos[m.photo_path!]); }} />
                                 : <span className="chat-photo loading">Photo</span>)}
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              {m.gif_url && <img src={m.gif_url} alt="GIF" className="chat-photo" />}
+                              {m.gif_url && <img src={m.gif_url} alt="GIF" className="chat-photo zoomable" onClick={(e) => { e.stopPropagation(); viewPhoto(m.gif_url!, "GIF"); }} />}
                               {m.body && <span className="chat-text">{renderBody(m)}</span>}
                             </>
                           )}

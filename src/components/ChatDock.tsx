@@ -1,4 +1,5 @@
 "use client";
+import { viewPhoto } from "./PhotoViewer";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -279,9 +280,9 @@ function MiniChat({ room, me, face, online, incoming, sign, photos, onClose, onE
               {showName && <span className="mini-name">{(members.get(m.sender_id) ?? "").split(" ")[0]}</span>}
               {m.deleted_at ? <span className="mini-bubble deleted">Message deleted</span>
                 // eslint-disable-next-line @next/next/no-img-element
-                : m.photo_path ? (photos[m.photo_path] ? <img className="mini-photo" src={photos[m.photo_path]} alt="Photo" /> : <span className="mini-bubble">Photo</span>)
+                : m.photo_path ? (photos[m.photo_path] ? <img className="mini-photo zoomable" src={photos[m.photo_path]} alt="Photo" onClick={() => viewPhoto(photos[m.photo_path!])} /> : <span className="mini-bubble">Photo</span>)
                 // eslint-disable-next-line @next/next/no-img-element
-                : m.gif_url ? <img className="mini-photo" src={m.gif_url} alt="GIF" />
+                : m.gif_url ? <img className="mini-photo zoomable" src={m.gif_url} alt="GIF" onClick={() => viewPhoto(m.gif_url!, "GIF")} />
                 : <span className="mini-bubble" title={time(m.created_at)}>{m.body}</span>}
             </div>
           );

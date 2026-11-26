@@ -13,6 +13,7 @@ import { photoUrls } from "@/lib/photos";
 import { NotifBell } from "./NotifBell";
 import { ChatAlerts } from "./ChatAlerts";
 import { ChatDock } from "./ChatDock";
+import { PhotoViewer } from "./PhotoViewer";
 import { NotifyRequired } from "./Hermosapp";
 import { manilaToday } from "@/lib/dates";
 import { menuFor, type MenuGrant } from "@/lib/hubs";
@@ -119,6 +120,7 @@ export async function TopBar({ access, viewing }: { access: Access; viewing?: { 
       <ChatAlerts me={access.user_id} management={viewAs} />
       {/* v0.73.1: Facebook-style chat heads (PC) and chat bubble (phone) on every page except Chat. */}
       <ChatDock me={access.user_id} />
+      <PhotoViewer />
       {timedIn && <NotifyRequired />}
     </>
   );
