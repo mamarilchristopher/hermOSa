@@ -8,7 +8,7 @@ const ORDER = [
   "Diamond Peel", "Acne Control", "Glass Skin Hydrafacial", "Carbon Laser Face", "Acne Control + PDT", "Acne Control + PDT + Kanolone",
   "Kanolone", "Hifu Face and Neck", "Hifu Arms", "Hifu Tummy", "Hifu Back Fat", "Microshading", "Lip Blushing", "BB Glow",
   "BB Glow with BB Blush", "Warts Removal Face", "Warts Removal Face and Neck", "Warts Removal Whole Body", "Skin tag Face",
-  "Skin Tag Face and Neck", "Skin Tag Whole Body", "VContour", "VContour 10+3", "VContour 5+1", "Mesolipo Arms/Tummy/Love Handle/ Backfat", "Mesolipo (Double Dose)", "Mesolipo 10+3", "Mesolipo 5+1", "Sweatox", "Jawtox",
+  "Skin Tag Face and Neck", "Skin Tag Whole Body", "VContour", "VContour 10+3", "VContour 5+1", "Mesolipo Arms/Tummy/Love Handle/ Backfat", "Mesolipo (Double Dose)", "Mesolipo 6+3", "Mesolipo 3+1", "Sweatox", "Jawtox",
   "Barbie Shoulder", "RF Face Single Session", "RF Body Single Session", "Face Botox Package",
   "Botox: Forehead/Crowsfeet/Frownline/Nasal Fold (PER UNIT)", "Botox: Undereye (PER UNIT)", "UA Whitening Single session",
   "UA Carbon Laser", "Lemon Bottle Face Single Session", "Lemon Bottle Arms/Love Handle/Backfat/Love Handle Single Session", "Lemon Bottle (Double Dose)",
