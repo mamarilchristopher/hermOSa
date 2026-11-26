@@ -8,7 +8,7 @@ import { centsToPhp } from "@/lib/csv";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { addDays, sortBranches, WEEKDAYS, weekday } from "@/lib/insights";
 import { ROLE_TEXT, TYPE_TEXT } from "@/lib/commission";
-import { BatchApprove, BranchEntryForm, ChangeDateForm, DecideButtons, RenumberForm } from "./Forms";
+import { AfterDpForm, BatchApprove, BranchEntryForm, ChangeDateForm, DecideButtons, RenumberForm } from "./Forms";
 import { Uid } from "@/components/Uid";
 import { StaffFilter } from "./StaffFilter";
 import { DeclaredCheck, diffText } from "./DeclaredCheck";
@@ -18,7 +18,7 @@ import { AttachProof } from "./PaymentProof";
 
 type Log = {
   id: string; service_date: string; amount_paid_cents: number; commission_type: string; performer_id: string; assistant_id: string | null;
-  receipt_no: string | null; note: string | null; branch_id?: string; client_name?: string | null; price_note?: string | null; photo_folder?: string | null; share_ok?: boolean; photos_due?: boolean; session_no?: number; log_no?: string | null; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
+  receipt_no: string | null; note: string | null; branch_id?: string; client_name?: string | null; price_note?: string | null; after_dp?: boolean; list_price_cents?: number | null; photo_folder?: string | null; share_ok?: boolean; photos_due?: boolean; session_no?: number; log_no?: string | null; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
   services: { name: string } | null;
 };
 const VISIT_TEXT: Record<string, string> = { BACKJOB: "Backjob (unpaid)", CHECKUP: "Check-up (unpaid)", NO_CHARGE: "No charge" };
@@ -199,6 +199,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                       )}
                       {(l.client_name || l.log_no) && <div className="log-client">{l.client_name}<Uid v={l.log_no} /></div>}<strong>{(l.session_no ?? 1) > 1 && <span className="session-tag">Session {l.session_no}</span>}{l.services?.name}</strong>
                       {l.receipt_no && <div className="small muted">Waiver / OR {l.receipt_no}</div>}
+                      {l.after_dp && <div className="small"><span className="tag">Balance after DP</span> <span className="muted">commission on the full price</span></div>}
                       {l.price_note && <div className="small muted">Price: {l.price_note}</div>}
                       {l.note && <div className="small muted">{l.note}</div>}
                       {l.photos_due && l.state !== "REJECTED" && (
@@ -255,6 +256,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                       )}
                       {l.state === "REJECTED" && l.decision_note && <div className="small muted">{l.decision_note}</div>}
                       {topMgmt && <ChangeDateForm id={l.id} date={l.service_date} max={today} />}
+                      {topMgmt && l.state !== "REJECTED" && (l.after_dp || ((l.visit_kind ?? "PAID") === "PAID" && Number(l.amount_paid_cents) > 0 && Number(l.list_price_cents ?? 0) > Number(l.amount_paid_cents))) && (
+                        <AfterDpForm id={l.id} on={!!l.after_dp} />
+                      )}
                     </td>
                   </tr>
                 );

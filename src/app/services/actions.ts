@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { manilaToday } from "@/lib/dates";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { phpToCents } from "@/lib/csv";
+import { centsToPhp, phpToCents } from "@/lib/csv";
 import { errorText } from "@/lib/access";
 import { isTestService } from "@/lib/serviceOrder";
 import { testResult } from "@/lib/serviceTest";
@@ -105,6 +105,11 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
       : ` An add-on didn't save${ad?.error ? ` (${errorText(ad.error)})` : ""}: log it again as its own entry.`;
   }
   if (addonsOk) medsNote += addonsOk === 1 ? " Add-on added." : ` ${addonsOk} add-ons added.`;
+  // CHRIS Nov 27 (update-0085): a balance after a DP earns 5% of the whole package price.
+  if (paid && fd.get("after_dp") === "1") {
+    const { data: dp, error: dpErr } = await supabase.rpc("set_after_dp", { p_log: data.id, p_on: true });
+    medsNote += dpErr || !dp?.ok ? " The DP balance mark didn't save: ask the owner or GM to tap \"Balance after DP\" on the entry." : " Marked as the balance after a DP (commission on the full price).";
+  }
   // CHRIS Nov 26 (update-0075): optional proof of payment, kept in its own folder.
   let proofs: { path: string; thumb: string | null }[] = [];
   try { proofs = z.array(z.object({ path: z.string().max(300), thumb: z.string().max(300).nullable() })).max(5).parse(JSON.parse(p.data.proofs || "[]")); } catch { proofs = []; }
@@ -178,6 +183,20 @@ export async function changeDate(_prev: ActionState, fd: FormData): Promise<Acti
   revalidatePath("/services");
   revalidatePath("/me");
   return { ok: `Moved to ${new Date(`${date.data}T00:00:00Z`).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}.`, at: Date.now() };
+}
+
+/** CHRIS Nov 27 (update-0085): mark or unmark an entry as the balance paid after a DP (commission on the full price). */
+export async function toggleAfterDp(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const id = z.uuid().safeParse(fd.get("id"));
+  if (!id.success) return { error: "Could not save. Try again." };
+  const on = fd.get("on") === "1";
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_after_dp", { p_log: id.data, p_on: on });
+  if (error) return { error: error.code === "PGRST202" ? "This needs database update-0085. Run it from your To-Do first." : "Could not save. Try again." };
+  if (!data.ok) return { error: data.error === "ALREADY_PAID" ? "This entry's commission is already on a final payslip." : data.error === "NOT_A_BALANCE" ? "Only an amount below the list price can be a balance after a DP." : errorText(data.error) };
+  revalidatePath("/services");
+  revalidatePath("/me");
+  return { ok: on ? `Balance after DP: commission is now ${centsToPhp(data.commission_cents)}.` : `Unmarked: commission is back to ${centsToPhp(data.commission_cents)}.`, at: Date.now() };
 }
 
 /** Owners: re-number a month's entries in order once its sales are final (update-0079). */

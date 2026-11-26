@@ -1,7 +1,7 @@
 "use client";
 import { pick } from "@/lib/decision";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { addService, approveMany, changeDate, renumberMonth, decideLog, logService, type ActionState } from "./actions";
+import { addService, approveMany, changeDate, renumberMonth, decideLog, logService, toggleAfterDp, type ActionState } from "./actions";
 import { previewCommission, type CommissionType } from "@/lib/commission";
 import { centsToPhp } from "@/lib/csv";
 import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
@@ -114,6 +114,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const [session, setSession] = useState("1");
   const [med, setMed] = useState("");
   const [extras, setExtras] = useState<AddonRow[]>([]);
+  const [afterDp, setAfterDp] = useState(false); // update-0085: balance paid after a down payment
   const photos = usePhotoSlots(branch);
   const proofs = useProofSlots(branch); // update-0075: optional proof of payment
   const form = useRef<HTMLFormElement>(null);
@@ -124,7 +125,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       setAmount("");
       setKind("PAID");
       setWho("");
-      setService(""); setPartner(""); setClient(""); setPriceNote(""); setShare(false); setNote(""); setSession("1"); setMed(""); setExtras([]);
+      setService(""); setPartner(""); setClient(""); setPriceNote(""); setShare(false); setNote(""); setSession("1"); setMed(""); setExtras([]); setAfterDp(false);
       photos.reset();
       proofs.reset();
     }
@@ -135,7 +136,11 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const svc = services.find((x) => x.id === service);
   // Lead with "Assisted by: None" is saved as Solo; the 60/40 split applies only once an assistant is chosen (CHRIS Nov 26).
   const effType: CommissionType = person?.eligible === false ? "NONCOMMI" : partner ? "LEAD" : "SOLO";
-  const raw = previewCommission(paid ? cents : 0, paid ? effType : "NONCOMMI", svc?.commission, svc?.price);
+  // CHRIS Nov 27 (update-0085): a balance paid after a DP earns 5% of the whole package (list) price.
+  const dpPossible = paid && !svc?.sessions?.length && !!svc?.price && svc.price > 0 && cents > 0 && cents < svc.price;
+  const dpOn = afterDp && dpPossible;
+  const raw = dpOn ? previewCommission(svc!.price!, effType, null, null)
+    : previewCommission(paid ? cents : 0, paid ? effType : "NONCOMMI", svc?.commission, svc?.price);
   // Only commission-based people get a share; someone not on commission is never mentioned (CHRIS Nov 26).
   const leadEmp = person, assistEmp = partnerEmp;
   const shown = {
@@ -275,6 +280,16 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
             <button type="button" className="secondary small" onClick={() => setExtras([...extras, { service: addons.length === 1 ? addons[0].id : "", amount: addons.length === 1 && addons[0].price ? String(addons[0].price / 100) : "" }])}>+ Add-on{extras.length ? " (another)" : ""}</button>
           </div>
         )}
+        {dpPossible && (
+          <label className="check-row span2">
+            <input type="checkbox" name="after_dp" value="1" checked={afterDp} onChange={(e) => {
+              setAfterDp(e.target.checked);
+              if (e.target.checked && !priceNote.trim()) setPriceNote("Balance after DP");
+              if (!e.target.checked && priceNote === "Balance after DP") setPriceNote("");
+            }} />
+            <span>This is the balance after a DP (down payment) <span className="muted">(commission is 5% of the full price {centsToPhp(svc!.price!)})</span></span>
+          </label>
+        )}
         {priceDiffers && (
           <label className="span2"><span>Reason for the different price <span className="muted">({scheduled != null ? `session ${session} of this bundle is ${centsToPhp(scheduled)}` : `list price ${centsToPhp(listPrice!)}`})</span></span>
             <input name="price_note" required minLength={3} maxLength={300} placeholder="e.g. 10% promo, loyalty discount" value={priceNote} onChange={(e) => setPriceNote(e.target.value)} />
@@ -409,6 +424,20 @@ export function ChangeDateForm({ id, date, max }: { id: string; date: string; ma
       <button className="small" disabled={pending}>Save</button>
       <button type="button" className="secondary small" onClick={() => setOpen(false)}>Cancel</button>
       {s?.error && <span className="field-error">{s.error}</span>}
+    </form>
+  );
+}
+
+/** CHRIS Nov 27 (update-0085): owners and the GM mark an entry as the balance after a DP (commission = 5% of the full price). */
+export function AfterDpForm({ id, on }: { id: string; on: boolean }) {
+  const [s, action, pending] = useActionState(toggleAfterDp, undefined);
+  return (
+    <form action={action} className="inline-form" onSubmit={(e) => { if (on && !confirm("Unmark this entry? Its commission goes back to 5% of the amount paid.")) e.preventDefault(); }}>
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="on" value={on ? "0" : "1"} />
+      <button className="link-button small" disabled={pending}>{pending ? "Saving…" : on ? "Not a DP balance" : "Balance after DP"}</button>
+      {s?.ok && <span className="small ok-text"> {s.ok}</span>}
+      {s?.error && <span className="field-error"> {s.error}</span>}
     </form>
   );
 }
