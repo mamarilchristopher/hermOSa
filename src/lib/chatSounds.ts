@@ -53,3 +53,13 @@ export function playChatSound(kind: "message" | "management" | "sent" | "mention
   }
   try { navigator.vibrate?.([200, 100, 200, 100, 300]); } catch { /* not supported */ }
 }
+
+/** Fired after a chat is marked read, so the management notice on every page refreshes at once. */
+export const CHAT_READ_EVENT = "hermosa-chat-read";
+
+/** Short name for labels: the first word of a name, skipping a "Ma." prefix. */
+export function firstName(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length > 1 && /^ma\.?$/i.test(parts[0])) parts.shift();
+  return parts[0] || name;
+}

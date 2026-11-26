@@ -3,19 +3,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { Avatar } from "@/components/Avatar";
 import { IconBack, IconImage, IconInfo, IconPlus, IconSend } from "@/components/Icons";
-import { CHAT_SOUNDS_EVENT, playChatSound, setSoundsOn, soundsOn } from "@/lib/chatSounds";
+import { CHAT_READ_EVENT, CHAT_SOUNDS_EVENT, firstName, playChatSound, setSoundsOn, soundsOn } from "@/lib/chatSounds";
 
 /** Team chat client (v0.49, update-0049). Messages arrive live through Supabase Realtime; reading is limited to members by the database. */
 
 export type ChatPerson = { id: string; name: string; photo_path: string | null; photo_url?: string | null };
 export type ChatRoomRow = {
   id: string; kind: "DM" | "GROUP"; auto: boolean; name: string | null; photo_path: string | null; photo_url?: string | null;
-  other_id: string | null; icon_path?: string | null; face_ids?: string[] | null; last_at: string; members: number; unread: number; mgmt_unread?: number; mention_unread?: number;
+  other_id: string | null; icon_path?: string | null; face_ids?: string[] | null; last_at: string; members: number; unread: number; mgmt_unread?: number; mgmt_from?: string | null; mention_unread?: number;
   last: { sender: string; mine: boolean; text: string; mgmt?: boolean } | null;
 };
 type Member = { id: string; name: string; photo_path: string | null; last_read_at: string };
 type RoomInfo = { id: string; kind: "DM" | "GROUP"; auto: boolean; name: string; members: Member[] };
-type Msg = { id: string; room_id: string; sender_id: string; body: string | null; photo_path: string | null; gif_url: string | null; from_management?: boolean; mentions?: string[]; mention_all?: boolean; created_at: string; deleted_at: string | null };
+type Msg = { id: string; room_id: string; sender_id: string; body: string | null; photo_path: string | null; gif_url: string | null; from_management?: boolean; mentions?: string[]; mention_all?: boolean; reply_to?: string | null; created_at: string; deleted_at: string | null };
 type Reaction = { message_id: string; user_id: string; emoji: string };
 type Deleted = { message_id: string; body: string | null; photo_path: string | null; gif_url: string | null };
 type Gif = { id: string; title: string; preview: string; url: string; w?: number; h?: number };
@@ -71,6 +71,9 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<null | "new" | "info">(null);
   const [picked, setPicked] = useState<string | null>(null); // message whose actions are open (phones)
+  // CHRIS Nov 26: reply to a chosen message (update-0062); double-tap a message to heart it.
+  const [replyTo, setReplyTo] = useState<Msg | null>(null);
+  const lastTap = useRef<{ id: string; t: number } | null>(null);
   const [photos, setPhotos] = useState<Record<string, string>>({});
   // Reactions and, for owners and the GM, what deleted messages said (update-0052).
   const [reactions, setReactions] = useState<Reaction[]>([]);
@@ -92,7 +95,6 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
   const activeRef = useRef(active);
   activeRef.current = active;
   const faces = useMemo(() => new Map(people.map((p) => [p.id, p.photo_url ?? null])), [people]);
-  const peopleNames = useMemo(() => new Map([...people.map((p) => [p.id, p.name] as const), [me.id, me.name] as const]), [people, me.id, me.name]);
 
   const refreshList = useCallback(async () => {
     const { data } = await supabase.rpc("chat_list");
@@ -121,8 +123,9 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
   }, [rooms, photos, signPhotos]);
 
   const markRead = useCallback((room: string) => {
-    void supabase.rpc("chat_mark_read", { p_room: room });
-    setRooms((rs) => rs.map((r) => (r.id === room ? { ...r, unread: 0 } : r)));
+    // Opening a chat clears its badges, the Management label and the management notice on every page.
+    setRooms((rs) => rs.map((r) => (r.id === room ? { ...r, unread: 0, mgmt_unread: 0, mention_unread: 0 } : r)));
+    void supabase.rpc("chat_mark_read", { p_room: room }).then(() => window.dispatchEvent(new Event(CHAT_READ_EVENT)));
   }, [supabase]);
 
   // Reactions on these messages; for owners and the GM, the deleted ones' text.
@@ -144,7 +147,7 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
 
   // Open a chat: its members and the newest messages.
   useEffect(() => {
-    setInfo(null); setMsgs([]); setMore(false); setError(null); setPanel((p) => (p === "info" ? null : p));
+    setInfo(null); setMsgs([]); setMore(false); setError(null); setReplyTo(null); setPanel((p) => (p === "info" ? null : p));
     setReactions([]); setDeleted({}); setPicker(null);
     if (!active) return;
     let gone = false;
@@ -244,9 +247,12 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
     const isGroup = info?.kind === "GROUP";
     const ids = isGroup && body ? [...tagged.current].filter(([, n]) => body.includes(`@${n}`)).map(([id]) => id) : [];
     const all = isGroup && management && !!body && /(^|\s)@all\b/i.test(body);
-    const { data, error: e } = await supabase.rpc("chat_send", { p_room: active, p_body: body, p_photo_path: photo ?? null, p_gif_url: gif ?? null, p_mentions: ids, p_all: all });
+    const args = { p_room: active, p_body: body, p_photo_path: photo ?? null, p_gif_url: gif ?? null, p_mentions: ids, p_all: all };
+    const { data, error: e } = await supabase.rpc("chat_send", replyTo ? { ...args, p_reply_to: replyTo.id } : args);
     setBusy(false);
+    if (e?.code === "PGRST202" && replyTo) { setError("Replies need database update-0062. Send it without replying for now."); return; }
     if (e || !data?.ok) { setError(ERR[data?.error] ?? "Couldn't send. Check your connection and try again."); return; }
+    setReplyTo(null);
     if (!photo && !gif) { setText(""); tagged.current.clear(); setTagQuery(null); }
     if (gif) setPicker(null);
     playChatSound("sent");
@@ -378,12 +384,12 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
           {rooms.map((r) => (
             <li key={r.id}>
               <button type="button" className={`chat-room-btn ${r.id === active ? "on" : ""} ${r.unread ? "unread" : ""} ${r.mgmt_unread ? "mgmt" : ""}`} onClick={() => open(r.id)}>
-                <RoomFace r={r} name={r.name} icon={r.icon_path ? photos[r.icon_path] : undefined} faces={faces} names={peopleNames} size={44} />
+                <RoomFace r={r} name={r.name} icon={r.icon_path ? photos[r.icon_path] : undefined} size={44} />
                 <span className="chat-room-text">
                   <span className="chat-room-top"><strong>{r.name ?? "Chat"}</strong>{r.last && <span className="chat-time">{listTime(r.last_at)}</span>}</span>
                   <span className="chat-room-last">
                     <span>{r.last ? `${r.last.mine ? "You: " : r.kind === "GROUP" ? `${r.last.sender.split(" ")[0]}: ` : ""}${r.last.text}` : r.kind === "GROUP" ? `${r.members} people` : "Say hi"}</span>
-                    {!!r.mgmt_unread && <span className="mgmt-chip">Management</span>}
+                    {!!r.mgmt_unread && <span className="mgmt-chip">{r.mgmt_from ? `Message from ${r.mgmt_from}` : "Management"}</span>}
                     {!!r.mention_unread && <span className="chat-at" title="You were tagged">@</span>}
                     {r.unread > 0 && <span className="nav-badge">{r.unread > 99 ? "99+" : r.unread}</span>}
                   </span>
@@ -402,12 +408,12 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
           <>
             <header className="chat-head">
               <button type="button" className="icon-btn chat-back" aria-label="Back to chats" onClick={() => open(null)}><IconBack /></button>
-              {room ? <RoomFace r={room} name={info?.name ?? room.name} icon={room.icon_path ? photos[room.icon_path] : undefined} faces={faces} names={peopleNames} size={36} />
+              {room ? <RoomFace r={room} name={info?.name ?? room.name} icon={room.icon_path ? photos[room.icon_path] : undefined} size={36} />
                 : <span className="chat-group-face small" aria-hidden>{(info?.name ?? "?").slice(0, 1).toUpperCase()}</span>}
               <span className="chat-head-text"><strong>{info?.name ?? room?.name ?? "Chat"}</strong>{group && <span className="small muted">{info?.members.length} people</span>}</span>
               {info && <button type="button" className="icon-btn" aria-label={group ? "Group details" : "Chat details"} title={group ? "Group details" : "Chat details"} onClick={() => setPanel(panel === "info" ? null : "info")}><IconInfo /></button>}
             </header>
-            {panel === "info" && info && <GroupInfo key={info.id} info={info} me={me.id} icon={room?.icon_path ?? null} canAdd={info.kind === "GROUP" && (!info.auto || management)} people={people} supabase={supabase}
+            {panel === "info" && info && <GroupInfo key={info.id} info={info} me={me.id} icon={room?.icon_path ?? null} canAdd={info.kind === "GROUP" && (!info.auto || management)} canIcon={management} people={people} supabase={supabase}
               onCleared={() => { setMsgs([]); setPanel(null); void refreshList(); }}
               onChanged={async (left) => { if (left) { await refreshList(); open(null); return; } const { data } = await supabase.rpc("chat_room", { p_room: info.id }); if (data?.ok) setInfo(data as RoomInfo); void refreshList(); }} />}
             <div className="chat-scroll" ref={scroller} onClick={() => { setPicked(null); setPicker((p) => (p && typeof p === "object" ? null : p)); }}>
@@ -422,17 +428,38 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
                 const next = msgs[i + 1];
                 const last = !next || next.sender_id !== m.sender_id || dayKey(next.created_at) !== dayKey(m.created_at) || Date.parse(next.created_at) - Date.parse(m.created_at) > 5 * 60000;
                 return (
-                  <div key={m.id}>
+                  <div key={m.id} id={`msg-${m.id}`}>
                     {newDay && <div className="chat-day"><span>{dayLabel(m.created_at)}</span></div>}
                     <div className={`chat-msg ${mine ? "mine" : ""} ${first ? "first" : ""} ${picked === m.id ? "picked" : ""} ${m.from_management && !m.deleted_at ? "mgmt" : ""} ${!mine && !m.deleted_at && (m.mention_all || m.mentions?.includes(me.id)) ? "tagged" : ""}`}>
                       {!mine && group && (first ? <Avatar name={who?.name ?? "?"} url={faces.get(m.sender_id) ?? null} size={30} /> : <span className="chat-face-gap" />)}
                       <div className="chat-bubble-wrap">
                         {!mine && group && first && <span className="chat-name">{who?.name ?? "Former member"}</span>}
-                        {!mine && m.from_management && !m.deleted_at && <span className="mgmt-chip">📣 Management</span>}
+                        {!mine && m.from_management && !m.deleted_at && <span className="mgmt-chip">📣 Message from {firstName(who?.name ?? "management")}</span>}
                         <div className={`chat-bubble ${m.deleted_at ? "deleted" : ""} ${m.photo_path && !m.body ? "photo-only" : ""}`}
-                          onClick={(e) => { if (!m.deleted_at) { e.stopPropagation(); setPicked(picked === m.id ? null : m.id); setPicker(null); } }} title={time(m.created_at)}>
+                          onClick={(e) => {
+                            if (m.deleted_at) return;
+                            e.stopPropagation(); setPicker(null);
+                            const now = Date.now(), prev = lastTap.current;
+                            lastTap.current = { id: m.id, t: now };
+                            // Double-tap: heart it (never takes a heart away), like Messenger and Instagram.
+                            if (prev && prev.id === m.id && now - prev.t < 350) {
+                              lastTap.current = null; setPicked(null);
+                              if (!reactions.some((r) => r.message_id === m.id && r.user_id === me.id && r.emoji === "❤️")) void react(m.id, "❤️");
+                              return;
+                            }
+                            setPicked(picked === m.id ? null : m.id);
+                          }} title={time(m.created_at)}>
                           {m.deleted_at ? (management && deleted[m.id] ? <DeletedView d={deleted[m.id]} photo={deleted[m.id].photo_path ? photos[deleted[m.id].photo_path!] : undefined} /> : <em>Message deleted</em>) : (
                             <>
+                              {m.reply_to !== undefined && m.reply_to !== null && (() => {
+                                const q = msgs.find((x) => x.id === m.reply_to);
+                                return (
+                                  <button type="button" className="chat-quote" onClick={(e) => { e.stopPropagation(); document.getElementById(`msg-${m.reply_to}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>
+                                    <strong>{q ? (q.sender_id === me.id ? "You" : names.get(q.sender_id)?.name ?? "Former member") : "Earlier message"}</strong>
+                                    <span>{!q ? "Scroll up to see it" : q.deleted_at ? "Message deleted" : q.body ? q.body.slice(0, 120) : q.gif_url ? "GIF" : "Photo"}</span>
+                                  </button>
+                                );
+                              })()}
                               {m.photo_path && (photos[m.photo_path]
                                 // eslint-disable-next-line @next/next/no-img-element
                                 ? <a href={photos[m.photo_path]} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><img src={photos[m.photo_path]} alt="Photo" className="chat-photo" /></a>
@@ -448,6 +475,7 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
                           <div className="chat-react-bar" role="toolbar" aria-label="React" onClick={(e) => e.stopPropagation()}>
                             {QUICK.map((e) => <button key={e} type="button" aria-label={`React ${e}`} onClick={() => void react(m.id, e)}>{e}</button>)}
                             <button type="button" className="more" aria-label="More emoji" onClick={() => setPicker({ react: m.id })}>＋</button>
+                            <button type="button" className="chat-reply-btn" aria-label="Reply" title="Reply" onClick={() => { setReplyTo(m); setPicked(null); box.current?.focus(); }}>↩ Reply</button>
                           </div>
                         )}
                         {typeof picker === "object" && picker?.react === m.id && <EmojiGrid onPick={(e) => void react(m.id, e)} onClose={() => setPicker(null)} />}
@@ -466,6 +494,13 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
               {!loading && msgs.length === 0 && !error && <p className="muted small chat-older">No messages yet. Say hi!</p>}
             </div>
             {error && <p className="chat-error small" role="alert">{error}</p>}
+            {replyTo && (
+              <div className="chat-replying">
+                <span><span className="muted small">Replying to {replyTo.sender_id === me.id ? "yourself" : names.get(replyTo.sender_id)?.name ?? "Former member"}</span>
+                  <span className="chat-replying-text">{replyTo.body ? replyTo.body.slice(0, 120) : replyTo.gif_url ? "GIF" : "Photo"}</span></span>
+                <button type="button" className="icon-btn" aria-label="Cancel reply" onClick={() => setReplyTo(null)}>✕</button>
+              </div>
+            )}
             <form className="chat-compose" onSubmit={(e) => { e.preventDefault(); void send(); }}>
               <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => void sendPhoto(e.target.files?.[0])} />
               <button type="button" className="icon-btn" aria-label="Send a photo" title="Send a photo" disabled={busy} onClick={() => fileInput.current?.click()}><IconImage /></button>
@@ -673,22 +708,15 @@ function NewChat({ people, supabase, onDone, onClose }: { people: ChatPerson[]; 
   );
 }
 
-/** A chat's picture: 1-on-1 = the other person's photo; group = its icon, else a combo of members' faces, else # / first letter. */
-function RoomFace({ r, name, icon, faces, names, size }: { r: ChatRoomRow; name: string | null; icon?: string; faces: Map<string, string | null>; names: Map<string, string>; size: number }) {
+/** A chat's picture: 1-on-1 = the other person's photo; group = its photo, else the Hermosa logo. */
+function RoomFace({ r, name, icon, size }: { r: ChatRoomRow; name: string | null; icon?: string; size: number }) {
   if (r.kind === "DM") return <Avatar name={name ?? "?"} url={r.photo_url} size={size} />;
   const cls = `chat-group-face ${size < 40 ? "small" : ""}`;
   // eslint-disable-next-line @next/next/no-img-element
   if (r.icon_path) return icon ? <img className={`${cls} chat-icon`} src={icon} alt="" /> : <span className={cls} aria-hidden />;
-  const ids = (r.face_ids ?? []).slice(0, 2);
-  if (!r.auto && ids.length >= 2) {
-    const s = Math.round(size * 0.68);
-    return (
-      <span className="chat-combo" style={{ width: size, height: size }} aria-hidden>
-        {ids.map((id) => <Avatar key={id} name={names.get(id) ?? "?"} url={faces.get(id) ?? null} size={s} />)}
-      </span>
-    );
-  }
-  return <span className={cls} aria-hidden>{r.auto ? "#" : (name ?? "?").slice(0, 1).toUpperCase()}</span>;
+  // Every group starts with the Hermosa logo until owners or the GM give it a photo (CHRIS, Nov 26).
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img className={`${cls} chat-icon chat-logo`} src="/hermosa-logo.png" alt="" />;
 }
 
 /** Group icons are small: centre-crop to a 512px square JPEG. */
@@ -704,7 +732,7 @@ async function squareIcon(file: File): Promise<Blob> {
   } finally { URL.revokeObjectURL(url); }
 }
 
-function GroupInfo({ info, me, icon, canAdd, people, supabase, onChanged, onCleared }: { info: RoomInfo; me: string; icon: string | null; canAdd: boolean; people: ChatPerson[]; supabase: Sb; onChanged: (left: boolean) => void; onCleared: () => void }) {
+function GroupInfo({ info, me, icon, canAdd, canIcon, people, supabase, onChanged, onCleared }: { info: RoomInfo; me: string; icon: string | null; canAdd: boolean; canIcon: boolean; people: ChatPerson[]; supabase: Sb; onChanged: (left: boolean) => void; onCleared: () => void }) {
   const [name, setName] = useState(info.name);
   const [canDelete, setCanDelete] = useState(false);
   useEffect(() => { void supabase.rpc("chat_can_delete", { p_room: info.id }).then(({ data }) => setCanDelete(data === true)); }, [supabase, info.id]);
@@ -758,7 +786,7 @@ function GroupInfo({ info, me, icon, canAdd, people, supabase, onChanged, onClea
           <button type="submit" className="secondary" disabled={!name.trim() || name.trim() === info.name}>Rename</button>
         </form>
       )}
-      {group && canAdd && (
+      {group && canIcon && (
         <div className="chat-panel-actions chat-icon-row">
           <input ref={iconInput} type="file" accept="image/*" hidden onChange={(e) => void setIcon(e.target.files?.[0] ?? null)} />
           <button type="button" className="secondary" disabled={iconBusy} onClick={() => iconInput.current?.click()}>{iconBusy ? "Saving…" : icon ? "Change group photo" : "Add group photo"}</button>

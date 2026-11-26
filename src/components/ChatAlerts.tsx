@@ -3,9 +3,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
-import { playChatSound } from "@/lib/chatSounds";
+import { CHAT_READ_EVENT, firstName, playChatSound } from "@/lib/chatSounds";
 
-type Notice = { id: string; room_id: string; created_at: string; sender: string; room_name: string | null; text: string };
+type Notice = { id: string; room_id: string; created_at: string; sender: string; sender_first?: string | null; room_name: string | null; text: string };
 
 /**
  * On every page (v0.49): chat sounds for new messages, and for staff a can't-miss notice when management
@@ -25,6 +25,12 @@ export function ChatAlerts({ me, management }: { me: string; management: boolean
   }, [supabase, management]);
 
   useEffect(() => { void load(); }, [load, path]);
+  // Opening the chat clears the notice right away (CHRIS, Nov 26).
+  useEffect(() => {
+    const h = () => { void load(); };
+    addEventListener(CHAT_READ_EVENT, h);
+    return () => removeEventListener(CHAT_READ_EVENT, h);
+  }, [load]);
   useEffect(() => {
     const ch = supabase.channel(`chat-alerts-${me}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages" }, (p) => {
@@ -41,19 +47,20 @@ export function ChatAlerts({ me, management }: { me: string; management: boolean
 
   const top = list.find((n) => path !== `/chat/${n.room_id}`);
   if (!top) return null;
+  const from = `Message from ${top.sender_first || firstName(top.sender)}`;
   const rest = list.filter((n) => n.room_id !== top.room_id).length;
   // "Later" shrinks it to a pulsing pill until a newer message from management arrives.
   if (later === top.id) {
     return (
       <Link href={`/chat/${top.room_id}`} className="mgmt-pill" role="status">
-        <span aria-hidden>📣</span> Message from management{list.length > 1 ? ` (${list.length})` : ""}
+        <span aria-hidden>📣</span> {from}{list.length > 1 ? ` (${list.length})` : ""}
       </Link>
     );
   }
   return (
-    <div className="mgmt-alert" role="alertdialog" aria-live="assertive" aria-label="Message from management">
+    <div className="mgmt-alert" role="alertdialog" aria-live="assertive" aria-label={from}>
       <div className="mgmt-alert-card">
-        <span className="mgmt-alert-tag"><span aria-hidden>📣</span> Message from management</span>
+        <span className="mgmt-alert-tag"><span aria-hidden>📣</span> {from}</span>
         <strong className="mgmt-alert-from">{top.sender}{top.room_name ? ` in ${top.room_name}` : ""}</strong>
         <p className="mgmt-alert-text">{top.text}</p>
         {rest > 0 && <p className="small mgmt-alert-more">+ {rest} more from management</p>}

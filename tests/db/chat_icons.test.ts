@@ -20,18 +20,17 @@ afterAll(async () => db?.close());
 const list = async (p: Person) => (await db.rpc(p, "aal1", "chat_list", [])) as Row[];
 
 describe("chat icons", () => {
-  it("members set a made group's icon from their own upload; outsiders and bad paths are refused", async () => {
-    const g = (await db.rpc(ana, "aal1", "chat_create_group", ["DEMO Icons", [bea.appUserId]])).id;
+  it("made groups: only owners and the GM change the icon (update-0062); bad paths are refused", async () => {
+    const g = (await db.rpc(ana, "aal1", "chat_create_group", ["DEMO Icons", [bea.appUserId, owner.appUserId]])).id;
     const row = (await list(ana)).find((r) => r.id === g)!;
     expect(row.icon_path).toBeNull();
-    expect(row.face_ids).toHaveLength(2);
-    expect(row.face_ids![0]).toBe(bea.appUserId); // others first
-    const path = `${g}/${bea.appUserId}/icon.jpg`;
-    expect((await db.rpc(bea, "aal1", "chat_set_icon", [g, path])).ok).toBe(true);
-    expect((await list(ana)).find((r) => r.id === g)!.icon_path).toBe(path);
-    expect((await db.rpc(ana, "aal1", "chat_set_icon", [g, path])).error).toBe("BAD_REQUEST"); // not Ana's upload
+    expect((await db.rpc(bea, "aal1", "chat_set_icon", [g, `${g}/${bea.appUserId}/icon.jpg`])).error).toBe("FORBIDDEN");
     expect((await db.rpc(cy, "aal1", "chat_set_icon", [g, `${g}/${cy.appUserId}/x.jpg`])).error).toBe("FORBIDDEN");
-    expect((await db.rpc(ana, "aal1", "chat_set_icon", [g, null])).ok).toBe(true);
+    const path = `${g}/${owner.appUserId}/icon.jpg`;
+    expect((await db.rpc(owner, "aal2", "chat_set_icon", [g, `${g}/${bea.appUserId}/icon.jpg`])).error).toBe("BAD_REQUEST"); // not the owner's upload
+    expect((await db.rpc(owner, "aal2", "chat_set_icon", [g, path])).ok).toBe(true);
+    expect((await list(ana)).find((r) => r.id === g)!.icon_path).toBe(path);
+    expect((await db.rpc(owner, "aal2", "chat_set_icon", [g, null])).ok).toBe(true);
   });
 
   it("automatic groups: only owners and the GM change the icon; 1-on-1 chats have none", async () => {
