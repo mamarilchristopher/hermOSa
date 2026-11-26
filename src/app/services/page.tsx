@@ -38,7 +38,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const isManager = can(access, ["OWNER", "MANAGER"], null) || branchesFor(access, branches, ["MANAGER"]).length > 0;
 
   const [{ data: services }, { data: emps }, { data: logs }, { data: ppl }] = await Promise.all([
-    supabase.from("services").select("id, name, price_cents, commission_cents").eq("active", true).order("name"),
+    supabase.from("services").select("*").eq("active", true).order("name"), // "*": session_prices exists only after update-0068
     supabase.from("employees").select("id, full_name, branch_id, commission_eligible, app_user_id, position").eq("active", true).order("full_name"),
     supabase.from("service_logs").select("*, services(name)")
       .eq("branch_id", branch.id).gte("service_date", from).lte("service_date", date).order("service_date", { ascending: false }).order("created_at"),
@@ -128,7 +128,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 {(services ?? []).length === 0 ? "Add your services below first." : null}
               </div>
             ) : (
-              <EntryForm branch={branch.id} date={date} today={today} services={sortServices(services ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
+              <EntryForm branch={branch.id} date={date} today={today} services={sortServices(services ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null, sessions: Array.isArray(s.session_prices) ? (s.session_prices as (number | string)[]).map(Number) : null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
             )}
             {isManager && <p className="small" style={{ marginTop: 12 }}><Link href="/services/prices">Price list and commissions</Link> (add a service, set its price and commission)</p>}
           </div>

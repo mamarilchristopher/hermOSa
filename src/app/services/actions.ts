@@ -36,6 +36,11 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
   try { photos = Photos.parse(JSON.parse(p.data.photos || "[]")); } catch { return { error: "The photos didn't attach. Remove them and add them again." }; }
   if (p.data.partner && p.data.partner === p.data.employee) return { error: "The lead and the assistant must be different people." };
   const paid = p.data.kind === "PAID";
+  const supabase = await createClient();
+  // "*": session_prices only exists after update-0068.
+  const { data: svcRow } = await supabase.from("services").select("*").eq("id", p.data.service).maybeSingle();
+  const sessions = Array.isArray(svcRow?.session_prices) ? (svcRow.session_prices as (number | string)[]).map(Number) : null;
+  const zeroOk = !!svcRow && !Number(svcRow.price_cents ?? 0) && svcRow.commission_cents != null; // bundle sessions, later doses
   let cents = 0;
   if (paid) {
     try {
@@ -43,9 +48,12 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     } catch {
       return { error: "Enter the amount paid, e.g. 2500 or 2500.50" };
     }
-    if (cents <= 0) return { error: "Enter the amount paid. If the client didn't pay, choose Backjob, Check-up or No charge." };
+    if (cents < 0 || (cents === 0 && !zeroOk)) return { error: "Enter the amount paid. If the client didn't pay, choose Backjob, Check-up or No charge." };
+    // A bundle session paid differently from its schedule needs a reason, like a different list price.
+    const due = sessions?.[p.data.session - 1];
+    if (sessions && due === undefined) return { error: `This bundle has ${sessions.length} sessions. Pick a session from 1 to ${sessions.length}.` };
+    if (due !== undefined && cents !== due && (p.data.price_note ?? "").length < 3) return { error: "Write why this session's amount is different from the bundle's schedule." };
   }
-  const supabase = await createClient();
   // CHRIS Nov 26: "already logged?" checks the same client and service today (not staff and amount).
   if (fd.get("confirm") !== "1") {
     const like = p.data.client.trim().replace(/[\\%_]/g, (c) => "\\" + c);

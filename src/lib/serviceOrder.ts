@@ -12,7 +12,8 @@ const ORDER = [
   "Barbie Shoulder", "RF Face Single Session", "RF Body Single Session", "Face Botox Package",
   "Botox: Forehead/Crowsfeet/Frownline/Nasal Fold (PER UNIT)", "Botox: Undereye (PER UNIT)", "UA Whitening Single session",
   "UA Carbon Laser", "Lemon Bottle Face Single Session", "Lemon Bottle Arms/Love Handle/Backfat/Love Handle Single Session",
-  "Lux Queen Single Session", "Illumina Single Session", "Brilliant Single Session",
+  "Lux Queen Single Session", "Lux Queen 10+3", "Lux Queen 5+1", "Illumina Single Session", "Illumina 10+3", "Illumina 5+1",
+  "Brilliant Single Session", "Brilliant 10+3", "Brilliant 5+1", "L-Carnitine",
   "Diode Upper Lip (Male)", "Diode Upper Lip (Female)", "Diode Lower Lip (Male)", "Diode Lower Lip (Female)", "Diode Full Face",
   "Diode Underarms", "Diode Arms", "Diode Half Leg", "Diode Full Legs", "Diode Bikini Line", "Diode Beard (Male)", "Diode Upper Neck (Male)",
 ];

@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.68.0 | Nov 26, 2026 | update-0068 | Service log: Gluta bundles (Lux Queen, Illumina, Brilliant 10+3 and 5+1) in the Service list; Session No. shows each session's amount (paid already / free = ₱0) and fills it in; every bundle session pays its set commission, ₱0 ones included; L-Carnitine ₱500 added |
 | 0.67.0 | Nov 26, 2026 | update-0067 | Late NTEs: management taps Accept reason (doesn't count toward an IR) or Reject reason (counts), with an optional note; the employee is notified and sees the result; the tracker shows reasons waiting for review |
 | 0.65.0 | Nov 26, 2026 | update-0065 | Late NTE: the explanation needs 1 to 3 proof photos (heavy traffic: a photo of the traffic; hard to book a ride: a screenshot of the ride app booking made before 10 AM); management sees the photos on the person's NTE page, staff on My Late NTEs |
 | 0.64.0 | Nov 26, 2026 | update-0064 | Service log: Session No. (1 by default, 1 to 15 for packages like Gluta) before the service, shown as "Session N" on entries; Session No. / Service / Amount paid on one row on PC; "Did the client pay?" fits phones as a 2 x 2 grid |

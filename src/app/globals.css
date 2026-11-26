@@ -1341,3 +1341,7 @@ input.batch-tick { width: 20px; height: 20px; margin: 0 8px 0 0; float: left; cu
 .nte-proof-row button.nte-proof-add { border-radius: 14px; }
 .nte-review { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
 .nte-review input[name="note"] { flex: 1 1 220px; min-width: 0; }
+/* v0.68.0: bundles show "9 · paid already" in Session No., so it gets more room */
+.service-row.bundle { grid-template-columns: 170px minmax(0, 2fr) minmax(0, 1fr); }
+.service-row.bundle.unpaid { grid-template-columns: 170px minmax(0, 1fr); }
+@media (max-width: 560px) { .service-row.bundle, .service-row.bundle.unpaid { grid-template-columns: 150px minmax(0, 1fr); } }

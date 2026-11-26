@@ -6,7 +6,14 @@ import { previewCommission, type CommissionType } from "@/lib/commission";
 import { centsToPhp } from "@/lib/csv";
 import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
 
-type Opt = { id: string; name: string; eligible?: boolean; here?: boolean; price?: number | null; commission?: number | null };
+type Opt = { id: string; name: string; eligible?: boolean; here?: boolean; price?: number | null; commission?: number | null; sessions?: number[] | null };
+
+/** A bundle session's label in the Session No. list: "1 · ₱6,800", "8 · paid already", "11 · free". */
+function sessionLabel(i: number, list: number[], name: string): string {
+  const free = Number(/\+(\d+)/.exec(name)?.[1] ?? 0);
+  const c = list[i];
+  return `${i + 1} · ${c > 0 ? centsToPhp(c) : i >= list.length - free ? "free" : "paid already"}`;
+}
 
 
 const KINDS = [
@@ -88,8 +95,10 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
     solo: person?.eligible === false ? 0 : raw.solo,
   };
   const p = { ...raw, total: shown.lead + shown.assist + shown.solo };
-  const listPrice = svc?.price ?? null;
-  const priceDiffers = paid && listPrice != null && listPrice > 0 && cents > 0 && cents !== listPrice;
+  // A bundle session's amount comes from its schedule (update-0068); anything else from the list price.
+  const scheduled = svc?.sessions?.length ? svc.sessions[Number(session) - 1] ?? null : null;
+  const listPrice = scheduled ?? svc?.price ?? null;
+  const priceDiffers = paid && listPrice != null && (scheduled != null ? amount.trim() !== "" && cents !== scheduled : listPrice > 0 && cents > 0 && cents !== listPrice);
   const needsPhotos = kind === "PAID" || kind === "BACKJOB";
   const missingPhotos = !needsPhotos ? null
     : photos.count("BEFORE") < 1 || photos.count("AFTER") < 1 ? "Add at least one before and one after photo."
@@ -137,17 +146,32 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
           <input name="client" required minLength={2} maxLength={120} autoComplete="off" placeholder="Full name, as on the waiver" value={client} onChange={(e) => setClient(e.target.value)} />
         </label>
         {/* CHRIS Nov 26: Session No. – Service – Amount paid on one row. Most services are session 1; packages (e.g. Gluta) go up to 15. */}
-        <div className={`span2 service-row ${paid ? "" : "unpaid"}`}>
+        <div className={`span2 service-row ${paid ? "" : "unpaid"} ${svc?.sessions?.length ? "bundle" : ""}`}>
         <label className="session-field">Session No.
-          <select name="session" value={session} onChange={(e) => setSession(e.target.value)} aria-label="Session number">
-            {Array.from({ length: 15 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+          <select name="session" value={session} onChange={(e) => {
+            setSession(e.target.value);
+            // Bundles (update-0068): each session has its own amount (₱0 once it's paid for, and the free ones).
+            const c = svc?.sessions?.[Number(e.target.value) - 1];
+            if (c != null) setAmount(String(c / 100));
+          }} aria-label="Session number">
+            {svc?.sessions?.length
+              ? svc.sessions.map((_, i) => <option key={i + 1} value={i + 1}>{sessionLabel(i, svc.sessions!, svc.name)}</option>)
+              : Array.from({ length: 15 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
           </select>
         </label>
         <label>Service
           <select name="service" required value={service} onChange={(e) => {
             setService(e.target.value);
+            const next = services.find((x) => x.id === e.target.value);
+            // A bundle: keep the session if it exists in the bundle, else session 1, and fill in that session's amount.
+            if (next?.sessions?.length) {
+              const n = Number(session) <= next.sessions.length ? Number(session) : 1;
+              setSession(String(n));
+              setAmount(String(next.sessions[n - 1] / 100));
+              return;
+            }
             // Fill in the list price (it can still be changed, e.g. for a discount).
-            const pr = services.find((x) => x.id === e.target.value)?.price;
+            const pr = next?.price;
             if (pr != null) setAmount(pr > 0 ? String(pr / 100) : "");
           }}>
             <option value="" disabled>Choose a service…</option>
@@ -161,7 +185,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
         )}
         </div>
         {priceDiffers && (
-          <label className="span2"><span>Reason for the different price <span className="muted">(list price {centsToPhp(listPrice!)})</span></span>
+          <label className="span2"><span>Reason for the different price <span className="muted">({scheduled != null ? `session ${session} of this bundle is ${centsToPhp(scheduled)}` : `list price ${centsToPhp(listPrice!)}`})</span></span>
             <input name="price_note" required minLength={3} maxLength={300} placeholder="e.g. 10% promo, loyalty discount" value={priceNote} onChange={(e) => setPriceNote(e.target.value)} />
           </label>
         )}
