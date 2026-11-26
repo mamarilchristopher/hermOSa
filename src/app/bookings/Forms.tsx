@@ -1,7 +1,7 @@
 "use client";
 import { useActionState, useEffect, useState } from "react";
 import { pick } from "@/lib/decision";
-import { addBooking, setStatus } from "./actions";
+import { addBooking, logFollowUp, setStatus } from "./actions";
 
 
 export function AddBookingForm({ branches, today, min, max, services }: { branches: { id: string; name: string }[]; today: string; min: string; max: string; services: { name: string; price: number | null }[] }) {
@@ -97,5 +97,36 @@ export function CopyForGc({ text }: { text: string }) {
     <button type="button" className="secondary small" onClick={async () => {
       try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 2000); } catch { window.prompt("Copy this:", text); }
     }}>{done ? "Copied" : "Copy for GC"}</button>
+  );
+}
+
+/** update-0081: Sales follow-ups. How they were contacted, then what happened. */
+export function FollowUpForm({ id, today }: { id: string; today: string }) {
+  const [s, action, pending] = useActionState(logFollowUp, undefined);
+  const [rebook, setRebook] = useState(false);
+  return (
+    <form action={action} className="fu-form">
+      <input type="hidden" name="id" value={id} />
+      <select name="channel" defaultValue="CALL" aria-label="How you contacted them">
+        <option value="CALL">Called</option>
+        <option value="FACEBOOK">Facebook message</option>
+        <option value="SMS">Text</option>
+        <option value="OTHER">Other</option>
+      </select>
+      <input name="note" maxLength={300} placeholder="Note (optional), e.g. busy until Dec" />
+      <div className="status-pick">
+        <button onClick={pick("STILL_UNRESPONSIVE")} disabled={pending}>Still unresponsive</button>
+        <button type="button" className={rebook ? "on" : ""} onClick={() => setRebook(!rebook)}>Rebooked…</button>
+        <button onClick={pick("CANCELLED")} disabled={pending}>Cancelled</button>
+      </div>
+      {rebook && (
+        <span className="booking-resched">
+          <input type="date" name="new_date" min={today} aria-label="New visit date" />
+          <button className="small" onClick={pick("REBOOKED")} disabled={pending}>Save new date</button>
+        </span>
+      )}
+      {s?.error && <span className="small" style={{ color: "var(--bad)" }}>{s.error}</span>}
+      {s?.ok && <span className="small" style={{ color: "var(--good)" }}>{s.ok}</span>}
+    </form>
   );
 }

@@ -52,3 +52,22 @@ export async function setStatus(_prev: BookingState, fd: FormData): Promise<Book
   revalidatePath("/bookings"); revalidatePath("/me");
   return { ok: "Saved." };
 }
+
+/** update-0081: log one follow-up of an Unresponsive booking, with its outcome. CSRs, owners and the GM. */
+export async function logFollowUp(_prev: BookingState, fd: FormData): Promise<BookingState> {
+  const id = z.uuid().safeParse(fd.get("id"));
+  const outcome = String(fd.get("decision") ?? "");
+  const channel = String(fd.get("channel") ?? "");
+  const newDate = String(fd.get("new_date") ?? "");
+  const note = String(fd.get("note") ?? "").trim();
+  if (!id.success) return { error: "Refresh the page and try again." };
+  if (!["CALL", "FACEBOOK", "SMS", "OTHER"].includes(channel)) return { error: "Choose how you contacted them." };
+  if (!["STILL_UNRESPONSIVE", "REBOOKED", "CANCELLED"].includes(outcome)) return { error: "Tap what happened." };
+  if (outcome === "REBOOKED" && !isIsoDate(newDate)) return { error: "Choose the new visit date first." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("log_booking_followup", { p_booking: id.data, p_channel: channel, p_outcome: outcome, p_new_date: outcome === "REBOOKED" ? newDate : null, p_note: note || null });
+  if (error) return { error: missing(error.code) ? "The owner needs to run update-0081 in Supabase first." : "Could not save. Try again." };
+  if (!data?.ok) return { error: data?.error === "NOT_UNRESPONSIVE" ? "Someone already updated this booking. Refresh the page." : errorText(data?.error) };
+  revalidatePath("/bookings"); revalidatePath("/bookings/followups"); revalidatePath("/me");
+  return { ok: outcome === "REBOOKED" ? "Rebooked." : outcome === "CANCELLED" ? "Cancelled." : "Follow-up logged." };
+}

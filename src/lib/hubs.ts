@@ -31,6 +31,8 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
       ...(management ? [{ href: "/", label: "Dashboard" }] : []),
       ...(filler ? [{ href: "/sales/daily", label: "Daily sales" }, { href: "/sales/missing", label: "Missing days" }] : []),
       ...(importer ? [{ href: "/imports", label: "Imports" }] : []),
+      // update-0081 (CHRIS Nov 26): Unresponsive bookings to call or message again. CSRs, owners and the GM.
+      ...(owner || gm || has(["CSR"]) ? [{ href: "/bookings/followups", label: "Follow-ups" }] : []),
     ] },
     { key: "clinic", label: "Clinic", short: "Clinic", icon: "clipboard", tabs: [
       ...(logger ? [{ href: "/services", label: "Service log", badge: n(c.overdue) }] : []),

@@ -4,11 +4,12 @@ import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { AddBookingForm, CopyForGc, NoteForm, StatusForm } from "./Forms";
+import { LiveBookings } from "./LiveBookings";
 
 type Booking = {
   id: string; booked_on: string; csr_employee_id: string | null; client_name: string; contact: string | null; platform: string; services: string;
   expected_cents: number | null; appointment_date: string; appointment_time: string | null; branch_id: string; deposit_cents: number | null; follow_up: boolean; note: string | null;
-  status: string; resched_count: number; rescheduled_from: string | null; status_note: string | null;
+  status: string; resched_count: number; rescheduled_from: string | null; status_note: string | null; status_by: string | null; status_at: string | null;
 };
 
 const STATUS: Record<string, [string, string]> = {
@@ -37,16 +38,22 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
   const shown = only ? [only] : clinics;
 
   // Bookings FOR this day (the visit date), plus any that were moved away from it (CHRIS Nov 26).
-  const cols = "id, booked_on, csr_employee_id, client_name, contact, platform, services, appointment_date, appointment_time, branch_id, deposit_cents, expected_cents, follow_up, note, status, resched_count, rescheduled_from, status_note";
+  const cols = "id, booked_on, csr_employee_id, client_name, contact, platform, services, appointment_date, appointment_time, branch_id, deposit_cents, expected_cents, follow_up, note, status, resched_count, rescheduled_from, status_note, status_by, status_at";
   const forDay = (withMoves: boolean) => supabase.from("bookings").select(cols)
     .or(`appointment_date.eq.${day},rescheduled_from.eq.${day}${withMoves ? `,moved_from.cs.{${day}}` : ""}`)
     .order("appointment_time", { ascending: true, nullsFirst: false }).order("created_at").limit(500);
-  const [first, { data: emps }, { data: madeToday }, { data: svcs }] = await Promise.all([
+  const [first, { data: emps }, { data: madeToday }, { data: svcs }, { data: ppl }, { count: toFollow }] = await Promise.all([
     forDay(true),
     supabase.from("employees").select("id, full_name"),
     booker ? supabase.from("bookings").select("csr_employee_id, expected_cents").eq("booked_on", day).limit(2000) : Promise.resolve({ data: [] }),
     booker ? supabase.from("services").select("name, price_cents").eq("active", true).order("name") : Promise.resolve({ data: [] }),
+    supabase.rpc("chat_people"), // names, for "Arrived · by Ana, 3:05 PM"
+    // update-0081: Unresponsive bookings waiting on Sales follow-ups (CSRs, owners and the GM).
+    booker ? supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "UNRESPONSIVE") : Promise.resolve({ count: 0 }),
   ]);
+  const who = new Map(((Array.isArray(ppl) ? ppl : []) as { id: string; name: string }[]).map((x) => [x.id, x.name]));
+  const at = (ts: string) => new Date(ts).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
+  const firstName = (n?: string) => (n ?? "").replace(/^ma\.?\s+/i, "").split(" ")[0];
   // moved_from comes with update-0071; until it runs, fall back to the last move only.
   const { data, error } = first.error?.code === "42703" ? await forDay(false) : first;
   const rows = (data ?? []) as Booking[];
@@ -85,7 +92,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
     <>
       <TopBar access={access} />
       <main>
-        <h1>Bookings</h1>
+        <h1 className="title-row">Bookings <LiveBookings /></h1>
         <p className="muted small">{booker ? "Log each booking here, from Facebook, calls, texts or walk-ins. The branch marks Arrived or Done, and you see it right away." : "Who is booked for this day at every branch, and their status. Your branch taps Arrived when they come in and Done when finished."}</p>
         {error && <div className="notice info">{error.code === "42P01" ? "The owner needs to run update-0040 in Supabase first." : "Could not load. Try again."}</div>}
 
@@ -111,6 +118,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
               {noValue > 0 && <span className="small muted"> · {noValue} booking{noValue === 1 ? "" : "s"} without a value</span>}
             </p>
           )}
+          {booker && (toFollow ?? 0) > 0 && <p className="small" style={{ margin: "8px 0 0" }}><Link href="/bookings/followups">{toFollow} unresponsive client{toFollow === 1 ? "" : "s"} to follow up ›</Link></p>}
           {rows.length > 0 && <div style={{ marginTop: 8 }}><CopyForGc text={gc} /></div>}
         </div>
 
@@ -144,6 +152,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
                 <p className="small muted" style={{ margin: "0 0 6px" }}>
                   {r.note && <>“{r.note}” · </>}
                   {r.status_note && <>{r.status_note} · </>}
+                  {r.status_by && r.status_at && r.status !== "BOOKED" && !moved(r) && <>{STATUS[r.status]?.[0] ?? r.status} by {firstName(who.get(r.status_by)) || "staff"}, {at(r.status_at)} · </>}
                   Logged {fmt(r.booked_on)}{r.csr_employee_id && name.get(r.csr_employee_id) ? ` by ${name.get(r.csr_employee_id)}` : r.csr_employee_id ? "" : " by owner / GM"}
                   {r.platform !== "FACEBOOK" && ` · ${r.platform.replace("_", "-").toLowerCase()}`}
                 </p>
