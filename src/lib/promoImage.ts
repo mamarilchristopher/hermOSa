@@ -3,7 +3,7 @@
  * Brand (hard rules): official logo with the wordmark untouched, satin ivory with a gold band, never a brown background,
  * and never a "regular price": only the promo price, the session count and the price per session.
  */
-import { BRANCH_LINE, mechanic, peso, sessionsOf, type PromoItem } from "./promoRules";
+import { adName, adNameLong, BRANCH_LINE, mechanic, peso, sessionsOf, type PromoItem } from "./promoRules";
 
 export type PromoArt = { title: string; tagline: string; items: PromoItem[]; price: number; months: number; endsOn?: string | null; photo: string };
 export type Fonts = { sans: string; serif: string };
@@ -72,8 +72,10 @@ function pill(g: CanvasRenderingContext2D, cx: number, y: number, text: string, 
 const untilText = (endsOn?: string | null) =>
   endsOn ? `Until ${new Date(`${endsOn}T00:00:00Z`).toLocaleDateString("en-PH", { month: "long", day: "numeric", timeZone: "UTC" })} only` : "Limited slots";
 
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
 function itemLines(items: PromoItem[]) {
-  return items.map((i) => `${i.paid + i.free} × ${i.name}`);
+  return items.map((i) => `${i.paid + i.free} × ${adName(i.name)}`);
 }
 
 export async function drawPromo(kind: "story" | "feed", a: PromoArt, f: Fonts): Promise<HTMLCanvasElement> {
@@ -113,7 +115,7 @@ export async function drawPromo(kind: "story" | "feed", a: PromoArt, f: Fonts): 
     for (const l of tagLines) { g.fillText(l, W / 2, y - ts * 0.1 + 10); y += 46; }
     goldBand(g, 0, bandTop, W, 140);
     g.fillStyle = "#fff";
-    const band = single ? `${mechanic(a.items)} ${a.items[0].name}` : `${n} sessions · ${a.months} months`;
+    const band = single ? `${mechanic(a.items)} ${adName(a.items[0].name)}` : `${n} sessions · ${a.months} months`;
     const bs = fitSize(g, (sz) => S(800, sz), band.toUpperCase(), W - 120, 1, 62, 34);
     g.font = S(800, bs); g.fillText(band.toUpperCase(), W / 2, bandTop + 70 + bs * 0.36);
     g.font = S(500, 32); g.fillStyle = INK2;
@@ -150,7 +152,7 @@ export async function drawPromo(kind: "story" | "feed", a: PromoArt, f: Fonts): 
   g.font = S(800, bs); g.fillText(band.toUpperCase(), M, y + 60 + bs * 0.36);
   y += 120 + 70;
   g.fillStyle = INK2; g.font = S(600, 30);
-  const all = single ? [a.items[0].name] : itemLines(a.items);
+  const all = single ? [cap(adNameLong(a.items[0].name))] : itemLines(a.items);
   const lines = all.length > 4 ? [...all.slice(0, 3), `+ ${all.length - 3} more`] : all;
   for (const l of lines) { for (const w of wrap(g, l, TW - 20).slice(0, 2)) { g.fillText(w, M, y); y += 38; } }
   y = Math.min(y + 100, H - 230);

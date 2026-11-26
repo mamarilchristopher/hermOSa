@@ -214,9 +214,9 @@ export function captions(p: { title: string; tagline?: string; items: PromoItem[
   const per = peso(Math.round(p.price / Math.max(1, n)));
   const until = p.endsOn ? ` until ${new Date(`${p.endsOn}T00:00:00Z`).toLocaleDateString("en-PH", { month: "long", day: "numeric", timeZone: "UTC" })}` : "";
   const what = p.items.length === 1
-    ? `${p.items[0].paid} ${p.items[0].name} sessions${p.items[0].free ? ` + ${p.items[0].free} FREE` : ""}`
-    : p.items.map((i) => `${i.paid + i.free} × ${i.name}`).join("\n• ");
-  const story = `${p.title.toUpperCase()} ✨\n${p.items.length === 1 ? mechanic(p.items) + " " + p.items[0].name : `${n} sessions, one price`}\n${peso(p.price)} only (${per}/session)\nAvailable${until} 💛 DM us to book!`;
+    ? `${p.items[0].paid}${p.items[0].free ? ` + ${p.items[0].free} FREE` : ""} sessions of ${adNameLong(p.items[0].name)}`
+    : p.items.map((i) => `${i.paid + i.free} × ${adName(i.name)}`).join("\n• ");
+  const story = `${p.title.toUpperCase()} ✨\n${p.items.length === 1 ? `${mechanic(p.items)} sessions of ${adNameLong(p.items[0].name)}`.replace("sessions sessions", "sessions") : `${n} sessions, one price`}\n${peso(p.price)} only (${per}/session)\nAvailable${until} 💛 DM us to book!`;
   const feed = `${p.title} ✨${p.tagline ? `\n${p.tagline}` : ""}\n\n${p.items.length === 1 ? what : `What's inside:\n• ${what}`}\n\n💛 ${peso(p.price)} for ${n} sessions, just ${per} per session\n🗓️ Use within ${p.months} month${p.months === 1 ? "" : "s"}${until ? `\n⏳ Promo runs${until}` : ""}\n\n📍 ${BRANCH_LINE}\n📩 Send us a message to book your slot. Slots are limited!\n\n#HermosaAesthetics #LetYourBeautyShine #GlowUp #AestheticClinic #SkincarePH`;
   return { story, feed };
 }
@@ -269,7 +269,7 @@ export function suggest(stats: SvcStat[], today: string, pkgs: Pkg[] = []): Sugg
     const items = [{ service_id: s.id, name: s.name, unit: s.price, paid, free }];
     const months = Math.max(1, Math.min(12, Math.ceil((paid + free) / Math.max(0.25, safetyFor(s.name).perMonth)) + 1));
     const title = titleIdeas(items, season)[0];
-    return { id: `${kind}-${s.id}-${season?.key ?? ""}`, kind, why, title, tagline: season?.angle ?? `${s.name}: more sessions, better results`, items, price: defaultPrice(items, pkgs), months, season: season?.name };
+    return { id: `${kind}-${s.id}-${season?.key ?? ""}`, kind, why, title, tagline: season?.angle ?? `${adName(s.name)}: more sessions, better results`, items, price: defaultPrice(items, pkgs), months, season: season?.name };
   };
   // 1. Seasons: the best-selling fitting service gets a seasonal bundle; a quieter fitting one gets a second.
   for (const season of upcomingSeasons(today)) {
@@ -351,6 +351,31 @@ export function planVisits(plan: PlanStep[]): { d: string; steps: PlanStep[] }[]
 /** Short service names for the client's schedule: "Brilliant drip", "Signature facial". */
 export const shortName = (name: string) => name.replace(/\s*\((?:single session|program)\)\s*$/i, "").replace(/\s+single session$/i, "").replace(/\s*·.*$/, "").trim();
 
+/** Client-facing name for photos and captions (CHRIS Nov 27: never show internal Service log labels such as
+ *  "Single Session", "(program)" or "Hifu Back Fat" in anything a client sees). */
+const AD_WORDS: [RegExp, string][] = [
+  [/\bhifu\b/gi, "HIFU"], [/\brf\b/gi, "RF"], [/\bbb\b/gi, "BB"], [/\bipl\b/gi, "IPL"],
+  [/\bback fat\b/gi, "Back"], [/\blove handles?\b/gi, "Waist"], [/\btummy\b/gi, "Tummy"],
+  [/\bunderarms\b/gi, "Underarm"], [/\bface and neck\b/gi, "Face & Neck"],
+];
+const DRIP = /\b(lux queen|illumina|brilliant|gluta)\b/i;
+const BEST = /\b(lux queen|hiko|ultra ?v)\b/i;
+export function adName(name: string): string {
+  let n = shortName(name)
+    .replace(/\s*\((?:[^)]*)\)\s*/g, " ")
+    .replace(/\s+\d+\s*\+\s*\d+\b/g, "")
+    .replace(/\b(single|solo|session|sessions|promo|package)\b/gi, "")
+    .replace(/\s{2,}/g, " ").trim();
+  for (const [re, to] of AD_WORDS) n = n.replace(re, to);
+  if (/^diode\b/i.test(n) && !/laser/i.test(n)) n = n.replace(/^diode/i, "Diode Laser");
+  if (DRIP.test(n) && !/\bdrip\b/i.test(n)) n = `${n} Drip`;
+  // Title case words that came in lower case ("Signature facial" → "Signature Facial").
+  n = n.replace(/\b([a-z])([a-z]+)/g, (_, a: string, b: string) => (/^(and|of|with|or)$/.test(a + b) ? a + b : a.toUpperCase() + b));
+  return n || shortName(name);
+}
+/** "our best-selling Lux Queen Drip" for best sellers, otherwise just the name. */
+export const adNameLong = (name: string) => (BEST.test(name) ? `our best-selling ${adName(name)}` : adName(name));
+
 /** Shortest clear name for the client's schedule photo: "Facial", "HIFU face", "Carbon laser". */
 export function tinyName(name: string): string {
   const n = shortName(name);
@@ -360,13 +385,13 @@ export function tinyName(name: string): string {
   if (/facial/i.test(n)) return "Facial";
   if (/carbon/i.test(n)) return "Carbon laser";
   if (/diode/i.test(n)) return "Diode laser";
-  return n;
+  return adName(name);
 }
 
 /** Copy-paste text of a schedule for Messenger. */
 export function scheduleText(p: { title: string; client: string; ends: string; plan: PlanStep[]; names: Record<string, string>; totals: Record<string, number> }) {
   const day = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-  const lines = planVisits(p.plan).map((v) => `${day(v.d)}: ${v.steps.map((s) => `${p.names[s.s] ?? "Session"} ${s.n} of ${p.totals[s.s] ?? s.n}`).join(" + ")}`);
+  const lines = planVisits(p.plan).map((v) => `${day(v.d)}: ${v.steps.map((s) => `${p.names[s.s] ? adName(p.names[s.s]) : "Session"} ${s.n} of ${p.totals[s.s] ?? s.n}`).join(" + ")}`);
   return [`${p.title}: your schedule`, p.client, `Use all sessions by ${day(p.ends)}.`, "", ...lines, "",
     "Message us a day before each visit to confirm your slot. You can move a date; just keep the spacing.", BRANCH_LINE].join("\n");
 }
