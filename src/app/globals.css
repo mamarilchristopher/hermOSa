@@ -1361,3 +1361,6 @@ input.batch-tick { width: 20px; height: 20px; margin: 0 8px 0 0; float: left; cu
 .record-visit { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2, #faf4ea); }
 .record-visit > div { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
 .record-visit .record-total { border-top: 1px solid var(--line, #eadcc2); margin-top: 6px; padding-top: 8px; font-weight: 800; }
+a.glance-link { color: inherit; text-decoration: none; transition: transform .15s ease, box-shadow .15s ease; }
+a.glance-link:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+a.glance-link strong::after { content: " →"; font-size: .9rem; color: var(--muted); }

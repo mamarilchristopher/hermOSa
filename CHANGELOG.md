@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.69.2 | Nov 26, 2026 | none | Home "Today so far": tapping a branch with sales opens that branch's Service log for the day |
 | 0.69.1 | Nov 26, 2026 | none | Home "Today so far": a branch's service log total now reads "₱1,100 Sales Logged" |
 | 0.69.0 | Nov 26, 2026 | update-0069 | Service log: Meds dropdown (None, Meds Package Free, Meds Package ₱800, Clindamycin only ₱500, Mupirocin only ₱300), saved as its own no-commission line of the visit and counted in the day's total; Details button on every entry (all staff) with Save as photo, a service record for clients or management (no commission shown); View as list sorted by seniority, CSRs last |
 | 0.68.3 | Nov 26, 2026 | none | Home "Today so far" (and yesterday / month figures) count each branch's service log total from Nov 25 on when no Daily Sales were typed, marked "service log"; empty boxes say "Nothing logged yet". Late NTE review note starts as "Adjust accordingly next time. NTE Accepted." (editable; left as is, Reject sends "Reason not accepted. This Late NTE counts toward an IR.") |

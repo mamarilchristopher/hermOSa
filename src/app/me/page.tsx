@@ -157,7 +157,7 @@ export default async function Me() {
             <a className="button secondary small" href="/chat">Open Chat</a>
           </div>
         )}
-                {home && <ManagerHome g={home.g} duty={home.duty} faces={home.faces} branches={branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: branchShort(b.name) }))} />}
+                {home && <ManagerHome g={home.g} duty={home.duty} faces={home.faces} branches={branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: branchShort(b.name), code: b.code }))} />}
         {ownerLevel && trackData != null && (
           <div className="card">
             <div className="card-head"><h2>Tardiness tracker, {monthLabel(today.slice(0, 7))}</h2><Link className="small" href="/nte">All Late NTEs</Link></div>

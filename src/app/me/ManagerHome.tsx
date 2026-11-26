@@ -42,7 +42,7 @@ export function TodoCard({ todos }: { todos: Todo[] }) {
 }
 
 /** Home for owners, finance and managers: what needs doing, yesterday per branch, and how the month is going. */
-export function ManagerHome({ g, duty, faces = {}, branches }: { g: Glance; duty: DutyRow[] | null; faces?: Record<string, DutyFace>; branches: { id: string; name: string }[] }) {
+export function ManagerHome({ g, duty, faces = {}, branches }: { g: Glance; duty: DutyRow[] | null; faces?: Record<string, DutyFace>; branches: { id: string; name: string; code?: string }[] }) {
   const ym = g.today.slice(0, 7);
   const hm = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" });
   const entered = g.branches.filter((b) => b.todayCell.kind !== "empty").length;
@@ -59,12 +59,17 @@ export function ManagerHome({ g, duty, faces = {}, branches }: { g: Glance; duty
         </div>
         <div className="glance-total"><strong>{php(g.todaySoFar)}</strong><span className="muted small">{open ? `${entered} of ${g.branches.length} branches with sales so far` : "Clinics open at 10 AM"}</span></div>
         {shown.length > 0 && <div className="glance-branches">
-          {shown.map((b) => (
-            <div key={b.id} className={`glance-branch ${b.todayCell.kind === "empty" ? "missing" : ""}`}>
+          {shown.map((b) => {
+            const inner = (<>
               <span className="small muted">{b.name}</span>
               <strong>{b.todayCell.kind === "empty" ? <span className="muted">Nothing logged yet</span> : <Cell c={b.todayCell} />}</strong>
-            </div>
-          ))}
+            </>);
+            // CHRIS Nov 26: a branch with sales opens that branch's Service log for the day.
+            const code = branches.find((x) => x.id === b.id)?.code;
+            return b.todayCell.kind !== "empty" && code
+              ? <Link key={b.id} href={`/services?date=${g.today}&branch=${code}`} className="glance-branch glance-link">{inner}</Link>
+              : <div key={b.id} className={`glance-branch ${b.todayCell.kind === "empty" ? "missing" : ""}`}>{inner}</div>;
+          })}
         </div>}
       </div>
 
