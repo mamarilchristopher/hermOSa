@@ -64,6 +64,31 @@ function medsChoices(meds: MedsOpt[]): { v: string; label: string }[] {
   return out;
 }
 
+/** CHRIS Nov 26 (v0.80.1): on "All branches" the entry form asks which branch first. Photos upload into the branch's
+ *  folder, so switching the branch starts the form over (the key). Staff at one branch never see the picker. */
+export function BranchEntryForm({ branches, start, employees, ...rest }: Omit<Parameters<typeof EntryForm>[0], "branch" | "employees"> & {
+  branches: { id: string; name: string }[]; start: string; employees: (Opt & { branch: string })[];
+}) {
+  const [b, setB] = useState(start);
+  const people = employees.map(({ branch, ...e }) => ({ ...e, here: branch === b }));
+  return (
+    <>
+      {branches.length > 1 && (
+        <div className="field">
+          <span className="field-label">Branch</span>
+          <div className="segmented choice" role="radiogroup" aria-label="Branch">
+            {branches.map((x) => (
+              <button type="button" key={x.id} role="radio" aria-checked={b === x.id} className={b === x.id ? "on" : ""} onClick={() => setB(x.id)}>{x.name.replace(/ \(.*\)$/, "")}</button>
+            ))}
+          </div>
+          {!b && <span className="small muted">Pick the branch where the service was done.</span>}
+        </div>
+      )}
+      {b && <EntryForm key={b} branch={b} employees={people} {...rest} />}
+    </>
+  );
+}
+
 /** Add-ons (CHRIS Nov 26, update-0080): extras sold with a service, e.g. L-Carnitine with a Lux Queen drip. */
 export type AddonOpt = { id: string; name: string; price: number | null };
 type AddonRow = { service: string; amount: string };

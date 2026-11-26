@@ -8,7 +8,7 @@ import { centsToPhp } from "@/lib/csv";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { addDays, sortBranches, WEEKDAYS, weekday } from "@/lib/insights";
 import { ROLE_TEXT, TYPE_TEXT } from "@/lib/commission";
-import { BatchApprove, ChangeDateForm, DecideButtons, EntryForm, RenumberForm } from "./Forms";
+import { BatchApprove, BranchEntryForm, ChangeDateForm, DecideButtons, RenumberForm } from "./Forms";
 import { Uid } from "@/components/Uid";
 import { StaffFilter } from "./StaffFilter";
 import { DeclaredCheck, diffText } from "./DeclaredCheck";
@@ -29,14 +29,22 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const viewable = branchesFor(access, branches, ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"]);
   if (viewable.length === 0) redirect("/");
-  const branch = viewable.find((b) => b.code === sp.branch) ?? viewable[0];
+  // CHRIS Nov 26 (v0.80.1): "All branches" is the default for anyone who sees more than one branch.
+  const picked = viewable.find((b) => b.code === sp.branch);
+  const branch = picked ?? (viewable.length > 1 ? null : viewable[0]);
+  const scope = branch ? [branch] : viewable;
+  const scopeIds = scope.map((b) => b.id);
+  const bName = Object.fromEntries(branches.map((b) => [b.id, b.name]));
+  const LOG_ROLES = ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN"] as const;
+  const logBranches = scope.filter((b) => can(access, [...LOG_ROLES], b.id));
+  const approverFor = (id: string | undefined) => !!id && can(access, ["OWNER", "MANAGER"], id);
   const today = manilaToday();
   const date = isIsoDate(sp.date) && sp.date <= today ? sp.date : today;
   // CHRIS Nov 26: entries grouped by day, the last 7 days up to the chosen day, with "Show 7 more days".
   const days = Math.min(91, Math.max(7, Math.round(Number(sp.days) / 7) * 7 || 7));
   const from = addDays(date, -(days - 1));
-  const canLog = can(access, ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN"], branch.id);
-  const approver = can(access, ["OWNER", "MANAGER"], branch.id);
+  const canLog = logBranches.length > 0;
+  const approver = scope.some((b) => approverFor(b.id));
   // Owners and the GM (update-0054) may log without photos; the lead and assist add them later.
   const topMgmt = can(access, ["OWNER"], null) || can(access, ["MANAGER"], null);
   const isManager = can(access, ["OWNER", "MANAGER"], null) || branchesFor(access, branches, ["MANAGER"]).length > 0;
@@ -45,14 +53,14 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
     supabase.from("services").select("*").eq("active", true).order("name"), // "*": session_prices exists only after update-0068
     supabase.from("employees").select("id, full_name, branch_id, commission_eligible, app_user_id, position").eq("active", true).order("full_name"),
     supabase.from("service_logs").select("*, services(name)")
-      .eq("branch_id", branch.id).gte("service_date", from).lte("service_date", date).order("service_date", { ascending: false }).order("created_at"),
+      .in("branch_id", scopeIds).gte("service_date", from).lte("service_date", date).order("service_date", { ascending: false }).order("created_at"),
     supabase.rpc("chat_people"), // names of everyone in the company, for "Entered by"
   ]);
   const allRaw = (logs ?? []) as unknown as Log[];
   // CHRIS Nov 26: filter by one staff member (Done by or Assisted by). Default: everyone.
   const staffPick = (emps ?? []).find((e) => e.id === sp.staff)?.id ?? null;
   const all = staffPick ? allRaw.filter((l) => l.performer_id === staffPick || l.assistant_id === staffPick) : allRaw;
-  const staffChoices = (emps ?? []).filter((e) => e.branch_id === branch.id || allRaw.some((l) => l.performer_id === e.id || l.assistant_id === e.id))
+  const staffChoices = (emps ?? []).filter((e) => scopeIds.includes(e.branch_id) || allRaw.some((l) => l.performer_id === e.id || l.assistant_id === e.id))
     .filter((e) => !/general\s*manager/i.test(e.position ?? "") && !/\bcsr\b/i.test(e.position ?? ""))
     .map((e) => ({ id: e.id, name: e.full_name }));
   // Proof of payment (update-0075): how many each entry has (only the ones this person may see; none before 0075).
@@ -68,7 +76,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const checkList = declared?.ok ? sortBranches(declared.branches) : [];
   const checks = checkBranches(declared?.days ?? [], checkList.map((b) => b.id)).map((c) => ({ ...c, code: checkList.find((b) => b.id === c.branch)!.code }));
   const checkNames = Object.fromEntries(checkList.map((b) => [b.id, b.name]));
-  const dayCheck = new Map((checks.find((c) => c.branch === branch.id)?.days ?? []).map((d) => [d.date, d]));
+  const dayCheck = new Map((branch ? checks.find((c) => c.branch === branch.id)?.days ?? [] : []).map((d) => [d.date, d]));
   const list = all.filter((l) => l.service_date === date); // the chosen day, for the cards on top
   // update-0054 (CHRIS Nov 26): only staff timed in today add entries; owners and the GM always can.
   const { data: onDuty } = canLog && !topMgmt ? await supabase.rpc("can_log_services_now") : { data: true };
@@ -92,7 +100,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   // CHRIS Nov 26: the General Manager doesn't perform services, so she isn't in the Lead / Assisted by lists.
   const clinicIds = new Set(branches.filter((b) => b.kind === "CLINIC").map((b) => b.id));
   // CHRIS Nov 26: only clinic staff in these lists (no CSRs / WFH staff).
-  const employees = (emps ?? []).filter((e) => !/general\s*manager/i.test(e.position ?? "") && !/\bcsr\b/i.test(e.position ?? "") && clinicIds.has(e.branch_id)).map((e) => ({ id: e.id, name: e.full_name, eligible: e.commission_eligible, here: e.branch_id === branch.id }));
+  const employees = (emps ?? []).filter((e) => !/general\s*manager/i.test(e.position ?? "") && !/\bcsr\b/i.test(e.position ?? "") && clinicIds.has(e.branch_id)).map((e) => ({ id: e.id, name: e.full_name, eligible: e.commission_eligible, branch: e.branch_id as string }));
   // Staff who aren't on commission never see commission choices (management still does, to log for others).
   const myEmp = (emps ?? []).find((e) => e.app_user_id === access.user_id);
   const noCommission = !!myEmp && !myEmp.commission_eligible && !access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
@@ -100,9 +108,14 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const paid = list.filter((l) => l.state !== "REJECTED").reduce((s, l) => s + Number(l.amount_paid_cents), 0);
   const commission = lines.filter((x) => list.find((l) => l.id === x.service_log_id)?.state !== "REJECTED").reduce((s, x) => s + Number(x.amount_cents), 0);
   const pendingCount = list.filter((l) => l.state === "PENDING").length;
-  const pendingAll = all.filter((l) => l.state === "PENDING").length;
+  const pendingMine = all.filter((l) => l.state === "PENDING" && approverFor(l.branch_id));
+  const pendingAll = pendingMine.length;
   const groups = [...new Set(all.map((l) => l.service_date))].map((d) => [d, all.filter((l) => l.service_date === d)] as const);
-  const link = (d: string, b = branch.code) => `/services?date=${d}&branch=${b}${staffPick && b === branch.code ? `&staff=${staffPick}` : ""}`;
+  const here = branch?.code ?? "ALL";
+  const link = (d: string, b = here) => `/services?date=${d}&branch=${b}${staffPick && b === here ? `&staff=${staffPick}` : ""}`;
+  // All branches: each branch's total for the chosen day, in branch order.
+  const perBranch = branch ? [] : scope.map((b) => ({ name: b.name, cents: list.filter((l) => l.branch_id === b.id && l.state !== "REJECTED").reduce((x, l) => x + Number(l.amount_paid_cents), 0) }));
+  const order = new Map(scope.map((b, i) => [b.id, i]));
   const dayLabel = `${WEEKDAYS[weekday(date)]}, ${new Date(`${date}T00:00:00Z`).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}`;
 
   return (
@@ -114,10 +127,11 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
 
         <div className="periods card">
           <div className="segmented" aria-label="Branch">
-            {viewable.map((b) => <Link key={b.id} href={link(date, b.code)} className={b.id === branch.id ? "on" : ""}>{b.name}</Link>)}
+            {viewable.length > 1 && <Link href={link(date, "ALL")} className={branch ? "" : "on"}>All branches</Link>}
+            {viewable.map((b) => <Link key={b.id} href={link(date, b.code)} className={b.id === branch?.id ? "on" : ""}>{b.name}</Link>)}
           </div>
           <form className="day-nav">
-            <input type="hidden" name="branch" value={branch.code} />
+            <input type="hidden" name="branch" value={here} />
             <Link className="button secondary small" href={link(addDays(date, -1))} aria-label="Previous day">←</Link>
             <input type="date" name="date" defaultValue={date} max={today} aria-label="Date" />
             <button type="submit" className="secondary small">Go</button>
@@ -127,12 +141,13 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
         </div>
 
         <div className="grid">
-          <div className="card stat hero"><div className="label">{branch.name} · {dayLabel}</div><div className="value">{centsToPhp(paid)}</div><div className="note">{(() => { const ok = list.filter((l) => l.state !== "REJECTED"); const unpaid = ok.filter((l) => l.visit_kind && l.visit_kind !== "PAID").length; return `${ok.length - unpaid} paid services${unpaid ? `, ${unpaid} unpaid visit${unpaid === 1 ? "" : "s"}` : ""}`; })()}</div></div>
+          <div className="card stat hero"><div className="label">{branch?.name ?? "All branches"} · {dayLabel}</div><div className="value">{centsToPhp(paid)}</div><div className="note">{(() => { const ok = list.filter((l) => l.state !== "REJECTED"); const unpaid = ok.filter((l) => l.visit_kind && l.visit_kind !== "PAID").length; return `${ok.length - unpaid} paid services${unpaid ? `, ${unpaid} unpaid visit${unpaid === 1 ? "" : "s"}` : ""}`; })()}</div>
+            {perBranch.length > 0 && <div className="branch-split">{perBranch.map((b) => <span key={b.name}><span className="muted">{b.name.replace(/ \(.*\)$/, "")}</span> {centsToPhp(b.cents)}</span>)}</div>}</div>
           {approver && <div className="card stat"><div className="label">Commission</div><div className="value">{centsToPhp(commission)}</div><div className="note">5% of amount paid, lead 60 / assist 40</div></div>}
           <div className="card stat"><div className="label">Sign-off</div><div className="value">{pendingCount === 0 ? (list.length ? "All signed" : "–") : `${pendingCount} waiting`}</div><div className="note">{approver ? "Approve entries below, one by one or together" : "Your manager signs these off"}</div></div>
         </div>
 
-        {checks.length > 0 && <DeclaredCheck checks={checks} names={checkNames} current={branch.id} open={inCheckWindow(date)} day={inCheckWindow(date) ? date : CHECK_TO} link={link} />}
+        {checks.length > 0 && <DeclaredCheck checks={checks} names={checkNames} current={branch?.id ?? ""} open={inCheckWindow(date)} day={inCheckWindow(date) ? date : CHECK_TO} link={link} />}
 
         {canLog && (
           <div className="card">
@@ -145,7 +160,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 {(services ?? []).length === 0 ? "Add your services below first." : null}
               </div>
             ) : (
-              <EntryForm branch={branch.id} date={date} today={today} meds={(services ?? []).filter((s) => s.is_meds).map((s) => ({ id: s.id, name: s.name, price: Number(s.price_cents ?? 0) }))} services={sortServices((services ?? []).filter((s) => !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null, sessions: Array.isArray(s.session_prices) ? (s.session_prices as (number | string)[]).map(Number) : null }))} addons={sortServices((services ?? []).filter((s) => s.is_addon && !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
+              <BranchEntryForm branches={logBranches.map((b) => ({ id: b.id, name: b.name }))} start={logBranches.find((b) => b.id === myEmp?.branch_id)?.id ?? (logBranches.length === 1 ? logBranches[0].id : "")} date={date} today={today} meds={(services ?? []).filter((s) => s.is_meds).map((s) => ({ id: s.id, name: s.name, price: Number(s.price_cents ?? 0) }))} services={sortServices((services ?? []).filter((s) => !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null, sessions: Array.isArray(s.session_prices) ? (s.session_prices as (number | string)[]).map(Number) : null }))} addons={sortServices((services ?? []).filter((s) => s.is_addon && !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
             )}
             {isManager && <p className="small" style={{ marginTop: 12 }}><Link href="/services/prices">Price list and commissions</Link> (add a service, set its price and commission)</p>}
           </div>
@@ -155,7 +170,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
           <h2>Entries</h2>
           {staffChoices.length > 0 && <StaffFilter choices={staffChoices} value={staffPick} />}
         </div>
-        {approver && pendingAll > 1 && <BatchApprove ids={all.filter((l) => l.state === "PENDING").map((l) => l.id)} />}
+        {approver && pendingAll > 1 && <BatchApprove ids={pendingMine.map((l) => l.id)} />}
         {groups.length === 0 && <p className="muted">Nothing logged in these {days} days.</p>}
         {groups.map(([d, dayList]) => {
           const ok = dayList.filter((l) => l.state !== "REJECTED");
@@ -173,12 +188,13 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
               <tr><th>Service</th><th className="num">Paid</th><th>Type</th><th>Staff</th><th className="num">{noCommission ? "Role" : "Commission"}</th><th>Status</th></tr>
             </thead>
             <tbody>
-              {dayList.map((l) => {
+              {(branch ? dayList : dayList.slice().sort((a, b) => (order.get(a.branch_id ?? "") ?? 9) - (order.get(b.branch_id ?? "") ?? 9))).map((l) => {
                 const ls = lines.filter((x) => x.service_log_id === l.id);
                 const staff = [l.performer_id, l.assistant_id].filter(Boolean) as string[];
                 return (
                   <tr key={l.id} id={`entry-${l.id}`} className={[l.state === "REJECTED" ? "rejected" : "", sp.entry === l.id ? "entry-focus" : ""].join(" ").trim() || undefined}>
-                    <td>{l.state === "PENDING" && approver && pendingAll > 1 && (
+                    <td>{!branch && l.branch_id && <span className="tag branch-tag">{(bName[l.branch_id] ?? "").replace(/ \(.*\)$/, "")}</span>}
+                      {l.state === "PENDING" && approverFor(l.branch_id) && pendingAll > 1 && (
                         <input type="checkbox" className="batch-tick" name="pick" value={l.id} form="batch-approve" aria-label={`Tick ${l.client_name ?? "entry"} to approve`} />
                       )}
                       {(l.client_name || l.log_no) && <div className="log-client">{l.client_name}<Uid v={l.log_no} /></div>}<strong>{(l.session_no ?? 1) > 1 && <span className="session-tag">Session {l.session_no}</span>}{l.services?.name}</strong>
@@ -190,13 +206,13 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                           <span className="pill REVERSED">Photos missing</span>
                           {!noCommission && <span className="small muted"> Commission held until they&apos;re added.</span>}
                           {(topMgmt || l.created_by === access.user_id || staff.some((x) => mine.has(x))) && (
-                            <AddPhotosLater log={l.id} branch={l.branch_id ?? branch.id} folder={l.photo_folder ?? null} needs="before and after photos and both waiver pages" />
+                            <AddPhotosLater log={l.id} branch={l.branch_id ?? branch?.id ?? ""} folder={l.photo_folder ?? null} needs="before and after photos and both waiver pages" />
                           )}
                         </div>
                       )}
                       <div className="log-by small"><span className="muted">Entered by</span> {l.created_by === access.user_id ? "you" : userName.get(l.created_by) ?? "a former user"} <span className="muted">· {enteredAt(l.created_at, l.service_date)}</span></div>
                       <EntryDetails r={{
-                        id: l.id, branch: branch.name, date: l.service_date, client: l.client_name ?? "No client name",
+                        id: l.id, branch: bName[l.branch_id ?? ""] ?? branch?.name ?? "", date: l.service_date, client: l.client_name ?? "No client name",
                         service: l.services?.name ?? "Service", session: l.session_no ?? 1, amount: Number(l.amount_paid_cents), kind: l.visit_kind ?? "PAID",
                         priceNote: l.price_note ?? null, doneBy: name[l.performer_id] ?? null, assistedBy: l.assistant_id ? name[l.assistant_id] ?? null : null,
                         status: l.state === "APPROVED" ? "Approved" : l.state === "REJECTED" ? "Rejected" : "Waiting for sign-off",
@@ -207,7 +223,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                       {proofCount.get(l.id) ? <div className="small"><Link href={`/clinic/payments?month=${l.service_date.slice(0, 7)}#${l.id}`}>💳 Proof of payment ({proofCount.get(l.id)})</Link>
                         {payCheck.get(l.id) && <span className={`pill ${payCheck.get(l.id) === "RECEIVED" ? "PUBLISHED" : payCheck.get(l.id) === "NOT_RECEIVED" ? "REVERSED" : "STAGED"}`} style={{ marginLeft: 6 }}>
                           {payCheck.get(l.id) === "RECEIVED" ? "Payment received" : payCheck.get(l.id) === "NOT_RECEIVED" ? "Not received" : "To confirm"}</span>}</div> : null}
-                      {l.state !== "REJECTED" && <AttachProof log={l.id} branch={l.branch_id ?? branch.id} have={proofCount.get(l.id) ?? 0} />}
+                      {l.state !== "REJECTED" && <AttachProof log={l.id} branch={l.branch_id ?? branch?.id ?? ""} have={proofCount.get(l.id) ?? 0} />}
                       {l.photo_folder && l.client_name && <div className="small"><Link href={`/clinic/archive?month=${l.service_date.slice(0, 7)}#${l.id}`}>Photos</Link>{l.share_ok ? <span className="muted"> · sharing OK</span> : null}</div>}</td>
                     <td className="num">{centsToPhp(l.amount_paid_cents)}</td>
                     <td>{l.visit_kind && l.visit_kind !== "PAID"
@@ -232,7 +248,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                       })}
                     </td>
                     <td>
-                      {l.state === "PENDING" && approver ? <DecideButtons id={l.id} /> : (
+                      {l.state === "PENDING" && approverFor(l.branch_id) ? <DecideButtons id={l.id} /> : (
                         <span className={`pill ${l.state === "APPROVED" ? "PUBLISHED" : l.state === "REJECTED" ? "REVERSED" : "STAGED"}`}>
                           {l.state === "APPROVED" ? "Approved" : l.state === "REJECTED" ? "Rejected" : "Waiting"}
                         </span>

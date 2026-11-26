@@ -1509,3 +1509,8 @@ button.chat-with:hover .avatar { box-shadow: 0 0 0 3px var(--gold-soft); }
 .addon-row select, .addon-row input { width: 100%; min-width: 0; height: 46px; box-sizing: border-box; }
 .addon-row .addon-remove { height: 46px; min-width: 46px; }
 @media (max-width: 560px) { .addon-row { grid-template-columns: minmax(0, 1fr) 96px auto; gap: 8px; } }
+/* v0.80.1: add-on button stays a pill; All branches split and branch tags */
+.entry-grid .addons { grid-column: 1 / -1; align-content: start; }
+.addons > button { align-self: start; }
+.branch-split { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 0.85rem; }
+.tag.branch-tag { margin-right: 6px; margin-bottom: 4px; }
