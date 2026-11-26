@@ -92,3 +92,6 @@
 [data-mode="dark"] .chat-reaction.mine { background: #3a3220; border-color: #d9b56b; }
 [data-mode="dark"] .chat-emoji-grid button:hover, [data-mode="dark"] .chat-react-bar button:hover { background: #3a3c42; }
 [data-mode="dark"] .chat-deleted-label { color: #f08a75; }
+[data-mode="dark"] .hb-branch { background: #34353c; color: #f1f1f3; border-bottom-color: #c9a24a; }
+[data-mode="dark"] .hb-branch:hover { background: #3d3e46; color: #fff; }
+[data-mode="dark"] .hb-branch-name { color: #e3c27f; }
