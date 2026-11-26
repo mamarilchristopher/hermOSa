@@ -1889,3 +1889,20 @@ a.hb-row:hover strong { text-decoration: underline; }
   .bj-row .link-button { grid-column: 2; justify-self: start; }
 }
 @media (max-width: 700px) { .backjobs .biz-kpis > :nth-child(3) { grid-column: auto; } }
+
+/* My day: today's add-on idea (v0.88.1). */
+.myday-addon { margin-bottom: 14px; background: linear-gradient(160deg, #fffaf1, #f5e8cf); border: 1px solid var(--gline, #e7d3ad); }
+.myday-addon.slow { background: linear-gradient(160deg, #fbf7f1, #efe6da); }
+[data-mode="dark"] .myday-addon { background: linear-gradient(160deg, #2a2924, #222220); border-color: #3a3730; }
+.myday-addon-head { display: flex; gap: 12px; align-items: flex-start; }
+.myday-addon-head .e { font-size: 1.8rem; line-height: 1; }
+.myday-addon-head .label { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--viz-deep); }
+[data-mode="dark"] .myday-addon-head .label { color: var(--viz-gold-hi); }
+.myday-addon-head h2 { margin: 2px 0 0; font-size: 1.2rem; }
+.myday-addon-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 6px; }
+.myday-addon-chips span { font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--surface); }
+.myday-addon-offer { margin: 6px 0 8px; font-size: 0.95rem; }
+.myday-addon-why summary { cursor: pointer; font-weight: 700; font-size: 0.85rem; color: var(--viz-deep); }
+[data-mode="dark"] .myday-addon-why summary { color: var(--viz-gold-hi); }
+.myday-addon-why ul { margin: 6px 0 10px; padding-left: 20px; font-size: 0.85rem; color: var(--ink-2); line-height: 1.45; }
+.myday-addon-ask { background: var(--surface); padding: 10px 12px; border-radius: 12px; margin: 8px 0 0; }

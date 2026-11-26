@@ -6,7 +6,10 @@ import { manilaToday } from "@/lib/dates";
 import { computeGlance, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
 import { addDays, addMonths, monthStart, sortBranches } from "@/lib/insights";
 import { companyDays, dayContext, monthEndOf, promoPicks, weekdayAverages } from "@/lib/business";
-import { cutoffInfo, daySections, paydayNear, staffCheckins } from "@/lib/gmDay";
+import { addonIdea, cutoffInfo, daySections, paydayNear, staffCheckins } from "@/lib/gmDay";
+import { adName } from "@/lib/promoRules";
+import { every } from "../business/load";
+import { AddonCard } from "./AddonCard";
 import { loadIdeas } from "../promos/ideas";
 import { promoDue } from "../business/load";
 import { DayList } from "./DayList";
@@ -23,6 +26,12 @@ export default async function MyDay() {
   const from28 = addDays(today, -27);
   const start = monthStart(addMonths(monthStart(today), -3)) < glanceFetchStart(today) ? monthStart(addMonths(monthStart(today), -3)) : glanceFetchStart(today);
 
+  const from56 = addDays(today, -55);
+  const [svcAll, logs56] = await Promise.all([
+    supabase.from("services").select("*"),
+    every<{ service_id: string; service_date: string }>((a, b) => supabase.from("service_logs").select("service_id, service_date")
+      .eq("visit_kind", "PAID").gte("service_date", from56).lte("service_date", addDays(today, -1)).neq("state", "REJECTED").order("id").range(a, b)),
+  ]);
   const [{ data: st }, bk, fu, drafts, live, signoff, payments, { data: lateData }, { data: bjData }, { data: empData }, ideas, promo] = await Promise.all([
     supabase.rpc("daily_sales_status", { p_start: start, p_end: today }),
     supabase.from("bookings").select("id", { count: "exact", head: true }).eq("appointment_date", today).in("status", ["BOOKED", "CONFIRMED", "ARRIVED", "DONE"]),
@@ -69,6 +78,28 @@ export default async function MyDay() {
   const tagStaff = new Map(((tagData ?? []) as { service_log_id: string; staff_id: string | null }[]).map((t) => [t.service_log_id, t.staff_id]));
   const checkins = staffCheckins(people, (lateData ?? []) as { employee_id: string; late_minutes: number }[],
     bjRows.map((b) => ({ performer_id: (tagStaff.has(b.id) ? tagStaff.get(b.id) : b.performer_id) ?? "" })));
+  // Today's add-on idea: the same weekday over the last 8 weeks, the add-on services and how often they sell.
+  type Svc = { id: string; name: string; price_cents: number | null; cost_cents?: number | null; is_addon?: boolean; is_meds?: boolean };
+  const svcs = (svcAll.data ?? []) as Svc[];
+  const svcById = new Map(svcs.map((x) => [x.id, x]));
+  const dow = new Date(`${today}T00:00:00Z`).getUTCDay();
+  const sameDay = logs56.filter((l) => new Date(`${l.service_date}T00:00:00Z`).getUTCDay() === dow);
+  const isMain = (id: string) => { const x = svcById.get(id); return !!x && !x.is_addon && !x.is_meds; };
+  const mainSame = sameDay.filter((l) => isMain(l.service_id));
+  const topCount = new Map<string, number>();
+  for (const l of mainSame) topCount.set(l.service_id, (topCount.get(l.service_id) ?? 0) + 1);
+  const top = [...topCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3)
+    .map(([id, count]) => ({ name: adName(svcById.get(id)!.name), count, price: Number(svcById.get(id)!.price_cents ?? 0) }));
+  const last28 = addDays(today, -28);
+  const recent = logs56.filter((l) => l.service_date >= last28);
+  const addonLogs = recent.filter((l) => svcById.get(l.service_id)?.is_addon);
+  const mains28 = recent.filter((l) => isMain(l.service_id)).length;
+  const idea = addonIdea({
+    weekdayName: ctx.weekdayName, busy: ctx.strong, slow: ctx.weak, payday: ctx.payday,
+    clientsToday: mainSame.length / 8,
+    addons: svcs.filter((x) => x.is_addon && !x.is_meds).map((x) => ({ name: adName(x.name), price: Number(x.price_cents ?? 0), cost: x.cost_cents ?? null, sold28: addonLogs.filter((l) => l.service_id === x.id).length })),
+    top, attach: mains28 ? addonLogs.length / mains28 : 0,
+  });
   const unsettled = count(signoff) + count(payments);
   void branches;
 
@@ -99,6 +130,7 @@ export default async function MyDay() {
           </div>
         )}
 
+        {idea && <AddonCard idea={idea} />}
         <DayList sections={sections} today={today} />
       </main>
     </>

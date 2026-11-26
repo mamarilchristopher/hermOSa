@@ -27,3 +27,22 @@ describe("My day", () => {
     expect(all.propose.note).toContain("2 drafts");
   });
 });
+
+import { addonIdea } from "../../src/lib/gmDay";
+describe("today's add-on idea", () => {
+  const base = { weekdayName: "Sat", payday: false, clientsToday: 24, addons: [{ name: "L-Carnitine", price: 80000, cost: 30000, sold28: 12 }], top: [{ name: "Lux Queen Drip", count: 40, price: 300000 }], attach: 0.1 };
+  it("busy day: a small discount for many clients", () => {
+    const a = addonIdea({ ...base, busy: true, slow: false })!;
+    expect(a.day).toBe("busy");
+    expect(a.title).toBe("L-Carnitine add-on for ₱700 today");
+    expect(a.ask).toContain("OK to run today?");
+  });
+  it("slow day: a bigger ticket per client", () => {
+    const a = addonIdea({ ...base, weekdayName: "Tue", clientsToday: 6, busy: false, slow: true })!;
+    expect(a.day).toBe("slow");
+    expect(a.title).toContain("with any package");
+  });
+  it("needs an add-on service", () => {
+    expect(addonIdea({ ...base, addons: [], busy: false, slow: false })).toBeNull();
+  });
+});
