@@ -5,9 +5,11 @@ import { requireAccess, branchesFor, can } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { centsToPhp } from "@/lib/csv";
 import { isIsoDate, manilaToday } from "@/lib/dates";
-import { addDays, WEEKDAYS, weekday } from "@/lib/insights";
+import { addDays, sortBranches, WEEKDAYS, weekday } from "@/lib/insights";
 import { ROLE_TEXT, TYPE_TEXT } from "@/lib/commission";
 import { BatchApprove, DecideButtons, EntryForm } from "./Forms";
+import { DeclaredCheck, diffText } from "./DeclaredCheck";
+import { CHECK_FROM, CHECK_TO, checkBranches, inCheckWindow, type StatusDay } from "@/lib/declaredCheck";
 import { AddPhotosLater } from "./PhotoSlots";
 
 type Log = {
@@ -43,6 +45,13 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
     supabase.rpc("chat_people"), // names of everyone in the company, for "Entered by"
   ]);
   const all = (logs ?? []) as unknown as Log[];
+  // CHRIS Nov 26: owners and the GM see a running Nov 1–24 check against the declared sales.
+  const { data: declaredData } = topMgmt ? await supabase.rpc("daily_sales_status", { p_start: CHECK_FROM, p_end: CHECK_TO }) : { data: null };
+  const declared = declaredData as { ok: boolean; branches: { id: string; code: string; name: string }[]; days: StatusDay[] } | null;
+  const checkList = declared?.ok ? sortBranches(declared.branches) : [];
+  const checks = checkBranches(declared?.days ?? [], checkList.map((b) => b.id)).map((c) => ({ ...c, code: checkList.find((b) => b.id === c.branch)!.code }));
+  const checkNames = Object.fromEntries(checkList.map((b) => [b.id, b.name]));
+  const dayCheck = new Map((checks.find((c) => c.branch === branch.id)?.days ?? []).map((d) => [d.date, d]));
   const list = all.filter((l) => l.service_date === date); // the chosen day, for the cards on top
   // update-0054 (CHRIS Nov 26): only staff timed in today add entries; owners and the GM always can.
   const { data: onDuty } = canLog && !topMgmt ? await supabase.rpc("can_log_services_now") : { data: true };
@@ -106,6 +115,8 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
           <div className="card stat"><div className="label">Sign-off</div><div className="value">{pendingCount === 0 ? (list.length ? "All signed" : "–") : `${pendingCount} waiting`}</div><div className="note">{approver ? "Approve entries below, one by one or together" : "Your manager signs these off"}</div></div>
         </div>
 
+        {checks.length > 0 && <DeclaredCheck checks={checks} names={checkNames} current={branch.id} open={inCheckWindow(date)} day={inCheckWindow(date) ? date : CHECK_TO} link={link} />}
+
         {canLog && (
           <div className="card">
             <h2>Add a service</h2>
@@ -133,7 +144,8 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
             <section key={d} className="log-day">
               <h3 className="log-day-head">
                 <span>{d === today ? "Today" : d === addDays(today, -1) ? "Yesterday" : WEEKDAYS[weekday(d)]}, {new Date(`${d}T00:00:00Z`).toLocaleDateString("en-PH", { month: "short", day: "numeric", timeZone: "UTC" })}</span>
-                <span className="small muted">{ok.length} entr{ok.length === 1 ? "y" : "ies"} · {centsToPhp(ok.reduce((x, l) => x + Number(l.amount_paid_cents), 0))}{waiting ? ` · ${waiting} waiting` : ""}</span>
+                <span className="small muted">{ok.length} entr{ok.length === 1 ? "y" : "ies"} · {centsToPhp(ok.reduce((x, l) => x + Number(l.amount_paid_cents), 0))}{waiting ? ` · ${waiting} waiting` : ""}
+                  {dayCheck.has(d) && <span className={`check-note ${dayCheck.get(d)!.status}`}> · {diffText(dayCheck.get(d)!)}</span>}</span>
               </h3>
         <div className="table-wrap">
           <table className="log-table">

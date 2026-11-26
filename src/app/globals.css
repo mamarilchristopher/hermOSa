@@ -1294,3 +1294,18 @@ input.batch-tick { width: 20px; height: 20px; margin: 0 8px 0 0; float: left; cu
 .chat-replying > span { display: grid; min-width: 0; flex: 1; }
 .chat-replying-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 .chat-replying button { min-height: 0; margin: 0; padding: 2px 8px; border: 0; background: transparent; box-shadow: none; color: var(--muted); font-size: 1rem; }
+
+/* v0.62.1: Nov 1–24 service log vs declared sales check */
+.declared-check summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.declared-check[open] summary { margin-bottom: 8px; }
+.declared-check tr.on td { background: var(--gold-soft); }
+.check-bar { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; margin: 6px 0 12px; }
+.check-bar span { display: block; height: 100%; background: var(--gold); }
+.check-sub { margin: 16px 0 8px; font-size: 0.95rem; }
+.check-ok { color: var(--good, #2f7a4f); font-weight: 700; }
+.check-off { color: var(--bad, #b3402e); font-weight: 700; }
+.check-pill { display: inline-block; font-size: 0.75rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--pearl); }
+.check-pill.match, .check-pill.closed { color: var(--good, #2f7a4f); }
+.check-pill.short, .check-pill.over, .check-pill.undeclared { color: var(--bad, #b3402e); }
+.check-note.match, .check-note.closed { color: var(--good, #2f7a4f); font-weight: 600; }
+.check-note.short, .check-note.over, .check-note.undeclared { color: var(--bad, #b3402e); font-weight: 600; }
