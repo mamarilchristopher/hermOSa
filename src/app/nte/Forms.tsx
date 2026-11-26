@@ -3,7 +3,8 @@ import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { nteDeadline } from "@/lib/nte";
-import { explainNte, issueLateIr, voidNte, type ActionState } from "./actions";
+import { explainNte, issueLateIr, reviewNte, voidNte, type ActionState } from "./actions";
+import { pick } from "@/lib/decision";
 
 function Msg({ s }: { s: ActionState }) {
   if (s?.error) return <div className="notice error">{s.error}</div>;
@@ -91,6 +92,23 @@ export function NteProofs({ urls }: { urls: string[] }) {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       {urls.map((u, i) => <a key={u} href={u} target="_blank" rel="noreferrer" className="nte-proof-thumb done"><img src={u} alt={`Proof photo ${i + 1}`} /></a>)}
     </div>
+  );
+}
+
+/** Management (update-0067): accept the reason (it stops counting toward an IR) or reject it (it keeps counting). */
+export function ReviewNteForm({ id, current }: { id: string; current?: "ACCEPTED" | "REJECTED" | null }) {
+  const [s, action, pending] = useActionState(reviewNte, undefined);
+  return (
+    <form action={action} className="nte-review">
+      <input type="hidden" name="id" value={id} />
+      <input name="note" maxLength={500} placeholder="Note to the employee (optional)" aria-label="Note to the employee" />
+      <div className="row-buttons">
+        {current !== "ACCEPTED" && <button className="small" disabled={pending} onClick={pick("accept")}>Accept reason</button>}
+        {current !== "REJECTED" && <button className="danger small" disabled={pending} onClick={pick("reject")}>Reject reason</button>}
+      </div>
+      {s?.error && <span className="field-error">{s.error}</span>}
+      {s?.ok && <span className="small ok-text">{s.ok}</span>}
+    </form>
   );
 }
 

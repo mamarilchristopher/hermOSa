@@ -167,6 +167,7 @@ export default async function Me() {
                   <li key={r.employee_id} className={r.due ? "ir-due" : undefined}>
                     <span><strong>{firstName(r.name)}</strong><Uid v={r.uid} /> has been issued Late NTEs <strong>{times(r.count)}</strong> this month
                       {r.open > 0 && <span className="small muted"> · {r.open} not explained yet</span>}
+                      {r.toReview > 0 && <span className="small" style={{ color: "var(--bad)" }}> · {r.toReview} reason{r.toReview === 1 ? "" : "s"} to accept or reject</span>}
                       {r.due && <><br /><span className="small ir-due-tag">IR suggested: {r.due}</span></>}</span>
                     <Link className="button secondary small" href={`/nte/staff/${r.employee_id}`}>Open</Link>
                   </li>

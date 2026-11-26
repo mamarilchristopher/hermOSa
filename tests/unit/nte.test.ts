@@ -27,6 +27,10 @@ describe("tracker due", () => {
     const [r] = tracker([nte({ late_minutes: 40 }), nte({ late_minutes: 35, state: "VOID" })]);
     expect(r.due).toBeNull();
   });
+  it("accepted reasons don't count; explained ones wait for review (update-0067)", () => {
+    const [r] = tracker([nte({ late_minutes: 40, state: "EXPLAINED" }), nte({ late_minutes: 35, state: "ACCEPTED", review: "ACCEPTED" })]);
+    expect(r).toMatchObject({ count: 1, minutes: 40, toReview: 1, due: null });
+  });
 });
 
 import { nteDeadline } from "../../src/lib/nte";

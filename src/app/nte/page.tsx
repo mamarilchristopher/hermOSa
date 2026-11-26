@@ -55,7 +55,7 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
                 {rows.map((r) => (
                   <li key={r.employee_id} className={r.due ? "ir-due" : undefined}>
                     <span><strong>{r.name}</strong><Uid v={r.uid} /> has been issued Late NTEs <strong>{times(r.count)}</strong> this month
-                      <br /><span className="small muted">{r.minutes} minutes late in total{r.open ? ` · ${r.open} not explained yet` : ""}{r.notInIr && r.notInIr < r.count ? ` · ${r.count - r.notInIr} already in an IR` : r.notInIr === 0 ? " · all in an IR" : ""}</span>
+                      <br /><span className="small muted">{r.minutes} minutes late in total{r.open ? ` · ${r.open} not explained yet` : ""}{r.toReview ? ` · ${r.toReview} reason${r.toReview === 1 ? "" : "s"} to accept or reject` : ""}{r.notInIr && r.notInIr < r.count ? ` · ${r.count - r.notInIr} already in an IR` : r.notInIr === 0 ? " · all in an IR" : ""}</span>
                       {r.due && <><br /><span className="small ir-due-tag">IR suggested: {r.due}</span></>}</span>
                     <Link className="button secondary small" href={`/nte/staff/${r.employee_id}?month=${ym}`}>Open</Link>
                   </li>
@@ -76,8 +76,11 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
                       <span><strong>NTE no. {n.nte_no} · {dayLabel(n.work_date)}</strong>
                         <br /><span className="small muted">Shift starts {timeLabel(n.shift_start)}, timed in {timeLabel(n.time_in)} ({n.late_minutes} minutes late){n.branch ? ` · ${n.branch}` : ""}</span></span>
                       {n.state === "OPEN" && <><NteDeadline n={n} /><NteExplainForm id={n.id} prompt={`Why were you late, ${firstName(n.name)}?`} /></>}
-                      {n.state === "EXPLAINED" && <p className="small" style={{ margin: 0 }}>Your explanation: {n.explanation}</p>}
-                      {n.state === "EXPLAINED" && <NteProofs urls={(n.proof_paths ?? []).map((p) => proofs.get(p)).filter((u): u is string => !!u)} />}
+                      {(n.state === "EXPLAINED" || n.state === "ACCEPTED") && <p className="small" style={{ margin: 0 }}>Your explanation: {n.explanation}</p>}
+                      {n.state === "ACCEPTED" && <p className="small" style={{ margin: 0, color: "var(--good)" }}><strong>Reason accepted</strong> · it doesn&apos;t count toward an IR{n.review_note ? ` · ${n.review_note}` : ""}</p>}
+                      {n.review === "REJECTED" && <p className="small" style={{ margin: 0, color: "var(--bad)" }}><strong>Reason not accepted</strong> · it counts toward an IR{n.review_note ? ` · ${n.review_note}` : ""}</p>}
+                      {n.state === "EXPLAINED" && !n.review && <p className="small muted" style={{ margin: 0 }}>Waiting for management to review your reason.</p>}
+                      {(n.state === "EXPLAINED" || n.state === "ACCEPTED") && <NteProofs urls={(n.proof_paths ?? []).map((p) => proofs.get(p)).filter((u): u is string => !!u)} />}
                       {n.state === "VOID" && <p className="small muted" style={{ margin: 0 }}>Cancelled by management: {n.void_reason}</p>}
                     </div>
                   </li>

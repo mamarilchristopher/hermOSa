@@ -8,13 +8,14 @@ import { monthLabel } from "@/lib/insights";
 import { dayLabel } from "@/lib/homeGlance";
 import { timeLabel } from "@/lib/schedule";
 import { firstName, irReason, IR_MINUTES_DEFAULT, IR_NTE_COUNT, nteCount, type NteList } from "@/lib/nte";
-import { IssueLateIrForm, NteDeadline, NteProofs, VoidNteForm } from "../../Forms";
+import { IssueLateIrForm, NteDeadline, NteProofs, ReviewNteForm, VoidNteForm } from "../../Forms";
 import { photoUrls } from "@/lib/photos";
 import { Uid } from "@/components/Uid";
 
 const STATE: Record<string, { label: string; cls: string }> = {
   OPEN: { label: "Waiting for explanation", cls: "STAGED" },
   EXPLAINED: { label: "Explained", cls: "PUBLISHED" },
+  ACCEPTED: { label: "Reason accepted · doesn't count", cls: "PUBLISHED" },
   VOID: { label: "Doesn't count", cls: "REVERSED" },
 };
 
@@ -36,7 +37,7 @@ export default async function StaffNtePage({ params, searchParams }: { params: P
   const ntes = list.ntes.filter((n) => n.can_manage);
   const proofs = await photoUrls(supabase, ntes.flatMap((n) => n.proof_paths ?? []), "nte-proofs");
   if (list.ntes.length > 0 && ntes.length === 0) notFound();
-  const counted = ntes.filter((n) => n.state !== "VOID");
+  const counted = ntes.filter((n) => n.state !== "VOID" && n.state !== "ACCEPTED"); // accepted reasons don't count (update-0067)
   const notInIr = counted.filter((n) => !n.ir_id);
   const irs = [...new Set(counted.map((n) => n.ir_id).filter(Boolean))] as string[];
   const first = firstName(emp.full_name);
@@ -80,6 +81,9 @@ export default async function StaffNtePage({ params, searchParams }: { params: P
                       <br /><span className="small muted">Shift starts {timeLabel(n.shift_start)}, timed in {timeLabel(n.time_in)} ({n.late_minutes} minutes late){n.branch ? ` · ${n.branch}` : ""}{n.ir_id ? " · in an IR" : ""}</span></span>
                     {n.explanation && <p className="small" style={{ margin: 0 }}>Explanation: {n.explanation}</p>}
                     <NteProofs urls={(n.proof_paths ?? []).map((p) => proofs.get(p)).filter((u): u is string => !!u)} />
+                    {n.review === "REJECTED" && <p className="small" style={{ margin: 0, color: "var(--bad)" }}><strong>Reason rejected</strong> · counts toward an IR{n.review_note ? ` · ${n.review_note}` : ""}</p>}
+                    {n.review === "ACCEPTED" && n.review_note && <p className="small muted" style={{ margin: 0 }}>Note: {n.review_note}</p>}
+                    {(n.state === "EXPLAINED" || n.state === "ACCEPTED") && !n.ir_id && <ReviewNteForm id={n.id} current={n.review ?? null} />}
                     {n.state === "OPEN" && !n.ir_id && <NteDeadline n={n} />}
                     {n.state === "VOID" && <p className="small muted" style={{ margin: 0 }}>Doesn&apos;t count: {n.void_reason}</p>}
                   </div>

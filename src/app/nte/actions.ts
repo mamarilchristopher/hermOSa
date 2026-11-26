@@ -36,6 +36,18 @@ export async function explainNte(_p: ActionState, fd: FormData): Promise<ActionS
   return { ok: "Sent. Thank you.", at: Date.now() };
 }
 
+/** Management: accept the reason (doesn't count toward an IR) or reject it (counts). update-0067. */
+export async function reviewNte(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const id = z.uuid().safeParse(fd.get("id"));
+  const d = String(fd.get("decision") ?? "");
+  if (!id.success || !["accept", "reject"].includes(d)) return { error: "Refresh the page and try again." };
+  const { data, error } = await (await createClient()).rpc("review_nte", { p_id: id.data, p_accept: d === "accept", p_note: text(fd, "note").slice(0, 500) || null });
+  if (error) return { error: error.code === "PGRST202" ? "Accept / Reject needs database update-0067. Ask the owner to run it." : "Could not save. Try again." };
+  if (!data?.ok) return { error: msg(data?.error) };
+  refresh();
+  return { ok: d === "accept" ? "Reason accepted. It doesn't count toward an IR." : "Reason rejected. It counts toward an IR.", at: Date.now() };
+}
+
 export async function voidNte(_p: ActionState, fd: FormData): Promise<ActionState> {
   const id = z.uuid().safeParse(fd.get("id"));
   const r = text(fd, "reason").slice(0, 500);
