@@ -165,10 +165,10 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
               <div key={it.service_id} className="promo-item">
                 <div className="row-between"><strong>{it.name}</strong><button type="button" className="link small" onClick={() => change({ items: d.items.filter((_, i) => i !== k) })}>Remove</button></div>
                 <div className="promo-counts">
-                  <Stepper label="Paid sessions" v={it.paid} min={1} max={50} onChange={(v) => setItem(k, { paid: v })} />
+                  <span className="promo-count-box"><span className="small">Paid</span><Stepper label="Paid sessions" v={it.paid} min={1} max={50} onChange={(v) => setItem(k, { paid: v })} /></span>
                   <span className="promo-plus">+</span>
-                  <Stepper label="Free sessions" v={it.free} min={0} max={50} onChange={(v) => setItem(k, { free: v })} />
-                  <span className="small muted">{peso(it.unit)} each on the price list · {safetyFor(it.name).note}</span>
+                  <span className="promo-count-box"><span className="small">FREE</span><Stepper label="Free sessions" v={it.free} min={0} max={50} onChange={(v) => setItem(k, { free: v })} /></span>
+                  <span className="small muted promo-note">{peso(it.unit)} each on the price list · {safetyFor(it.name).note}</span>
                 </div>
               </div>
             ))}
@@ -280,25 +280,19 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
         {[["Running", live], ["Drafts", drafts], ["Ended", ended]].map(([label, list]) => (list as SavedPromo[]).length > 0 && (
           <div key={label as string}>
             <h3>{label as string}</h3>
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>Promo</th><th className="num">Price</th><th className="num">Sessions</th><th>Ends</th><th></th></tr></thead>
-                <tbody>
-                  {(list as SavedPromo[]).map((p) => (
-                    <tr key={p.id}>
-                      <td><strong>{p.title}</strong><br /><span className="small muted">{p.items.map((i) => `${i.paid}${i.free ? `+${i.free}` : ""} ${i.name}`).join(", ")}</span>
-                        {p.state === "APPROVED" && <PromoPhotos p={p} serif={serif} fileName={fileName} />}</td>
-                      <td className="num">{peso(p.price_cents)}</td>
-                      <td className="num">{p.sessions}</td>
-                      <td>{p.ends_on ?? "—"}</td>
-                      <td><span className="row-buttons">
-                        <button type="button" className="secondary small" onClick={() => openSaved(p)}>{p.state === "DRAFT" ? "Open" : "Copy into builder"}</button>
-                        {p.state !== "ENDED" && <button type="button" className="secondary small" disabled={pending} onClick={() => end(p)}>{p.state === "DRAFT" ? "Delete" : "End"}</button>}
-                      </span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="promo-list">
+              {(list as SavedPromo[]).map((p) => (
+                <div key={p.id} className="promo-saved">
+                  <div><strong>{p.title}</strong></div>
+                  <div className="small muted">{p.items.map((i) => `${i.paid}${i.free ? `+${i.free}` : ""} ${i.name}`).join(", ")}</div>
+                  <div className="small"><strong>{peso(p.price_cents)}</strong> · {p.sessions} sessions{p.ends_on ? ` · ends ${p.ends_on}` : ""}</div>
+                  {p.state === "APPROVED" && <PromoPhotos p={p} serif={serif} fileName={fileName} />}
+                  <span className="row-buttons">
+                    <button type="button" className="secondary small" onClick={() => openSaved(p)}>{p.state === "DRAFT" ? "Open" : "Copy into builder"}</button>
+                    {p.state !== "ENDED" && <button type="button" className="secondary small" disabled={pending} onClick={() => end(p)}>{p.state === "DRAFT" ? "Delete" : "End"}</button>}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         ))}
