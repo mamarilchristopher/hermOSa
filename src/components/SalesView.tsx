@@ -56,7 +56,6 @@ export function SalesView({ ins, whole, q }: { ins: Insights; whole: boolean; q:
         <div className="two">
           <div className="card">
             <h2 style={{ marginTop: 0 }}>Monthly sales, last 13 months</h2>
-            <p className="small muted" style={{ marginTop: 0 }}>Hover a bar for the amount. Hatched = this month so far.</p>
             <MonthBars months={c.months} title="Monthly sales, last 13 months" />
             <details className="small"><summary>Show as table</summary>
               <div className="table-wrap"><table><tbody>
@@ -66,7 +65,6 @@ export function SalesView({ ins, whole, q }: { ins: Insights; whole: boolean; q:
           </div>
           <div className="card">
             <h2 style={{ marginTop: 0 }}>Average by weekday</h2>
-            <p className="small muted" style={{ marginTop: 0 }}>Last 12 months, days with recorded sales</p>
             <WeekdayBars days={ins.weekdays} />
           </div>
         </div>

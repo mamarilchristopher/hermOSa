@@ -152,7 +152,7 @@ export function dayContext(today: string, wk: { day: number; avg: number | null 
 
 /** Rank this week's promo ideas for today: payday favors programs (bigger tickets), a slow weekday favors slow-seller
  *  and season bundles (easy yeses), otherwise the season leads. Returns the ideas with the reason for today. */
-export function promoPicks(ideas: Suggestion[], ctx: DayContext, n = 3): { idea: Suggestion; today: string }[] {
+export function promoPicks(ideas: Suggestion[], ctx: DayContext, n = 3): { idea: Suggestion; today: string; badge: string }[] {
   const score = (s: Suggestion) =>
     (ctx.payday ? (s.kind === "PROGRAM" ? 4 : 1) : 0) + (ctx.weak ? (s.kind === "SLOW" ? 2 : s.kind === "SEASON" ? 1.5 : 0) : 0) +
     (s.kind === "SEASON" ? 1 : 0) + (!ctx.payday && !ctx.weak && s.kind === "PROGRAM" ? 0.5 : 0);
@@ -166,6 +166,12 @@ export function promoPicks(ideas: Suggestion[], ctx: DayContext, n = 3): { idea:
       : idea.kind === "SEASON" ? `${idea.season ?? "The season"} is coming: post it today so it's seen early.`
       : idea.kind === "SLOW" ? "This service has been quiet; a bonus session gives it a push."
       : "Keeps clients coming back all year.",
+    // A two-word reason for the dashboard card (the sentence above is its hover text).
+    badge: ctx.payday && idea.kind === "PROGRAM" ? "💸 Payday"
+      : ctx.weak && idea.kind !== "PROGRAM" ? `📉 Slow ${ctx.weekdayName}`
+      : idea.kind === "SEASON" ? `🎄 ${(idea.season ?? "Season").replace(/ season$/i, "")}`
+      : idea.kind === "SLOW" ? "📈 Quiet service"
+      : "🔁 All year",
   }));
 }
 
