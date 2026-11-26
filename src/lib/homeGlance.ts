@@ -8,7 +8,7 @@ export type StatusDay = [string, string, number | null, string | null, boolean, 
 export type GlanceBranch = { id: string; name: string };
 
 export type DayCell =
-  | { kind: "sales"; cents: number }
+  | { kind: "sales"; cents: number; log?: true } // log: total of the day's service log (no declared sales typed)
   | { kind: "zero" }
   | { kind: "closed" }
   | { kind: "waiting" } // uploaded, waiting for sign-off
@@ -49,10 +49,14 @@ export type Glance = {
 
 const pct = (cur: number, base: number) => (base > 0 ? (cur - base) / base : null);
 
+/** CHRIS (Nov 26): from Nov 25 the service log is the source of each day's sales; days before keep declared Daily Sales. */
+export const SERVICE_LOG_FROM = "2026-11-25";
+
 export function cellOf(rec: StatusDay | undefined): DayCell {
   if (!rec) return { kind: "empty" };
-  const [, , cents, mark, staged] = rec;
+  const [, date, cents, mark, staged, service] = rec;
   if (cents !== null) return { kind: "sales", cents: Number(cents) };
+  if (!mark && service !== null && service !== undefined && Number(service) > 0 && date >= SERVICE_LOG_FROM) return { kind: "sales", cents: Number(service), log: true };
   if (mark === "NO_SALES") return { kind: "zero" };
   if (mark === "CLOSED") return { kind: "closed" };
   if (staged) return { kind: "waiting" };

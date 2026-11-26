@@ -15,7 +15,7 @@ function Delta({ v, title }: { v: number | null; title?: string }) {
 }
 function Cell({ c }: { c: DayCell }) {
   switch (c.kind) {
-    case "sales": return <>{php(c.cents)}</>;
+    case "sales": return <>{php(c.cents)}{c.log && <span className="muted small glance-log"> service log</span>}</>;
     case "zero": return <span className="muted">Zero sales</span>;
     case "closed": return <span className="muted">Closed</span>;
     case "waiting": return <span className="pill STAGED">Waiting sign-off</span>;
@@ -57,12 +57,12 @@ export function ManagerHome({ g, duty, faces = {}, branches }: { g: Glance; duty
           <h2>Today so far, {dayLabel(g.today)}</h2>
           <Link className="small" href="/sales/daily">Daily Sales →</Link>
         </div>
-        <div className="glance-total"><strong>{php(g.todaySoFar)}</strong><span className="muted small">{open ? `${entered} of ${g.branches.length} branches entered` : "Clinics open at 10 AM"}</span></div>
+        <div className="glance-total"><strong>{php(g.todaySoFar)}</strong><span className="muted small">{open ? `${entered} of ${g.branches.length} branches with sales so far` : "Clinics open at 10 AM"}</span></div>
         {shown.length > 0 && <div className="glance-branches">
           {shown.map((b) => (
             <div key={b.id} className={`glance-branch ${b.todayCell.kind === "empty" ? "missing" : ""}`}>
               <span className="small muted">{b.name}</span>
-              <strong>{b.todayCell.kind === "empty" ? <span className="muted">Not entered yet</span> : <Cell c={b.todayCell} />}</strong>
+              <strong>{b.todayCell.kind === "empty" ? <span className="muted">Nothing logged yet</span> : <Cell c={b.todayCell} />}</strong>
             </div>
           ))}
         </div>}

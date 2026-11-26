@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.68.3 | Nov 26, 2026 | none | Home "Today so far" (and yesterday / month figures) count each branch's service log total from Nov 25 on when no Daily Sales were typed, marked "service log"; empty boxes say "Nothing logged yet". Late NTE review note starts as "Adjust accordingly next time. NTE Accepted." (editable; left as is, Reject sends "Reason not accepted. This Late NTE counts toward an IR.") |
 | 0.68.2 | Nov 26, 2026 | none | To do "Sign off commission entries" opens the oldest waiting entry in its own branch, highlighted (it used to open the first branch, which could be empty) |
 | 0.68.1 | Nov 26, 2026 | none | Home "Open Chat" button opens Chat reliably; every page shows a Loading spinner right away while it loads, so taps never look ignored on slow phones; the app reloads itself cleanly when it was updated while a page was open (no more unstyled pages) |
 | 0.68.0 | Nov 26, 2026 | update-0068 | Service log: Gluta bundles (Lux Queen, Illumina, Brilliant 10+3 and 5+1) in the Service list; Session No. shows each session's amount (paid already / free = ₱0) and fills it in; every bundle session pays its set commission, ₱0 ones included; L-Carnitine ₱500 added |

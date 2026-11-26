@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState, type MouseEvent } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { nteDeadline } from "@/lib/nte";
 import { explainNte, issueLateIr, reviewNte, voidNte, type ActionState } from "./actions";
@@ -96,20 +96,35 @@ export function NteProofs({ urls }: { urls: string[] }) {
 }
 
 /** Management (update-0067): accept the reason (it stops counting toward an IR) or reject it (it keeps counting). */
+/** CHRIS (Nov 26): default note, still editable. Untouched, Reject sends the reject wording instead. */
+export const NTE_ACCEPT_NOTE = "Adjust accordingly next time. NTE Accepted.";
+export const NTE_REJECT_NOTE = "Reason not accepted. This Late NTE counts toward an IR.";
+
 export function ReviewNteForm({ id, current }: { id: string; current?: "ACCEPTED" | "REJECTED" | null }) {
   const [s, action, pending] = useActionState(reviewNte, undefined);
+  const [note, setNote] = useState(NTE_ACCEPT_NOTE);
+  const onReject = (e: MouseEvent<HTMLButtonElement>) => {
+    if (note === NTE_ACCEPT_NOTE) { setNoteNow(e.currentTarget.form, NTE_REJECT_NOTE); setNote(NTE_REJECT_NOTE); }
+    pick("reject")(e);
+  };
   return (
     <form action={action} className="nte-review">
       <input type="hidden" name="id" value={id} />
-      <input name="note" maxLength={500} placeholder="Note to the employee (optional)" aria-label="Note to the employee" />
+      <input name="note" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note to the employee (optional)" aria-label="Note to the employee" />
       <div className="row-buttons">
         {current !== "ACCEPTED" && <button className="small" disabled={pending} onClick={pick("accept")}>Accept reason</button>}
-        {current !== "REJECTED" && <button className="danger small" disabled={pending} onClick={pick("reject")}>Reject reason</button>}
+        {current !== "REJECTED" && <button className="danger small" disabled={pending} onClick={onReject}>Reject reason</button>}
       </div>
       {s?.error && <span className="field-error">{s.error}</span>}
       {s?.ok && <span className="small ok-text">{s.ok}</span>}
     </form>
   );
+}
+
+/** Sets the note field before the form submits (React state would update too late for this submit). */
+function setNoteNow(form: HTMLFormElement | null, text: string) {
+  const el = form?.elements.namedItem("note");
+  if (el instanceof HTMLInputElement) el.value = text;
 }
 
 /** Management: cancel an NTE that was a mistake (wrong schedule, approved errand). */
