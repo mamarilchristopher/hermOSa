@@ -79,8 +79,6 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
         <h1>Hi, {first}</h1>
         <p className="muted small">{v.employee?.position ?? "Staff"}{v.employee && ` · ${branchName[v.employee.branch_id] ?? ""}`} · {dayLabel(today)}{seen && ` · last in the app ${seen}`}</p>
         <TodoCard todos={todos} />
-        {/* Phones have no side menu: show the person's menu as a card (CHRIS Nov 26). */}
-        <div className="card view-menu-card"><StaticMenu hubs={menuFor(v.roles)} title={`${first}'s menu`} /></div>
         {notices?.ok && (
           // CHRIS Nov 26: folded by default, so the live Bookings board sits right under it.
           <details className="card notices-fold">
@@ -123,6 +121,8 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
             {v.joined_at && <><dt>Joined the app</dt><dd>{v.joined_at.slice(0, 10)}</dd></>}
           </dl>
         </div>
+        {/* Phones have no side menu: show the person's menu as a card, at the bottom of the page (CHRIS Nov 26). */}
+        <div className="card view-menu-card"><StaticMenu hubs={menuFor(v.roles)} title={`${first}'s menu`} /></div>
       </main>
     </>
   );

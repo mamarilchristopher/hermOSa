@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.81.5 | Nov 26, 2026 | none | View as on phones: the person's menu card is now at the bottom of the page instead of the top |
 | 0.81.4 | Nov 26, 2026 | none | Every employee's Home now has the live Bookings today board (each branch's clients, status, and who marked it); in View as, Notifications fold up (tap to open, showing the latest one) and the live Bookings board sits right under it |
 | 0.81.3 | Nov 26, 2026 | none | Management Home order is now Today so far, Bookings today (live, updates by itself when anyone changes a booking, with each branch's clients and who marked them), On duty today, Yesterday, the month so far, then the Tardiness tracker; the Tardiness tracker lists every Late NTE issued this month with its status (Not explained yet, Reason to review, Accepted reason, Rejected reason, Voided) plus the reason and the reviewer's note |
 | 0.81.2 | Nov 26, 2026 | none | Home shows the same daily sales as the Daily Sales tab again; the service log total only shows for a day nobody has entered yet |
