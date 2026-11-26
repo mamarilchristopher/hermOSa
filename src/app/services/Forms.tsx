@@ -59,6 +59,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const [priceNote, setPriceNote] = useState("");
   const [share, setShare] = useState(false);
   const [note, setNote] = useState("");
+  const [session, setSession] = useState("1");
   const photos = usePhotoSlots(branch);
   const form = useRef<HTMLFormElement>(null);
   useEffect(() => {
@@ -68,7 +69,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       setAmount("");
       setKind("PAID");
       setWho("");
-      setService(""); setPartner(""); setClient(""); setPriceNote(""); setShare(false); setNote("");
+      setService(""); setPartner(""); setClient(""); setPriceNote(""); setShare(false); setNote(""); setSession("1");
       photos.reset();
     }
   }, [state]);
@@ -135,7 +136,14 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
         <label className="span2">Client name
           <input name="client" required minLength={2} maxLength={120} autoComplete="off" placeholder="Full name, as on the waiver" value={client} onChange={(e) => setClient(e.target.value)} />
         </label>
-        <label className={paid ? "" : "span2"}>Service
+        {/* CHRIS Nov 26: Session No. – Service – Amount paid on one row. Most services are session 1; packages (e.g. Gluta) go up to 15. */}
+        <div className={`span2 service-row ${paid ? "" : "unpaid"}`}>
+        <label className="session-field">Session No.
+          <select name="session" value={session} onChange={(e) => setSession(e.target.value)} aria-label="Session number">
+            {Array.from({ length: 15 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+          </select>
+        </label>
+        <label>Service
           <select name="service" required value={service} onChange={(e) => {
             setService(e.target.value);
             // Fill in the list price (it can still be changed, e.g. for a discount).
@@ -151,6 +159,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
             <input name="amount" inputMode="decimal" placeholder="e.g. 2500" required value={amount} onChange={(e) => setAmount(e.target.value)} />
           </label>
         )}
+        </div>
         {priceDiffers && (
           <label className="span2"><span>Reason for the different price <span className="muted">(list price {centsToPhp(listPrice!)})</span></span>
             <input name="price_note" required minLength={3} maxLength={300} placeholder="e.g. 10% promo, loyalty discount" value={priceNote} onChange={(e) => setPriceNote(e.target.value)} />

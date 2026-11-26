@@ -1309,3 +1309,19 @@ input.batch-tick { width: 20px; height: 20px; margin: 0 8px 0 0; float: left; cu
 .check-pill.short, .check-pill.over, .check-pill.undeclared { color: var(--bad, #b3402e); }
 .check-note.match, .check-note.closed { color: var(--good, #2f7a4f); font-weight: 600; }
 .check-note.short, .check-note.over, .check-note.undeclared { color: var(--bad, #b3402e); font-weight: 600; }
+
+/* v0.64.0: Session No. – Service – Amount paid on one row (phone: session + service, then amount) */
+.entry-grid .service-row { grid-column: 1 / -1; }
+.service-row { display: grid; grid-template-columns: 110px minmax(0, 2fr) minmax(0, 1fr); gap: 14px; align-items: start; min-width: 0; }
+.service-row.unpaid { grid-template-columns: 110px minmax(0, 1fr); }
+.service-row > label { min-width: 0; }
+.service-row select, .service-row input { width: 100%; min-width: 0; height: 46px; box-sizing: border-box; }
+@media (max-width: 560px) {
+  .service-row { grid-template-columns: 84px minmax(0, 1fr); }
+  .service-row > label:nth-child(3) { grid-column: 1 / -1; }
+  /* "Did the client pay?" fits a phone: four choices as a 2 x 2 grid instead of running off the edge. */
+  .entry-form .segmented.choice { display: grid; grid-template-columns: 1fr 1fr; width: 100%; border-radius: 16px; }
+  .entry-form .segmented.choice button { white-space: nowrap; }
+}
+.session-tag { display: inline-block; margin-right: 6px; padding: 1px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; vertical-align: 1px;
+  background: var(--gold-soft); color: var(--brown-dark); border: 1px solid var(--gold-line); }

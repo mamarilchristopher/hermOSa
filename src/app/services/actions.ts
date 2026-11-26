@@ -25,11 +25,12 @@ const Log = z.object({
   folder: z.uuid(),
   photos: z.string().max(20000),
   share: z.literal("1").optional(),
+  session: z.coerce.number().int().min(1).max(15).default(1),
 });
 const Photos = z.array(z.object({ kind: z.enum(["WAIVER", "BEFORE", "AFTER"]), path: z.string().max(300), thumb: z.string().max(300).nullable() })).max(20);
 
 export async function logService(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share"].map((k) => [k, fd.get(k) ?? undefined])));
+  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session"].map((k) => [k, fd.get(k) ?? undefined])));
   if (!p.success) return { error: "Fill in the client's name, the service, the amount paid and who did it." };
   let photos;
   try { photos = Photos.parse(JSON.parse(p.data.photos || "[]")); } catch { return { error: "The photos didn't attach. Remove them and add them again." }; }
@@ -60,8 +61,10 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     p_employee: p.data.employee, p_partner: paid ? p.data.partner || null : null, p_note: p.data.note || null,
     p_kind: p.data.kind, p_confirm: true, // the client + service check above replaces the old staff + amount check
     p_client: p.data.client, p_price_note: p.data.price_note || null, p_folder: p.data.folder, p_photos: photos, p_share: p.data.share === "1",
+    // CHRIS Nov 26: session number (update-0064). Session 1 is the default, so it is sent only when it's 2 to 15.
+    ...(p.data.session > 1 ? { p_session: p.data.session } : {}),
   });
-  if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0053 in Supabase first." : "Could not save. Try again." };
+  if (error) return { error: error.code === "PGRST202" ? (p.data.session > 1 ? "Session numbers need database update-0064. Ask the owner to run it, or save it as Session 1 for now." : "The owner needs to run update-0053 in Supabase first.") : "Could not save. Try again." };
   if (!data.ok && data.error === "POSSIBLE_DUPLICATE") {
     const at = new Date(data.existing.at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
     return { duplicate: `${data.existing.by} already logged this service for the same staff and amount today at ${at}. Is this a different client?`, at: Date.now() };

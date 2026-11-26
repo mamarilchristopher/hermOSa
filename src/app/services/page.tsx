@@ -14,7 +14,7 @@ import { AddPhotosLater } from "./PhotoSlots";
 
 type Log = {
   id: string; service_date: string; amount_paid_cents: number; commission_type: string; performer_id: string; assistant_id: string | null;
-  receipt_no: string | null; note: string | null; branch_id?: string; client_name?: string | null; price_note?: string | null; photo_folder?: string | null; share_ok?: boolean; photos_due?: boolean; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
+  receipt_no: string | null; note: string | null; branch_id?: string; client_name?: string | null; price_note?: string | null; photo_folder?: string | null; share_ok?: boolean; photos_due?: boolean; session_no?: number; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
   services: { name: string } | null;
 };
 const VISIT_TEXT: Record<string, string> = { BACKJOB: "Backjob (unpaid)", CHECKUP: "Check-up (unpaid)", NO_CHARGE: "No charge" };
@@ -161,7 +161,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                     <td>{l.state === "PENDING" && approver && pendingAll > 1 && (
                         <input type="checkbox" className="batch-tick" name="pick" value={l.id} form="batch-approve" aria-label={`Tick ${l.client_name ?? "entry"} to approve`} />
                       )}
-                      {l.client_name && <div className="log-client">{l.client_name}</div>}<strong>{l.services?.name}</strong>
+                      {l.client_name && <div className="log-client">{l.client_name}</div>}<strong>{(l.session_no ?? 1) > 1 && <span className="session-tag">Session {l.session_no}</span>}{l.services?.name}</strong>
                       {l.receipt_no && <div className="small muted">Waiver / OR {l.receipt_no}</div>}
                       {l.price_note && <div className="small muted">Price: {l.price_note}</div>}
                       {l.note && <div className="small muted">{l.note}</div>}
