@@ -104,15 +104,15 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
     if (!confirm(p.state === "DRAFT" ? `Delete the draft "${p.title}"?` : `End "${p.title}"? Its Service log item will be hidden.`)) return;
     start(async () => setMsg(await endPromo(p.id)));
   }
+  const fileName = (title: string, kind: "story" | "feed") => `${(title || "Promo").replace(/[^A-Za-z0-9]+/g, "-")}-${kind === "story" ? "Story" : "FB-post"}.png`;
   async function download(kind: "story" | "feed") {
     const c = canvases.current[kind];
+    if (c) await saveCanvas(Promise.resolve(c), fileName(d.title, kind));
+  }
+  async function copyImage(kind: "story" | "feed") {
+    const c = canvases.current[kind];
     if (!c) return;
-    const blob = await new Promise<Blob | null>((ok) => c.toBlob(ok, "image/png"));
-    if (!blob) return;
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${(d.title || "Promo").replace(/[^A-Za-z0-9]+/g, "-")}-${kind === "story" ? "Story" : "FB-post"}.png`;
-    document.body.append(a); a.click(); a.remove();
+    setMsg((await copyCanvas(Promise.resolve(c))) ? { ok: `${kind === "story" ? "Story" : "FB post"} copied. Paste it in a chat or post.` } : { error: COPY_FAIL });
   }
   async function copy(text: string) {
     try { await navigator.clipboard.writeText(text); setMsg({ ok: "Caption copied." }); } catch { setMsg({ error: "Could not copy. Select the text and copy it." }); }
@@ -254,12 +254,12 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
                   <figure>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={story} alt="Story preview" />
-                    <figcaption><button type="button" className="secondary small" onClick={() => download("story")}>Save story</button></figcaption>
+                    <figcaption className="row-buttons"><button type="button" className="secondary small" onClick={() => download("story")}>Save as photo</button><button type="button" className="secondary small" onClick={() => copyImage("story")}>Copy as photo</button></figcaption>
                   </figure>
                   <figure>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={feed} alt="FB post preview" />
-                    <figcaption><button type="button" className="secondary small" onClick={() => download("feed")}>Save FB post</button></figcaption>
+                    <figcaption className="row-buttons"><button type="button" className="secondary small" onClick={() => download("feed")}>Save as photo</button><button type="button" className="secondary small" onClick={() => copyImage("feed")}>Copy as photo</button></figcaption>
                   </figure>
                 </div>
                 {caps && (
@@ -286,7 +286,8 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
                 <tbody>
                   {(list as SavedPromo[]).map((p) => (
                     <tr key={p.id}>
-                      <td><strong>{p.title}</strong><br /><span className="small muted">{p.items.map((i) => `${i.paid}${i.free ? `+${i.free}` : ""} ${i.name}`).join(", ")}</span></td>
+                      <td><strong>{p.title}</strong><br /><span className="small muted">{p.items.map((i) => `${i.paid}${i.free ? `+${i.free}` : ""} ${i.name}`).join(", ")}</span>
+                        {p.state === "APPROVED" && <PromoPhotos p={p} serif={serif} fileName={fileName} />}</td>
                       <td className="num">{peso(p.price_cents)}</td>
                       <td className="num">{p.sessions}</td>
                       <td>{p.ends_on ?? "—"}</td>
@@ -302,6 +303,55 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+const COPY_FAIL = "This browser can't copy photos. Use Save as photo instead.";
+const fontsOf = async (serif: string) => {
+  await document.fonts.load(`700 80px ${serif}`).catch(() => null);
+  await document.fonts.ready;
+  return { sans: getComputedStyle(document.body).fontFamily || "sans-serif", serif };
+};
+const pngOf = (c: HTMLCanvasElement) => new Promise<Blob>((ok, bad) => c.toBlob((b) => (b ? ok(b) : bad(new Error("no image"))), "image/png"));
+async function saveCanvas(c: Promise<HTMLCanvasElement>, name: string) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(await pngOf(await c));
+  a.download = name; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+/** Safari needs the clipboard write to start right away, so it gets a promise of the image. */
+async function copyCanvas(c: Promise<HTMLCanvasElement>): Promise<boolean> {
+  try {
+    if (!navigator.clipboard || typeof ClipboardItem === "undefined") return false;
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": c.then(pngOf) })]);
+    return true;
+  } catch { return false; }
+}
+
+/** Save as photo / Copy as photo (story and FB post) and Copy caption for an approved, running promo (CHRIS Nov 27). */
+function PromoPhotos({ p, serif, fileName }: { p: SavedPromo; serif: string; fileName: (t: string, k: "story" | "feed") => string }) {
+  const [note, setNote] = useState<string | null>(null);
+  const items: PromoItem[] = p.items.map((i) => ({ service_id: i.service_id, name: i.name, unit: i.unit_cents, paid: i.paid, free: i.free }));
+  const model = p.model || modelsFor(items.map((i) => i.name))[0]?.m || "M01";
+  const art = { title: p.title, tagline: p.tagline ?? "", items, price: p.price_cents, months: p.valid_months, endsOn: p.ends_on, photo: modelSrc(model) };
+  const draw = (kind: "story" | "feed") => fontsOf(serif).then((f) => drawPromo(kind, art, f));
+  const caps = captions({ title: p.title, tagline: p.tagline ?? "", items, price: p.price_cents, months: p.valid_months, endsOn: p.ends_on });
+  const label = (k: "story" | "feed") => (k === "story" ? "Story" : "FB post");
+  async function copyText(t: string, what: string) {
+    try { await navigator.clipboard.writeText(t); setNote(`${what} copied.`); } catch { setNote("Could not copy. Try again."); }
+  }
+  return (
+    <div className="promo-photos">
+      {(["story", "feed"] as const).map((k) => (
+        <span key={k} className="row-buttons">
+          <span className="small"><strong>{label(k)}:</strong></span>
+          <button type="button" className="secondary small" onClick={() => saveCanvas(draw(k), fileName(p.title, k)).catch(() => setNote("Could not make the photo. Try again."))}>Save as photo</button>
+          <button type="button" className="secondary small" onClick={async () => setNote((await copyCanvas(draw(k))) ? `${label(k)} copied. Paste it in a chat or post.` : COPY_FAIL)}>Copy as photo</button>
+          <button type="button" className="secondary small" onClick={() => copyText(k === "story" ? caps.story : caps.feed, `${label(k)} caption`)}>Copy caption</button>
+        </span>
+      ))}
+      {note && <span className="small">{note}</span>}
     </div>
   );
 }

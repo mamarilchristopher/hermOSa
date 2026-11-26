@@ -1622,3 +1622,5 @@ a.hb-row:hover strong { text-decoration: underline; }
 .promo-shots figure { margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .promo-shots img { width: 100%; border-radius: 10px; border: 1px solid var(--line); box-shadow: var(--shadow-sm); }
 .promo-caption textarea { width: 100%; font-size: 0.85rem; margin-top: 4px; }
+.promo-photos { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.promo-shots figcaption.row-buttons { gap: 6px; }
