@@ -23,6 +23,20 @@ export type Payslip = {
   attendance: { worked?: number; paid_leave?: number; unpaid_leave?: number; absent?: number; late_min?: number; daily_rate?: number };
   gross_cents: number; deductions_cents: number; net_cents: number;
   name: string; uid: string | null; position: string | null; period_start: string; period_end: string; state: "DRAFT" | "FINAL";
+  /** Employment details printed on page 1 (optional: shown as "—" when unknown). */
+  hire_date?: string | null; branch?: string | null;
+  gov?: { tin?: string | null; sss?: string | null; philhealth?: string | null; pagibig?: string | null };
 };
+
+/** "Mar 4, 2024" */
+export const longDate = (d: string | null | undefined) => (d ? `${MO[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}, ${d.slice(0, 4)}` : "—");
+
+/** Government numbers on a payslip show only the last 4 digits. */
+export function maskId(v: string | null | undefined) {
+  if (!v) return "—";
+  if (/^none$/i.test(v)) return "None yet";
+  const d = v.replace(/\D/g, "");
+  return d.length >= 4 ? `••••${d.slice(-4)}` : "—";
+}
 
 export const ROLE_TEXT: Record<string, string> = { SOLO: "Solo", LEAD: "Lead", ASSIST: "Assist" };

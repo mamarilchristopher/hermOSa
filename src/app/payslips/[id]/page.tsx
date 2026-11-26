@@ -4,7 +4,7 @@ import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { Uid } from "@/components/Uid";
 import { loadPayslip } from "../load";
-import { peso, periodLabel, shortDate, ROLE_TEXT } from "@/lib/payroll";
+import { peso, periodLabel, shortDate, longDate, ROLE_TEXT } from "@/lib/payroll";
 import { PayslipTools } from "./PayslipTools";
 import { AdjustmentForm } from "@/app/payroll/Forms";
 import { removeAdjustment } from "@/app/payroll/actions";
@@ -45,6 +45,10 @@ export default async function PayslipPage({ params }: { params: Promise<{ id: st
             <div><span className="muted small">Period</span> {periodLabel(p.period_start)}</div>
             <div><span className="muted small">Employee</span> {p.name}<Uid v={p.uid} /></div>
             <div><span className="muted small">Rate</span> {peso(p.rate_cents)} {p.basis === "MONTHLY" ? "a month" : "a day"}</div>
+            <div><span className="muted small">Position</span> {p.position ?? "—"}</div>
+            <div><span className="muted small">Branch</span> {p.branch ?? "—"}</div>
+            <div><span className="muted small">Date hired</span> {longDate(p.hire_date)}</div>
+            <div><span className="muted small">Paid by</span> Cash</div>
           </div>
           <table className="payslip-table">
             <tbody>
@@ -63,6 +67,7 @@ export default async function PayslipPage({ params }: { params: Promise<{ id: st
             {a.daily_rate ? ` · a day's pay ${peso(a.daily_rate)}` : ""}
           </p>
           <PayslipTools p={p} />
+          <p className="small muted no-print">The photo and PDF have the details on page 1{p.commissions.length > 0 ? " and every commission on the next page(s). Copy as photo copies page 1" : ""}.</p>
         </div>
 
         {p.commissions.length > 0 && (

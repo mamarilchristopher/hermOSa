@@ -114,6 +114,11 @@ export async function drawIrImage(r: Ir, logoSrc: string, font: string): Promise
 
 /** A one-page A4 PDF holding a JPEG (the drawn IR). Built by hand so no PDF library is needed. */
 export function pdfFromJpeg(jpeg: Uint8Array, wPx: number, hPx: number): Blob {
+  return pdfFromJpegs([{ jpeg, w: wPx, h: hPx }]);
+}
+
+/** An A4 PDF with one JPEG per page (e.g. a payslip and its commission pages). */
+export function pdfFromJpegs(pages: { jpeg: Uint8Array; w: number; h: number }[]): Blob {
   const enc = new TextEncoder();
   const parts: Uint8Array[] = [];
   const offsets: number[] = [];
@@ -122,14 +127,20 @@ export function pdfFromJpeg(jpeg: Uint8Array, wPx: number, hPx: number): Blob {
   const obj = (n: number, body: () => void) => { offsets[n] = len; push(`${n} 0 obj\n`); body(); push("\nendobj\n"); };
   const PW = 595.28, PH = 841.89; // A4 in points
   const content = `q ${PW} 0 0 ${PH} 0 0 cm /Im0 Do Q`;
+  // Objects: 1 catalog, 2 pages, then per page k: page 3+3k, image 4+3k, content 5+3k.
+  const pageObj = (k: number) => 3 + 3 * k;
   push("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
   obj(1, () => push("<< /Type /Catalog /Pages 2 0 R >>"));
-  obj(2, () => push("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"));
-  obj(3, () => push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`));
-  obj(4, () => { push(`<< /Type /XObject /Subtype /Image /Width ${wPx} /Height ${hPx} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`); push(jpeg); push("\nendstream"); });
-  obj(5, () => push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`));
+  obj(2, () => push(`<< /Type /Pages /Kids [${pages.map((_, k) => `${pageObj(k)} 0 R`).join(" ")}] /Count ${pages.length} >>`));
+  pages.forEach((pg, k) => {
+    const n = pageObj(k);
+    obj(n, () => push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources << /XObject << /Im0 ${n + 1} 0 R >> >> /Contents ${n + 2} 0 R >>`));
+    obj(n + 1, () => { push(`<< /Type /XObject /Subtype /Image /Width ${pg.w} /Height ${pg.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${pg.jpeg.length} >>\nstream\n`); push(pg.jpeg); push("\nendstream"); });
+    obj(n + 2, () => push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`));
+  });
+  const total = 3 + 3 * pages.length;
   const xref = len;
-  push(`xref\n0 6\n0000000000 65535 f \n${[1, 2, 3, 4, 5].map((n) => `${String(offsets[n]).padStart(10, "0")} 00000 n \n`).join("")}`);
-  push(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  push(`xref\n0 ${total}\n0000000000 65535 f \n${Array.from({ length: total - 1 }, (_, i) => `${String(offsets[i + 1]).padStart(10, "0")} 00000 n \n`).join("")}`);
+  push(`trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
   return new Blob(parts as BlobPart[], { type: "application/pdf" });
 }
