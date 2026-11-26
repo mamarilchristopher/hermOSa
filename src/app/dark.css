@@ -19,6 +19,7 @@
 /* Dark-mode logo: same gold mark, lettering in light cream so it reads on dark (public/hermosa-logo-dark.png). */
 [data-mode="dark"] .side-nav a.active, [data-mode="dark"] .side-nav a:hover { background: var(--surface); box-shadow: none; }
 [data-mode="dark"] .mobile-bar { background: rgba(23, 24, 27, 0.94); }
+[data-mode="dark"] .online-strip { background: rgba(23, 24, 27, 0.92); border-bottom-color: rgba(255, 255, 255, 0.08); }
 [data-mode="dark"] .tab-nav { background: rgba(23, 24, 27, 0.97); }
 [data-mode="dark"] button, [data-mode="dark"] .button { background: #ececef; border-color: #ececef; color: #16171a; }
 [data-mode="dark"] button.secondary, [data-mode="dark"] .button.secondary { background: var(--surface); color: var(--brown-dark); border-color: var(--line-strong); }

@@ -95,7 +95,7 @@ export default async function TimePage() {
           <>
             <div className="card">
               <div className="card-head"><h2>On duty today, {dayLabel(today)}</h2><span className="small"><Link href="/time/photos">Time-in photos →</Link> · <Link href="/schedule">Schedule →</Link></span></div>
-              <OnDutyFaces rows={rows} faces={faces} branches={short} photos={photos} nowHm={nowHm()} tagDate={canApprove(access, null) ? today : undefined} />
+              <OnDutyFaces me={access.user_id} rows={rows} faces={faces} branches={short} photos={photos} nowHm={nowHm()} tagDate={canApprove(access, null) ? today : undefined} />
             </div>
 
             <div className="card">

@@ -9,7 +9,9 @@
 [data-theme="ivory"] .sidebar { background: #f6eedf; border-right-color: transparent; }
 [data-theme="ivory"] .brand { border-bottom-color: #eadcc2; }
 [data-theme="ivory"] .me { border-top-color: #eadcc2; }
-[data-theme="ivory"] .online-strip { background: transparent; border-bottom: 0; }
+/* Online now bar (CHRIS Nov 26): stays on screen, so it gets a frosted ivory background, a hairline and a soft shadow. */
+[data-theme="ivory"] .online-strip { background: rgba(250, 247, 242, 0.97); backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px);
+  border-bottom: 1px solid #eadcc2; box-shadow: 0 6px 14px -12px rgba(115, 82, 64, 0.45); }
 [data-theme="ivory"] .side-nav a { border-radius: 999px; }
 [data-theme="ivory"] .side-nav a.active { background: #fff; box-shadow: 0 6px 16px -10px rgba(115, 82, 64, 0.45); }
 [data-theme="ivory"] .side-nav a:hover { background: rgba(255, 255, 255, 0.6); }

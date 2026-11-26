@@ -18,7 +18,7 @@ export async function loadFaces(supabase: SupabaseClient, duty: DutyRow[]): Prom
   const out: Record<string, DutyFace> = {};
   for (const e of list) {
     const path = e.app_user_id ? pathOf.get(e.app_user_id) : null;
-    out[e.id] = { short: names[e.id] ?? e.full_name, photo: path ? urls.get(path) ?? null : null };
+    out[e.id] = { short: names[e.id] ?? e.full_name, photo: path ? urls.get(path) ?? null : null, user: e.app_user_id };
   }
   return out;
 }

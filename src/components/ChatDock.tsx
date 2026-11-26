@@ -87,6 +87,24 @@ export function ChatDock({ me }: { me: string }) {
     html.style.overflow = "hidden"; body.style.overflow = "hidden";
     return () => { html.style.overflow = prev[0]; body.style.overflow = prev[1]; };
   }, [open.length]);
+  // Phone keyboard (CHRIS Nov 26): keep the chat window full width and just above the keyboard, and hide the bottom menu
+  // while typing. iOS shrinks only the "visual viewport" when the keyboard opens, so the window follows it.
+  const winRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!open.length || !isPhone() || !vv) return;
+    const fit = () => {
+      const el = winRef.current;
+      if (!el) return;
+      const kb = window.innerHeight - vv.height > 120;
+      document.body.classList.toggle("kb-open", kb);
+      if (kb) { el.style.top = `${vv.offsetTop + 8}px`; el.style.height = `${vv.height - 8}px`; el.style.bottom = "auto"; }
+      else { el.style.top = ""; el.style.height = ""; el.style.bottom = ""; }
+    };
+    fit();
+    vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit);
+    return () => { vv.removeEventListener("resize", fit); vv.removeEventListener("scroll", fit); document.body.classList.remove("kb-open"); };
+  }, [open.length]);
   useEffect(() => { setSheet(false); if (isPhone()) setOpen([]); }, [path]);
   useEffect(() => { if (!onChatPage) void load(); }, [load, onChatPage, path]);
   useEffect(() => {
@@ -167,7 +185,7 @@ export function ChatDock({ me }: { me: string }) {
       {sheet && <><div className="dock-backdrop" aria-hidden onClick={() => setSheet(false)} />{list}</>}
       {/* Phone: tapping outside the open chat closes it. Hidden on PC. */}
       {open.length > 0 && <div className="dock-backdrop dock-win-backdrop" aria-hidden onClick={() => setOpen([])} />}
-      <div className="dock-windows">
+      <div className="dock-windows" ref={winRef}>
         {open.map((id) => byId.get(id) && (
           <MiniChat key={id} room={byId.get(id)!} me={me} face={face(byId.get(id)!, 30)} online={isOn(byId.get(id)!)} incoming={incoming} sign={sign} photos={faces}
             onClose={() => close(id)} onExpand={() => { close(id); router.push(`/chat/${id}`); }} onSent={load} />

@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { OPEN_CHAT_EVENT } from "./ChatDock";
+import { useChatWith } from "./ChatWith";
 import { createClient } from "@/lib/supabase/browser";
 import { Avatar } from "./Avatar";
 
@@ -15,16 +14,7 @@ export function OnlineNow({ show }: { show: boolean }) {
   const supabase = useMemo(() => createClient(), []);
   const [people, setPeople] = useState<Person[] | null>(null);
   const [urls, setUrls] = useState<Record<string, string>>({});
-  const router = useRouter();
-  // Tap a person to chat with them (CHRIS Nov 26): opens the chat window, or the Chat page when there's no chat window here.
-  const chat = async (id: string) => {
-    const { data } = await supabase.rpc("chat_start_dm", { p_user: id });
-    const room = (data as { ok?: boolean; id?: string } | null)?.ok ? (data as { id: string }).id : null;
-    if (!room) return;
-    const detail = { room, handled: false };
-    window.dispatchEvent(new CustomEvent(OPEN_CHAT_EVENT, { detail }));
-    if (!detail.handled) router.push(`/chat/${room}`);
-  };
+  const chat = useChatWith(); // tap a person to chat (CHRIS Nov 26)
 
   useEffect(() => {
     let stop = false;

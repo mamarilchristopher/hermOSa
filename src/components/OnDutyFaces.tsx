@@ -1,9 +1,10 @@
 import { Avatar } from "./Avatar";
+import { ChatWith } from "./ChatWith";
 import type { DutyRow } from "./OnDuty";
 import { IrregularTagForm, IrregularUndo } from "./IrregularForms";
 import { irregularLabel } from "@/lib/irregular";
 
-export type DutyFace = { short: string; photo: string | null };
+export type DutyFace = { short: string; photo: string | null; user?: string | null };
 const clock = (ts: string) => new Date(ts).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" });
 /** "4:15–7:09 PM": one AM/PM when both times share it, so the range fits under a face. */
 const range = (a: string, b: string) => {
@@ -15,8 +16,8 @@ const lateText = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` $
 
 /** On duty, the neat view (CHRIS Nov 25): per branch, a face per person with a short status.
  *  On the Time clock page it also links each time-in photo and, for owners and the GM (tagDate), marks irregular days. */
-export function OnDutyFaces({ rows, faces, branches, nowHm, photos, tagDate }: {
-  rows: DutyRow[]; faces: Record<string, DutyFace>; branches: { id: string; name: string }[]; nowHm: string;
+export function OnDutyFaces({ rows, faces, branches, nowHm, photos, tagDate, me }: {
+  me?: string; rows: DutyRow[]; faces: Record<string, DutyFace>; branches: { id: string; name: string }[]; nowHm: string;
   photos?: Record<string, string>; tagDate?: string;
 }) {
   const wholeDay = rows.find((r) => r.irregular?.whole_day)?.irregular ?? null;
@@ -50,7 +51,10 @@ export function OnDutyFaces({ rows, faces, branches, nowHm, photos, tagDate }: {
                 const state = r.time_out ? "out" : r.time_in ? (late ? "late" : "in") : r.start && r.start.slice(0, 5) <= nowHm ? "missing" : "waiting";
                 return (
                   <div key={r.employee_id} className={`face is-${state}`} title={r.name}>
-                    <Avatar name={r.name} url={faces[r.employee_id]?.photo} size={52} />
+                    {/* CHRIS Nov 26: tap a face to chat with that person. */}
+                    {faces[r.employee_id]?.user && faces[r.employee_id]!.user !== me
+                      ? <ChatWith user={faces[r.employee_id]!.user!} name={name(r)}><Avatar name={r.name} url={faces[r.employee_id]?.photo} size={52} /></ChatWith>
+                      : <Avatar name={r.name} url={faces[r.employee_id]?.photo} size={52} />}
                     <span className="face-name">{name(r)}</span>
                     {/* CHRIS Nov 25: show whether the shift is still going or over. */}
                     <span className={`face-shift ${state === "out" ? "over" : r.time_in ? "going" : ""}`}>

@@ -1478,3 +1478,20 @@ img.dock-group[src="/hermosa-logo.png"] { object-fit: contain; padding: 4px; }
 .entries-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
 .staff-filter { display: inline-flex; align-items: center; gap: 8px; }
 .staff-filter select { min-width: 200px; }
+/* Phone chat window while typing (CHRIS Nov 26): 16px text so iPhones don't zoom in; bottom menu hidden while the keyboard is up. */
+@media (max-width: 900px) {
+  .mini-send textarea { font-size: 16px; }
+  body.kb-open .tab-nav, body.kb-open .dock-bubble { display: none !important; }
+}
+/* Online now bar on phones (CHRIS Nov 26): one compact row; the names scroll sideways, View as and the bell stay put. */
+@media (max-width: 900px) {
+  .online-strip { flex-wrap: nowrap; gap: 8px; padding: 6px 12px !important; }
+  .online-strip .online-now { flex: 1; min-width: 0; padding: 3px 4px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
+  .online-strip .online-now::-webkit-scrollbar { display: none; }
+  .online-strip .online-now > strong { font-size: 0.8rem; }
+  .online-strip .online-name { flex: none; }
+  .online-strip .view-as-btn, .online-strip .bell { flex: none; }
+}
+button.chat-with { all: unset; cursor: pointer; border-radius: 50%; display: inline-grid; }
+button.chat-with:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+button.chat-with:hover .avatar { box-shadow: 0 0 0 3px var(--gold-soft); }
