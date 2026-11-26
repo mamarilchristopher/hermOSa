@@ -46,6 +46,12 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
     return (<><TopBar access={access} /><main><Link href="/me">← Back to my Home</Link><div className="notice error">{v.error === "UNKNOWN" ? "View as isn't set up yet. The owner needs to run update-0021 in Supabase." : errorText(v.error)}</div></main></>);
   }
   const first = v.name.trim().split(/\s+/)[0];
+  // Commission earned today, any sign-off state except rejected (CHRIS Nov 26).
+  const { data: todayLines } = v.employee?.commission_eligible
+    ? await supabase.from("commission_lines").select("amount_cents, service_logs!inner(service_date, state)")
+        .eq("employee_id", v.employee.id).eq("service_logs.service_date", today).neq("service_logs.state", "REJECTED")
+    : { data: [] };
+  const todayCents = ((todayLines ?? []) as { amount_cents: number }[]).reduce((s, l) => s + Number(l.amount_cents), 0);
   const todos: Todo[] = [];
   if (v.details_state === "RETURNED") todos.push({ text: "Employee details were sent back to fix", href: "/admin/details", urgent: true });
   else if (v.details_state !== "APPROVED" && v.details_state !== "PENDING") todos.push({ text: "Employee details not filled in yet", href: "/admin/details", urgent: true });
@@ -92,6 +98,7 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
         )}
         {v.employee?.commission_eligible && (
           <div className="grid">
+            <div className="card stat"><div className="label">Commission today</div><div className="value">{centsToPhp(todayCents)}</div><div className="note">Approved or waiting sign-off</div></div>
             <div className="card stat"><div className="label">Approved commission this month</div><div className="value">{centsToPhp(v.month_approved_cents)}</div></div>
             <div className="card stat"><div className="label">Waiting sign-off</div><div className="value">{centsToPhp(v.unsigned.cents)}</div>
               {v.employee && <div className="note"><Link href={`/people/${v.employee.id}`}>See every commission line →</Link></div>}</div>

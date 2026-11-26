@@ -75,6 +75,10 @@ export default async function Me() {
   // update-0054: entries still missing client photos don't count until they're added.
   const sum = (state: string) => lines.filter((l) => l.service_logs.state === state && !l.service_logs.photos_due).reduce((s, l) => s + Number(l.amount_cents), 0);
   const approved = sum("APPROVED"), waiting = sum("PENDING");
+  // Commission earned today, approved or still waiting (CHRIS Nov 26). Today's lines are in this month's list.
+  const todayIso = manilaToday();
+  const todayCents = lines.filter((l) => l.service_logs.service_date === todayIso && l.service_logs.state !== "REJECTED").reduce((s, l) => s + Number(l.amount_cents), 0);
+  const showToday = todayIso >= start && todayIso <= monthEnd(start);
   const held = lines.filter((l) => l.service_logs.state !== "REJECTED" && l.service_logs.photos_due).reduce((s, l) => s + Number(l.amount_cents), 0);
   const recent = lines.filter((l) => l.service_logs.state !== "REJECTED")
     .sort((a, b) => b.service_logs.service_date.localeCompare(a.service_logs.service_date)).slice(0, 5);
@@ -182,6 +186,11 @@ export default async function Me() {
               <div className="card stat hero">
                 <Reveal label={`Approved commission, ${monthLabel(ym)}`} note="Signed off by your manager. This is what goes to payroll.">{centsToPhp(approved)}</Reveal>
               </div>
+              {showToday && (
+                <div className="card stat">
+                  <Reveal label="Commission today" note="Today's entries, approved or waiting sign-off.">{centsToPhp(todayCents)}</Reveal>
+                </div>
+              )}
               <div className="card stat">
                 <Reveal label="Waiting sign-off" note="Counts once your manager approves it.">{centsToPhp(waiting)}</Reveal>
               </div>
