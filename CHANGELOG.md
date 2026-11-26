@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.82.1 | Nov 26, 2026 | none | Home Bookings today board: each branch now has a bold header band with its name and number of bookings, plus a quick line of how many are still to come, arrived and done; tap the band to open that branch on Bookings |
 | 0.82.0 | Nov 26, 2026 | update-0082 | New Clinic › Documents page for everyone: every approved form (Declaration and Consent Form, Novoform waiver, Payment confirmation, stock and supply trackers) with its current version and all old versions, including the original forms; tap one to view it as a PDF inside the app, then Download PDF or Share (on phones, Share sends the PDF file itself); owners and the GM can upload a new version (it becomes the current one and the old one moves to Old versions) or remove one added by mistake |
 | 0.81.5 | Nov 26, 2026 | none | Tap a client on the Home Bookings today board to open their booking on the Bookings page, scrolled to and highlighted, where you can change the status or add a note |
 | 0.81.4 | Nov 26, 2026 | none | Every employee's Home now has the live Bookings today board (each branch's clients, status, and who marked it); in View as, Notifications fold up (tap to open, showing the latest one) and the live Bookings board sits right under it |

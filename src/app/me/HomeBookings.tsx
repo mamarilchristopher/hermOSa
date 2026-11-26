@@ -28,6 +28,7 @@ const STATUS: Record<string, [string, string]> = {
 };
 const time12 = (t: string) => { const [h, m] = t.split(":").map(Number); return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
 const at = (ts: string) => new Date(ts).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
+const toCome = (l: HomeBooking[]) => l.filter((r) => r.status === "BOOKED" || r.status === "CONFIRMED").length;
 const first = (n?: string) => (n ?? "").replace(/^ma\.?\s+/i, "").split(" ")[0];
 
 /** CHRIS Nov 26: the live Bookings board sits on Home right after Today so far. It updates by itself (update-0081). */
@@ -52,7 +53,12 @@ export function HomeBookings({ rows, branches, who, toFollow }: {
             const list = rows.filter((r) => r.branch_id === b.id);
             return (
               <div key={b.id} className="glance-branch">
-                <Link className="small muted" href={`/bookings?b=${b.code ?? ""}`}>{b.name} ({list.length})</Link>
+                {/* CHRIS Nov 26 (v0.82.1): a bold band per branch so each list is easy to tell apart. */}
+                <Link className="hb-branch" href={`/bookings?b=${b.code ?? ""}`}>
+                  <span className="hb-branch-name">{b.name}</span>
+                  <span className="hb-branch-count">{list.length} {list.length === 1 ? "booking" : "bookings"}</span>
+                </Link>
+                {list.length > 0 && <span className="small muted hb-branch-sum">{toCome(list)} to come · {list.filter((r) => r.status === "ARRIVED").length} arrived · {list.filter((r) => r.status === "DONE").length} done</span>}
                 {list.length === 0 ? <span className="small muted">No bookings</span> : list.map((r) => (
                   // CHRIS Nov 26: tapping a client opens their booking on the Bookings page (scrolled to and highlighted).
                   <Link key={r.id} className="hb-row" href={`/bookings?b=${b.code ?? ""}&focus=${r.id}#bk-${r.id}`}>
