@@ -54,12 +54,13 @@ export function HomeBookings({ rows, branches, who, toFollow }: {
               <div key={b.id} className="glance-branch">
                 <Link className="small muted" href={`/bookings?b=${b.code ?? ""}`}>{b.name} ({list.length})</Link>
                 {list.length === 0 ? <span className="small muted">No bookings</span> : list.map((r) => (
-                  <div key={r.id} className="hb-row">
+                  // CHRIS Nov 26: tapping a client opens their booking on the Bookings page (scrolled to and highlighted).
+                  <Link key={r.id} className="hb-row" href={`/bookings?b=${b.code ?? ""}&focus=${r.id}#bk-${r.id}`}>
                     <span className="hb-name"><strong>{r.client_name}</strong>{r.appointment_time && <span className="small muted"> {time12(r.appointment_time)}</span>}</span>
                     <span className="small muted hb-svc">{r.services}</span>
                     <span className="small"><span className={`pill ${STATUS[r.status]?.[1] ?? ""}`}>{STATUS[r.status]?.[0] ?? r.status}</span>
                       {r.status !== "BOOKED" && r.status_by && r.status_at && <span className="muted"> by {first(who[r.status_by]) || "staff"}, {at(r.status_at)}</span>}</span>
-                  </div>
+                  </Link>
                 ))}
               </div>
             );

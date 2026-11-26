@@ -1553,3 +1553,30 @@ details.notices-fold > summary::after { margin-left: auto; }
 details.notices-fold > summary h2 { margin: 0; }
 details.notices-fold .nf-latest { flex: 1 1 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 details.notices-fold[open] > summary { margin-bottom: 12px; }
+/* Home board: each client opens their booking (CHRIS Nov 26) */
+a.hb-row { color: inherit; text-decoration: none; border-radius: 8px; margin: 0 -6px; padding-left: 6px; padding-right: 6px; }
+a.hb-row:hover { background: var(--gold-soft); }
+a.hb-row:hover strong { text-decoration: underline; }
+.booking-row { scroll-margin-top: 90px; }
+.booking-row.focused, .booking-row:target { outline: 2px solid var(--gold); outline-offset: 4px; border-radius: 10px; background: rgba(201, 162, 74, 0.12); }
+/* Documents (update-0082, CHRIS Nov 26) */
+.doc-cat { font-size: 0.85rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 22px 0 10px; }
+.doc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 14px; }
+.doc-card { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.doc-open { display: flex; gap: 14px; align-items: flex-start; color: inherit; text-decoration: none; }
+.doc-open:hover strong { text-decoration: underline; }
+.doc-icon { flex: none; width: 44px; height: 54px; border-radius: 6px; border: 1.5px solid var(--gold-line, #e3cfa3); background: var(--gold-soft, #fbf3e4);
+  color: var(--brown); font-size: 0.7rem; font-weight: 800; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px; }
+.doc-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.doc-old summary { margin: 0; }
+.doc-old li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; padding: 6px 0; }
+.danger-text { color: var(--bad) !important; }
+.add-doc { margin-top: 22px; }
+.doc-form .wide { grid-column: 1 / -1; }
+.pdf-viewer { margin: 10px 0 18px; }
+.pdf-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; margin-bottom: 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.pdf-actions { display: flex; gap: 8px; }
+.pdf-pages { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.pdf-page { width: 100%; max-width: 1000px; height: auto; background: #fff; border: 1px solid var(--line); border-radius: 4px; box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+.pdf-frame { width: 100%; height: 80vh; border: 1px solid var(--line); border-radius: 8px; background: #fff; }

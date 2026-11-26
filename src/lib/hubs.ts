@@ -42,6 +42,8 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
       ...(archiver ? [{ href: "/clinic/archive", label: "Client archive" }, { href: "/clinic/social", label: "Social media" }] : []),
       // update-0075: proof of payment in its own folder (staff see their own entries, management sees all).
       ...(archiver ? [{ href: "/clinic/payments", label: "Proof of payment" }] : []),
+      // update-0082 (CHRIS Nov 26): approved forms with every old version, for everyone.
+      ...(archiver ? [{ href: "/documents", label: "Documents" }] : []),
     ] },
     { key: "team", label: "Team", short: "Team", icon: "week", tabs: [
       { href: "/schedule", label: "Schedule" },
