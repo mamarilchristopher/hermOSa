@@ -65,15 +65,13 @@ describe("service log as the source from Nov 25", () => {
   const g = computeGlance("2026-11-26", [A, B], [
     s("a", "2026-11-24", null, 500_00), // before the switch: service log alone doesn't count
     s("a", "2026-11-25", null, 300_00), s("a", "2026-11-26", null, 120_00),
-    s("b", "2026-11-26", 90_00, 40_00), // v0.80.1: the service log wins over typed Daily Sales from Nov 25
-    s("b", "2026-11-25", 70_00, null), // typed but nothing logged: empty
+    s("b", "2026-11-26", 90_00, 40_00), // declared sales typed in still win
   ]);
-  it("uses the day's service log total, even when Daily Sales were typed", () => {
+  it("uses the day's service log total when no sales were typed", () => {
     expect(g.branches[0].todayCell).toEqual({ kind: "sales", cents: 120_00, log: true });
     expect(g.branches[0].yesterday).toEqual({ kind: "sales", cents: 300_00, log: true });
     expect(g.branches[0].mtd).toBe(300_00);
-    expect(g.branches[1].todayCell).toEqual({ kind: "sales", cents: 40_00, log: true });
-    expect(g.branches[1].yesterday).toEqual({ kind: "empty" });
-    expect(g.todaySoFar).toBe(160_00);
+    expect(g.branches[1].todayCell).toEqual({ kind: "sales", cents: 90_00 });
+    expect(g.todaySoFar).toBe(210_00);
   });
 });

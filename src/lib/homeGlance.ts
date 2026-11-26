@@ -55,15 +55,10 @@ export const SERVICE_LOG_FROM = "2026-11-25";
 export function cellOf(rec: StatusDay | undefined): DayCell {
   if (!rec) return { kind: "empty" };
   const [, date, cents, mark, staged, service] = rec;
-  // CHRIS Nov 26 (v0.80.1): from Nov 25 Home shows what the Service log holds, even when Daily Sales were also typed,
-  // so Home and the Service log always match. A Closed / Zero sales mark still counts when nothing was logged.
-  if (date >= SERVICE_LOG_FROM) {
-    if (service !== null && service !== undefined && Number(service) > 0) return { kind: "sales", cents: Number(service), log: true };
-    if (mark === "NO_SALES") return { kind: "zero" };
-    if (mark === "CLOSED") return { kind: "closed" };
-    return { kind: "empty" };
-  }
+  // CHRIS Nov 26 (v0.81.2): the Daily Sales tab is the correct figure, so Home shows exactly what it shows.
+  // The service log only fills a day nobody has typed or marked yet (shown as "Sales Logged").
   if (cents !== null) return { kind: "sales", cents: Number(cents) };
+  if (!mark && service !== null && service !== undefined && Number(service) > 0 && date >= SERVICE_LOG_FROM) return { kind: "sales", cents: Number(service), log: true };
   if (mark === "NO_SALES") return { kind: "zero" };
   if (mark === "CLOSED") return { kind: "closed" };
   if (staged) return { kind: "waiting" };
