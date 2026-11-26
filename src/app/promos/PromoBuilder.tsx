@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   adIssues, organicOnly, captions, commissionsOf, defaultPrice, isBundle, peso, planVisits, promoSchedule, safetyFor, safetyIssues, sessionsOf, shortName, thinItems, titleIdeas, usualCount,
-  justify, valueOf, SEASONS, type Pkg, type PromoItem, type Suggestion,
+  adName, justify, valueOf, vsChip, SEASONS, type Pkg, type PromoItem, type Suggestion,
 } from "@/lib/promoRules";
 import { modelSrc, modelsFor } from "@/lib/promoModels";
 import { drawPromo } from "@/lib/promoImage";
@@ -46,7 +46,6 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
   const models = useMemo(() => modelsFor(d.items.map((i) => i.name), d.season), [d.items, d.season]);
   const model = d.model || models[0]?.m || "M01";
   const issues = safetyIssues(d.items, d.months);
-  const off = value > 0 ? 1 - price / value : 0;
   const ideasForTitle = titleIdeas(d.items, season);
   const caps = d.items.length ? captions({ title: d.title || "Your promo title", tagline: d.tagline, items: d.items, price, months: d.months, endsOn: d.endsOn || null }) : null;
   const thin = thinItems(d.items, d.months);
@@ -139,6 +138,8 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
     try { await navigator.clipboard.writeText(text); setMsg({ ok: "Caption copied." }); } catch { setMsg({ error: "Could not copy. Select the text and copy it." }); }
   }
 
+  const usualAll = Object.fromEntries(services.map((x) => [x.id, x.commission ?? null]));
+  const costAll = Object.fromEntries(services.map((x) => [x.id, x.cost ?? null]));
   const drafts = saved.filter((p) => p.state === "DRAFT");
   const live = saved.filter((p) => p.state === "APPROVED");
   const ended = saved.filter((p) => p.state === "ENDED").slice(0, 10);
@@ -158,10 +159,19 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
               <PromoMockup idea={s} endsOn={addDays(today, 13)} serif={serif} />
               <span className="tag">{KIND[s.kind]}</span>
               <strong>{s.title}</strong>
-              <span className="small">{s.items.length === 1 ? `${s.items[0].name} ${s.items[0].paid}+${s.items[0].free}` : s.items.map((i) => `${i.paid} ${i.name}`).join(", ")}</span>
-              <span className="small"><strong>{peso(s.price)}</strong> · {sessionsOf(s.items)} sessions · {peso(Math.round(s.price / sessionsOf(s.items)))} each</span>
-              <span className="small muted">{s.why}</span>
-              <span className="small promo-why-line">{justify(s.items, s.price, { pkgs, usual: Object.fromEntries(services.map((x) => [x.id, x.commission ?? null])), cost: Object.fromEntries(services.map((x) => [x.id, x.cost ?? null])) }).headline}</span>
+              <span className="small">{offerLine(s.items)}</span>
+              <span className="promo-idea-price"><b>{peso(s.price)}</b> · {sessionsOf(s.items)} sessions · {peso(Math.round(s.price / sessionsOf(s.items)))} each</span>
+              {(() => {
+                const j = justify(s.items, s.price, { pkgs, usual: usualAll, cost: costAll });
+                return (
+                  <span className="promo-idea-chips">
+                    <span>{vsChip(j.off, j.basis)}</span>
+                    <span>Commission: {s.price ? Math.round((j.commission / s.price) * 100) : 0}% ({peso(j.commission)})</span>
+                    {j.margin !== null && <span>{Math.round(j.margin * 100)}% left</span>}
+                  </span>
+                );
+              })()}
+              <span className="small muted promo-idea-why">{s.why}</span>
               <button type="button" className="secondary small" onClick={() => openIdea(s)}>Open in builder</button>
             </div>
           ))}
@@ -214,7 +224,7 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
                   {!d.auto && <button type="button" className="link-button small" onClick={() => change({ auto: true })}>Use the suggested price ({peso(defaultPrice(d.items, pkgs))})</button>}
                   <p className="small">
                     <strong>{n} sessions</strong> for <strong>{peso(price)}</strong> = {peso(Math.round(price / Math.max(1, n)))} per session.
-                    {" "}The sessions are worth {peso(value)} on the price list, so the client saves {Math.round(off * 100)}% <span className="muted">(for you only; posts never show a regular price)</span>.
+                    {why && <>{" "}That&apos;s <strong>{vsChip(why.off, why.basis).replace(/^Same as/, "the same as")}</strong>{why.off > 0 && why.off <= 0.1 && !isBundle(d.items) ? ", a small step down that locks the client in for longer" : ""}.</>}
                   </p>
                   <div className="small">
                     <strong>Staff commission per session done</strong> (5% of each service&apos;s price per session in this promo, free sessions included, split 60/40 when assisted):
@@ -227,7 +237,7 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
                     {!isBundle(d.items) && <span className="muted">Payments go on the promo&apos;s payment line, with no commission.</span>}
                   </div>
                   {price > value && <div className="notice warn small">The price is more than the sessions are worth. Lower it.</div>}
-                  {off > 0.3 && <div className="notice warn small">That&apos;s {Math.round(off * 100)}% off. Over 30% cuts deep into profit: try fewer free sessions, or a free add-on (like L-Carnitine) instead of a lower price.</div>}
+                  {why?.deep && <div className="notice warn small">That&apos;s {vsChip(why.off, why.basis)}. That cuts into profit: try fewer free sessions, or a free add-on (like L-Carnitine) instead of a lower price.</div>}
                 </div>
 
                 <div className="promo-row">
@@ -394,6 +404,11 @@ function PromoPhotos({ p, serif, fileName }: { p: SavedPromo; serif: string; fil
       {note && <span className="small">{note}</span>}
     </div>
   );
+}
+
+/** "Lux Queen Drip 10 + 3" or "48 Brilliant Drip + 12 Signature Facial + 2 HIFU Face & Neck" (card summary). */
+function offerLine(items: PromoItem[]) {
+  return items.length === 1 ? `${adName(items[0].name)} ${items[0].paid}${items[0].free ? ` + ${items[0].free}` : ""}` : items.map((i) => `${i.paid + i.free} ${adName(i.name)}`).join(" + ");
 }
 
 function Stepper({ label, v, min, max, onChange }: { label: string; v: number; min: number; max: number; onChange: (v: number) => void }) {

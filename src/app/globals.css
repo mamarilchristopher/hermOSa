@@ -1802,9 +1802,66 @@ a.hb-row:hover strong { text-decoration: underline; }
   .promo-lightbox { width: 100vw; max-height: 100dvh; height: 100dvh; border-radius: 0; margin: 0; }
   .promo-lightbox-img img { max-height: calc(100dvh - 76px); }
   /* Phones: photo on the left, details on the right, so the list stays short. */
-  .promo-idea:has(.promo-mock), .biz-pick:has(.promo-mock) { display: grid; grid-template-columns: 112px minmax(0, 1fr); column-gap: 12px; row-gap: 4px; align-content: start; }
+  .promo-idea, .biz-pick { display: grid; grid-template-columns: 112px minmax(0, 1fr); column-gap: 12px; row-gap: 4px; align-content: start; }
   .promo-idea > .promo-mock, .biz-pick > .promo-mock { grid-column: 1; grid-row: 1 / span 12; margin: 0; align-self: start; }
   .promo-idea > :not(.promo-mock), .biz-pick > :not(.promo-mock) { grid-column: 2; }
   .promo-idea > .tag, .promo-idea > button, .biz-pick > .tag, .biz-pick > .why, .biz-pick > .biz-open { justify-self: start; }
   .promo-mock-zoom { width: 26px; height: 26px; font-size: 14px; right: 5px; bottom: 5px; }
 }
+
+/* My day (v0.88, CHRIS Nov 27): the GM's daily reminders. PC: two columns; phone: one. */
+.myday-heads { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; margin-bottom: 14px; }
+.myday-head { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 16px; text-decoration: none; color: inherit; background: var(--surface); border: 1px solid var(--line); }
+.myday-head .e { font-size: 1.6rem; line-height: 1; }
+.myday-head b { display: block; margin-bottom: 2px; }
+.myday-head span { font-size: 0.86rem; color: var(--ink-2); }
+.myday-head b { color: var(--ink); font-size: 0.98rem; }
+.myday-head.warn { background: linear-gradient(160deg, #fff7e6, #fbe9c4); border-color: #f1dfb0; }
+.myday-head.ok { background: linear-gradient(160deg, #fffaf1, #f5e8cf); border-color: var(--line); }
+.myday-head.soft { background: var(--surface); }
+[data-mode="dark"] .myday-head.warn, [data-mode="dark"] .myday-head.ok { background: linear-gradient(160deg, #2a2924, #222220); border-color: #3a3730; }
+.myday-head:hover { box-shadow: 0 6px 18px -10px rgba(115, 82, 64, 0.35); }
+.myday-progress { display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; }
+.myday-bar { flex: 1; max-width: 360px; height: 10px; border-radius: 999px; background: var(--viz-track); overflow: hidden; }
+.myday-bar span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--viz-gold), var(--viz-gold-hi)); transition: width 0.3s ease; }
+.myday-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.myday-sec h2 { display: flex; align-items: center; gap: 8px; }
+.myday-sec h2 small { margin-left: auto; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--viz-deep); background: var(--viz-track); padding: 4px 10px; border-radius: 999px; }
+.myday-sec ul { list-style: none; margin: 0; padding: 0; }
+.myday-item { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid var(--line); }
+.myday-item:first-child { border-top: 0; }
+.myday-tick { flex: none; width: 30px; height: 30px; min-height: 30px; padding: 0; border-radius: 9px; border: 2px solid var(--viz-gold); background: transparent; color: #fff; font-weight: 800; font-size: 16px; cursor: pointer; }
+.myday-item.done .myday-tick { background: var(--viz-gold); }
+.myday-item.done .myday-text b { text-decoration: line-through; color: var(--muted); }
+.myday-ico { flex: none; font-size: 1.2rem; width: 26px; text-align: center; }
+.myday-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.myday-text b { font-size: 0.95rem; }
+.myday-text span { font-size: 0.8rem; color: var(--ink-2); line-height: 1.35; }
+.myday-count { flex: none; min-width: 30px; text-align: center; font-weight: 800; font-size: 0.85rem; padding: 4px 9px; border-radius: 999px; background: var(--viz-track); color: var(--ink); }
+.myday-count.todo { background: var(--viz-champ); color: var(--viz-deep); }
+.myday-count.warn { background: #fbe1c4; color: #9a4f00; }
+[data-mode="dark"] .myday-count.todo, [data-mode="dark"] .myday-count.warn { color: #f0d394; }
+.myday-go { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--viz-track); color: var(--ink); text-decoration: none; font-size: 1.3rem; font-weight: 700; }
+.myday-go:hover { background: var(--viz-champ); }
+.myday-sec { margin: 0; }
+@media (max-width: 760px) { .myday-grid { grid-template-columns: 1fr; } .myday-ico { display: none; } .myday-item { gap: 10px; } }
+.myday-item .myday-tick, [data-mode="dark"] .myday-item .myday-tick { background: transparent; box-shadow: none; }
+.myday-item.done .myday-tick, [data-mode="dark"] .myday-item.done .myday-tick { background: var(--viz-gold); color: #fff; }
+[data-mode="dark"] .myday-count.warn { background: #4a3a22; color: #f0d394; }
+[data-mode="dark"] .myday-count.todo { background: #3d3626; }
+/* Dark mode: keep the promo photo and lightbox buttons out of the generic dark button style. */
+[data-mode="dark"] .promo-mock { background: var(--viz-track); border-color: var(--line); color: inherit; }
+[data-mode="dark"] .promo-lightbox-tabs button { background: transparent; border: 0; color: inherit; }
+[data-mode="dark"] .promo-lightbox-tabs button.on { background: var(--surface); color: var(--viz-gold-hi); }
+[data-mode="dark"] .promo-lightbox-x { background: var(--viz-track); border: 0; color: inherit; }
+[data-mode="dark"] .myday-item .myday-tick { border-color: var(--viz-gold); }
+
+/* v0.88: the theme rounds every button into a pill; the promo photo stays a rounded rectangle. */
+[data-theme] button.promo-mock, button.promo-mock { border-radius: 12px; padding: 0; min-height: 0; }
+.promo-idea-price { font-size: 0.9rem; }
+.promo-idea-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.promo-idea-chips span { font-size: 0.74rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--viz-track); color: var(--ink); }
+.promo-idea-chips span:first-child { background: var(--viz-champ); color: var(--viz-deep); }
+[data-mode="dark"] .promo-idea-chips span:first-child { background: #3d3626; color: var(--viz-gold-hi); }
+.promo-idea-why { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.promo-idea .promo-mock, .biz-pick .promo-mock { margin: 0 0 6px; }

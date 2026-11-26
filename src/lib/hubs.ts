@@ -29,7 +29,10 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
     { key: "chat", label: "Chat", short: "Chat", icon: "chat", tabs: [{ href: "/chat", label: "Chat", badge: n(c.chat) }] },
     { key: "sales", label: "Sales", short: "Sales", icon: "chart", tabs: [
       // CHRIS Nov 27 (v0.87.1): the Business dashboard (sales, trends, team patterns, today's promo picks) for all management.
+      // CHRIS Nov 27 (v0.88): My day, the GM's daily reminders with live counts; first for the GM, owners can open it too.
+      ...(gm ? [{ href: "/focus", label: "My day" }] : []),
       ...(management ? [{ href: "/business", label: "Business" }, { href: "/", label: "Dashboard" }] : []),
+      ...(owner ? [{ href: "/focus", label: "My day" }] : []),
       ...(filler ? [{ href: "/sales/daily", label: "Daily sales" }] : []),
       // update-0086 (CHRIS Nov 27): promo ideas every Monday, and the builder; beside Daily sales. Owners and the GM.
       ...(owner || gm ? [{ href: "/promos", label: "Promos" }] : []),

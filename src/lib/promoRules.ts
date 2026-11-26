@@ -101,6 +101,9 @@ export function packagePrice(items: PromoItem[], pkgs: Pkg[] = []): number | nul
  *  further ~20% off the paid value. */
 export const defaultPrice = (items: PromoItem[], pkgs: Pkg[] = []) => {
   if (!isBundle(items)) return nicePrice(Math.round(paidValueOf(items) * 0.8));
+  // CHRIS Nov 27: priced from our CURRENT package price, not the single price. With a package for the service, a promo
+  // bundle is about 5% under it (a reason to buy now without undercutting the package); otherwise paid sessions only.
+  if (packageRate(items[0].name, pkgs)) return Math.min(paidValueOf(items), nicePrice(Math.round(currentValue(items, pkgs).value * 0.95)));
   const pk = packagePrice(items, pkgs);
   return pk != null ? Math.min(pk, paidValueOf(items)) : paidValueOf(items);
 };
@@ -274,9 +277,9 @@ export function suggest(stats: SvcStat[], today: string, pkgs: Pkg[] = []): Sugg
   // 1. Seasons: the best-selling fitting service gets a seasonal bundle; a quieter fitting one gets a second.
   for (const season of upcomingSeasons(today)) {
     const fit = usable.filter((s) => season.fits.test(s.name)).sort((a, b) => b.recentCents - a.recentCents);
-    if (fit[0]) out.push(mk(fit[0], "SEASON", `${season.name}: ${season.angle.toLowerCase()}. ${fit[0].name} sold ${fit[0].recent} in the last 4 weeks.`, season));
+    if (fit[0]) out.push(mk(fit[0], "SEASON", `${season.name} is coming. ${adName(fit[0].name)} sold ${fit[0].recent} in 4 weeks.`, season));
     const quiet = fit.slice(1).find((s) => s.recent <= 2);
-    if (quiet) out.push(mk(quiet, "SEASON", `${season.name}, and ${quiet.name} has been quiet (${quiet.recent} in 4 weeks): a bonus session gives it a push.`, season));
+    if (quiet) out.push(mk(quiet, "SEASON", `${season.name} is coming, and ${adName(quiet.name)} has been quiet (${quiet.recent} in 4 weeks).`, season));
   }
   // 2. Slow movers: sold 0-1 times in 4 weeks, or down 40%+ from the 4 weeks before.
   const slow = usable
@@ -285,7 +288,7 @@ export function suggest(stats: SvcStat[], today: string, pkgs: Pkg[] = []): Sugg
     .slice(0, 3);
   for (const s of slow) {
     if (out.some((o) => o.items[0]?.service_id === s.id)) continue;
-    out.push(mk(s, "SLOW", s.recent <= 1 ? `${s.name} sold ${s.recent} in the last 4 weeks. A bonus-session bundle makes it easier to say yes.` : `${s.name} dropped from ${s.before} to ${s.recent} sales vs the 4 weeks before.`));
+    out.push(mk(s, "SLOW", s.recent <= 1 ? `${adName(s.name)} sold ${s.recent} in 4 weeks. A bonus session makes it an easy yes.` : `${adName(s.name)} dropped from ${s.before} to ${s.recent} sales vs the 4 weeks before.`));
   }
   // 3. Two year-long programs each week (rotating by week number), priced from the research and checked against today's prices.
   const week = Math.floor(new Date(`${today}T00:00:00Z`).getTime() / (7 * 86400000));
@@ -410,27 +413,53 @@ export function packageRate(name: string, pkgs: Pkg[]): { name: string; perSessi
   return best;
 }
 
+/** What these sessions cost today at our CURRENT prices (CHRIS Nov 27: nobody buys at the single "regular" price): each
+ *  service at its existing package's per-session price (e.g. Lux Queen 10+3), or its single price when it has no package.
+ *  `basis` names the packages used, for "5% below your Lux Queen 10+3 price". */
+export function currentValue(items: PromoItem[], pkgs: Pkg[] = []): { value: number; basis: string[]; single: string[] } {
+  let value = 0; const basis: string[] = [], single: string[] = [];
+  for (const it of items) {
+    const pk = packageRate(it.name, pkgs);
+    value += (pk ? pk.perSession : it.unit) * (it.paid + it.free);
+    if (pk) basis.push(pk.name); else single.push(shortName(it.name));
+  }
+  return { value, basis, single };
+}
+/** "your Lux Queen 10+3 price", "your package prices", "single prices". */
+export function basisText(c: { basis: string[]; single: string[] }): string {
+  if (!c.basis.length) return "single prices";
+  const pk = c.basis.length === 1 ? `your ${c.basis[0]} price` : "your package prices";
+  return c.single.length ? `${pk} (single price for ${c.single.join(", ")})` : pk;
+}
+/** How far below today's prices a promo may go before it needs a second look: 15% against packages, 30% against singles. */
+/** Short chip text: "5% below Lux Queen 10+3", "Same as packages", "8% below single prices". */
+export function vsChip(off: number, basis: string): string {
+  const b = basis.replace(/^your /, "").replace(/ price$/, "").replace(/ prices$/, "").replace(/ \(single price for .*\)$/, "");
+  const pct = Math.abs(Math.round(off * 100));
+  return pct < 1 ? `Same as ${b}` : `${pct}% ${off >= 0 ? "below" : "above"} ${b}`;
+}
+export const deepCut = (c: { basis: string[] }) => (c.basis.length ? 0.15 : 0.3);
+
 export type Justification = {
   headline: string; lines: string[]; warnings: string[];
   value: number; off: number; commission: number; cost: number | null; margin: number | null;
+  /** Value at current prices (packages where we have them) and the price's discount against it (negative = above). */
+  current: number; basis: string; deep: boolean;
 };
 /** Why the price is what it is: against single prices, against your own packages, the commission it carries and the
  *  product cost (when set), plus the research or sales reason behind the idea. Shown in the builder and on the promo page. */
 export function justify(items: PromoItem[], price: number, o: { pkgs?: Pkg[]; usual?: Record<string, number | null>; cost?: Record<string, number | null>; why?: string } = {}): Justification {
   const value = valueOf(items), n = sessionsOf(items);
-  const off = value > 0 ? 1 - price / value : 0;
+  const cur = currentValue(items, o.pkgs ?? []);
+  const off = cur.value > 0 ? 1 - price / cur.value : 0;
+  const basis = basisText(cur);
   const lines: string[] = [], warnings: string[] = [];
   if (o.why) lines.push(`Why this idea: ${o.why}`);
-  lines.push(`${n} sessions are worth ${peso(value)} at single prices; ${peso(price)} is ${Math.round(off * 100)}% off that.`);
-  const freeValue = items.reduce((s, i) => s + i.unit * i.free, 0);
-  if (freeValue > 0) {
-    const extra = Math.max(0, value - freeValue - price);
-    lines.push(`Where the discount comes from: ${peso(freeValue)} in free sessions${extra > 0 ? ` and ${peso(extra)} off the paid ones` : ", the paid sessions are at full price"}.`);
-  }
+  lines.push(`At ${basis}, these ${n} sessions come to ${peso(cur.value)}. ${peso(price)} is ${Math.abs(Math.round(off * 100))}% ${off >= 0 ? "below" : "above"} that${off >= 0 && off <= 0.1 && !isBundle(items) ? ", a small step down for a longer commitment" : ""}.`);
   for (const it of items) {
     const per = value > 0 ? Math.round((it.unit * Math.min(price, value)) / value) : 0;
     const pk = packageRate(it.name, o.pkgs ?? []);
-    let t = `${shortName(it.name)}: ${peso(per)} per session here (single ${peso(it.unit)})`;
+    let t = `${shortName(it.name)}: ${peso(per)} per session here${pk ? "" : ` (single ${peso(it.unit)}, no package yet)`}`;
     if (pk) {
       const vs = per / pk.perSession - 1;
       t += `; your ${pk.name} is ${peso(pk.perSession)} per session, so this is ${Math.abs(Math.round(vs * 100))}% ${vs >= 0 ? "above" : "below"} it`;
@@ -452,7 +481,9 @@ export function justify(items: PromoItem[], price: number, o: { pkgs?: Pkg[]; us
   } else {
     lines.push(`Product cost per session isn't set yet for ${missing.join(", ")}, so the true margin can't be shown. Type it on the promo's Clients and profit page.`);
   }
-  if (off > 0.3 && !items.some((it) => packageRate(it.name, o.pkgs ?? []))) warnings.push(`${Math.round(off * 100)}% off single prices with no existing package to compare: check the product cost before approving.`);
-  const headline = `${Math.round(off * 100)}% off single prices · ${peso(Math.round(price / Math.max(1, n)))} per session on average · commission ${peso(commission)}${margin !== null ? ` · about ${Math.round(margin * 100)}% left after commission and product` : ""}`;
-  return { headline, lines, warnings, value, off, commission, cost, margin };
+  const deep = off > deepCut(cur);
+  if (deep) warnings.push(`${Math.round(off * 100)}% below ${basis}. That cuts into profit: try fewer free sessions, or a free add-on (like L-Carnitine) instead of a lower price.`);
+  const vs = Math.abs(Math.round(off * 100)) < 1 ? `Same as ${basis}` : `${Math.abs(Math.round(off * 100))}% ${off >= 0 ? "below" : "above"} ${basis}`;
+  const headline = `${vs} · ${peso(Math.round(price / Math.max(1, n)))} per session on average · commission ${peso(commission)}${margin !== null ? ` · about ${Math.round(margin * 100)}% left after commission and product` : ""}`;
+  return { headline, lines, warnings, value, off, commission, cost, margin, current: cur.value, basis, deep };
 }
