@@ -34,4 +34,13 @@ describe("online now", () => {
     await db.sql("UPDATE private.user_presence SET last_seen = now() - interval '3 minutes' WHERE user_id = $1", [cma.appUserId]);
     expect((await db.rpc(owner, "aal2", "online_now", [])).map((x: any) => x.name)).toEqual(["DEMO General Manager"]);
   });
+
+  it("shows the approved nickname, else the first name without a Ma. prefix (update-0059)", async () => {
+    await db.rpc(cma, "aal1", "touch_presence", []);
+    const emp = (await db.rpc(owner, "aal2", "save_employee", [null, db.branches.FAIRVIEW, "Ma. DEMOJ Cruz", "CMA", true, cma.appUserId, true])).id;
+    const names = async () => (await db.rpc(owner, "aal2", "online_now", [])).map((x: any) => x.name);
+    expect(await names()).toContain("DEMOJ");
+    expect((await db.rpc(owner, "aal2", "set_employee_nickname", [emp, "DEMO Jess"])).ok).toBe(true);
+    expect(await names()).toContain("DEMO Jess");
+  });
 });
