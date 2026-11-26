@@ -161,3 +161,15 @@ export async function changeDate(_prev: ActionState, fd: FormData): Promise<Acti
   revalidatePath("/me");
   return { ok: `Moved to ${new Date(`${date.data}T00:00:00Z`).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}.`, at: Date.now() };
 }
+
+/** Owners: re-number a month's entries in order once its sales are final (update-0079). */
+export async function renumberMonth(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const month = z.string().regex(/^\d{4}-\d{2}$/).safeParse(fd.get("month"));
+  if (!month.success) return { error: "Pick a month." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("renumber_service_logs", { p_month: `${month.data}-01` });
+  if (error) return { error: error.code === "PGRST202" ? "Entry numbers need database update-0079. Run it from your To-Do first." : "Could not re-number. Try again." };
+  if (!data.ok) return { error: errorText(data.error) };
+  revalidatePath("/services");
+  return { ok: `${data.entries} entries re-numbered in order.`, at: Date.now() };
+}

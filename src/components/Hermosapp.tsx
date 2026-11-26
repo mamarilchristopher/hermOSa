@@ -39,7 +39,7 @@ async function subscribe(): Promise<string | null> {
 }
 
 export function HermosappCard() {
-  const [state, setState] = useState<{ standalone: boolean; ios: boolean; push: boolean; perm: string; installable: boolean; subscribed: boolean } | null>(null);
+  const [state, setState] = useState<{ standalone: boolean; ios: boolean; push: boolean; perm: string; installable: boolean; subscribed: boolean; phone: boolean } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -47,13 +47,15 @@ export function HermosappCard() {
     const check = async () => {
       const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
       const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+      // CHRIS Nov 26: offer "Install" on phones and tablets only, never on PCs.
+      const phone = ios || /Android|Mobile/i.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
       const push = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
       let subscribed = false;
       if (push && Notification.permission === "granted") {
         const reg = await navigator.serviceWorker.getRegistration("/");
         subscribed = !!(await reg?.pushManager.getSubscription());
       }
-      setState({ standalone, ios, push, perm: push ? Notification.permission : "unsupported", installable: !!deferred, subscribed });
+      setState({ standalone, ios, push, perm: push ? Notification.permission : "unsupported", installable: !!deferred, subscribed, phone });
     };
     void check();
     const on = () => void check();
@@ -63,7 +65,7 @@ export function HermosappCard() {
     return () => window.removeEventListener("hermosapp-installable", on);
   }, []);
   if (!state || hidden) return null;
-  const needInstall = !state.standalone && (state.installable || state.ios);
+  const needInstall = state.phone && !state.standalone && (state.installable || state.ios);
   // iPhones only allow notifications once Hermosapp is on the home screen.
   const canNotify = state.push && state.perm !== "denied" && !state.subscribed && (!state.ios || state.standalone);
   if (!needInstall && !canNotify) return null;

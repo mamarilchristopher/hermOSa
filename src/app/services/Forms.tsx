@@ -1,7 +1,7 @@
 "use client";
 import { pick } from "@/lib/decision";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { addService, approveMany, changeDate, decideLog, logService, type ActionState } from "./actions";
+import { addService, approveMany, changeDate, renumberMonth, decideLog, logService, type ActionState } from "./actions";
 import { previewCommission, type CommissionType } from "@/lib/commission";
 import { centsToPhp } from "@/lib/csv";
 import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
@@ -341,6 +341,20 @@ export function ChangeDateForm({ id, date, max }: { id: string; date: string; ma
       <input type="date" name="date" defaultValue={date} max={max} required aria-label="Correct date" />
       <button className="small" disabled={pending}>Save</button>
       <button type="button" className="secondary small" onClick={() => setOpen(false)}>Cancel</button>
+      {s?.error && <span className="field-error">{s.error}</span>}
+    </form>
+  );
+}
+
+/** Owners only: once a month's sales are final, number its entries in order (date, then branch, then time entered). */
+export function RenumberForm({ month, label }: { month: string; label: string }) {
+  const [s, action, pending] = useActionState(renumberMonth, undefined);
+  return (
+    <form action={action} className="renumber" onSubmit={(e) => { if (!confirm(`Re-number every ${label} entry in order? Their numbers will change.`)) e.preventDefault(); }}>
+      <input type="hidden" name="month" value={month} />
+      <span className="small muted">Entry numbers (SL-) run in the order entries were made. Once {label} sales are final, put them in order of service date, then branch:</span>
+      <button className="secondary small" disabled={pending}>{pending ? "Re-numbering…" : `Re-number ${label}`}</button>
+      {s?.ok && <span className="small ok-text">{s.ok}</span>}
       {s?.error && <span className="field-error">{s.error}</span>}
     </form>
   );

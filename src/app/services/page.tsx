@@ -8,7 +8,9 @@ import { centsToPhp } from "@/lib/csv";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { addDays, sortBranches, WEEKDAYS, weekday } from "@/lib/insights";
 import { ROLE_TEXT, TYPE_TEXT } from "@/lib/commission";
-import { BatchApprove, ChangeDateForm, DecideButtons, EntryForm } from "./Forms";
+import { BatchApprove, ChangeDateForm, DecideButtons, EntryForm, RenumberForm } from "./Forms";
+import { Uid } from "@/components/Uid";
+import { StaffFilter } from "./StaffFilter";
 import { DeclaredCheck, diffText } from "./DeclaredCheck";
 import { CHECK_FROM, CHECK_TO, checkBranches, inCheckWindow, type StatusDay } from "@/lib/declaredCheck";
 import { AddPhotosLater } from "./PhotoSlots";
@@ -16,13 +18,13 @@ import { AttachProof } from "./PaymentProof";
 
 type Log = {
   id: string; service_date: string; amount_paid_cents: number; commission_type: string; performer_id: string; assistant_id: string | null;
-  receipt_no: string | null; note: string | null; branch_id?: string; client_name?: string | null; price_note?: string | null; photo_folder?: string | null; share_ok?: boolean; photos_due?: boolean; session_no?: number; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
+  receipt_no: string | null; note: string | null; branch_id?: string; client_name?: string | null; price_note?: string | null; photo_folder?: string | null; share_ok?: boolean; photos_due?: boolean; session_no?: number; log_no?: string | null; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
   services: { name: string } | null;
 };
 const VISIT_TEXT: Record<string, string> = { BACKJOB: "Backjob (unpaid)", CHECKUP: "Check-up (unpaid)", NO_CHARGE: "No charge" };
 type Line = { service_log_id: string; employee_id: string; role: string; amount_cents: number };
 
-export default async function ServiceLog({ searchParams }: { searchParams: Promise<{ date?: string; branch?: string; entry?: string; days?: string }> }) {
+export default async function ServiceLog({ searchParams }: { searchParams: Promise<{ date?: string; branch?: string; entry?: string; days?: string; staff?: string }> }) {
   const { supabase, access, branches } = await requireAccess();
   const sp = await searchParams;
   const viewable = branchesFor(access, branches, ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"]);
@@ -46,7 +48,13 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
       .eq("branch_id", branch.id).gte("service_date", from).lte("service_date", date).order("service_date", { ascending: false }).order("created_at"),
     supabase.rpc("chat_people"), // names of everyone in the company, for "Entered by"
   ]);
-  const all = (logs ?? []) as unknown as Log[];
+  const allRaw = (logs ?? []) as unknown as Log[];
+  // CHRIS Nov 26: filter by one staff member (Done by or Assisted by). Default: everyone.
+  const staffPick = (emps ?? []).find((e) => e.id === sp.staff)?.id ?? null;
+  const all = staffPick ? allRaw.filter((l) => l.performer_id === staffPick || l.assistant_id === staffPick) : allRaw;
+  const staffChoices = (emps ?? []).filter((e) => e.branch_id === branch.id || allRaw.some((l) => l.performer_id === e.id || l.assistant_id === e.id))
+    .filter((e) => !/general\s*manager/i.test(e.position ?? "") && !/\bcsr\b/i.test(e.position ?? ""))
+    .map((e) => ({ id: e.id, name: e.full_name }));
   // Proof of payment (update-0075): how many each entry has (only the ones this person may see; none before 0075).
   const { data: proofRows } = all.length ? await supabase.from("payment_proofs").select("service_log_id").in("service_log_id", all.map((l) => l.id)) : { data: [] };
   const proofCount = new Map<string, number>();
@@ -94,7 +102,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const pendingCount = list.filter((l) => l.state === "PENDING").length;
   const pendingAll = all.filter((l) => l.state === "PENDING").length;
   const groups = [...new Set(all.map((l) => l.service_date))].map((d) => [d, all.filter((l) => l.service_date === d)] as const);
-  const link = (d: string, b = branch.code) => `/services?date=${d}&branch=${b}`;
+  const link = (d: string, b = branch.code) => `/services?date=${d}&branch=${b}${staffPick && b === branch.code ? `&staff=${staffPick}` : ""}`;
   const dayLabel = `${WEEKDAYS[weekday(date)]}, ${new Date(`${date}T00:00:00Z`).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}`;
 
   return (
@@ -143,7 +151,10 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
           </div>
         )}
 
-        <h2>Entries</h2>
+        <div className="entries-head">
+          <h2>Entries</h2>
+          {staffChoices.length > 0 && <StaffFilter choices={staffChoices} value={staffPick} />}
+        </div>
         {approver && pendingAll > 1 && <BatchApprove ids={all.filter((l) => l.state === "PENDING").map((l) => l.id)} />}
         {groups.length === 0 && <p className="muted">Nothing logged in these {days} days.</p>}
         {groups.map(([d, dayList]) => {
@@ -170,7 +181,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                     <td>{l.state === "PENDING" && approver && pendingAll > 1 && (
                         <input type="checkbox" className="batch-tick" name="pick" value={l.id} form="batch-approve" aria-label={`Tick ${l.client_name ?? "entry"} to approve`} />
                       )}
-                      {l.client_name && <div className="log-client">{l.client_name}</div>}<strong>{(l.session_no ?? 1) > 1 && <span className="session-tag">Session {l.session_no}</span>}{l.services?.name}</strong>
+                      {(l.client_name || l.log_no) && <div className="log-client">{l.client_name}<Uid v={l.log_no} /></div>}<strong>{(l.session_no ?? 1) > 1 && <span className="session-tag">Session {l.session_no}</span>}{l.services?.name}</strong>
                       {l.receipt_no && <div className="small muted">Waiver / OR {l.receipt_no}</div>}
                       {l.price_note && <div className="small muted">Price: {l.price_note}</div>}
                       {l.note && <div className="small muted">{l.note}</div>}
@@ -240,6 +251,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
         })}
         <p className="log-more">{days < 91 && <Link className="button secondary" href={`${link(date)}&days=${days + 7}`} scroll={false}>Show 7 more days</Link>}
           <span className="small muted"> Showing the {days} days up to {date === today ? "today" : dayLabel}.</span></p>
+        {can(access, ["OWNER"], null) && (
+          <RenumberForm month={date.slice(0, 7)} label={new Date(`${date.slice(0, 7)}-01T00:00:00Z`).toLocaleDateString("en-PH", { month: "long", year: "numeric", timeZone: "UTC" })} />
+        )}
       </main>
     </>
   );
