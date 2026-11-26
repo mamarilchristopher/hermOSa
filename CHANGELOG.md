@@ -4,7 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
-| 0.84.3 | Nov 27, 2026 | update-0083 | Photo uploads work again (time-in photos, client photos and chat photos failed with "permission denied for function is_management"); CSRs and owners/GM no longer see "You're not on today's published schedule" on the time clock, they just time in when they start
+| 0.84.3 | Nov 27, 2026 | update-0083 | Photo uploads work again (time-in photos, client photos and chat photos failed with "permission denied for function is_management"); CSRs and owners/GM no longer see "You're not on today's published schedule" on the time clock, they just time in when they start |
 | 0.84.2 | Nov 27, 2026 | none | Payslip photo and PDF redesigned: page 1 has the employee details (ID, position, branch, date hired, pay basis, daily rate, paid by cash, TIN / SSS / PhilHealth / Pag-IBIG showing only the last 4 digits), attendance this cutoff, earnings and deductions side by side, net salary and signature lines (Prepared by, Approved by, Received by); every commission is listed on page 2 onward with a total; new Copy as photo button copies page 1 to paste in a chat, Save as photos saves each page, and the PDF has all pages |
 | 0.84.0 | Nov 27, 2026 | update-0084 | Payslips: scheduled work days before the in-app time clock started (Nov 25) are no longer counted as absences, and a day with a service log entry (done or assisted) counts as worked even if the person forgot to Time In; draft payslips are recomputed (final ones are not changed) |
 | 0.82.2 | Nov 26, 2026 | none | View as on phones: the person's menu card is now at the bottom of the page instead of the top |
