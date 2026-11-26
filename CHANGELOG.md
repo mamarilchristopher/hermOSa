@@ -4,6 +4,7 @@ Pre-launch numbering: **v0.NN.P**. NN = the latest database update (`update-00NN
 
 | Version | Date (Manila) | Needs SQL | What changed |
 | --- | --- | --- | --- |
+| 0.60.0 | Nov 26, 2026 | update-0060 | Service log: each entry shows who entered it and when. Owners and the GM add entries with no photos needed and no second sign-off (approved at once); their earlier "Photos missing" entries are cleared. Management can tick entries and approve them together, or approve all waiting |
 | 0.59.0 | Nov 26, 2026 | update-0059 | "Online now" shows each person's approved nickname (else first name without a "Ma." prefix) |
 | 0.58.0 | Nov 26, 2026 | update-0058 | Chat: groups can have a photo (Group details > Add group photo; any member of a group someone made, owners and the GM for All staff and branch groups). Groups without a photo show two members' profile pictures; 1-on-1 chats show the other person's photo |
 | 0.57.0 | Nov 26, 2026 | update-0057 | Client archive and Social media: every employee can view and download all branches' client folders; owners and the GM get a Delete button on each folder (removes the service log entry, its commission and its photos; asks first; refused if the commission is already on a final payslip). Home: today's red "Not entered yet" branch boxes are hidden from 12:00 AM to 9:59 AM |

@@ -76,6 +76,7 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     return { ok: testResult({ kind: p.data.kind, cents, type: !paid ? "NONCOMMI" : p.data.type === "LEAD" && !p.data.partner ? "SOLO" : p.data.type, eligible: emp?.commission_eligible ?? null, photos, photosDue: !!data.photos_due }), at: Date.now() };
   }
   if (data.photos_due) return { ok: "Saved. The lead and assist were asked to add the client photos and waiver; their commission is held until they do.", at: Date.now() };
+  if (data.state === "APPROVED") return { ok: paid ? "Saved and approved." : "Saved. Unpaid visit logged (no commission).", at: Date.now() };
   return { ok: paid ? "Saved. Waiting for manager sign-off." : "Saved. Unpaid visit logged (no commission).", at: Date.now() };
 }
 
@@ -90,6 +91,21 @@ export async function decideLog(_prev: ActionState, fd: FormData): Promise<Actio
   revalidatePath("/services");
   revalidatePath("/people");
   return { ok: approve ? "Approved" : "Rejected" };
+}
+
+/** Approve several entries at once (update-0060): the ticked ones, or all waiting ones of the day. */
+export async function approveMany(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const raw = fd.get("decision") === "all" ? fd.getAll("all") : fd.getAll("pick");
+  const ids = z.array(z.uuid()).max(300).safeParse(raw.map(String));
+  if (!ids.success) return { error: "Try again." };
+  if (!ids.data.length) return { error: "Tick at least one entry first." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("approve_service_logs", { p_logs: ids.data });
+  if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0060 in Supabase first." : "Could not save. Try again." };
+  if (!data.ok) return { error: errorText(data.error) };
+  revalidatePath("/services");
+  revalidatePath("/people");
+  return { ok: `Approved ${data.approved}.${data.skipped ? ` ${data.skipped} couldn't be (already decided or not yours to approve).` : ""}` };
 }
 
 export async function addService(_prev: ActionState, fd: FormData): Promise<ActionState> {

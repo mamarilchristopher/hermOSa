@@ -1,7 +1,7 @@
 "use client";
 import { pick } from "@/lib/decision";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { addService, decideLog, logService, type ActionState } from "./actions";
+import { addService, approveMany, decideLog, logService, type ActionState } from "./actions";
 import { previewCommission, type CommissionType } from "@/lib/commission";
 import { centsToPhp } from "@/lib/csv";
 import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
@@ -195,10 +195,6 @@ export function EntryForm({ branch, date, services, employees, noCommission = fa
         </button>
       </div>
       {missing && !photos.uploading && (!!service || !!client || photos.slots.length > 0) && <p className="small muted entry-missing">{missing}</p>}
-      {/* Only once this new entry is under way: an empty form isn't "missing" anything yet. */}
-      {photosOptional && missingPhotos && !photos.uploading && (!!service || !!client || photos.slots.length > 0) && (
-        <p className="small entry-missing" style={{ color: "var(--bad)" }}><strong>This new entry still needs photos: {missingPhotos}</strong> You can save without them, but the entry will show "Photos missing": the lead and assist get an urgent notice to add them, and their commission for this entry is held until they do.</p>
-      )}
       {state?.duplicate && (
         <div className="notice warn dup-check">
           <span><strong>Already logged?</strong> {state.duplicate}</span>
@@ -234,6 +230,21 @@ export function DecideButtons({ id }: { id: string }) {
           <button type="button" className="secondary small" onClick={() => setRejecting(true)}>Reject</button>
         </>
       )}
+      {state?.error && <span className="small" style={{ color: "var(--bad)" }}>{state.error}</span>}
+    </form>
+  );
+}
+
+/** Owners and the GM (update-0060): approve the ticked entries, or every waiting entry of the day, in one go. */
+export function BatchApprove({ ids }: { ids: string[] }) {
+  const [state, action, pending] = useActionState(approveMany, undefined);
+  return (
+    <form id="batch-approve" action={action} className="batch-approve">
+      {ids.map((id) => <input key={id} type="hidden" name="all" value={id} />)}
+      <span className="small muted">{ids.length} waiting. Tick entries below, or approve them all.</span>
+      <button type="submit" className="secondary small" disabled={pending} onClick={pick("selected")}>Approve ticked</button>
+      <button type="submit" className="small" disabled={pending} onClick={(e) => { if (!confirm(`Approve all ${ids.length} waiting entries?`)) { e.preventDefault(); return; } pick("all")(e); }}>Approve all {ids.length}</button>
+      {state?.ok && <span className="small" style={{ color: "var(--good)" }}>{state.ok}</span>}
       {state?.error && <span className="small" style={{ color: "var(--bad)" }}>{state.error}</span>}
     </form>
   );

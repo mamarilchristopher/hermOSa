@@ -1267,3 +1267,9 @@ body:has(.notify-required) main { padding-bottom: 80px; }
 .chat-combo > .avatar { position: absolute; border: 2px solid var(--surface, #fff); box-sizing: border-box; }
 .chat-combo > .avatar:first-child { top: 0; left: 0; }
 .chat-combo > .avatar:last-child { right: 0; bottom: 0; }
+/* Service log (update-0060): who entered each entry; approve several at once. */
+.log-by { margin-top: 4px; display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 2px 8px; border-radius: 999px; background: var(--gold-soft); border: 1px solid var(--gold-line); }
+.batch-approve { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
+.batch-approve > span:first-child { flex: 1 1 220px; }
+.batch-tick { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 6px; cursor: pointer; }
+.batch-tick input { width: 18px; height: 18px; }

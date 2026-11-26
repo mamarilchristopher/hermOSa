@@ -54,23 +54,26 @@ describe("photos due", () => {
     expect((await db.rpc(gm, "aal1", "can_log_services_now", []))).toBe(true);
   });
 
-  it("staff still need the photos; owners and the GM can log without them", async () => {
+  it("staff still need the photos; owners and the GM log without any, approved at once (update-0060)", async () => {
     expect((await log(staff, "aal1", [])).error).toBe("WAIVER_PHOTOS_REQUIRED");
     const r = await log(gm, "aal1", []);
-    expect(r).toMatchObject({ ok: true, photos_due: true });
+    expect(r).toMatchObject({ ok: true, photos_due: false, state: "APPROVED" });
+    expect((await db.sql("SELECT state, decided_by FROM public.service_logs WHERE id = $1", [r.id])).rows[0]).toEqual({ state: "APPROVED", decided_by: gm.appUserId });
+    expect((await log(owner, "aal2", ["WAIVER", "WAIVER", "BEFORE", "AFTER"])).state).toBe("APPROVED");
+    expect((await db.sql("SELECT count(*)::int n FROM public.notifications WHERE kind = 'PHOTOS_DUE'")).rows[0].n).toBe(0);
+    // staff entries still wait for sign-off
+    expect((await log(staff, "aal1", ["WAIVER", "WAIVER", "BEFORE", "AFTER"])).state).toBe("PENDING");
+    // pretend the GM's entry is an older one still missing its photos (from before update-0060)
     id = r.id;
-    expect((await log(owner, "aal2", ["WAIVER", "WAIVER", "BEFORE", "AFTER"])).photos_due).toBe(false);
+    await db.sql("SELECT set_config('hermosa.photo_sharing', 'on', false); UPDATE public.service_logs SET photos_due = true WHERE id = '" + id + "'; SELECT set_config('hermosa.photo_sharing', 'off', false);");
   });
 
-  it("the lead and assist get an urgent notice and see it on Home", async () => {
-    for (const p of [staff, other]) {
-      const n = (await db.as(p, "aal1", "SELECT kind, link FROM public.notifications WHERE kind = 'PHOTOS_DUE'")).rows;
-      expect(n.length).toBe(1);
-      expect(n[0].link).toContain(`entry=${id}`);
-      const due = await db.rpc(p, "aal1", "my_photos_due", []);
-      expect(due.map((d: { id: string }) => d.id)).toEqual([id]);
-    }
-    expect((await db.as(csr, "aal1", "SELECT count(*)::int n FROM public.notifications WHERE kind = 'PHOTOS_DUE'")).rows[0].n).toBe(0);
+  it("management approves several entries at once; staff can't", async () => {
+    const a = (await log(staff, "aal1", ["WAIVER", "WAIVER", "BEFORE", "AFTER"])).id;
+    const b = (await log(staff, "aal1", ["WAIVER", "WAIVER", "BEFORE", "AFTER"])).id;
+    expect(await db.rpc(staff, "aal1", "approve_service_logs", [[a, b]])).toMatchObject({ ok: true, approved: 0, skipped: 2 });
+    expect(await db.rpc(gm, "aal1", "approve_service_logs", [[a, b]])).toMatchObject({ ok: true, approved: 2, skipped: 0 });
+    expect((await db.sql("SELECT count(*)::int n FROM public.service_logs WHERE id = ANY($1) AND state = 'APPROVED'", [[a, b]])).rows[0].n).toBe(2);
   });
 
   it("commission is held from payroll until the photos are added", async () => {
@@ -78,8 +81,7 @@ describe("photos due", () => {
     expect(def).toContain("NOT l.photos_due");
   });
 
-  it("the lead adds them after sign-off; the notice clears and the entry counts again", async () => {
-    expect((await db.rpc(owner, "aal2", "decide_service_log", [id, true, null])).state).toBe("APPROVED");
+  it("on an older entry, the lead adds them after sign-off; the notice clears and the entry counts again", async () => {
     expect((await db.rpc(csr, "aal1", "add_visit_photos", [id, randomUUID(), JSON.stringify(photos(randomUUID(), ["BEFORE"]))])).ok).toBe(false);
     const folder = (await db.sql("SELECT photo_folder FROM public.service_logs WHERE id = $1", [id])).rows[0].photo_folder;
     const half = await db.rpc(staff, "aal1", "add_visit_photos", [id, folder, JSON.stringify(photos(folder, ["BEFORE", "AFTER"]))]);
@@ -89,7 +91,6 @@ describe("photos due", () => {
     const done = await db.rpc(other, "aal1", "add_visit_photos", [id, folder, JSON.stringify(photos(folder, ["WAIVER", "WAIVER"]))]);
     expect(done).toMatchObject({ ok: true, complete: true });
     expect((await db.sql("SELECT photos_due, state FROM public.service_logs WHERE id = $1", [id])).rows[0]).toEqual({ photos_due: false, state: "APPROVED" });
-    expect((await db.as(staff, "aal1", "SELECT count(*)::int n FROM public.notifications WHERE kind = 'PHOTOS_DUE' AND read_at IS NULL")).rows[0].n).toBe(0);
     expect(await db.rpc(staff, "aal1", "my_photos_due", [])).toEqual([]);
   });
 });

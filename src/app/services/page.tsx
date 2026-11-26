@@ -7,7 +7,7 @@ import { centsToPhp } from "@/lib/csv";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { addDays, WEEKDAYS, weekday } from "@/lib/insights";
 import { ROLE_TEXT, TYPE_TEXT } from "@/lib/commission";
-import { DecideButtons, EntryForm } from "./Forms";
+import { BatchApprove, DecideButtons, EntryForm } from "./Forms";
 import { AddPhotosLater } from "./PhotoSlots";
 
 type Log = {
@@ -32,11 +32,12 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const topMgmt = can(access, ["OWNER"], null) || can(access, ["MANAGER"], null);
   const isManager = can(access, ["OWNER", "MANAGER"], null) || branchesFor(access, branches, ["MANAGER"]).length > 0;
 
-  const [{ data: services }, { data: emps }, { data: logs }] = await Promise.all([
+  const [{ data: services }, { data: emps }, { data: logs }, { data: ppl }] = await Promise.all([
     supabase.from("services").select("id, name, price_cents, commission_cents").eq("active", true).order("name"),
     supabase.from("employees").select("id, full_name, branch_id, commission_eligible, app_user_id, position").eq("active", true).order("full_name"),
     supabase.from("service_logs").select("*, services(name)")
       .eq("branch_id", branch.id).eq("service_date", date).order("created_at"),
+    supabase.rpc("chat_people"), // names of everyone in the company, for "Entered by"
   ]);
   const list = (logs ?? []) as unknown as Log[];
   // update-0054 (CHRIS Nov 26): only staff timed in today add entries; owners and the GM always can.
@@ -46,6 +47,17 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
     : { data: [] as Line[] };
   const lines = (lineRows ?? []) as Line[];
   const name = Object.fromEntries((emps ?? []).map((e) => [e.id, e.full_name]));
+  // CHRIS Nov 26: who entered each entry, and when.
+  const userName = new Map<string, string>([
+    ...(emps ?? []).filter((e) => e.app_user_id).map((e) => [e.app_user_id as string, e.full_name] as [string, string]),
+    ...((Array.isArray(ppl) ? ppl : []) as { id: string; name: string }[]).map((x) => [x.id, x.name] as [string, string]),
+    [access.user_id, access.display_name],
+  ]);
+  // Time it was entered; the date too when it was entered on a later day than the service.
+  const enteredAt = (ts: string, day: string) => {
+    const d = new Date(ts), t = d.toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
+    return manilaToday(d) === day ? t : `${d.toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" })}, ${t}`;
+  };
   const mine = new Set((emps ?? []).filter((e) => e.app_user_id === access.user_id).map((e) => e.id));
   // CHRIS Nov 26: the General Manager doesn't perform services, so she isn't in the Lead / Assisted by lists.
   const clinicIds = new Set(branches.filter((b) => b.kind === "CLINIC").map((b) => b.id));
@@ -85,7 +97,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
         <div className="grid">
           <div className="card stat hero"><div className="label">{branch.name} · {dayLabel}</div><div className="value">{centsToPhp(paid)}</div><div className="note">{(() => { const ok = list.filter((l) => l.state !== "REJECTED"); const unpaid = ok.filter((l) => l.visit_kind && l.visit_kind !== "PAID").length; return `${ok.length - unpaid} paid services${unpaid ? `, ${unpaid} unpaid visit${unpaid === 1 ? "" : "s"}` : ""}`; })()}</div></div>
           {approver && <div className="card stat"><div className="label">Commission</div><div className="value">{centsToPhp(commission)}</div><div className="note">5% of amount paid, lead 60 / assist 40</div></div>}
-          <div className="card stat"><div className="label">Sign-off</div><div className="value">{pendingCount === 0 ? (list.length ? "All signed" : "–") : `${pendingCount} waiting`}</div><div className="note">{approver ? "Approve each entry below" : "Your manager signs these off"}</div></div>
+          <div className="card stat"><div className="label">Sign-off</div><div className="value">{pendingCount === 0 ? (list.length ? "All signed" : "–") : `${pendingCount} waiting`}</div><div className="note">{approver ? "Approve entries below, one by one or together" : "Your manager signs these off"}</div></div>
         </div>
 
         {canLog && (
@@ -106,6 +118,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
         )}
 
         <h2>Entries</h2>
+        {approver && pendingCount > 1 && <BatchApprove ids={list.filter((l) => l.state === "PENDING").map((l) => l.id)} />}
         <div className="table-wrap">
           <table className="log-table">
             <thead>
@@ -130,6 +143,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                           )}
                         </div>
                       )}
+                      <div className="log-by small"><span className="muted">Entered by</span> {l.created_by === access.user_id ? "you" : userName.get(l.created_by) ?? "a former user"} <span className="muted">· {enteredAt(l.created_at, l.service_date)}</span></div>
                       {l.photo_folder && l.client_name && <div className="small"><Link href={`/clinic/archive?month=${l.service_date.slice(0, 7)}#${l.id}`}>Photos</Link>{l.share_ok ? <span className="muted"> · sharing OK</span> : null}</div>}</td>
                     <td className="num">{centsToPhp(l.amount_paid_cents)}</td>
                     <td>{l.visit_kind && l.visit_kind !== "PAID"
@@ -154,6 +168,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                       })}
                     </td>
                     <td>
+                      {l.state === "PENDING" && approver && pendingCount > 1 && (
+                        <label className="batch-tick small"><input type="checkbox" name="pick" value={l.id} form="batch-approve" /> Tick</label>
+                      )}
                       {l.state === "PENDING" && approver ? <DecideButtons id={l.id} /> : (
                         <span className={`pill ${l.state === "APPROVED" ? "PUBLISHED" : l.state === "REJECTED" ? "REVERSED" : "STAGED"}`}>
                           {l.state === "APPROVED" ? "Approved" : l.state === "REJECTED" ? "Rejected" : "Waiting"}
