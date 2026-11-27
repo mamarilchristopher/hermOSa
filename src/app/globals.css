@@ -2011,3 +2011,42 @@ a.hb-row:hover strong { text-decoration: underline; }
 .client-hit-end { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .double-dose { display: flex; gap: 10px; align-items: flex-start; background: var(--pearl); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 15px; }
 .double-dose input { width: auto; flex: none; margin-top: 3px; }
+
+/* Business › Ads (v0.96.0, update-0096). PC and phone. */
+.ads-periods { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin: -4px 0 14px; scrollbar-width: none; }
+.ads-periods::-webkit-scrollbar { display: none; }
+.ads-periods a { flex: none; font-size: 0.82rem; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--gold-line); color: var(--ink-2); text-decoration: none; background: var(--surface); }
+.ads-periods a.on { background: var(--ink); border-color: var(--ink); color: var(--pearl); }
+.ads .biz-kpi .value { white-space: nowrap; }
+.ads-findings { margin: 12px 0 0; }
+.ads-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; font-variant-numeric: tabular-nums; }
+.ads-table th { text-align: left; font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 800; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.ads-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); font-weight: 600; white-space: nowrap; }
+.ads-table tr.tot td { border-bottom: none; font-weight: 800; }
+.ads-table td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; }
+.ads-table select { min-width: 140px; padding: 4px 6px; font-size: 0.84rem; }
+.roas { display: inline-block; font-weight: 800; padding: 2px 9px; border-radius: 999px; }
+.roas.ok { background: var(--good-bg); color: var(--good); }
+.roas.low { background: var(--bad-bg); color: var(--bad); }
+.roasbars .rb-group { font-size: 13px; font-weight: 800; fill: var(--ink); font-family: var(--font); }
+.ads-src { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; align-items: center; }
+.ads-src-facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 0.86rem; color: var(--ink-2); }
+.ads-src-facts b { color: var(--ink); }
+.ads-tag { display: grid; gap: 10px; margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+.ads-tag summary, .ads details > summary { cursor: pointer; font-weight: 800; font-size: 0.9rem; }
+.ads-tag textarea { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+.ads-tag > * { min-width: 0; }
+.ads-tag button { justify-self: start; }
+.ads-creatives { display: grid; gap: 6px; }
+.ads-creatives > div { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 0.84rem; padding: 6px 10px; border-radius: 12px; }
+.ads-creatives .best { background: var(--good-bg); }
+.ads-creatives .worst { background: var(--bad-bg); }
+.ads-creatives .tag { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.ads-creatives .best .tag, .ads-creatives .best b { color: var(--good); }
+.ads-creatives .worst .tag, .ads-creatives .worst b { color: var(--bad); }
+.ads-creatives .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.ads-foot { margin-top: 8px; }
+@media (max-width: 700px) {
+  .ads-src { grid-template-columns: minmax(0, 1fr); }
+  .ads-table th, .ads-table td { padding: 6px 5px; }
+}

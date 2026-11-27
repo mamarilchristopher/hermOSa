@@ -7,7 +7,7 @@ import { cellOf, type StatusDay } from "./homeGlance";
 import { addDays, monthStart, weekday, WEEKDAYS } from "./insights";
 import type { Suggestion } from "./promoRules";
 
-const centsOfCell = (r: StatusDay | undefined): number | null => {
+export const centsOfCell = (r: StatusDay | undefined): number | null => {
   const c = cellOf(r);
   return c.kind === "sales" ? c.cents : c.kind === "zero" ? 0 : null;
 };
