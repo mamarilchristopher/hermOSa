@@ -5,7 +5,7 @@
  */
 import { addDay, CLINIC_PIN, LEARN_PER_WEEK, PAGES, perChat, type AdSetView, type Feed, type LineView } from "./adsAdvisor";
 import { SERVICE_LABEL } from "./ads";
-import { bestRadius, CLINIC_SEARCH, locationOk } from "./adsSteps";
+import { bestRadius, CLINIC_SEARCH, locationOk, planGeo, plannedAreas, plannedPlace } from "./adsSteps";
 
 export type CheckKey = "pin" | "overlap" | "area" | "age" | "gender" | "split" | "setCost" | "dupe" | "zeroTag" | "zeroDay" | "cpcJump" | "quality" | "saturation";
 /** Every check, in the order it is listed on the page. */
@@ -92,9 +92,13 @@ export function audit(inp: AuditInput): Finding[] {
       if (p.lat === null || p.lng === null || !p.radius) continue;
       for (const [code, pin] of Object.entries(CLINIC_PIN)) {
         if (code === l.branch) continue;
+        // A circle the plan sets on purpose (Hiko at QC Main reaches 10 mi) is the location check's job, not this one.
+        if (plannedPlace(l.branch, l.service, p)) continue;
+        // A clinic the plan leaves out of a wide circle: the fix is the exclusion (location check), not a smaller circle.
+        if (planGeo(l.branch, l.service).exclude.some((x) => x.branch === code)) continue;
         const d = miles([p.lat, p.lng], pin);
         if (d >= p.radius) continue;
-        const best = bestRadius(l.branch), fix = best < d - 0.2 ? best : Math.max(1, Math.floor(d - 0.5));
+        const best = bestRadius(l.branch, l.service), fix = best < d - 0.2 ? best : Math.max(1, Math.floor(d - 0.5));
         out.push({
           id: `overlap-${s.id}-${code}`, name: s.name, check: "overlap", sev: "warn", line: l.key, tag: tagOf(l), title: `Shrink the circle to ${fix} mi`,
           short: `Its ${p.radius}-mile circle covers the ${SHORT[code]} clinic (${d.toFixed(1)} mi away)`,
@@ -107,20 +111,33 @@ export function audit(inp: AuditInput): Finding[] {
     }
   }
 
-  // 2b. Location format (CHRIS Nov 28: "An address of the clinic + the best mile radius"): one pin on the branch's clinic,
-  //     no wider than the plan's radius. Town lists and extra places get flagged (Meta turns towns into 10–25 mi circles).
+  // 2b. Location format (CHRIS Nov 28: "An address of the clinic + the best mile radius"): one pin on the branch's clinic
+  //     at the plan's radius for that service. Reach depends on the service (Hiko clients travel from other cities to QC
+  //     Main; Gluta repeat sessions need a clinic nearby), so a circle too small is flagged as well as one too wide.
+  //     Town lists and extra places get flagged too (Meta turns towns into 10–25 mi circles).
   for (const { l, s } of sets) {
     const t = s.targeting;
-    if (!t || s.mismatch || locationOk(l.branch, t)) continue;
+    if (!t || s.mismatch || locationOk(l.branch, t, l.service)) continue;
     if (out.some((f) => f.check === "overlap" && f.target && f.target.kind === "adset" && f.target.id === s.id)) continue;
-    const r = bestRadius(l.branch);
+    const r = bestRadius(l.branch, l.service), ex = planGeo(l.branch, l.service).exclude;
     const now = [...t.places.map((x) => `${x.radius ?? "?"} mi around "${x.name}"`), ...t.cities].join(" + ") || "no location";
+    const inc = plannedAreas(l.branch, l.service);
+    const one = t.places.length === inc.length && t.cities.length === 0 && t.nearest === l.branch, rNow = t.places[0]?.radius ?? null;
+    const small = one && rNow !== null && rNow < r - 1;
+    const alsoText = inc.slice(1).map((x) => ` and the ${SHORT[x.branch]} clinic at ${x.radius} mi`).join("");
+    const exText = ex.length ? `, leaving out ${ex[0].radius} mi around the ${ex.map((x) => SHORT[x.branch]).join(" and ")} clinic${ex.length > 1 ? "s" : ""} (their own ads cover them)` : "";
+    const svc = SERVICE_LABEL[l.service as keyof typeof SERVICE_LABEL] ?? l.service;
     out.push({
-      id: `area-${s.id}`, name: s.name, check: "area", sev: "warn", line: l.key, tag: tagOf(l), title: `Use the clinic pin + ${r} mi`,
-      short: `"${s.name}" targets ${t.places.length + t.cities.length > 1 ? `${t.places.length + t.cities.length} places` : now}`,
-      why: `"${s.name}" targets ${now}. The rule is one location: the ${SHORT[l.branch]} clinic's address with a ${r}-mile radius, which stops short of the other clinics. Town lists and extra places spread the ads into other branches' areas (Meta also widens towns into 10–25 mile circles). In Locations, remove them and add only "${CLINIC_SEARCH[l.branch]}" at ${r} mi.`,
+      id: `area-${s.id}`, name: s.name, check: "area", sev: "warn", line: l.key, tag: tagOf(l),
+      title: small ? `Widen the circle to ${r} mi` : `Use the clinic pin + ${r} mi`,
+      short: small ? `"${s.name}" reaches only ${rNow} mi; ${svc} clients come from up to ${r} mi`
+        : one && ex.length ? `"${s.name}" doesn't leave out the other clinics' areas`
+        : `"${s.name}" targets ${t.places.length + t.cities.length > 1 ? `${t.places.length + t.cities.length} places` : now}`,
+      why: `"${s.name}" targets ${now}. The plan for ${svc} at ${SHORT[l.branch]} is the clinic's address with a ${r}-mile radius${alsoText}${exText}. `
+        + (small ? `A smaller circle loses clients who travel for ${svc}. ` : `Town lists and extra places spread the ads into other branches' areas (Meta also widens towns into 10–25 mile circles). `)
+        + `In Locations, keep "${CLINIC_SEARCH[l.branch]}" at ${r} mi${alsoText} and nothing else.`,
       action: "Fix location", target: { kind: "adset", id: s.id, cid: s.cid, view: "edit" },
-      approve: `${tagOf(l)}: set ad set "${s.name}" location to the ${SHORT[l.branch]} clinic + ${r} mi`,
+      approve: `${tagOf(l)}: set ad set "${s.name}" location to the ${SHORT[l.branch]} clinic + ${r} mi${ex.length ? ` minus the ${ex.map((x) => SHORT[x.branch]).join(" and ")} clinic areas` : ""}`,
     });
   }
 

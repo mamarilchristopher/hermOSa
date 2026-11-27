@@ -61,6 +61,8 @@ const ctr = (t: Totals) => (t.impressions > 0 ? t.clicks / t.impressions : null)
 export type Targeting = {
   advantage: boolean; ageMin: number | null; ageSuggest: [number, number] | null; ageMax: number | null; genders: "all" | "women" | "men";
   places: { name: string; radius: number | null; lat: number | null; lng: number | null }[]; cities: string[];
+  /** Places left out (Locations › Exclude), e.g. another clinic's doorstep inside a wide circle. */
+  excluded?: { name: string; radius: number | null; lat: number | null; lng: number | null }[];
   interests: string[]; behaviors: string[]; audiences: string[]; nearest: string | null;
 };
 /** Meta's targeting JSON → the parts that matter here. Null if it can't be read. */
@@ -71,7 +73,9 @@ export function parseTargeting(raw: string | null | undefined): Targeting | null
   if (!t || typeof t !== "object") return null;
   const names = (arr: any) => (Array.isArray(arr) ? arr.map((x: any) => String(x?.name ?? "")).filter(Boolean) : []);
   const flex: any[] = Array.isArray(t.flexible_spec) ? t.flexible_spec : [];
-  const places = (t.geo_locations?.places ?? []).map((p: any) => ({ name: String(p?.name ?? ""), radius: p?.radius ?? null, lat: p?.latitude ?? null, lng: p?.longitude ?? null }));
+  const toPlace = (p: any) => ({ name: String(p?.name ?? ""), radius: p?.radius ?? null, lat: p?.latitude ?? null, lng: p?.longitude ?? null });
+  const places = (t.geo_locations?.places ?? []).map(toPlace);
+  const excluded = (t.excluded_geo_locations?.places ?? []).map(toPlace);
   const g: number[] = Array.isArray(t.genders) ? t.genders : [];
   const p0 = places.find((p: any) => p.lat !== null && p.lng !== null);
   let nearest: string | null = null;
@@ -87,7 +91,7 @@ export function parseTargeting(raw: string | null | undefined): Targeting | null
     advantage: Number(t.targeting_automation?.advantage_audience) === 1,
     ageMin: t.age_min ?? null, ageMax: t.age_max ?? null, ageSuggest: ar,
     genders: g.length === 1 && g[0] === 2 ? "women" : g.length === 1 && g[0] === 1 ? "men" : "all",
-    places, cities: names(t.geo_locations?.cities),
+    places, cities: names(t.geo_locations?.cities), excluded,
     interests: [...new Set(flex.flatMap((f) => names(f?.interests)))],
     behaviors: [...new Set(flex.flatMap((f) => names(f?.behaviors)))],
     audiences: names(t.custom_audiences), nearest,

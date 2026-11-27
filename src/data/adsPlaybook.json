@@ -56,7 +56,7 @@
   "daily_shape": "Dec 1-12 about 0.80x the normal daily budget; paydays (13-16, 27-31) about 1.4x. See the master plan chart."
  },
  "rules": [
-  "Geo (CHRIS Nov 28): one pin per branch on the clinic's own address + a radius. No town lists or bulk locations, no exclusions. Radii stop short of the next Hermosa clinic: QC Main 3.5 mi (Marikina is 3.9 mi away), Fairview 4 mi (QC Main is 4.5 mi), Marikina 3.5 mi, Sta. Maria Bulacan 7 mi. Widen only with CHRIS's OK.",
+  "Geo (CHRIS Nov 28): each ad set = clinic address pin(s) + a whole-mile radius (Ads Manager takes whole miles). No town lists or bulk locations. Radius follows how far clients travel for the SERVICE. Destination services clients travel across cities for (Hiko and Ultra Max at QC Main, NovoForm, men's Hiko test): QC Main 10 mi (reaches Makati, BGC, Manila, Pasig, Caloocan, Valenzuela, Antipolo), with only two small exclusions, Fairview clinic 1 mi and Marikina clinic 1 mi, so each clinic's doorstep stays with its own ads. Repeat-session / everyday services (Gluta drips, Jawtox, laser, other branches' Hiko): stay close, QC Main 3 mi, Fairview 4 mi, Sta. Maria 7 mi, Marikina 3 mi. Widen further only with CHRIS's OK.",
   "Never edit an ad set in learning, or within 7 days of its last edit.",
   "Change budgets in steps of about 20%, at most once a week.",
   "Scale when weekly real ROAS is 5x or more. Trim when it stays under 3.5x for 2 weeks.",
@@ -74,7 +74,7 @@
   {
    "branch": "QC_MAIN",
    "service": "HIKO",
-   "ad_set_name": "QC_HIKO_3.5MI_BROAD_21-54_F_AUTO",
+   "ad_set_name": "QC_HIKO_10MI_BROAD_21-54_F_AUTO",
    "status": "keep_and_refresh",
    "audience": {
     "mode": "original_audience_women",
@@ -135,9 +135,12 @@
    "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
    "geo": {
     "include": [
-     "QC Main clinic address, 3.5 mi radius"
+     "QC Main clinic address, 10 mi radius"
     ],
-    "exclude": []
+    "exclude": [
+     "Fairview clinic address, 1 mi radius",
+     "Marikina clinic address, 1 mi radius"
+    ]
    },
    "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
    "kpis": {
@@ -174,7 +177,7 @@
    "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
    "geo": {
     "include": [
-     "QC Main clinic address, 3.5 mi radius"
+     "QC Main clinic address, 3 mi radius"
     ],
     "exclude": []
    },
@@ -412,7 +415,7 @@
   {
    "branch": "MARIKINA",
    "service": "HIKO",
-   "ad_set_name": "MK_HIKO_3.5MI_BROAD_21-54_F_AUTO",
+   "ad_set_name": "MK_HIKO_3MI_BROAD_21-54_F_AUTO",
    "status": "keep_untouched",
    "audience": {
     "mode": "original_audience_women",
@@ -450,7 +453,7 @@
    "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
    "geo": {
     "include": [
-     "Marikina clinic address, 3.5 mi radius"
+     "Marikina clinic address, 3 mi radius"
     ],
     "exclude": []
    },
@@ -469,7 +472,7 @@
   {
    "branch": "MARIKINA",
    "service": "GLUTA",
-   "ad_set_name": "MK_DRIP_3.5MI_BROAD_21-45_F_AUTO",
+   "ad_set_name": "MK_DRIP_3MI_BROAD_21-45_F_AUTO",
    "status": "start",
    "audience": {
     "mode": "original_audience_women",
@@ -506,7 +509,7 @@
    "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
    "geo": {
     "include": [
-     "Marikina clinic address, 3.5 mi radius"
+     "Marikina clinic address, 3 mi radius"
     ],
     "exclude": []
    },
@@ -568,7 +571,7 @@
    "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
    "geo": {
     "include": [
-     "each branch's clinic address + its radius (QC 3.5 mi, Fairview 4 mi, Sta. Maria 7 mi, Marikina 3.5 mi)"
+     "each branch's clinic address + its everyday radius (QC Main 3 mi, Fairview 4 mi, Sta. Maria 7 mi, Marikina 3 mi)"
     ],
     "exclude": []
    },
@@ -615,7 +618,7 @@
    "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
    "geo": {
     "include": [
-     "each branch's clinic address + its radius (QC 3.5 mi, Fairview 4 mi, Sta. Maria 7 mi, Marikina 3.5 mi)"
+     "the branch's clinic address + the radius for that service (Hiko at QC Main: 10 mi with 1 mi exclusions on the Fairview and Marikina clinics; everyday services: QC Main 3 mi, Fairview 4 mi, Sta. Maria 7 mi, Marikina 3 mi)"
     ],
     "exclude": []
    },
@@ -630,7 +633,7 @@
    "branch": "QC_MAIN",
    "service": "HIKO",
    "service_name": "Ultra Max Hiko ₱13,999 (premium tier)",
-   "ad_set_name": "QC_HIKO-ULTRAMAX_3.5MI_ADV_27-50_F_AUTO",
+   "ad_set_name": "QC_HIKO-ULTRAMAX_10MI_ADV_27-50_F_AUTO",
    "status": "proposed",
    "daily_budget_pre_vat": 1000,
    "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
@@ -652,9 +655,12 @@
    },
    "geo": {
     "include": [
-     "QC Main clinic address, 3.5 mi radius"
+     "QC Main clinic address, 10 mi radius"
     ],
-    "exclude": []
+    "exclude": [
+     "Fairview clinic address, 1 mi radius",
+     "Marikina clinic address, 1 mi radius"
+    ]
    },
    "creatives": [
     {
@@ -708,10 +714,10 @@
    },
    "geo": {
     "include": [
-     "QC Main clinic address, 3.5 mi radius",
+     "QC Main clinic address, 3 mi radius",
      "Fairview clinic address, 4 mi radius",
      "Sta. Maria Bulacan clinic address, 7 mi radius",
-     "Marikina clinic address, 3.5 mi radius"
+     "Marikina clinic address, 3 mi radius"
     ],
     "exclude": []
    },
@@ -741,7 +747,7 @@
    "branch": "FAIRVIEW",
    "service": "OTHER",
    "service_name": "NovoForm (doctor-guided)",
-   "ad_set_name": "FV_NOVOFORM_FV4MI+QC3.5MI_ADV_25-55_F_AUTO",
+   "ad_set_name": "FV_NOVOFORM_FV4MI+QC10MI_ADV_25-55_F_AUTO",
    "status": "proposed",
    "daily_budget_pre_vat": 300,
    "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
@@ -762,7 +768,7 @@
    "geo": {
     "include": [
      "Fairview clinic address, 4 mi radius",
-     "QC Main clinic address, 3.5 mi radius"
+     "QC Main clinic address, 10 mi radius"
     ],
     "exclude": []
    },
@@ -784,7 +790,7 @@
   }
  ],
  "proposed_note": "Lines with status 'proposed' (Ultra Max ₱1,000, Botox family ₱600, NovoForm ₱300 per day) wait on CHRIS's OK. They take the ALL_TEST ₱495/day. Total ₱11,940/day, about ₱363k a month pre-VAT, still under the 2026 average of ~₱367k pre-VAT (₱411k*).",
- "version": "1.8",
+ "version": "1.9",
  "radar": {
   "note": "Outside sources are mostly US agency or vendor blogs. Treat their numbers as directional. Our own ad log and the Hermosa OS sales numbers win.",
   "untapped": [
@@ -795,7 +801,7 @@
      "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)",
      "Hermosa service log Nov 1-24 (playbook/service-gaps-nov2026.csv)"
     ],
-    "setup": "ALL_TEST ad set for 2 weeks. QC Main address 3.5 mi + Fairview address 4 mi, original audience (Advantage+ audience off), women only (hard limit), age 25-55, minimum 21. Doctor-guided, wellness framing only: no scale photos, no before/after, no weight or kilos claims, no 'lose X kg'.",
+    "setup": "ALL_TEST ad set for 2 weeks. Fairview address 4 mi + QC Main address 10 mi (NovoForm is a destination service), original audience (Advantage+ audience off), women only (hard limit), age 25-55, minimum 21. Doctor-guided, wellness framing only: no scale photos, no before/after, no weight or kilos claims, no 'lose X kg'.",
     "budget_day_pre_vat": 300,
     "creative_brief": "Doctor talking head (15s): 'Safe ba ang GLP-1? Dito, doctor-guided ka from day 1.' Then the consult is free, then Send message. Reuse V057 with the scale shots removed."
    },
@@ -839,7 +845,7 @@
      "CHRIS Nov 28 (clients about 90% women)",
      "https://claude.ai/artifact/Wc51DtfoxjBAj5rQpknB2D"
     ],
-    "setup": "Only after the women-only leak fix. One QC Main men-only ad set in its own campaign, QC Main clinic address + 3.5 mi: original audience, gender Men, 21-54, ₱600/day before VAT for 21 days (₱12,600). Two male-led Taglish ads: Jawtox, and Hiko for men at ₱8,999/₱13,999. No before/after, no women in the ads. Front desk tags chats MEN-TEST.",
+    "setup": "Only after the women-only leak fix. One QC Main men-only ad set in its own campaign, QC Main clinic address + 10 mi, excluding the Fairview and Marikina clinic addresses at 1 mi each (Hiko clients travel across cities): original audience, gender Men, 21-54, ₱600/day before VAT for 21 days (₱12,600). Two male-led Taglish ads: Jawtox, and Hiko for men at ₱8,999/₱13,999. No before/after, no women in the ads. Front desk tags chats MEN-TEST.",
     "budget_day_pre_vat": 600,
     "creative_brief": "V055 'Ang ganda and pogi mo' re-cut to 15s with the male client in the first 2 seconds.",
     "status": "proposed",

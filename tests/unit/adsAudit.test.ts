@@ -1,15 +1,19 @@
 // v0.99.6: Ad advisor checks and Ads Manager links. Synthetic DEMO feed rows only.
 import { describe, expect, it } from "vitest";
-import { addDay, advise, type FeedRow } from "../../src/lib/adsAdvisor";
+import { addDay, advise, CLINIC_PIN, type FeedRow } from "../../src/lib/adsAdvisor";
 import { adsManagerUrl, audit, miles } from "../../src/lib/adsAudit";
-import { bestRadius } from "../../src/lib/adsSteps";
+import { bestRadius, planGeo } from "../../src/lib/adsSteps";
 
 const QC = "103117851723422", SMB = "112393681804031";
 const TODAY = "2026-12-15", END = addDay(TODAY, -1);
 const QC_PIN = { lat: 14.6393, lng: 121.0566 }, SMB_PIN = { lat: 14.8659, lng: 120.9966 };
+// Default = what the plan says for QC Main Hiko (its radius, plus the other clinics left out if the plan leaves them out).
+const QC_HIKO = bestRadius("QC_MAIN", "HIKO");
+const OUT = planGeo("QC_MAIN", "HIKO").exclude.map((x) => ({ name: "DEMO out", latitude: CLINIC_PIN[x.branch][0], longitude: CLINIC_PIN[x.branch][1], radius: x.radius }));
 const tg = (o: { pin?: { lat: number; lng: number }; radius?: number; ageMin?: number; genders?: number[]; advantage?: boolean }) => JSON.stringify({
   age_min: o.ageMin ?? 21, age_max: 65, genders: o.genders ?? [2],
-  geo_locations: { places: [{ name: "DEMO pin", latitude: (o.pin ?? QC_PIN).lat, longitude: (o.pin ?? QC_PIN).lng, radius: o.radius ?? 3, distance_unit: "mile" }] },
+  geo_locations: { places: [{ name: "DEMO pin", latitude: (o.pin ?? QC_PIN).lat, longitude: (o.pin ?? QC_PIN).lng, radius: o.radius ?? QC_HIKO, distance_unit: "mile" }] },
+  ...(o.pin ? {} : { excluded_geo_locations: { places: OUT } }),
   targeting_automation: { advantage_audience: o.advantage ? 1 : 0 },
 });
 /** 21 days of one ad in one ad set; spend and chats per day: [last 7, the 7 before, the 7 before that]. */
@@ -49,20 +53,27 @@ describe("ad checks", () => {
     expect(pin.target).toEqual({ kind: "adset", id: "s1", cid: "c1-0769", view: "edit" });
   });
 
-  it("flags a circle that reaches another clinic and suggests half the distance", () => {
-    const f = run(base(), { s1: tg({ radius: 7 }) }).find((x) => x.check === "overlap")!;
-    const d = miles([QC_PIN.lat, QC_PIN.lng], [14.7032, 121.0686]);
-    expect(d).toBeGreaterThan(4);
-    expect(d).toBeLessThan(5);
+  it("flags a circle that reaches another clinic and shrinks it to the plan's radius", () => {
+    const f = run(ad({ page: SMB, sid: "s1", aid: "a1", a: "DEMO Hiko", sp: [1000, 1000, 1000], m: [40, 40, 40] }), { s1: tg({ pin: SMB_PIN, radius: 13 }) }).find((x) => x.check === "overlap")!;
+    const d = miles([SMB_PIN.lat, SMB_PIN.lng], [14.7032, 121.0686]);
+    expect(d).toBeGreaterThan(12);
+    expect(d).toBeLessThan(13);
     expect(f.short).toContain("Fairview clinic");
-    expect(f.title).toBe(`Shrink the circle to ${bestRadius("QC_MAIN")} mi`);
+    expect(f.title).toBe(`Shrink the circle to ${bestRadius("STA_MARIA", "HIKO")} mi`);
+  });
+
+  it("a circle smaller than the service's reach gets widened, not left alone (CHRIS Nov 28)", () => {
+    if (QC_HIKO < 5) return; // plan keeps QC Hiko local
+    const f = run(base(), { s1: tg({ radius: 3 }) });
+    expect(f.map((x) => x.check)).toEqual(["area"]);
+    expect(f[0].title).toBe(`Widen the circle to ${QC_HIKO} mi`);
   });
 
   it("flags a town list instead of one clinic pin", () => {
-    const t = JSON.stringify({ age_min: 21, age_max: 54, genders: [2], geo_locations: { cities: [{ name: "DEMO town" }], places: [{ name: "DEMO pin", latitude: QC_PIN.lat, longitude: QC_PIN.lng, radius: 3, distance_unit: "mile" }] }, targeting_automation: { advantage_audience: 0 } });
+    const t = JSON.stringify({ age_min: 21, age_max: 54, genders: [2], geo_locations: { cities: [{ name: "DEMO town" }], places: [{ name: "DEMO pin", latitude: QC_PIN.lat, longitude: QC_PIN.lng, radius: QC_HIKO, distance_unit: "mile" }] }, targeting_automation: { advantage_audience: 0 } });
     const f = run(base(), { s1: t }).find((x) => x.check === "area")!;
-    expect(f.title).toBe(`Use the clinic pin + ${bestRadius("QC_MAIN")} mi`);
-    expect(run(base(), { s1: tg({ radius: 3 }) }).some((x) => x.check === "area")).toBe(false);
+    expect(f.title).toBe(`Use the clinic pin + ${QC_HIKO} mi`);
+    expect(run(base(), { s1: tg({}) }).some((x) => x.check === "area")).toBe(false);
   });
 
   it("flags ages under 21", () => {

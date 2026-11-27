@@ -146,7 +146,7 @@ export default async function AdAdvisor() {
       // Setting fixes: the whole target set-up from the playbook, and the clicks to get there (v0.99.8, delegable).
       const hit = SETTINGS.has(f.check) && f.target && f.target.kind === "adset" ? setOf.get(f.target.id) : undefined;
       const sp = hit ? settingsPlan({
-        name: hit.s.name, branch: hit.l.branch, t: hit.s.targeting, plan: audiencePlan(hit.l.branch, hit.l.service), button: action,
+        name: hit.s.name, branch: hit.l.branch, service: hit.l.service, t: hit.s.targeting, plan: audiencePlan(hit.l.branch, hit.l.service), button: action,
         overlapFix: g.find((x) => x.check === "overlap")?.radius ?? null, locationFlag: g.some((x) => x.check === "pin" || x.check === "area"),
       }) : null;
       const extra = sp ? { rows: sp.rows, steps: sp.steps, location: sp.location, branch: hit!.l.branch } : { steps: f.steps };
@@ -286,7 +286,7 @@ export default async function AdAdvisor() {
                       {m.rows.some((r) => !r.change) && <li className="ok"><b>Already right</b><span>{m.rows.filter((r) => !r.change).map((r) => r.field).join(", ")}</span></li>}
                     </ul>
                   )}
-                  {m.location && <div className="adv-bulk"><AddressBox pick={m.location} label={`Hermosa ${SHORT[m.branch ?? ""] ?? ""} clinic`} /></div>}
+                  {m.location && <Addresses pick={m.location} branch={m.branch ?? ""} />}
                   <div className="adv-move-foot">
                     {m.go && <a className="adv-go" href={m.go.href} {...(m.go.external ? { target: "_blank", rel: "noreferrer" } : {})}>{m.action}{m.go.external ? " ↗" : " →"}</a>}
                     {m.steps && <TaskChip id={m.id} text={taskText(m)} />}
@@ -581,7 +581,9 @@ function taskText(m: Move) {
   const set = (m.rows ?? []).filter((r) => r.change).map((r) => `- ${r.field}: ${r.set}`);
   return [`Hermosa ads task · ${m.tag} · ${m.kind}`, m.title, m.short, href ? `Open: ${href}` : null, set.length ? `Set it to:\n${set.join("\n")}` : null,
     m.steps?.length ? `Steps:\n${m.steps.map((x, i) => `${i + 1}. ${x}`).join("\n")}` : null,
-    m.location ? `Location (paste in Search locations, then radius ${m.location.radius} mi):\n${m.location.address}` : null].filter(Boolean).join("\n\n");
+    m.location ? [`Location (paste in Search locations, then radius ${m.location.radius} mi):\n${m.location.address}`,
+      ...m.location.also.map((x) => `Also add (paste in Search locations, then radius ${x.radius} mi):\n${x.address}`),
+      ...m.location.exclude.map((x) => `Exclude (switch Include to Exclude, paste, then radius ${x.radius} mi):\n${x.address}`)].join("\n\n") : null].filter(Boolean).join("\n\n");
 }
 type PhMarket = {
   refs: { cpm: { label: string; median: number }; cpc: { label: string; median: number }; chat: { label: string; lo: number; hi: number } };
@@ -680,7 +682,7 @@ function Setup({ p }: { p: PlayLine }) {
           {a.note && <div className="small muted">{a.note}</div>}
         </dd>
         <dt>Location</dt><dd>{p.geo.include.join("; ")}{p.geo.exclude.length > 0 && <><br /><span className="muted">Exclude: {p.geo.exclude.join("; ")}</span></>}
-          {p.branch !== "ALL" && <div className="adv-bulk"><AddressBox pick={locationPick(p.branch)} label={`Hermosa ${SHORT[p.branch] ?? p.branch} clinic`} /></div>}</dd>
+          {p.branch !== "ALL" && <Addresses pick={locationPick(p.branch, { line: p })} branch={p.branch} />}</dd>
         <dt>Placements</dt><dd>{p.placements}</dd>
       </dl>
       {p.creatives.length > 0 && (
@@ -695,6 +697,17 @@ function Setup({ p }: { p: PlayLine }) {
       )}
       <p className="small">{p.rationale}</p>
       <p className="small muted">Goal: about ₱{p.kpis.target_cost_per_chat_vat}* a chat. Raise at {p.kpis.scale_if_weekly_real_roas_at_least}x a week; cut under {p.kpis.trim_if_real_roas_below_for_2_weeks}x for 2 weeks. Check every {p.review_after_days} days.</p>
+    </div>
+  );
+}
+
+/** The clinic address to include, plus any clinic areas the plan leaves out, each with Copy. */
+function Addresses({ pick, branch }: { pick: LocationPick; branch: string }) {
+  return (
+    <div className="adv-bulk">
+      <AddressBox pick={pick} label={`Hermosa ${SHORT[branch] ?? branch} clinic`} />
+      {pick.also.map((x) => <AddressBox key={`a${x.branch}`} pick={{ address: x.address, radius: x.radius, also: [], exclude: [] }} label={`Also: Hermosa ${SHORT[x.branch] ?? x.branch} clinic`} />)}
+      {pick.exclude.map((x) => <AddressBox key={`x${x.branch}`} pick={{ address: x.address, radius: x.radius, also: [], exclude: [] }} exclude label={`Leave out: ${SHORT[x.branch] ?? x.branch} clinic`} />)}
     </div>
   );
 }
