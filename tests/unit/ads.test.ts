@@ -75,9 +75,10 @@ describe("sales sources", () => {
     expect(adRoas(summarizeSources([{ cents: 5, source: null, auto: false }]), 100)).toBeNull();
   });
   it("reads pasted SL numbers and source words, and lists what it couldn't read", () => {
-    const r = parseSourceLines("SL-2611-0012 ad\nsl26110013, Walk-in\n  SL-2611-14 : referral \nSL-2611-0015 maybe\nhello\n\n");
+    const r = parseSourceLines("SL-2611-0012 ad\nsl26110013, Walk-in\n  SL-2611-14 : referral \nSL-2611-0015 maybe\nhello\nSL-271126-001 ad\nsl 271126-12, returning\n\n");
     expect(r.rows).toEqual([
       { log_no: "SL-2611-0012", source: "AD" }, { log_no: "SL-2611-0013", source: "WALK_IN" }, { log_no: "SL-2611-0014", source: "REFERRAL" },
+      { log_no: "SL-271126-001", source: "AD" }, { log_no: "SL-271126-012", source: "RETURNING" },
     ]);
     expect(r.bad).toEqual(["SL-2611-0015 maybe", "hello"]);
   });

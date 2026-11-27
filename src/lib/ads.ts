@@ -175,7 +175,7 @@ export const sourceWord = (w: string): Source | null => {
 };
 
 /**
- * Pasted lines like "SL-2611-0012 walk-in" or "SL26110013, ad" (read off sales-log photos) → rows for set_sales_sources.
+ * Pasted lines like "SL-271126-012 walk-in", old "SL-2611-0012 walk-in" or "SL26110013, ad" (read off sales-log photos) → rows for set_sales_sources.
  * Returns the lines it couldn't read.
  */
 export function parseSourceLines(text: string): { rows: { log_no: string; source: Source }[]; bad: string[] } {
@@ -184,11 +184,13 @@ export function parseSourceLines(text: string): { rows: { log_no: string; source
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) continue;
-    const m = line.match(/S\s*L\s*-?\s*(\d{4})\s*-?\s*(\d{1,4})/i);
+    // update-0098: new codes SL-DDMMYY-NNN (day first); old codes SL-YYMM-NNNN still work.
+    const m = line.match(/S\s*L\s*-?\s*(\d{6}|\d{4})\s*-\s*(\d{1,4})/i) ?? line.match(/S\s*L\s*-?\s*(\d{6}|\d{4})()(?=\D|$)/i) ?? line.match(/S\s*L\s*-?\s*(\d{4})(\d{4})(?=\D|$)/i);
     const rest = m ? line.slice((m.index ?? 0) + m[0].length).replace(/^[\s,;:|\t-]+/, "") : "";
     const src = m ? sourceWord(rest) : null;
     if (!m || !src) { bad.push(line); continue; }
-    rows.push({ log_no: `SL-${m[1]}-${m[2].padStart(4, "0")}`, source: src });
+    if (!m[2]) { bad.push(line); continue; }
+    rows.push({ log_no: `SL-${m[1]}-${m[2].padStart(m[1].length === 6 ? 3 : 4, "0")}`, source: src });
   }
   return { rows, bad };
 }

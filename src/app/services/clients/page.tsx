@@ -4,7 +4,7 @@ import { TopBar } from "@/components/TopBar";
 import { centsToPhp } from "@/lib/csv";
 import { Uid } from "@/components/Uid";
 
-type Row = { id: string; log_no: string | null; client_name: string | null; service_date: string; branch_id: string | null; session_no: number | null; visit_kind: string | null;
+type Row = { id: string; log_no: string | null; old_log_no?: string | null; client_name: string | null; service_date: string; branch_id: string | null; session_no: number | null; visit_kind: string | null;
   amount_paid_cents: number; state: string; performer_id: string | null; assistant_id: string | null; services: { name: string } | null };
 const day = (d: string) => new Date(`${d}T00:00:00+08:00`).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", weekday: "short", month: "short", day: "numeric", year: "numeric" });
 const STATE: Record<string, [string, string]> = { APPROVED: ["Approved", "PUBLISHED"], PENDING: ["Waiting", "STAGED"], REJECTED: ["Rejected", "REVERSED"] };
@@ -16,8 +16,8 @@ export default async function ClientSearch({ searchParams }: { searchParams: Pro
   const q = (sp.q ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
   const like = q.replace(/[%_*\\,()."':]/g, " ").trim().split(" ").filter(Boolean).join("*");
   const { data } = like.length >= 2
-    ? await supabase.from("service_logs").select("id, log_no, client_name, service_date, branch_id, session_no, visit_kind, amount_paid_cents, state, performer_id, assistant_id, services(name)")
-      .or(`client_name.ilike.*${like}*,log_no.ilike.*${like}*`).order("service_date", { ascending: false }).order("created_at", { ascending: false }).limit(300)
+    ? await supabase.from("service_logs").select("id, log_no, old_log_no, client_name, service_date, branch_id, session_no, visit_kind, amount_paid_cents, state, performer_id, assistant_id, services(name)")
+      .or(`client_name.ilike.*${like}*,log_no.ilike.*${like}*,old_log_no.ilike.*${like}*`).order("service_date", { ascending: false }).order("created_at", { ascending: false }).limit(300)
     : { data: [] };
   const rows = (data ?? []) as unknown as Row[];
   const ids = [...new Set(rows.flatMap((r) => [r.performer_id, r.assistant_id]).filter(Boolean))] as string[];
@@ -49,7 +49,7 @@ export default async function ClientSearch({ searchParams }: { searchParams: Pro
                   const b = r.branch_id ? bName.get(r.branch_id) : null;
                   return (
                     <li key={r.id}>
-                      <span><strong>{(r.session_no ?? 1) > 1 && <span className="session-tag">Session {r.session_no}</span>}{r.services?.name ?? "Service"}</strong> <Uid v={r.log_no} />
+                      <span><strong>{(r.session_no ?? 1) > 1 && <span className="session-tag">Session {r.session_no}</span>}{r.services?.name ?? "Service"}</strong> <Uid v={r.log_no} />{r.old_log_no && <span className="small muted" style={{ whiteSpace: "nowrap" }}> (old code {r.old_log_no})</span>}
                         <br /><span className="small muted">{day(r.service_date)}{b ? ` · ${b.name}` : ""}{r.performer_id ? ` · by ${who.get(r.performer_id) ?? "staff"}` : ""}{r.assistant_id ? ` + ${who.get(r.assistant_id) ?? "staff"}` : ""}</span></span>
                       <span className="client-hit-end">
                         <span className="num">{(r.visit_kind ?? "PAID") === "PAID" ? centsToPhp(Number(r.amount_paid_cents)) : (r.visit_kind ?? "").replace("_", " ").toLowerCase()}</span>
