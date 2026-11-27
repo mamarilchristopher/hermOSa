@@ -2059,3 +2059,62 @@ a.hb-row:hover strong { text-decoration: underline; }
   .clock-branch .segmented.choice { display: grid; grid-template-columns: 1fr 1fr; border-radius: 16px; }
   .clock-branch .segmented.choice button { white-space: nowrap; padding: 10px 8px; }
 }
+
+/* Business › Ad advisor (update-0099) */
+.adv-link { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; text-decoration: none; color: inherit; margin-bottom: 14px; padding: 12px 16px; border: 1px solid var(--gold-line); }
+.adv-link span:nth-child(2) { font-size: 0.84rem; color: var(--ink-2); }
+.adv-link b { font-size: 0.95rem; }
+.adv-fresh { margin-bottom: 14px; }
+.adv-todo ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 0.88rem; }
+.adv-todo li.bad b { color: var(--bad); }
+.adv-todo li.good b { color: var(--good); }
+.adv-branch { display: grid; gap: 12px; }
+.adv-branch > h2 { margin-bottom: 0; }
+.adv-line { border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; min-width: 0; }
+.adv-line > * { min-width: 0; }
+.adv-line.up { border-left-color: var(--good); }
+.adv-line.down { border-left-color: var(--bad); }
+.adv-line.keep { border-left-color: var(--viz-gold); }
+.adv-line header { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.adv-svc { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.02em; }
+.adv-move { font-size: 1.1rem; font-weight: 800; margin-top: 2px; }
+.adv-line.up .adv-move { color: var(--good); }
+.adv-line.down .adv-move { color: var(--bad); }
+.adv-status { background: var(--pearl); color: var(--ink-2); white-space: nowrap; }
+.adv-why { margin: 0; font-size: 0.88rem; color: var(--ink-2); }
+.adv-nums { display: flex; flex-wrap: wrap; gap: 6px 18px; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 0.92rem; }
+.adv-nums span { display: grid; }
+.adv-nums small { font-size: 0.66rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 800; }
+.adv-nums em { font-style: normal; font-size: 0.75rem; font-weight: 600; }
+.adv-set { font-size: 0.86rem; background: var(--pearl); border-radius: 10px; padding: 8px 10px; overflow-wrap: anywhere; }
+.adv-set.warn { background: var(--bad-bg); }
+.adv-set .bad { color: var(--bad); font-weight: 700; }
+.adv-line details > summary, .adv-new details > summary, .adv-radar details > summary { cursor: pointer; font-weight: 700; font-size: 0.88rem; overflow-wrap: anywhere; }
+.adv-setup { display: grid; gap: 8px; margin-top: 8px; font-size: 0.86rem; }
+.adv-setup dl { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 4px 10px; margin: 0; }
+.adv-setup dt { font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 800; padding-top: 2px; }
+.adv-setup dd { margin: 0; overflow-wrap: anywhere; }
+.adv-setup p { margin: 0; }
+.adv-vids { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.adv-vids li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; align-items: start; }
+.adv-v { background: var(--ink); color: var(--pearl); text-align: center; }
+.adv-flag.OFF { background: var(--bad-bg); color: var(--bad); }
+.adv-flag.WINNER { background: var(--good-bg); color: var(--good); }
+.adv-flag.TIRING { background: var(--warn-bg); color: var(--warn); }
+.adv-ad { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.adv-next { margin: 0; }
+.adv-new, .adv-radar { display: grid; gap: 8px; }
+.adv-new details, .adv-radar details { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.adv-radar p { font-size: 0.86rem; margin: 6px 0 0; overflow-wrap: anywhere; }
+.adv-list { margin: 6px 0; padding-left: 18px; display: grid; gap: 4px; font-size: 0.86rem; }
+.adv-trends { margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: 0.86rem; }
+.adv-bench td { white-space: normal; vertical-align: top; }
+.adv-bench a { overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .adv-link { grid-template-columns: minmax(0, 1fr) auto; }
+  .adv-link span:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+  .adv-setup dl { grid-template-columns: minmax(0, 1fr); }
+  .adv-setup dt { padding-top: 6px; }
+  .adv-line header { flex-direction: column; }
+}
+@media (max-width: 900px) { .advisor .biz-kpis > :nth-child(3) { grid-column: auto; } }
