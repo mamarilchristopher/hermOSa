@@ -6,17 +6,18 @@
 import { addDay, CLINIC_PIN, LEARN_PER_WEEK, PAGES, perChat, type AdSetView, type Feed, type LineView } from "./adsAdvisor";
 import { SERVICE_LABEL } from "./ads";
 
-export type CheckKey = "pin" | "overlap" | "age" | "gender" | "split" | "setCost" | "dupe" | "zeroDay" | "cpcJump" | "quality" | "saturation";
+export type CheckKey = "pin" | "overlap" | "age" | "gender" | "split" | "setCost" | "dupe" | "zeroTag" | "zeroDay" | "cpcJump" | "quality" | "saturation";
 /** Every check, in the order it is listed on the page. */
 export const CHECKS: { key: CheckKey; label: string }[] = [
   { key: "pin", label: "Each ad set's pin is in its own branch's area" },
   { key: "overlap", label: "Branch circles don't reach another clinic" },
-  { key: "age", label: "Ages 21+ (house rule)" },
+  { key: "age", label: "Ages 21+ and capped at the plan's top age" },
   { key: "gender", label: "Women only as a hard limit (men only in a separate test)" },
   { key: "split", label: "Ad sets get enough chats to leave learning" },
   { key: "setCost", label: "Ad sets in a line cost about the same per chat" },
   { key: "dupe", label: "No ad runs in two ad sets of the same line" },
-  { key: "zeroDay", label: "No ad money on days a branch declared ₱0 sales" },
+  { key: "zeroTag", label: "Every ₱0 or blank day with ad spend is tagged (No sales or Closed)" },
+  { key: "zeroDay", label: "₱0-sales days no more common than at the other branches (else a plan to fill them)" },
   { key: "cpcJump", label: "Cost per chat steady week to week" },
   { key: "quality", label: "Sales per chat holding as chats change" },
   { key: "saturation", label: "Audiences not wearing out (frequency and clicks)" },
@@ -31,6 +32,10 @@ export type Finding = {
   /** The ad set's name, on setting fixes. */
   name?: string;
   title: string; short: string; why: string; action: string; target: Target | null; approve: string;
+  /** Click-by-click steps someone else can follow (v0.99.8). Setting fixes get theirs from settingsPlan on the page. */
+  steps?: string[];
+  /** Overlap fixes: the circle size that stops short of the other clinic. */
+  radius?: number;
 };
 
 const SHORT: Record<string, string> = { QC_MAIN: "QC Main", FAIRVIEW: "Fairview", STA_MARIA: "Sta. Maria", MARIKINA: "Marikina" };
@@ -38,6 +43,7 @@ const n = (v: unknown) => (v === null || v === undefined || v === "" ? 0 : Numbe
 const peso = (p: number) => `₱${Math.round(p).toLocaleString("en-US")}`;
 const pct = (x: number) => `${Math.round(Math.abs(x) * 100)}%`;
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const FULL_DOW: Record<string, string> = { Sun: "Sunday", Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday" };
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const day = (d: string) => `${DOW[new Date(`${d}T00:00:00Z`).getUTCDay()]} ${MON[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}`;
 /** Miles between two points (good enough at city scale). */
@@ -53,7 +59,9 @@ export type AuditInput = {
   /** Declared sales per branch per day (centavos); a typed ₱0 day is 0, an untyped day is missing. */
   sales: Map<string, Map<string, number>>;
   /** Playbook audience per "BRANCH|SERVICE" (genders "all" | "female" | …, age_min). */
-  plan: (branch: string, service: string) => { genders: string; ageMin: number } | null;
+  plan: (branch: string, service: string) => { genders: string; ageMin: number; ageMax?: number } | null;
+  /** Day marks per branch: NO_SALES = declared ₱0 day (tagged), CLOSED = clinic closed. Untagged ₱0 days have none. */
+  marks?: Map<string, Map<string, "NO_SALES" | "CLOSED">>;
 };
 
 export function audit(inp: AuditInput): Finding[] {
@@ -89,7 +97,7 @@ export function audit(inp: AuditInput): Finding[] {
           id: `overlap-${s.id}-${code}`, name: s.name, check: "overlap", sev: "warn", line: l.key, tag: tagOf(l), title: `Shrink the circle to ${fix} mi`,
           short: `Its ${p.radius}-mile circle covers the ${SHORT[code]} clinic (${d.toFixed(1)} mi away)`,
           why: `"${s.name}" reaches ${p.radius} miles around ${p.name}; the ${SHORT[code]} clinic is ${d.toFixed(1)} miles away, so people near ${SHORT[code]} get ${SHORT[l.branch]} ads and chat with the farther clinic. Where our ad sets reach the same people, Meta enters only one of them in each auction and holds the others back (auction overlap), which slows their learning. Set the radius to about ${fix} miles so it stops short of ${SHORT[code]}, or keep it and exclude a 2-mile circle around the ${SHORT[code]} clinic.`,
-          action: "Fix radius", target: { kind: "adset", id: s.id, cid: s.cid, view: "edit" },
+          radius: fix, action: "Fix radius", target: { kind: "adset", id: s.id, cid: s.cid, view: "edit" },
           approve: `${tagOf(l)}: set ad set "${s.name}" radius to ${fix} mi`,
         });
         break;
@@ -104,13 +112,20 @@ export function audit(inp: AuditInput): Finding[] {
     if (!t) continue;
     const plan = inp.plan(l.branch, l.service);
     const minAge = plan?.ageMin && plan.ageMin > 21 ? plan.ageMin : 21;
-    if ((t.ageMin ?? 18) < 21) {
+    // Top age (CHRIS Nov 28: demographics too): our 2 years of data show women 65+ cost the most per chat (₱53.8* vs
+    // ₱41.7* at 25–34), so the playbook caps each line's ages. With Advantage+ audience the top age is only a suggestion.
+    const maxAge = plan?.ageMax ?? null;
+    const topNow = t.advantage ? (t.ageSuggest?.[1] ?? 65) : (t.ageMax ?? 65);
+    const tooOld = maxAge !== null && topNow > maxAge;
+    if ((t.ageMin ?? 18) < 21 || tooOld) {
+      const range = maxAge !== null ? `${minAge}–${maxAge}` : `${minAge}+`;
       out.push({
-        id: `age-${s.id}`, name: s.name, check: "age", sev: "warn", line: l.key, tag: tagOf(l), title: `Raise the minimum age to ${minAge}`,
-        short: `"${s.name}" reaches people from age ${t.ageMin ?? 18}`,
-        why: `The house rule is 21+ for aesthetic ads (Meta's own floor for cosmetic procedures is 18). Under-21s rarely book and some need a parent's OK. In the ad set's Audience, set the minimum age to ${minAge}${t.advantage ? " (with Advantage+ audience, the minimum age is a hard limit; the age range is only a suggestion)" : ""}.`,
+        id: `age-${s.id}`, name: s.name, check: "age", sev: "warn", line: l.key, tag: tagOf(l),
+        title: (t.ageMin ?? 18) < 21 && !tooOld ? `Raise the minimum age to ${minAge}` : `Set ages to ${range}`,
+        short: `"${s.name}" reaches ages ${t.ageMin ?? 18}–${topNow}${t.advantage ? " (top age only suggested)" : ""}`,
+        why: `${(t.ageMin ?? 18) < 21 ? `The house rule is 21+ for aesthetic ads (Meta's own floor for cosmetic procedures is 18). Under-21s rarely book and some need a parent's OK. ` : ""}${tooOld ? `The plan for this line is ages ${range}: in our own 2 years of Meta data, women 65+ cost the most per chat (₱53.8* vs ₱41.7* at 25–34). ` : ""}In the ad set's Audience, set Age to ${range}${t.advantage ? " after switching to original audience options (with Advantage+ audience only the minimum age is a hard limit)" : ""}.`,
         action: "Fix ages", target: { kind: "adset", id: s.id, cid: s.cid, view: "edit" },
-        approve: `${tagOf(l)}: set ad set "${s.name}" minimum age to ${minAge}`,
+        approve: `${tagOf(l)}: set ad set "${s.name}" ages to ${range}`,
       });
     }
     // A separate men-only TEST ad set with male-led creative is allowed (playbook v1.6); mixed gender never is.
@@ -137,6 +152,7 @@ export function audit(inp: AuditInput): Finding[] {
           short: `${live.map((s) => s.t7.msgs).join(" + ")} chats a week: none leaves learning`,
           why: `Meta needs about ${LEARN_PER_WEEK} chats a week per ad set to finish learning. Together these ad sets get ${tot}, but split ${live.length} ways none gets there, so all of them stay in learning and cost more. Keep the best one (${live.slice().sort((a, b) => (perChat(a.t7) ?? 1e9) - (perChat(b.t7) ?? 1e9))[0].name}), move its ads and the budget there.`,
           action: "Open ad sets", target: { kind: "adset", id: live[0].id, cid: live[0].cid, view: "list" },
+          steps: [`Tap "Open ad sets ↗" on this card. Ads Manager opens the ad set list (log in with the Hermosa account if asked).`, `Keep "${live.slice().sort((a, b) => (perChat(a.t7) ?? 1e9) - (perChat(b.t7) ?? 1e9))[0].name}" (cheapest per chat). For each other ad set (${live.length - 1}), open its ads, tick the running ones, click "Duplicate" and choose the kept ad set as the destination.`, `Add the other ad sets' daily budgets to the kept one (Budget & schedule), then turn the other ad sets Off.`, `Click "Publish".`, "Back in Hermosa OS, tap \"Done\" on this card."],
           approve: `${tagOf(l)}: merge ${live.map((s) => `"${s.name}"`).join(", ")} into one ad set`,
         });
       }
@@ -150,6 +166,7 @@ export function audit(inp: AuditInput): Finding[] {
             short: `₱${worst.c.toFixed(0)}* a chat vs ₱${best.c.toFixed(0)}* in the other ad set`,
             why: `In the last 7 days "${worst.s.name}" paid ₱${worst.c.toFixed(0)}* a chat (${worst.s.t7.msgs} chats) and "${best.s.name}" ₱${best.c.toFixed(0)}* (${best.s.t7.msgs} chats), ${pct(worst.c / best.c - 1)} more for the same service and branch. Move about 20% of the dearer one's budget to the cheaper one; check sales per chat before moving more. ${worst.s.text ? `Dearer ad set: ${worst.s.text}.` : ""}`,
             action: "Open ad set", target: { kind: "adset", id: worst.s.id, cid: worst.s.cid, view: "edit" },
+            steps: [`Tap "Open ad set ↗" on this card. Ads Manager opens on ad set "${worst.s.name}" (log in with the Hermosa account if asked).`, `In Budget & schedule, lower Daily budget by 20% (write down the amount you took off). Click "Publish".`, `Open ad set "${best.s.name}" and raise its Daily budget by that same amount. Click "Publish".`, "Back in Hermosa OS, tap \"Done\" on this card."],
             approve: `${tagOf(l)}: move 20% of "${worst.s.name}" budget to "${best.s.name}"`,
           });
         }
@@ -168,6 +185,7 @@ export function audit(inp: AuditInput): Finding[] {
         short: `Runs in ${setsOf.size} ad sets of the same line`,
         why: `The same ad runs in ${setsOf.size} ad sets aimed at the same people. Meta lets only one of our ad sets into each auction for a person, so the copies hold each other back and split the chats each needs to finish learning. Keep the copy at ₱${(ranked[0].cpc14 ?? 0).toFixed(0)}* a chat and pause the one at ₱${(worse.cpc14 ?? 0).toFixed(0)}*.`,
         action: "Open ad", target: { kind: "ad", id: worse.id, cid: worse.cid, view: "list" },
+        steps: [`Tap "Open ad ↗". Ads Manager opens with ad "${worse.name}" selected in ad set "${worse.adset}".`, `Turn that copy's On/Off switch to Off. Leave the other copy on.`, "Back in Hermosa OS, tap \"Done\" on this card."],
         approve: `${tagOf(l)}: pause the copy of ad "${worse.name}" in ad set "${worse.adset}"`,
       });
     }
@@ -180,6 +198,7 @@ export function audit(inp: AuditInput): Finding[] {
         short: `₱${c7.toFixed(0)}* a chat this week vs ₱${cP.toFixed(0)}* last week`,
         why: `Chats got ${pct(c7 / cP - 1)} dearer in one week. Look at the ads list for the one that slipped (it will show as tiring or fatigued) and at the ad set's delivery; don't raise the budget until it settles.`,
         action: top ? "Open ads" : "Open line", target: top ? { kind: "adset", id: top.id, cid: top.cid, view: "ads" } : null,
+        steps: [`Tap "${top ? "Open ads" : "Open line"} ↗". Ads Manager opens this line's ads (log in with the Hermosa account if asked).`, `Sort by "Cost per result" for the last 7 days and note the ad whose cost rose most.`, `Don't raise any budget this week. Send the owner the ad's name and its cost per result now vs last week.`, "Back in Hermosa OS, tap \"Done\" on this card."],
         approve: `${tagOf(l)}: check why cost per chat rose to ₱${c7.toFixed(0)}*`,
       });
     }
@@ -202,35 +221,85 @@ export function audit(inp: AuditInput): Finding[] {
       short: `${peso(q7)} in sales per chat vs ${peso(qP)} last week (${m7} chats vs ${mP})`,
       why: `${SHORT[b]} got ${m7} ad chats this week (${mP} last week) but each brought ${peso(q7)} in declared sales instead of ${peso(qP)}. In 2026 more chats haven't meant more sales, so check the replies first: how fast CSRs answer, whether they ask for the booking, and the price objections in the inbox. Then check whether a new ad is bringing price-shoppers.`,
       action: "Open inbox", target: { kind: "page", href: "https://business.facebook.com/latest/inbox/all", external: true },
+      steps: [`Tap "Open inbox ↗" (Meta Business Suite inbox).`, `Open 20 chats from this week for ${SHORT[b]}. For each, note: minutes to first reply, whether the CSR asked for a booking date, and any price objection.`, `Send the owner the 3 most common reasons chats didn't book.`, "Back in Hermosa OS, tap \"Done\" on this card."],
       approve: `${SHORT[b]}: review chats and closing (sales per chat fell to ${peso(q7)})`,
     });
   }
 
-  // 8. Ad money on days a branch declared ₱0 sales (closed, short-staffed or not typed in).
-  const spendByBranchDay = new Map<string, Map<string, number>>();
+  // 8. ₱0-sales days (CHRIS Nov 28). Two different jobs:
+  //    a) a ₱0 or blank day that ads paid for and nobody tagged → data clarity: tag it (No sales / Closed) or type the sales;
+  //    b) declared ₱0 days that are more common than at the other branches → a sales plan to fill those days, not an ad cut
+  //       (ad chats book for later days, so cutting ads on the quiet day doesn't fill it; steering bookings into it does).
+  const marks = inp.marks ?? new Map<string, Map<string, "NO_SALES" | "CLOSED">>();
+  const spendByBranchDay = new Map<string, Map<string, { sp: number; m: number }>>();
   for (const r of feed.rows) {
     const b = PAGES[r.page];
     if (!b || r.d < w28 || r.d > end) continue;
-    const m = spendByBranchDay.get(b) ?? new Map<string, number>();
-    m.set(r.d, (m.get(r.d) ?? 0) + n(r.sp));
+    const m = spendByBranchDay.get(b) ?? new Map<string, { sp: number; m: number }>();
+    const x = m.get(r.d) ?? { sp: 0, m: 0 };
+    x.sp += n(r.sp); x.m += n(r.m);
+    m.set(r.d, x);
     spendByBranchDay.set(b, m);
   }
-  for (const [b, m] of spendByBranchDay) {
-    const s = sales.get(b);
-    if (!s) continue;
-    const zero = [...m.entries()].filter(([d, sp]) => sp > 0 && s.get(d) === 0).sort();
-    if (!zero.length) continue;
-    const spent = zero.reduce((a, [, sp]) => a + sp, 0) * 1.12;
-    const dows = new Map<string, number>();
-    for (const [d] of zero) dows.set(DOW[new Date(`${d}T00:00:00Z`).getUTCDay()], (dows.get(DOW[new Date(`${d}T00:00:00Z`).getUTCDay()]) ?? 0) + 1);
-    const pattern = [...dows.entries()].filter(([, k]) => k >= 2).map(([w]) => `${w}s`);
+  const days28 = Array.from({ length: 28 }, (_, i) => addDay(w28, i));
+  const quiet = new Map<string, string[]>();
+  for (const b of new Set([...spendByBranchDay.keys(), ...sales.keys()])) {
+    const s = sales.get(b) ?? new Map<string, number>(), mk = marks.get(b) ?? new Map<string, "NO_SALES" | "CLOSED">();
+    quiet.set(b, days28.filter((d) => s.get(d) === 0 && mk.get(d) === "NO_SALES"));
+    const sp = spendByBranchDay.get(b);
+    if (!sp) continue;
+    const untagged = [...sp.entries()].filter(([d, x]) => x.sp > 0 && s.get(d) === 0 && mk.get(d) !== "NO_SALES").map(([d]) => d).sort();
+    const blank = [...sp.entries()].filter(([d, x]) => x.sp > 0 && d <= addDay(end, -2) && !s.has(d) && !mk.has(d)).map(([d]) => d).sort();
+    const all = [...untagged, ...blank].sort();
+    if (!all.length) continue;
+    const spent = all.reduce((a, d) => a + sp.get(d)!.sp, 0) * 1.12;
     out.push({
-      id: `zero-${b}`, check: "zeroDay", sev: zero.length >= 3 ? "bad" : "warn", line: null, tag: SHORT[b] ?? b,
-      title: `${peso(spent)}* spent on ${zero.length} ₱0-sales day${zero.length === 1 ? "" : "s"}`,
-      short: `${zero.slice(-3).map(([d]) => day(d)).join(", ")}${pattern.length ? ` · mostly ${pattern.join(" and ")}` : ""}`,
-      why: `In the last 4 weeks ${SHORT[b]} declared ₱0 sales on ${zero.map(([d]) => day(d)).join(", ")} while its ads spent ${peso(spent)}*. If the clinic was closed or short of staff, those chats were wasted or went cold. First check the day's sales were typed in; if they were really ₱0${pattern.length ? ` and it keeps happening on ${pattern.join(" and ")}` : ""}, lower the budget on those days (ad scheduling) or fix the staffing.`,
+      id: `zerotag-${b}`, check: "zeroTag", sev: "warn", line: null, tag: SHORT[b] ?? b,
+      title: `Tag ${all.length} ${all.length === 1 ? "day" : "days"} in Daily sales`,
+      short: `${all.slice(-3).map(day).join(", ")}${all.length > 3 ? ` +${all.length - 3} more` : ""} · ads spent ${peso(spent)}*`,
+      why: `${SHORT[b]}'s ads ran on ${all.map(day).join(", ")}, but ${untagged.length ? `${untagged.length === all.length ? "those days show" : `${untagged.map(day).join(", ")} show`} ₱0 without a "No sales" or "Closed" tag` : ""}${untagged.length && blank.length ? " and " : ""}${blank.length ? `${blank.map(day).join(", ")} ${blank.length === 1 ? "has" : "have"} no sales typed in` : ""}. Until each day is typed or tagged, the advisor can't tell a slow day from a missing entry, and ROAS for ${SHORT[b]} reads low.`,
       action: "Open daily sales", target: { kind: "page", href: "/sales/daily" },
-      approve: `${SHORT[b]}: cut ads on ₱0-sales days (${zero.map(([d]) => day(d)).join(", ")})`,
+      steps: [
+        `Tap "Open daily sales →" and pick ${SHORT[b]}.`,
+        `For each of ${all.map(day).join(", ")}: if there were sales, type the real total. If the clinic was open with no sales, mark it "No sales". If it was closed, mark it "Closed".`,
+        `A second person confirms each No sales / Closed mark (the usual sign-off).`,
+        `Back here, tap "Done" on this card.`,
+      ],
+      approve: `${SHORT[b]}: tag or type ${all.map(day).join(", ")} in Daily sales`,
+    });
+  }
+  for (const [b, qd] of quiet) {
+    if (!qd.length) continue;
+    const others = [...quiet.entries()].filter(([x]) => x !== b).map(([, v]) => v.length);
+    const usual = others.length ? others.reduce((a, x) => a + x, 0) / others.length : 0;
+    const dows = new Map<string, number>();
+    for (const d of qd) { const w = DOW[new Date(`${d}T00:00:00Z`).getUTCDay()]; dows.set(w, (dows.get(w) ?? 0) + 1); }
+    const pattern = [...dows.entries()].filter(([, k]) => k >= 2).sort((x, y) => y[1] - x[1]).map(([w]) => w);
+    if (!(qd.length >= 3 || (qd.length >= 2 && pattern.length > 0)) || qd.length < usual * 1.5) continue;
+    const s = sales.get(b) ?? new Map<string, number>();
+    const selling = days28.map((d) => s.get(d) ?? 0).filter((v) => v > 0);
+    const perDay = selling.length ? selling.reduce((a, v) => a + v, 0) / selling.length / 100 : 0;
+    const chats = qd.reduce((a, d) => a + (spendByBranchDay.get(b)?.get(d)?.m ?? 0), 0);
+    const when = pattern.length ? pattern.map((w) => `${w}s`).join(" and ") : "quiet days";
+    // The weekday to push first: the repeat one, else the one with the most ₱0 days (latest wins a tie).
+    const top = pattern[0] ?? [...dows.entries()].sort((x, y) => y[1] - x[1] || qd.map((d) => DOW[new Date(`${d}T00:00:00Z`).getUTCDay()]).lastIndexOf(y[0]) - qd.map((d) => DOW[new Date(`${d}T00:00:00Z`).getUTCDay()]).lastIndexOf(x[0]))[0][0];
+    const whenOne = pattern.length ? pattern.map((w) => FULL_DOW[w]).join(" or ") : `${FULL_DOW[top]} and other quiet weekdays (lately ${[...dows.keys()].join(", ")})`;
+    out.push({
+      id: `quiet-${b}`, check: "zeroDay", sev: qd.length >= 5 ? "bad" : "warn", line: null, tag: SHORT[b] ?? b,
+      title: pattern.length ? `Fill ${SHORT[b]}'s ${when}` : `Fill ${SHORT[b]}'s quiet days`,
+      short: `${qd.length} declared ₱0 days in 4 weeks (other branches ${usual.toFixed(1)})${perDay ? ` · a normal day sells ${peso(perDay)}` : ""}`,
+      why: `${SHORT[b]} declared ₱0 sales on ${qd.map(day).join(", ")}${usual ? `, against ${usual.toFixed(1)} such days at the other branches` : ""}. ${perDay ? `A normal selling day there brings about ${peso(perDay)}, so these days left about ${peso(perDay * qd.length)} on the table. ` : ""}Ads kept bringing chats on those days (${chats} in all), and chats book for later dates, so cutting ads on ${when} won't fill them. The days are empty because no bookings were steered into them. The fix is in the chats and the clinic: offer the quiet day first, rebook the people who went quiet, bring package clients back on that day, and give a reason to choose it that doesn't cut the price.`,
+      action: "Open bookings", target: { kind: "page", href: "/bookings" },
+      steps: [
+        `CSRs: in every new chat, offer ${whenOne} first, with 3 exact times ("May open slot po kami sa ${FULL_DOW[top]}: 11 AM, 2 PM o 4 PM"). Save it as a quick reply in the inbox.`,
+        `Follow-ups: open Bookings › Follow-ups and offer every unresponsive client a ${FULL_DOW[top]} slot. Target: 3 rebooked for each ${FULL_DOW[top]}.`,
+        `Packages: open Services › Packages, filter ${SHORT[b]}, and message clients with sessions left (Hiko touch-ups, drips, NovoForm) to book their next one on ${FULL_DOW[top]}.`,
+        `Owner picks one ${FULL_DOW[top]}-only perk that adds value without cutting the price (for example a free Diamond Tip upgrade with Hiko, or a free gluta booster with a drip). Set it up in Promos so it's tracked; never show a "regular price".`,
+        `Ads: keep budgets as they are. Two days before each ${FULL_DOW[top]}, add one ad in ${SHORT[b]}'s ad set that names the day and the perk ("This ${FULL_DOW[top]} only at Hermosa ${SHORT[b]}"). Claude can prepare it after the owner's OK.`,
+        `Staffing: check that a CMA who does Hiko is rostered on ${pattern.length ? when : `${FULL_DOW[top]}s and the other quiet days`}. If it's a common day off, swap one.`,
+        `In 2 weeks the advisor counts again. Goal: at most 1 ₱0 day a month at ${SHORT[b]}.`,
+      ],
+      approve: `${SHORT[b]}: start the ${when} fill plan (CSR first-offer script, follow-ups, package rebooking, one perk for the owner to pick)`,
     });
   }
 
@@ -254,6 +323,7 @@ export function audit(inp: AuditInput): Finding[] {
         short: `Frequency ${fThen.toFixed(2)} → ${fNow.toFixed(2)} a day, clicks ${pct(cNow / cThen - 1)} lower`,
         why: `"${s.name}" shows its ads to the same people more often (${fThen.toFixed(2)} → ${fNow.toFixed(2)} times a day vs two weeks ago) and they click ${pct(cNow / cThen - 1)} less (${(cThen * 100).toFixed(1)}% → ${(cNow * 100).toFixed(1)}%). Add 1–2 genuinely new ads, or widen the area a little; don't add budget.`,
         action: "Open ad set", target: { kind: "adset", id: s.id, cid: s.cid, view: "edit" },
+        steps: [`Tap "Open ad set ↗". Ads Manager opens on ad set "${s.name}" (log in with the Hermosa account if asked).`, `Duplicate the best ad in it and swap in a new video from the Hermosa ad library (or a new first line of text). Name it with " v2".`, `Don't add budget. Click "Publish".`, "Back in Hermosa OS, tap \"Done\" on this card."],
         approve: `${tagOf(l)}: freshen ad set "${s.name}" (audience wearing out)`,
       });
     }

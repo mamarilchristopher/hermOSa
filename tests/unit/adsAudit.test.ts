@@ -26,11 +26,12 @@ const flat = (cents: number, zeroDays: string[] = []) => {
   for (let i = 0; i < 35; i++) { const d = addDay(TODAY, -i); m.set(d, zeroDays.includes(d) ? 0 : cents); }
   return m;
 };
-function run(rows: FeedRow[], targeting: Record<string, string>, o: { sales?: Map<string, number>; plan?: { genders: string; ageMin: number } } = {}) {
+function run(rows: FeedRow[], targeting: Record<string, string>, o: { sales?: Map<string, number>; plan?: { genders: string; ageMin: number; ageMax?: number }; noSales?: string[] } = {}) {
   const feed = { ok: true, last_date: END, loaded_at: null, source: "windsor", rows, targeting };
   const sales = new Map([["QC_MAIN", o.sales ?? flat(3000 * 1.12 * 5 * 100)], ["STA_MARIA", flat(1_000_000)]]);
   const res = advise({ feed, today: TODAY, sales, shares: new Map([["QC_MAIN", { HIKO: 1, GLUTA: 0, OTHER: 0 }], ["STA_MARIA", { HIKO: 1, GLUTA: 0, OTHER: 0 }]]), plan: new Map() });
-  return audit({ feed, lines: res.lines, end: res.end, sales, plan: () => o.plan ?? null });
+  const marks = new Map([["QC_MAIN", new Map((o.noSales ?? []).map((d) => [d, "NO_SALES" as const]))]]);
+  return audit({ feed, lines: res.lines, end: res.end, sales, marks, plan: () => o.plan ?? null });
 }
 const base = (sid = "s1", aid = "a1") => ad({ sid, aid, a: `DEMO Hiko ${aid}`, sp: [3000, 3000, 3000], m: [100, 100, 100] });
 
@@ -95,13 +96,30 @@ describe("ad checks", () => {
     expect(f.target).toMatchObject({ kind: "ad", id: "a2" });
   });
 
-  it("flags ad money on days a branch declared ₱0 sales, and names the weekday pattern", () => {
+  it("asks to tag a ₱0 day nobody tagged (data clarity)", () => {
+    const zero = [addDay(END, -1), addDay(END, -8)];
+    const f = run(base(), { s1: tg({}) }, { sales: flat(3000 * 1.12 * 5 * 100, zero) });
+    const t = f.find((x) => x.check === "zeroTag")!;
+    expect(t.title).toBe("Tag 2 days in Daily sales");
+    expect(t.target).toEqual({ kind: "page", href: "/sales/daily" });
+    expect(f.some((x) => x.check === "zeroDay")).toBe(false);
+  });
+
+  it("turns frequent declared ₱0 days into a plan to fill them, not an ad cut", () => {
     const zero = [addDay(END, -1), addDay(END, -8), addDay(END, -15)];
-    const f = run(base(), { s1: tg({}) }, { sales: flat(3000 * 1.12 * 5 * 100, zero) }).find((x) => x.check === "zeroDay")!;
-    expect(f.sev).toBe("bad");
-    expect(f.title).toBe("₱10,080* spent on 3 ₱0-sales days");
-    expect(f.short).toMatch(/mostly \w{3}s/);
-    expect(f.target).toEqual({ kind: "page", href: "/sales/daily" });
+    const f = run(base(), { s1: tg({}) }, { sales: flat(3000 * 1.12 * 5 * 100, zero), noSales: zero });
+    expect(f.some((x) => x.check === "zeroTag")).toBe(false);
+    const q = f.find((x) => x.check === "zeroDay")!;
+    expect(q.sev).toBe("warn");
+    expect(q.title).toMatch(/^Fill QC Main's \w{3}s$/);
+    expect(q.short).toContain("3 declared ₱0 days in 4 weeks (other branches 0.0)");
+    expect(q.target).toEqual({ kind: "page", href: "/bookings" });
+    expect(q.steps!.join(" ")).toContain("keep budgets as they are");
+  });
+
+  it("caps the top age at the plan's", () => {
+    const f = run(base(), { s1: tg({}) }, { plan: { genders: "women", ageMin: 21, ageMax: 54 } }).find((x) => x.check === "age")!;
+    expect(f.title).toBe("Set ages to 21–54");
   });
 
   it("flags a 30% jump in cost per chat and a fall in sales per chat", () => {

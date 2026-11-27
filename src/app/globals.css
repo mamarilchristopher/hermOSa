@@ -2523,3 +2523,44 @@ a.adv-open:hover { background: var(--viz-track); }
 .adv-detail .adv-nums span.adv-wk { display: flex; }
 @media (max-width: 700px) { .adv-detail .adv-nums { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; } }
 .adv-st.research { background: var(--viz-track); color: var(--viz-deep); }
+
+/* v0.99.8 Ad advisor research areas */
+.biz-signals a { font-size: 0.84rem; font-weight: 700; padding: 6px 12px; border-radius: 12px; background: var(--gold-soft, var(--viz-track)); color: var(--ink); text-decoration: none; }
+.adv-st.researching, .adv-st.research, .adv-st.queued { background: var(--warn-bg); color: var(--warn); }
+.adv-st.testing { background: color-mix(in srgb, var(--viz-gold) 22%, var(--surface)); color: var(--ink); }
+.adv-st.done { background: var(--good-bg); color: var(--good); }
+.adv-rs > summary .pill { justify-self: start; }
+.adv-rs-head { color: var(--ink-2); line-height: 1.4; }
+.adv-rs:not([open]) .adv-rs-head { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.adv-rs-f { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 8px; }
+.adv-rs-f li { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: start; font-size: 0.86rem; line-height: 1.45; }
+.adv-rs-f li > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.adv-tier { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; white-space: nowrap; background: var(--pearl); color: var(--ink-2); margin-top: 1px; }
+.adv-tier.t1 { background: color-mix(in srgb, var(--viz-gold) 25%, var(--surface)); color: var(--ink); }
+.adv-tier.t2 { background: var(--good-bg); color: var(--good); }
+.adv-rs-rec { border-left: 3px solid var(--viz-gold); padding-left: 10px; }
+@media (max-width: 640px) {
+  .adv-research { grid-template-columns: minmax(0, 1fr); }
+  .adv-rs-f li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .adv-tier { justify-self: start; }
+}
+
+/* v0.99.8 delegable fixes (CHRIS Nov 28): exact values on the card, numbered steps, Copy steps + Done */
+.adv-set { list-style: none; margin: 8px 0 4px; padding: 8px 10px; display: grid; gap: 6px; background: var(--viz-track); border-radius: 12px; }
+.adv-set li { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 0 8px; font-size: 0.84rem; line-height: 1.35; }
+.adv-set li > b { grid-row: span 2; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding-top: 2px; }
+.adv-set-to { font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+.adv-set-now { font-size: 0.74rem; color: var(--muted); overflow-wrap: anywhere; }
+.adv-set li.ok { grid-template-columns: 82px minmax(0, 1fr); }
+.adv-set li.ok > span { color: var(--good); font-weight: 700; }
+.adv-move-more { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; margin-top: 2px; }
+.adv-move-more .adv-why2 { flex: 0 1 auto; }
+.adv-move-more .adv-why2[open] { flex-basis: 100%; }
+.adv-steps ol { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 5px; font-size: 0.84rem; color: var(--ink); line-height: 1.4; }
+.adv-move-foot button.adv-done.on { background: var(--good-bg); border-color: var(--good); color: var(--good); }
+@media (max-width: 640px) {
+  .adv-set li { grid-template-columns: minmax(0, 1fr); }
+  .adv-set li > b { grid-row: auto; }
+  .adv-move-foot { gap: 6px; }
+  .adv-move-foot a.adv-go, .adv-move-foot button.adv-ok { padding: 4px 11px; }
+}

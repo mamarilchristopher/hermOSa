@@ -1,0 +1,153 @@
+{
+ "_note": "Synced from playbook/research.json (Ad advisor research areas).",
+ "updated": "2026-11-28",
+ "areas": [
+  {
+   "id": "men-test",
+   "title": "Men's market: Hiko for men and other men's services",
+   "question": "Is there an untapped men's market worth a separate men-only test ad set, and what would the advisor run?",
+   "asked": "2026-11-28",
+   "asked_by": "CHRIS",
+   "status": "done",
+   "headline": "Fix the leak first (₱65k* a month already goes to men through women-led ads), then a small men-only test: ₱600/day before VAT for 21 days, Jawtox and Hiko for men, judged by bookings per chat.",
+   "findings": [
+    {
+     "tier": 1,
+     "text": "Nov 2024 to Nov 2026: men took 25.4% of Hermosa ad spend (₱2,664,422*) and gave 24.2% of chats (55,633) at ₱47.9* per chat, vs women ₱44.9*. No ad was ever made for men; they saw women-led ads.",
+     "source": "Hermosa Meta accounts via Windsor, gender breakdown"
+    },
+    {
+     "tier": 1,
+     "text": "Clients are about 90% women (CHRIS). So a man who chatted was about a third as likely to become a client as a woman who chatted, and each male client cost about 3x as much in ads.",
+     "source": "Hermosa Meta accounts via Windsor + CHRIS Nov 28"
+    },
+    {
+     "tier": 1,
+     "text": "Last 30 days: men still got ₱65,205* (about 21%) and 1,733 chats, even in ad sets named 'Women only', because Advantage+ audience treats gender as a suggestion.",
+     "source": "Hermosa Meta accounts via Windsor, ad set x gender"
+    },
+    {
+     "tier": 1,
+     "text": "Reaching men is cheap (₱58* per 1,000 views vs ₱102* for women), so a men-only test must be judged by bookings per chat, not cost per chat.",
+     "source": "Hermosa Meta accounts via Windsor"
+    },
+    {
+     "tier": 1,
+     "text": "Men's services already on the menu: diode laser beard ₱999, upper neck ₱599, lip ₱499. No men's Hiko package or men's ad exists.",
+     "source": "Hermosa OS price list"
+    },
+    {
+     "tier": 2,
+     "text": "No clinic in QC, Fairview, Marikina or Bulacan advertises Hiko for men. Men's lines exist only in BGC/Pasig (Aivee Masculook, Lift, BroVage) and lead with the jaw. Hiko Deluxe ₱8,999 is below QC rivals (₱9,999-10,599).",
+     "source": "https://theaiveeclinic.com/treatments/aivee-masculook/ ; https://sereneaseph.com/products/hiko-nose ; https://tribune.net.ph/2026/01/22/male-treatments-a-rising-segment-in-aesthetic-medicine"
+    },
+    {
+     "tier": 3,
+     "text": "PH clinics report more men: Glow Skin about 1 in 10 clients (2018) to 4 in 10 (2025); Lift about 55%. Owner estimates from BGC/Pasig, not our area. Men want discreet, natural results; 'retokado' stigma remains.",
+     "source": "https://www.philstar.com/lifestyle/fashion-and-beauty/2025/07/28/2459875/it-makes-them-happy-more-men-visit-beauty-clinics ; https://abs-cbn.com/lifestyle/2025/6/24/retokado-more-men-getting-facial-enhancements-says-cosmetic-surgeon-2027"
+    },
+    {
+     "tier": 0,
+     "text": "Ads must not imply the viewer's looks ('Malaki ba ilong mo?' is out; 'Sharper jawline, natural pa rin' is fine). Gender is a hard limit only with original audience options.",
+     "source": "https://transparency.meta.com/policies/ad-standards/objectionable-content/personal-attributes"
+    }
+   ],
+   "recommendation": "1) Make every regular ad set women only as a hard limit and close 'All Genders + Mid class filter' (stops about ₱65k* a month to men). 2) Then, with your OK: one men-only ad set at QC Main, own campaign, gender Men, original audience, ages 21-54, ₱600/day before VAT for 21 days (₱12,600). Two male-led Taglish ads: Jawtox, and Hiko for men with ₱8,999/₱13,999. No before/after, no women in the ads. Front desk tags chats MEN-TEST. Win = men's bookings per chat at least 0.7x the women's at the same branch and 5+ paid treatments; below 0.4x = stop for good.",
+   "next": "Waiting for your OK on the women-only fixes (they're on This week's moves). The men's test waits until those are done.",
+   "links": {
+    "untapped": "Men-only test (Hiko for men, jawtox)"
+   },
+   "report": "https://claude.ai/artifact/Wc51DtfoxjBAj5rQpknB2D"
+  },
+  {
+   "id": "ph-market",
+   "title": "Philippine market data only",
+   "question": "Is US market data right for PH ads advice? What PH data can we use instead?",
+   "asked": "2026-11-28",
+   "asked_by": "CHRIS",
+   "status": "done",
+   "headline": "US figures removed. The advisor now uses our own numbers first, then PH clinic prices, then PH Meta costs.",
+   "findings": [
+    {
+     "tier": 1,
+     "text": "Our cost per chat 2026: QC ₱43.9*, Fairview ₱45.1*, Sta. Maria ₱39.0*, Marikina ₱38.5*. Winners ₱19.5-33.7*.",
+     "source": "Hermosa Meta data by page (Windsor)"
+    },
+    {
+     "tier": 2,
+     "text": "PH Hiko prices: budget ₱5,000-6,999, mid-market ₱10,599-11,999, premium from ₱35,000. Deluxe ₱8,999 sits below mid-market; Ultra Max ₱13,999 fills the gap to premium.",
+     "source": "https://sereneaseph.com/products/hiko-nose ; https://www.glamer.ph/price-list ; https://www.onenadelamed.ph/product/nose-thread-lift-pcl-nose-threads-hiko"
+    },
+    {
+     "tier": 3,
+     "text": "PH Meta: median CPM about ₱87, CPC about ₱4.70, cost per message ₱15-50 (agency range).",
+     "source": "https://anahawdigital.com/philippine-ad-cost-index/ ; https://modernchameleon.com/how-much-are-facebook-ads-in-the-philippines-the-2026-reality-check/"
+    }
+   ],
+   "recommendation": "Keep PH-only evidence in every ads decision.",
+   "next": null,
+   "links": {},
+   "report": null
+  },
+  {
+   "id": "past-ads",
+   "title": "Past Meta ads: what paid back",
+   "question": "Which past ads, branches and services returned the most sales per peso?",
+   "asked": "2026-11-27",
+   "asked_by": "CHRIS",
+   "status": "done",
+   "headline": "2026 average 5.1x ROAS, but extra money in the same ads returned only 0.5-1.8x. Growth comes from new offers, not bigger Hiko budgets.",
+   "findings": [
+    {
+     "tier": 1,
+     "text": "2026 ROAS by page: QC 4.9x, Fairview 4.3x, Sta. Maria 5.5x, Marikina 6.8x. Hiko took 85% of spend.",
+     "source": "Hermosa sales + Meta spend by page"
+    },
+    {
+     "tier": 1,
+     "text": "QC Main halved spend in November and sales held, the only real natural test.",
+     "source": "Hermosa sales + Meta spend by page"
+    },
+    {
+     "tier": 1,
+     "text": "More chats did not bring more sales: QC sales per chat fell from ₱370 (Apr) to ₱155 (Aug-Sep).",
+     "source": "Hermosa sales + Meta spend by page"
+    }
+   ],
+   "recommendation": "Don't raise existing Hiko budgets for growth; put new money into Ultra Max, the Botox family and NovoForm.",
+   "next": null,
+   "links": {},
+   "report": "https://claude.ai/artifact/NBhJKh5fqUpE7SG6pVQsTD"
+  },
+  {
+   "id": "fairview-revival",
+   "title": "Bring Fairview back to #2",
+   "question": "Why did Fairview fall from the #2 branch, and what brings it back?",
+   "asked": "2026-11-27",
+   "asked_by": "CHRIS",
+   "status": "testing",
+   "headline": "Fairview logs ₱0 sales on 5-8 days a month (often Wednesdays). Fixing those days and a Fairview-only Hiko reset are the first steps.",
+   "findings": [
+    {
+     "tier": 1,
+     "text": "2023: ₱927k a month, #2 every month. 2026 Jan-Oct: ₱399k a month, #2 only in October.",
+     "source": "Hermosa declared sales"
+    },
+    {
+     "tier": 1,
+     "text": "19 of 60 ₱0-sales days in 2026 were Wednesdays; QC Main has 1-2 such days a month.",
+     "source": "Hermosa declared sales"
+    },
+    {
+     "tier": 1,
+     "text": "Fairview Hiko returns 2.8x, the weakest branch and service.",
+     "source": "Hermosa sales + Meta spend by page"
+    }
+   ],
+   "recommendation": "Fix ₱0 days, CSR weekday fill, Fairview-specific Hiko ads, budget FV Hiko ₱60k + FV drips ₱15k a month (pre-VAT). Targets: Dec ₱550k, Mar 2027 ₱650k a month.",
+   "next": "Watch December sales against the ₱550k target.",
+   "links": {},
+   "report": "https://claude.ai/artifact/Sf3SGgnZBBm9rQuqtJJH9r"
+  }
+ ]
+}

@@ -15,8 +15,12 @@ import { links, newAdSets, PLAYBOOK, planMap, planPerDay, playLine, proposedPerD
 import { every } from "../../load";
 import PH from "@/data/phMarket.json";
 import { ApproveChip } from "./ApproveChip";
+import { OpenOnHash } from "./OpenOnHash";
+import { TaskChip } from "./TaskChip";
+import { budgetSteps, pauseSteps, remakeSteps, settingsPlan, versionSteps, type SetRow } from "@/lib/adsSteps";
 import { adsManagerUrl, audit, CHECKS, type Finding, type Target } from "@/lib/adsAudit";
 import ACC from "@/data/adAccounts.json";
+import { areaFor, areaStatus, openQuestions, sortAreas, TIER } from "@/lib/adsResearch";
 
 const MGMT = ["OWNER", "FINANCE", "AUDITOR", "MANAGER"];
 const peso = (p: number) => `₱${Math.round(p).toLocaleString("en-US")}`;
@@ -52,8 +56,15 @@ export default async function AdAdvisor() {
 
   // Declared sales per branch per day, and each branch's Hiko/Gluta share from the last 4 weeks of the Service log.
   const sales = new Map<string, Map<string, number>>();
+  // Day tags: "No sales" (declared ₱0) and "Closed"; a ₱0 day without one is untagged (v0.99.8).
+  const marks = new Map<string, Map<string, "NO_SALES" | "CLOSED">>();
   for (const r of await withApprovedSales(supabase, (st as { days?: StatusDay[] } | null)?.days ?? [], today)) {
     const v = centsOfCell(r), code = codeOf[r[0]];
+    if (code && (r[3] === "NO_SALES" || r[3] === "CLOSED")) {
+      const mk = marks.get(code) ?? new Map<string, "NO_SALES" | "CLOSED">();
+      mk.set(r[1], r[3]);
+      marks.set(code, mk);
+    }
     if (v === null || !code) continue;
     const m = sales.get(code) ?? new Map<string, number>();
     m.set(r[1], v);
@@ -119,17 +130,31 @@ export default async function AdAdvisor() {
     if (!top) return { href: `https://adsmanager.facebook.com/adsmanager/manage/campaigns`, external: true };
     return go(l.budgetSource === "campaign" ? { kind: "campaign", id: top.cid, cid: top.cid, view: "edit" } : { kind: "adset", id: top.id, cid: top.cid, view: "edit" });
   }
-  const findings = audit({ feed, lines, end: res.end, sales, plan: (b, sv) => { const p = playLine(b, sv); return p ? { genders: p.audience.genders, ageMin: p.audience.age_min } : null; } });
-  const KIND: Record<string, string> = { pin: "Fix the area", overlap: "Branches overlap", age: "Audience", gender: "Audience", split: "Learning", setCost: "Ad sets", dupe: "Duplicate ad", zeroDay: "₱0-sales days", cpcJump: "Cost per chat", quality: "Chat quality", saturation: "Audience tired" };
+  const findings = audit({ feed, lines, end: res.end, sales, marks, plan: (b, sv) => { const p = playLine(b, sv); return p ? { genders: p.audience.genders, ageMin: p.audience.age_min, ageMax: p.audience.age_max } : null; } });
+  const SETTINGS = new Set(["pin", "overlap", "age", "gender"]);
+  const setOf = new Map(lines.flatMap((l) => l.adsets.map((s) => [s.id, { l, s }] as const)));
+  const audiencePlan = (b: string, sv: string) => {
+    const p = playLine(b, sv);
+    return p ? { ageMin: p.audience.age_min, ageMax: p.audience.age_max, genders: p.audience.genders, interests: p.audience.interests, include: p.geo.include, exclude: p.geo.exclude } : null;
+  };
+  const KIND: Record<string, string> = { pin: "Fix the area", overlap: "Branches overlap", age: "Audience", gender: "Audience", split: "Learning", setCost: "Ad sets", dupe: "Duplicate ad", zeroTag: "Data check", zeroDay: "Sales plan", cpcJump: "Cost per chat", quality: "Chat quality", saturation: "Audience tired" };
   const moves: Move[] = [
     ...groupFixes(findings.filter((f) => f.sev !== "info")).map((g) => {
       const f = g[0];
-      if (g.length === 1) return { id: f.id, tone: f.sev, tag: f.tag, kind: KIND[f.check], title: f.title, short: f.short, why: f.why, approve: f.approve, action: f.action, go: go(f.target) };
+      const action = g.length === 1 ? f.action : "Fix settings";
+      // Setting fixes: the whole target set-up from the playbook, and the clicks to get there (v0.99.8, delegable).
+      const hit = SETTINGS.has(f.check) && f.target && f.target.kind === "adset" ? setOf.get(f.target.id) : undefined;
+      const sp = hit ? settingsPlan({
+        name: hit.s.name, branch: hit.l.branch, t: hit.s.targeting, plan: audiencePlan(hit.l.branch, hit.l.service), button: action,
+        overlapFix: g.find((x) => x.check === "overlap")?.radius ?? null, locationFlag: g.some((x) => x.check === "pin"),
+      }) : null;
+      const extra = sp ? { rows: sp.rows, steps: sp.steps } : { steps: f.steps };
+      if (g.length === 1) return { id: f.id, tone: f.sev, tag: f.tag, kind: KIND[f.check], title: f.title, short: f.short, why: f.why, approve: f.approve, action, go: go(f.target), ...extra };
       const name = f.name;
       return {
         id: g.map((x) => x.id).join("+"), tone: g.some((x) => x.sev === "bad") ? "bad" : "warn", tag: f.tag, kind: `${g.length} fixes, one ad set`,
         title: g.map((x) => x.title).join(" · "), short: name ? `"${name}"` : f.short, why: g.map((x) => x.why).join(" "),
-        approve: g.map((x) => x.approve).join("; "), action: "Fix settings", go: go(f.target),
+        approve: g.map((x) => x.approve).join("; "), action, go: go(f.target), ...extra,
       };
     }),
     ...lines.filter((l) => ["RAISE", "TEST", "CUT", "OFF", "START"].includes(l.action)).map((l) => ({
@@ -140,21 +165,22 @@ export default async function AdAdvisor() {
       approve: `${tag(l)}: ${l.headline}`, delta: l.budget > 0 ? l.newBudget / l.budget - 1 : null,
       action: l.action === "START" ? "Open ad sets" : l.action === "OFF" ? "Turn off" : "Change budget",
       go: budgetGo(l),
+      steps: budgetSteps({ name: l.budgetSource === "campaign" ? (l.adsets[0]?.campaign ?? tag(l)) : (l.adsets[0]?.name ?? tag(l)), level: l.budgetSource, from: l.budget, to: l.newBudget, off: l.action === "OFF" }),
     })),
     ...losers.map(({ l, a }) => ({
       id: `pause-${a.id}`, tone: "bad", tag: tag(l), kind: "Pause ad", title: `Pause "${a.name}"`,
       short: `${a.cpc14 === null ? "No chats" : `₱${a.cpc14.toFixed(0)}* a chat`} · ${vat(a.t14.spend)} in 14 days`, why: a.why,
-      approve: `${tag(l)}: pause ad "${a.name}"`, action: "Pause ad", go: go({ kind: "ad", id: a.id, cid: a.cid, view: "list" }),
+      approve: `${tag(l)}: pause ad "${a.name}"`, action: "Pause ad", go: go({ kind: "ad", id: a.id, cid: a.cid, view: "list" }), steps: pauseSteps(a.name),
     })),
     ...fatigued.map(({ l, a }) => ({
       id: `remake-${a.id}`, tone: "bad", tag: tag(l), kind: "Pause + remake", title: `Remake "${a.name}"`,
       short: `₱${(a.cpc14 ?? 0).toFixed(0)}* a chat vs its best ₱${(a.baseline ?? 0).toFixed(0)}*`, why: a.why,
-      approve: `${tag(l)}: pause and remake ad "${a.name}"`, action: "Open ad", go: go({ kind: "ad", id: a.id, cid: a.cid, view: "edit" }),
+      approve: `${tag(l)}: pause and remake ad "${a.name}"`, action: "Open ad", go: go({ kind: "ad", id: a.id, cid: a.cid, view: "edit" }), steps: remakeSteps(a.name),
     })),
     ...tiring.map(({ l, a }) => ({
       id: `tiring-${a.id}`, tone: "warn", tag: tag(l), kind: "Add new versions", title: `Freshen "${a.name}"`,
       short: "Add 1–2 new versions; keep it running", why: a.why,
-      approve: `${tag(l)}: add 1–2 new versions next to ad "${a.name}"`, action: "Add versions", go: go({ kind: "adset", id: a.sid, cid: a.cid, view: "ads" }),
+      approve: `${tag(l)}: add 1–2 new versions next to ad "${a.name}"`, action: "Add versions", go: go({ kind: "adset", id: a.sid, cid: a.cid, view: "ads" }), steps: versionSteps(a.name),
     })),
   ];
   const infos = findings.filter((f) => f.sev === "info");
@@ -184,6 +210,9 @@ export default async function AdAdvisor() {
   }).filter((x) => x.spend > 0);
   const mkt = PH as PhMarket;
   const tier = (t: number) => pb.radar.benchmarks.filter((x) => (x.tier ?? 3) === t);
+  // Research areas (v0.99.8): studies first, then questions the advisor finds open in the playbook by itself.
+  const areas = sortAreas(), questions = openQuestions();
+  const openAreas = areas.filter((a) => a.status !== "done" && a.status !== "parked").length;
 
   return (
     <>
@@ -233,12 +262,13 @@ export default async function AdAdvisor() {
           {learning > 0 && <span title={`Under ${LEARN_PER_WEEK} chats a week, Meta is still learning`}>{learning} ad set{learning === 1 ? "" : "s"} still learning</span>}
           <span>{holding} line{holding === 1 ? "" : "s"} holding budget</span>
           <span>Next review {nextReview ? fmtDay(nextReview) : "today"}</span>
+          <a href="#research">{areas.length} research areas{openAreas ? ` · ${openAreas} open` : ""}</a>
         </div>
 
         <section className="card adv-moves-card">
           <div className="adv-h">
             <h2>This week&apos;s moves <small>{moves.length ? `${moves.length} to OK` : "nothing to change"}</small></h2>
-            <span className="small muted">Each button opens the exact ad or ad set in Ads Manager. Or tap Approve to have Claude do it after you OK a preview.</span>
+            <span className="small muted">Each card says exactly what to set. Hand it to anyone: Copy steps sends the link, the values and the clicks. Or tap Approve to have Claude do it after you OK a preview.</span>
           </div>
           {moves.length === 0 ? (
             <p className="adv-calm">Every line is holding. Leave budgets alone so Meta keeps learning; next review {nextReview ? fmtDay(nextReview) : "today"}.</p>
@@ -249,9 +279,19 @@ export default async function AdAdvisor() {
                   <div className="adv-move-top"><span className="adv-kind">{m.kind}</span><span className="adv-tag">{m.tag}</span></div>
                   <div className="adv-move-title">{m.title}{m.delta !== undefined && m.delta !== null && Number.isFinite(m.delta) && <Chg c={m.delta} />}</div>
                   <div className="adv-move-short">{m.short}</div>
+                  {m.rows && m.rows.some((r) => r.change) && (
+                    <ul className="adv-set">
+                      {m.rows.filter((r) => r.change).map((r) => <li key={r.field}><b>{r.field}</b><span className="adv-set-to">{r.set}</span><span className="adv-set-now">now: {r.now}</span></li>)}
+                      {m.rows.some((r) => !r.change) && <li className="ok"><b>Already right</b><span>{m.rows.filter((r) => !r.change).map((r) => r.field).join(", ")}</span></li>}
+                    </ul>
+                  )}
                   <div className="adv-move-foot">
                     {m.go && <a className="adv-go" href={m.go.href} {...(m.go.external ? { target: "_blank", rel: "noreferrer" } : {})}>{m.action}{m.go.external ? " ↗" : " →"}</a>}
+                    {m.steps && <TaskChip id={m.id} text={taskText(m)} />}
                     <ApproveChip id={m.id} text={m.approve} />
+                  </div>
+                  <div className="adv-move-more">
+                    {m.steps && <details className="adv-why2 adv-steps"><summary>Steps ({m.steps.length})</summary><ol>{m.steps.map((x) => <li key={x}>{x}</li>)}</ol></details>}
                     <details className="adv-why2"><summary>Why</summary><p>{m.why}</p></details>
                   </div>
                 </article>
@@ -407,6 +447,7 @@ export default async function AdAdvisor() {
                 <p className="small"><b>Set-up:</b> {u.setup}</p>
                 <p className="small"><b>Ad:</b> {u.creative_brief}</p>
                 <p className="small muted">Sources: <Sources s={u.evidence.join(" ; ")} /></p>
+                {areaFor(u.service) && <p className="small"><a href={`#r-${areaFor(u.service)!.id}`}>Research: {areaStatus(areaFor(u.service)!.status).toLowerCase()}, see Research areas</a></p>}
               </details>
             ))}
             <details className="adv-tile adv-opp">
@@ -460,6 +501,37 @@ export default async function AdAdvisor() {
           </details>
         </section>
 
+        <section className="card" id="research">
+          <h2>Research areas <small>{openAreas ? `${openAreas} open · ` : ""}{areas.length - openAreas} done{questions.length ? ` · ${questions.length} questions waiting` : ""}</small></h2>
+          <div className="adv-opps adv-research">
+            {areas.map((a) => (
+              <details key={a.id} id={`r-${a.id}`} className="adv-tile adv-rs">
+                <summary>
+                  <span className="label">{fmtDay(a.asked)} · {a.asked_by}</span>
+                  <span className="adv-opp-title">{a.title}</span>
+                  <span className="small adv-rs-head">{a.headline}</span>
+                  <span className={`pill adv-st ${a.status}`}>{areaStatus(a.status)}</span>
+                </summary>
+                <p className="small"><b>Question:</b> {a.question}</p>
+                <ul className="adv-rs-f">
+                  {a.findings.map((f) => <li key={f.text}><span className={`adv-tier t${f.tier}`}>{TIER[f.tier] ?? "Source"}</span><span>{f.text} <span className="small muted"><Sources s={f.source} /></span></span></li>)}
+                </ul>
+                {a.recommendation && <p className="small adv-rs-rec"><b>Advisor says:</b> {a.recommendation}</p>}
+                {a.next && <p className="small muted"><b>Next:</b> {a.next}</p>}
+                {a.report && /^https:\/\//.test(a.report) && <a className="adv-go" href={a.report} target="_blank" rel="noreferrer">Open full report</a>}
+              </details>
+            ))}
+          </div>
+          {questions.length > 0 && (
+            <details className="adv-fold">
+              <summary>Questions the advisor can&apos;t answer yet ({questions.length})</summary>
+              <ul className="adv-list small">{questions.map((q) => <li key={q.id}><b>{q.title}.</b> {q.need}</li>)}</ul>
+            </details>
+          )}
+          <OpenOnHash />
+          <p className="small muted">Every ads study lands here: what was asked, what our own data and PH sources show, and what the advisor recommends.</p>
+        </section>
+
         <details className="card biz-more">
           <summary>How the advisor decides</summary>
           <ul className="adv-list small">
@@ -499,7 +571,15 @@ function groupFixes(fs: Finding[]) {
   return out;
 }
 
-type Move = { id: string; tone: string; tag: string; kind: string; title: string; short: string; why: string; approve: string; delta?: number | null; action: string; go: { href: string; external: boolean } | null };
+type Move = { id: string; tone: string; tag: string; kind: string; title: string; short: string; why: string; approve: string; delta?: number | null; action: string; go: { href: string; external: boolean } | null; rows?: SetRow[]; steps?: string[] };
+
+/** The task as text to send to whoever does it: link, values to set, numbered steps. */
+function taskText(m: Move) {
+  const href = m.go ? (m.go.href.startsWith("/") ? `https://hermosaos.com${m.go.href}` : m.go.href) : null;
+  const set = (m.rows ?? []).filter((r) => r.change).map((r) => `- ${r.field}: ${r.set}`);
+  return [`Hermosa ads task · ${m.tag} · ${m.kind}`, m.title, m.short, href ? `Open: ${href}` : null, set.length ? `Set it to:\n${set.join("\n")}` : null,
+    m.steps?.length ? `Steps:\n${m.steps.map((x, i) => `${i + 1}. ${x}`).join("\n")}` : null].filter(Boolean).join("\n\n");
+}
 type PhMarket = {
   refs: { cpm: { label: string; median: number }; cpc: { label: string; median: number }; chat: { label: string; lo: number; hi: number } };
   ad_library: { note: string; searches: { label: string; url: string }[] };
