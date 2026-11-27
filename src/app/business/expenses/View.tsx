@@ -83,7 +83,7 @@ export function ExpensesView(p: ViewProps) {
           reset={ym === thisMonth ? null : { href: q({ month: thisMonth }), label: "This month" }} prevLabel="Previous month" nextLabel="Next month" />
       </ControlBar>
 
-      {p.canManage && <AddPanel title="Add expense" hint="A bill or purchase, with its receipt" id="add">{form({ branch_id: scope && scope !== "company" ? p.branches.find((b) => b.code === scope)?.id ?? null : null })}</AddPanel>}
+      {p.canManage && <AddPanel title="Add expense" hint="Scan a receipt or screenshot, or type it" id="add">{form({ branch_id: scope === "company" ? null : scope ? p.branches.find((b) => b.code === scope)?.id : undefined })}</AddPanel>}
 
       {p.showCats && p.canCategories && <Categories cats={p.cats} month={ym} scope={scope} />}
 

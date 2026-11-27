@@ -2637,3 +2637,29 @@ details.exp-edit[open] { flex-basis: 100%; }
   .exp-grid { grid-template-columns: 1fr; }
   .exp-wide { grid-column: auto; }
 }
+
+/* v0.100.1 Expenses › Scan receipt + branch on every entry */
+.exp-scan { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px; border: 1px dashed var(--gold-line); border-radius: 14px; background: var(--gold-soft); }
+.exp-scan-btn { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700; }
+.exp-scan-btn.busy { opacity: .75; cursor: progress; }
+.exp-scan .small { flex: 1 1 220px; min-width: 0; }
+.exp-scan-msg { margin: 0; }
+.exp-pick-branch { margin: 0; max-width: 520px; }
+.exp-pick-branch .small { font-weight: 400; }
+.exp-check select, .exp-check input { border-color: var(--warn); box-shadow: 0 0 0 3px var(--warn-bg); }
+.exp-rows { display: grid; gap: 8px; }
+.exp-row { display: grid; grid-template-columns: 28px 150px minmax(0, 1fr) minmax(0, 220px) 110px; gap: 6px 8px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.exp-row.off { opacity: .55; }
+.exp-row.unsure { border-color: var(--warn); }
+.exp-row input, .exp-row select { min-width: 0; width: 100%; }
+.exp-row-on { display: grid; place-items: center; }
+.exp-row-amt { text-align: right; font-weight: 700; }
+.exp-row-tag { grid-column: 2 / -1; color: var(--warn); }
+.exp-rows-foot { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+@media (max-width: 860px) {
+  .exp-row { grid-template-columns: 28px minmax(0, 1fr) 110px; }
+  .exp-row > input[type="date"] { grid-column: 2 / 3; }
+  .exp-row > input:not([type]):not(.exp-row-amt), .exp-row > select, .exp-row > .muted { grid-column: 2 / -1; }
+  .exp-row-amt { grid-column: 3 / 4; grid-row: 1; }
+  .exp-pick-branch { max-width: none; }
+}
