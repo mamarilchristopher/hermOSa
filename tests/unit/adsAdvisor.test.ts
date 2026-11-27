@@ -129,3 +129,21 @@ describe("one week isn't enough", () => {
     expect(l.why).toMatch(/first week. Cut 20% if next week stays under/);
   });
 });
+
+describe("growth check (Nov 27): more spend on the same ads didn't bring more sales", () => {
+  it("a playbook line at 5x+ holds and points to new offers; a proposed test is the move instead", () => {
+    const rows = ad({ aid: "a1", a: "DEMO Hiko", sp: [3000, 3000], m: [100, 100] });
+    const sales = 3000 * 1.12 * 6 * 100;
+    const held = run(rows, sales, new Map([["QC_MAIN|HIKO", { budget: 3000, status: "keep", reviewDays: 7 }]])).lines[0];
+    expect(held.action).toBe("KEEP");
+    expect(held.why).toMatch(/new offer/);
+    const test = run(rows, sales, new Map([["QC_MAIN|HIKO", { budget: 3000, status: "keep", reviewDays: 7, proposedChange: { budget: 3600, why: "DEMO controlled test.", status: "proposed" } }]])).lines[0];
+    expect(test.action).toBe("TEST");
+    expect(test.headline).toBe("Test ₱3,600/day for 3 weeks (from ₱3,000)");
+    expect(test.why).toBe("DEMO controlled test. Waiting for your OK.");
+  });
+
+  it("the shipped playbook carries Marikina's proposed test", () => {
+    expect(planMap().get("MARIKINA|HIKO")!.proposedChange?.budget).toBeGreaterThan(planMap().get("MARIKINA|HIKO")!.budget);
+  });
+});

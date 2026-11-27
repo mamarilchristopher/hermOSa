@@ -2129,3 +2129,8 @@ a.hb-row:hover strong { text-decoration: underline; }
 .adv-gaps li:last-child { border-bottom: none; }
 .adv-gap-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
 .adv-gaps .adv-verdict { min-width: 0; font-size: 0.84rem; }
+.adv-growth h3 { font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 12px 0 6px; }
+.adv-acts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 0.88rem; }
+.adv-acts li { display: flex; gap: 10px; justify-content: space-between; align-items: flex-start; padding: 8px 10px; background: var(--pearl); border-radius: 10px; }
+.adv-acts .pill { flex: none; }
+@media (max-width: 640px) { .adv-acts li { flex-direction: column; gap: 4px; } }

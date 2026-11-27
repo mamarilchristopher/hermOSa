@@ -12,6 +12,7 @@ export type PlayLine = {
   audience: { mode: string; age_min: number; age_max: number; genders: string; interests: string[]; behaviors: string[]; note?: string };
   geo: { include: string[]; exclude: string[] };
   creatives: PlayCreative[];
+  proposed_change?: { daily_budget_pre_vat: number; why: string; status?: string } | null;
   kpis: { target_cost_per_chat_vat: number; scale_if_weekly_real_roas_at_least: number; trim_if_real_roas_below_for_2_weeks: number };
 };
 export type Untapped = { service: string; why: string; evidence: string[]; setup: string; budget_day_pre_vat: number; creative_brief: string };
@@ -31,6 +32,7 @@ export type Playbook = {
     trends: { title: string; detail: string; source: string }[];
     benchmarks: { campaign_type: string; metric: string; value: string; source: string }[];
     service_gaps?: ServiceGap[] | null; service_gaps_note?: string | null;
+    growth_signals?: { updated: string; source: string; findings: string[]; actions: { what: string; budget_day_pre_vat: number; status?: string }[]; emerging_service_rule?: string } | null;
   };
   videos: Record<string, { title: string; kind?: string | null; cpc?: string | number | null; running?: string | null; sec?: number | null }>;
 };
@@ -41,7 +43,10 @@ export const PLAYBOOK = raw as unknown as Playbook;
 const isBranchLine = (l: PlayLine) => l.branch !== "ALL" && l.status !== "proposed";
 /** Plan per "BRANCH|SERVICE" for the advisor. */
 export const planMap = (pb: Playbook = PLAYBOOK) =>
-  new Map(pb.lines.filter(isBranchLine).map((l) => [`${l.branch}|${l.service}`, { budget: l.daily_budget_pre_vat, status: l.status, reviewDays: l.review_after_days }]));
+  new Map(pb.lines.filter(isBranchLine).map((l) => [`${l.branch}|${l.service}`, {
+    budget: l.daily_budget_pre_vat, status: l.status, reviewDays: l.review_after_days,
+    proposedChange: l.proposed_change ? { budget: l.proposed_change.daily_budget_pre_vat, why: l.proposed_change.why, status: l.proposed_change.status } : null,
+  }]));
 export const playLine = (branch: string, service: string, pb: Playbook = PLAYBOOK) => pb.lines.find((l) => isBranchLine(l) && l.branch === branch && l.service === service) ?? null;
 /** All-branch ad sets and proposed new ones, proposed first. */
 export const newAdSets = (pb: Playbook = PLAYBOOK) => pb.lines.filter((l) => !isBranchLine(l)).sort((a, b) => Number(b.status === "proposed") - Number(a.status === "proposed"));
