@@ -238,36 +238,73 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 <span className="small muted">{ok.length} entr{ok.length === 1 ? "y" : "ies"} · {centsToPhp(ok.reduce((x, l) => x + Number(l.amount_paid_cents), 0))}{waiting ? ` · ${waiting} waiting` : ""}
                   {dayCheck.has(d) && <span className={`check-note ${dayCheck.get(d)!.status}`}> · {diffText(dayCheck.get(d)!)}</span>}</span>
               </h3>
-        <div className="table-wrap">
-          <table className="log-table">
-            <thead>
-              <tr><th>Service</th><th className="num">Paid</th><th>Type</th><th>Staff</th><th className="num">{noCommission ? "Role" : "Commission"}</th><th>Status</th></tr>
-            </thead>
-            <tbody>
+        {/* v0.99.1 (CHRIS Nov 27): one tidy card per entry. Who / what on the left, staff with their commission in the middle,
+            amount and status on the right, every action as one row of buttons; the fix tools sit behind "Fix entry". */}
+        <div className="card entry-list">
               {(branch ? dayList : dayList.slice().sort((a, b) => (order.get(a.branch_id ?? "") ?? 9) - (order.get(b.branch_id ?? "") ?? 9))).map((l) => {
                 const ls = lines.filter((x) => x.service_log_id === l.id);
                 const staff = [l.performer_id, l.assistant_id].filter(Boolean) as string[];
+                const canEdit = topMgmt || l.created_by === access.user_id || staff.some((x) => mine.has(x));
+                const fixName = !!l.client_name && l.state !== "REJECTED" && canEdit;
+                const afterDp = topMgmt && l.state !== "REJECTED" && (l.after_dp || ((l.visit_kind ?? "PAID") === "PAID" && Number(l.amount_paid_cents) > 0 && Number(l.list_price_cents ?? 0) > Number(l.amount_paid_cents)));
+                const fixPkg = topMgmt && l.state !== "REJECTED" && l.visit_kind === "NO_CHARGE" && !!l.service_id && bundleIds.includes(l.service_id);
                 return (
-                  <tr key={l.id} id={`entry-${l.id}`} className={[l.state === "REJECTED" ? "rejected" : "", sp.entry === l.id ? "entry-focus" : ""].join(" ").trim() || undefined}>
-                    <td>{!branch && l.branch_id && <span className="tag branch-tag">{(bName[l.branch_id] ?? "").replace(/ \(.*\)$/, "")}</span>}
-                      {l.state === "PENDING" && approverFor(l.branch_id) && pendingAll > 1 && (
-                        <input type="checkbox" className="batch-tick" name="pick" value={l.id} form="batch-approve" aria-label={`Tick ${l.client_name ?? "entry"} to approve`} />
-                      )}
-                      {(l.client_name || l.log_no) && <div className="log-client">{l.client_name}<Uid v={l.log_no} /></div>}<strong>{(l.session_no ?? 1) > 1 && <span className="session-tag">Session {l.session_no}</span>}{l.services?.name}</strong>
+                  <article key={l.id} id={`entry-${l.id}`} className={["entry", l.state === "REJECTED" ? "rejected" : "", sp.entry === l.id ? "entry-focus" : ""].join(" ").trim()}>
+                    <div className="entry-main">
+                      <div className="entry-top">
+                        {l.state === "PENDING" && approverFor(l.branch_id) && pendingAll > 1 && (
+                          <input type="checkbox" className="batch-tick" name="pick" value={l.id} form="batch-approve" aria-label={`Tick ${l.client_name ?? "entry"} to approve`} />
+                        )}
+                        {!branch && l.branch_id && <span className="tag branch-tag">{(bName[l.branch_id] ?? "").replace(/ \(.*\)$/, "")}</span>}
+                        <span className="entry-client">{l.client_name ?? "No client name"}</span>
+                        <Uid v={l.log_no} />
+                      </div>
+                      <div className="entry-service">
+                        {(l.session_no ?? 1) > 1 && <span className="session-tag">Session {l.session_no}</span>}
+                        <strong>{l.services?.name}</strong>
+                        {l.visit_kind && l.visit_kind !== "PAID"
+                          ? <span className="tag">{VISIT_TEXT[l.visit_kind] ?? l.visit_kind}</span>
+                          : <span className={`tag ${l.commission_type}`}>{TYPE_TEXT[l.commission_type]}</span>}
+                      </div>
                       {l.receipt_no && <div className="small muted">Waiver / OR {l.receipt_no}</div>}
                       {l.after_dp && <div className="small"><span className="tag">Balance after DP</span> <span className="muted">commission on the full price</span></div>}
                       {l.price_note && <div className="small muted">Price: {l.price_note}</div>}
                       {l.note && <div className="small muted">{l.note}</div>}
-                      {l.photos_due && l.state !== "REJECTED" && (
-                        <div className="photos-due">
-                          <span className="pill REVERSED">Photos missing</span>
-                          {!noCommission && <span className="small muted"> Commission held until they&apos;re added.</span>}
-                          {(topMgmt || l.created_by === access.user_id || staff.some((x) => mine.has(x))) && (
-                            <AddPhotosLater log={l.id} branch={l.branch_id ?? branch?.id ?? ""} folder={l.photo_folder ?? null} needs="before and after photos and both waiver pages" />
-                          )}
-                        </div>
+                      <div className="entry-by small muted">Entered by {l.created_by === access.user_id ? "you" : userName.get(l.created_by) ?? "a former user"} · {enteredAt(l.created_at, l.service_date)}</div>
+                    </div>
+                    <div className="entry-staff">
+                      {staff.length === 0 && <span className="small muted">No staff</span>}
+                      {staff.map((id, i) => {
+                        const line = ls.find((x) => x.employee_id === id);
+                        const role = l.commission_type === "LEAD" ? (i === 0 ? "lead" : "assist") : l.commission_type === "SOLO" ? "solo" : "";
+                        return (
+                          <div key={id} className="entry-person">
+                            <span className="who">{name[id] ?? "Former staff"}{mine.has(id) && <span className="muted"> (you)</span>}</span>
+                            <span className="comm">
+                              {noCommission ? <span className="muted small">{role || "-"}</span> : line ? <><strong>{centsToPhp(line.amount_cents)}</strong> <span className="muted small">{ROLE_TEXT[line.role]}</span></>
+                                : <span className="muted small">{l.commission_type === "NONCOMMI" ? "no commission" : approver || mine.has(id) ? `no commission · ${role}` : role}</span>}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="entry-side">
+                      <div className="entry-paid">{centsToPhp(l.amount_paid_cents)}</div>
+                      {l.state === "PENDING" && approverFor(l.branch_id) ? <DecideButtons id={l.id} /> : (
+                        <span className={`pill ${l.state === "APPROVED" ? "PUBLISHED" : l.state === "REJECTED" ? "REVERSED" : "STAGED"}`}>
+                          {l.state === "APPROVED" ? "Approved" : l.state === "REJECTED" ? "Rejected" : "Waiting"}
+                        </span>
                       )}
-                      <div className="log-by small"><span className="muted">Entered by</span> {l.created_by === access.user_id ? "you" : userName.get(l.created_by) ?? "a former user"} <span className="muted">· {enteredAt(l.created_at, l.service_date)}</span></div>
+                      {l.state === "REJECTED" && l.decision_note && <div className="small muted">{l.decision_note}</div>}
+                    </div>
+                    {l.photos_due && l.state !== "REJECTED" && (
+                      <div className="photos-due entry-wide">
+                        <span className="pill REVERSED">Photos missing</span>
+                        {!noCommission && <span className="small muted"> Commission held until they&apos;re added.</span>}
+                        {canEdit && <AddPhotosLater log={l.id} branch={l.branch_id ?? branch?.id ?? ""} folder={l.photo_folder ?? null} needs="before and after photos and both waiver pages" />}
+                      </div>
+                    )}
+                    <div className="entry-actions">
                       <EntryDetails r={{
                         id: l.id, branch: bName[l.branch_id ?? ""] ?? branch?.name ?? "", date: l.service_date, client: l.client_name ?? "No client name",
                         service: l.services?.name ?? "Service", session: l.session_no ?? 1, amount: Number(l.amount_paid_cents), kind: l.visit_kind ?? "PAID",
@@ -277,58 +314,32 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                         visit: (l.client_name ? dayList.filter((x) => x.state !== "REJECTED" && (x.client_name ?? "").trim().toLowerCase() === l.client_name!.trim().toLowerCase()) : [l])
                           .slice().reverse().map((x) => ({ service: x.services?.name ?? "Service", session: x.session_no ?? 1, amount: Number(x.amount_paid_cents), kind: x.visit_kind ?? "PAID" })),
                       }} />
-                      {proofCount.get(l.id) ? <div className="small"><Link href={`/clinic/payments?month=${l.service_date.slice(0, 7)}#${l.id}`}>💳 Proof of payment ({proofCount.get(l.id)})</Link>
-                        {payCheck.get(l.id) && <span className={`pill ${payCheck.get(l.id) === "RECEIVED" ? "PUBLISHED" : payCheck.get(l.id) === "NOT_RECEIVED" ? "REVERSED" : "STAGED"}`} style={{ marginLeft: 6 }}>
-                          {payCheck.get(l.id) === "RECEIVED" ? "Payment received" : payCheck.get(l.id) === "NOT_RECEIVED" ? "Not received" : "To confirm"}</span>}</div> : null}
-                      {l.state !== "REJECTED" && <AttachProof log={l.id} branch={l.branch_id ?? branch?.id ?? ""} have={proofCount.get(l.id) ?? 0} />}
-                      {l.photo_folder && l.client_name && <div className="small"><Link href={`/clinic/archive?month=${l.service_date.slice(0, 7)}#${l.id}`}>Photos</Link>{l.share_ok ? <span className="muted"> · sharing OK</span> : null}</div>}
+                      {l.photo_folder && l.client_name && <Link className="button secondary small" href={`/clinic/archive?month=${l.service_date.slice(0, 7)}#${l.id}`}>Photos{l.share_ok ? " · sharing OK" : ""}</Link>}
                       {/* update-0093 (CHRIS Nov 27): add, remove or replace photos on a past entry; saved after an owner's or the GM's approval. */}
-                      {l.state !== "REJECTED" && !l.photos_due && (topMgmt || l.created_by === access.user_id || staff.some((x) => mine.has(x))) && (
+                      {l.state !== "REJECTED" && !l.photos_due && canEdit && (
                         <EditPhotos log={l.id} branch={l.branch_id ?? branch?.id ?? ""} approver={can(access, ["OWNER"], null) || can(access, ["MANAGER"], null)} />
-                      )}</td>
-                    <td className="num">{centsToPhp(l.amount_paid_cents)}</td>
-                    <td>{l.visit_kind && l.visit_kind !== "PAID"
-                      ? <span className="tag">{VISIT_TEXT[l.visit_kind] ?? l.visit_kind}</span>
-                      : <span className={`tag ${l.commission_type}`}>{TYPE_TEXT[l.commission_type]}</span>}</td>
-                    {/* v0.49 (CHRIS Nov 26): staff and commission in their own columns, one line per person, aligned. */}
-                    <td>
-                      {staff.map((id) => (
-                        <div key={id} className="staff-line">{name[id] ?? "Former staff"}{mine.has(id) && <span className="muted"> (you)</span>}</div>
-                      ))}
-                    </td>
-                    <td className="num">
-                      {staff.map((id, i) => {
-                        const line = ls.find((x) => x.employee_id === id);
-                        const role = l.commission_type === "LEAD" ? (i === 0 ? "lead" : "assist") : l.commission_type === "SOLO" ? "solo" : "";
-                        return (
-                          <div key={id} className="staff-line comm">
-                            {noCommission ? <span className="muted small">{role || "-"}</span> : line ? <><strong>{centsToPhp(line.amount_cents)}</strong> <span className="muted small">{ROLE_TEXT[line.role]}</span></>
-                              : <span className="muted small">{l.commission_type === "NONCOMMI" ? "-" : approver || mine.has(id) ? `no commission · ${role}` : role}</span>}
+                      )}
+                      {proofCount.get(l.id) ? <span className="entry-proof"><Link className="button secondary small" href={`/clinic/payments?month=${l.service_date.slice(0, 7)}#${l.id}`}>💳 Proof ({proofCount.get(l.id)})</Link>
+                        {payCheck.get(l.id) && <span className={`pill ${payCheck.get(l.id) === "RECEIVED" ? "PUBLISHED" : payCheck.get(l.id) === "NOT_RECEIVED" ? "REVERSED" : "STAGED"}`}>
+                          {payCheck.get(l.id) === "RECEIVED" ? "Payment received" : payCheck.get(l.id) === "NOT_RECEIVED" ? "Not received" : "To confirm"}</span>}</span> : null}
+                      {l.state !== "REJECTED" && <AttachProof log={l.id} branch={l.branch_id ?? branch?.id ?? ""} have={proofCount.get(l.id) ?? 0} />}
+                      {(topMgmt || fixName) && (
+                        <details className="entry-more">
+                          <summary>Fix entry</summary>
+                          <div className="entry-more-body">
+                            {fixName && <RenameClientForm id={l.id} name={l.client_name!} all={topMgmt} />}
+                            {topMgmt && <ChangeDateForm id={l.id} date={l.service_date} max={today} />}
+                            {topMgmt && <ChangeBranchForm id={l.id} branch={l.branch_id ?? ""} branches={viewable.map((b) => ({ id: b.id, name: b.name }))} />}
+                            {afterDp && <AfterDpForm id={l.id} on={!!l.after_dp} />}
+                            {fixPkg && <FixPackageForm id={l.id} />}
+                            {topMgmt && l.state === "APPROVED" && <VoidEntryForm id={l.id} />}
                           </div>
-                        );
-                      })}
-                    </td>
-                    <td>
-                      {l.state === "PENDING" && approverFor(l.branch_id) ? <DecideButtons id={l.id} /> : (
-                        <span className={`pill ${l.state === "APPROVED" ? "PUBLISHED" : l.state === "REJECTED" ? "REVERSED" : "STAGED"}`}>
-                          {l.state === "APPROVED" ? "Approved" : l.state === "REJECTED" ? "Rejected" : "Waiting"}
-                        </span>
+                        </details>
                       )}
-                      {l.state === "REJECTED" && l.decision_note && <div className="small muted">{l.decision_note}</div>}
-                      {topMgmt && <ChangeDateForm id={l.id} date={l.service_date} max={today} />}
-                      {topMgmt && l.state !== "REJECTED" && l.visit_kind === "NO_CHARGE" && l.service_id && bundleIds.includes(l.service_id) && <FixPackageForm id={l.id} />}
-                      {topMgmt && l.state === "APPROVED" && <VoidEntryForm id={l.id} />}
-                      {topMgmt && <ChangeBranchForm id={l.id} branch={l.branch_id ?? ""} branches={viewable.map((b) => ({ id: b.id, name: b.name }))} />}
-                      {l.client_name && l.state !== "REJECTED" && (topMgmt || l.created_by === access.user_id || staff.some((x) => mine.has(x))) && <RenameClientForm id={l.id} name={l.client_name} all={topMgmt} />}
-                      {topMgmt && l.state !== "REJECTED" && (l.after_dp || ((l.visit_kind ?? "PAID") === "PAID" && Number(l.amount_paid_cents) > 0 && Number(l.list_price_cents ?? 0) > Number(l.amount_paid_cents))) && (
-                        <AfterDpForm id={l.id} on={!!l.after_dp} />
-                      )}
-                    </td>
-                  </tr>
+                    </div>
+                  </article>
                 );
               })}
-            </tbody>
-          </table>
         </div>
             </section>
           );
