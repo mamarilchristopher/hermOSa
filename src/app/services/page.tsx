@@ -176,7 +176,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
         </form>
 
         <div className="periods card">
-          <div className="segmented" aria-label="Branch">
+          <div className="segmented" role="tablist" aria-label="Branch">
             {viewable.length > 1 && <Link href={link(date, "ALL")} className={branch ? "" : "on"}>All branches</Link>}
             {viewable.map((b) => <Link key={b.id} href={link(date, b.code)} className={b.id === branch?.id ? "on" : ""}>{b.name}</Link>)}
           </div>

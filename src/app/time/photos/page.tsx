@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ControlBar, PeriodNav, Tabs } from "@/components/Controls";
 import { redirect } from "next/navigation";
 import { requireAccess, can } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
@@ -53,28 +54,21 @@ export default async function TimePhotosPage({ searchParams }: { searchParams: P
         <h1>Time-in photos</h1>
         <p className="muted small">The server time is the official time. &ldquo;Photo taken&rdquo; is the time saved inside the photo by the staff member&apos;s phone; more than {OLD_MIN} minutes apart is flagged as an old photo.</p>
 
-        <div className="card">
-          <div className="sched-nav">
-            <Link className="nav-arrow" href={link(addDays(day, -1))} aria-label="Previous day">‹</Link>
-            <div className="week-title"><strong>{dayLabel(day)}</strong>
-              <span className="small muted">{day === today ? "Today" : <Link href={link(today)}>Go to today</Link>}</span></div>
-            {day < today ? <Link className="nav-arrow" href={link(addDays(day, 1))} aria-label="Next day">›</Link> : <span className="nav-arrow" aria-hidden />}
-          </div>
-          <form className="field-grid" method="get" style={{ marginTop: 12 }}>
-            <input type="hidden" name="date" value={day} />
-            <label className="field half">Branch
-              <select name="branch" defaultValue={branch}>
-                <option value="">All branches</option>
-                {clinics.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select></label>
-            <label className="field half">Person
-              <select name="who" defaultValue={sp.who ?? ""}>
-                <option value="">Everyone</option>
-                {people.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-              </select></label>
-            <div className="field row-buttons"><button className="small" type="submit">Show</button></div>
-          </form>
-        </div>
+        {/* v0.98.1: branch tabs + day nav in one bar (the Service log pattern); the person filter under it. */}
+        <ControlBar>
+          <Tabs tabs={[{ href: link(day, ""), label: "All branches", on: !branch }, ...clinics.map((b) => ({ href: link(day, b.id), label: b.name, on: branch === b.id }))]} />
+          <PeriodNav prev={link(addDays(day, -1))} next={day < today ? link(addDays(day, 1)) : null} label={dayLabel(day)}
+            reset={day === today ? null : { href: link(today), label: "Today" }} prevLabel="Previous day" nextLabel="Next day" />
+        </ControlBar>
+        <form className="row-buttons log-search" method="get">
+          <input type="hidden" name="date" value={day} />
+          {branch && <input type="hidden" name="branch" value={branch} />}
+          <select name="who" defaultValue={sp.who ?? ""} aria-label="Person">
+            <option value="">Everyone</option>
+            {people.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </select>
+          <button className="secondary small" type="submit">Show</button>
+        </form>
 
         {error ? <div className="notice error">Could not load the photos. Try again.</div>
           : rows.length === 0 ? <p className="muted">No time-ins on this day.</p> : (

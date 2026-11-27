@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ControlBar, PeriodNav } from "@/components/Controls";
 import { requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { manilaToday } from "@/lib/dates";
@@ -49,11 +50,10 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
         <p className="muted small">A Late NTE (Notice to Explain) is made automatically when someone times in more than {list.grace} minutes after their shift starts.
           {manager ? ` An IR is suggested at 3 Late NTEs in a month, or sooner once someone is more than ${list.ir_minutes ?? 60} minutes late in total. Open a person to see their NTEs and issue an IR.` : " Write your explanation for each one."}</p>
 
-        <div className="week-nav">
-          <Link className="button secondary small" href={`/nte?month=${shiftMonth(ym, -1)}`}>← {monthLabel(shiftMonth(ym, -1))}</Link>
-          <div className="week-title"><strong>{monthLabel(ym)}</strong></div>
-          {ym < thisMonth ? <Link className="button secondary small" href={`/nte?month=${shiftMonth(ym, 1)}`}>{monthLabel(shiftMonth(ym, 1))} →</Link> : <span />}
-        </div>
+        <ControlBar>
+          <PeriodNav prev={`/nte?month=${shiftMonth(ym, -1)}`} next={ym < thisMonth ? `/nte?month=${shiftMonth(ym, 1)}` : null} label={monthLabel(ym)}
+            reset={ym === thisMonth ? null : { href: "/nte", label: "This month" }} prevLabel="Previous month" nextLabel="Next month" />
+        </ControlBar>
 
         {manager && (
           <div className="card">

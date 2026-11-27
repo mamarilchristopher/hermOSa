@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AddPanel } from "@/components/Controls";
 import { requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { dateLabel, groupDocs, type DocVersion } from "@/lib/documents";
@@ -58,10 +59,9 @@ export default async function DocumentsPage() {
         {!error && groups.length === 0 && <p className="muted">No documents yet.</p>}
 
         {management && (
-          <details className="card add-doc">
-            <summary><strong>+ Upload a new version</strong> <span className="small muted">owners and the GM · PDF</span></summary>
+          <AddPanel title="Upload a new version" hint="Owners and the GM · PDF">
             <AddVersionForm docs={groups.map((g) => ({ key: g.key, title: g.title, category: g.category, next: `Version ${g.old.length + 2}` }))} />
-          </details>
+          </AddPanel>
         )}
       </main>
     </>

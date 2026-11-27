@@ -5,6 +5,7 @@ import { TopBar } from "@/components/TopBar";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { AddBookingForm, CancelReasonForm, CopyForGc, NoteForm, StatusForm } from "./Forms";
 import { LiveBookings } from "./LiveBookings";
+import { AddPanel, ControlBar, DayPicker, Stat, Stats, Tabs } from "@/components/Controls";
 
 type Booking = {
   id: string; booked_on: string; csr_employee_id: string | null; client_name: string; contact: string | null; platform: string; services: string;
@@ -114,45 +115,44 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
         <p className="muted small">{booker ? "Log each booking here, from Facebook, calls, texts or walk-ins. Tap Arriving when the client says they're on the way; the branch marks Arrived, and every booking is closed out (Arrived or Did not arrive) by 7 PM." : "Who is booked for this day at every branch, and their status. Tap Arriving when the client is on the way, Arrived when they come in, then tap their name to log the sale. Close out everyone (Arrived or Did not arrive) by 7 PM."}</p>
         {error && <div className="notice info">{error.code === "42P01" ? "The owner needs to run update-0040 in Supabase first." : "Could not load. Try again."}</div>}
 
-        <div className="card">
-          <div className="booking-nav">
-            <Link className="secondary small button" href={href(addDays(day, -1))}>‹ Prev</Link>
-            <strong>{fmt(day)}{day === today ? " (today)" : ""}</strong>
-            <Link className="secondary small button" href={href(addDays(day, 1))}>Next ›</Link>
-            {day !== today && <Link className="small" href={href(today)}>Today</Link>}
+        {/* v0.98.1 (CHRIS Nov 27): the Service log pattern. Branch tabs and the day picker in one bar, counts as cards,
+            actions as buttons, and "Add a booking" as a real button. */}
+        <ControlBar>
+          <Tabs tabs={[{ href: `/bookings?d=${day}`, label: "All branches", on: !only },
+            ...clinics.map((b) => ({ href: `/bookings?d=${day}&b=${b.code}`, label: b.name, on: only?.id === b.id }))]} />
+          <DayPicker name="d" value={day} prev={href(addDays(day, -1))} next={href(addDays(day, 1))} today={day !== today ? href(today) : null}
+            keep={sp.b ? { b: sp.b } : {}} />
+        </ControlBar>
+
+        <Stats>
+          <Stat hero label={`${only?.name ?? "All branches"} · ${fmt(day)}${day === today ? " (today)" : ""}`} value={`${live.length} booked`}
+            note={seesValue && live.length > 0 ? <>Expected {peso(worth(open(live)))}{noValue > 0 ? ` · ${noValue} without a value` : ""}</> : undefined} />
+          <Stat label="Arrived or done" value={count("ARRIVED") + count("DONE")} tone={count("ARRIVED") + count("DONE") > 0 ? "good" : undefined}
+            note={seesValue && live.length > 0 ? <>{peso(worth(came(live)))} so far</> : undefined} />
+          <Stat label="Still to come" value={toClose.length} note={`${count("ARRIVING")} on the way`} tone={closingTime && toClose.length > 0 ? "bad" : undefined} />
+          <Stat label="Did not arrive" value={count("NO_SHOW") + count("UNRESPONSIVE")} note={`${count("UNRESPONSIVE")} unresponsive`} tone={count("NO_SHOW") + count("UNRESPONSIVE") > 0 ? "warn" : undefined} />
+          <Stat label="Cancelled" value={count("CANCELLED")} note={`${rows.filter(moved).length} re-scheduled`} />
+        </Stats>
+
+        {toClose.length > 0 && day <= today && (
+          <div className={`notice ${closingTime ? "error" : "info"}`}>
+            {closingTime
+              ? <>⚠ {toClose.length} client{toClose.length === 1 ? "" : "s"} still not closed out. Set each one to <strong>Arrived</strong> or <strong>Did not arrive</strong>.</>
+              : <>{toClose.length} still to come today. Before 7 PM, set each one to <strong>Arrived</strong> or <strong>Did not arrive</strong>.</>}
           </div>
-          {clinics.length > 1 && (
-            <div className="booking-nav small">
-              <Link href={`/bookings?d=${day}`} className={!only ? "on" : ""}>All branches</Link>
-              {clinics.map((b) => <Link key={b.id} href={`/bookings?d=${day}&b=${b.code}`} className={only?.id === b.id ? "on" : ""}>{GC_NAME[b.code] ?? b.name}</Link>)}
-            </div>
-          )}
-          <p className="small muted" style={{ margin: "8px 0 0" }}>
-            {live.length} booked · {count("ARRIVING")} arriving · {count("ARRIVED")} arrived · {count("DONE")} done · {count("NO_SHOW")} did not arrive · {count("UNRESPONSIVE")} unresponsive · {rows.filter(moved).length} re-sched · {count("CANCELLED")} cancelled
-          </p>
-          {seesValue && live.length > 0 && (
-            <p style={{ margin: "8px 0 0" }}>
-              Expected value: <strong>{peso(worth(open(live)))}</strong> · arrived or done: <strong>{peso(worth(came(live)))}</strong>
-              {noValue > 0 && <span className="small muted"> · {noValue} booking{noValue === 1 ? "" : "s"} without a value</span>}
-            </p>
-          )}
-          {toClose.length > 0 && day <= today && (
-            <p className={`small ${closingTime ? "notice error" : ""}`} style={{ margin: "8px 0 0" }}>
-              {closingTime
-                ? <>⚠ {toClose.length} client{toClose.length === 1 ? "" : "s"} still not closed out. Set each one to <strong>Arrived</strong> or <strong>Did not arrive</strong>.</>
-                : <>{toClose.length} still to come today. Before 7 PM, set each one to <strong>Arrived</strong> or <strong>Did not arrive</strong>.</>}
-            </p>
-          )}
-          {booker && (toFollow ?? 0) > 0 && <p className="small" style={{ margin: "8px 0 0" }}><Link href="/bookings/followups">{toFollow} unresponsive client{toFollow === 1 ? "" : "s"} to follow up ›</Link></p>}
-          {rows.length > 0 && <div style={{ marginTop: 8 }}><CopyForGc text={gc} /></div>}
-        </div>
+        )}
+        {(rows.length > 0 || (booker && (toFollow ?? 0) > 0)) && (
+          <div className="action-row">
+            {rows.length > 0 && <CopyForGc text={gc} />}
+            {booker && (toFollow ?? 0) > 0 && <Link className="button secondary small" href="/bookings/followups">{toFollow} unresponsive to follow up ›</Link>}
+          </div>
+        )}
 
         {booker && (
           // At the top (CHRIS Nov 25): management also books calls, walk-ins and texts, not only CSRs' online bookings.
-          <details className="card add-booking">
-            <summary><strong>+ Add a booking</strong> <span className="small muted">online, call, text or walk-in</span></summary>
+          <AddPanel title="Add a booking" hint="Online, call, text or walk-in">
             <AddBookingForm branches={clinics.map((b) => ({ id: b.id, name: b.name }))} today={day < today ? today : day} min={addDays(today, -30)} max={addDays(today, 365)} services={sortServices((svcs ?? []) as { name: string; price_cents: number | null }[]).map((x) => ({ name: x.name, price: x.price_cents }))} />
-          </details>
+          </AddPanel>
         )}
 
         {byBranch.map(({ b, list }) => (

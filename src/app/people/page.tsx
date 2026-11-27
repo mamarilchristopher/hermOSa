@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AddPanel } from "@/components/Controls";
 import { redirect } from "next/navigation";
 import { requireAccess, branchesFor, can } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
@@ -70,10 +71,9 @@ export default async function People() {
           </div>
         ))}
         {manage.length > 0 && (
-          <div className="card">
-            <h2>Add an employee</h2>
+          <AddPanel title="Add an employee" hint="A staff record; their login can be linked later">
             <EmployeeForm branches={[...manage, ...branches.filter((b) => b.kind === "WFH" && can(access, ["OWNER"], null))].map((b) => ({ id: b.id, name: b.name }))} logins={users ? users.map((u) => ({ id: u.id, name: u.display_name })) : null} />
-          </div>
+          </AddPanel>
         )}
       </main>
     </>

@@ -1,4 +1,5 @@
 import { sortServices } from "@/lib/serviceOrder";
+import { AddPanel } from "@/components/Controls";
 import Link from "next/link";
 import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
@@ -23,10 +24,9 @@ export default async function PricesPage() {
         {!look && <div className="notice info">Only owners and managers can see the price list.</div>}
         {error && <div className="notice info">{error.code === "42703" ? "The owner needs to run update-0042 in Supabase first." : "Could not load. Try again."}</div>}
         {edit && (
-          <div className="card">
-            <h2>Add a service</h2>
+          <AddPanel title="Add a service" hint="Name, price and commission">
             <AddServiceForm />
-          </div>
+          </AddPanel>
         )}
         {look && (
           <div className="card">
