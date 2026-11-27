@@ -1,0 +1,1104 @@
+{
+ "_note": "Synced from the ads thread playbook (adset-playbook.json + radar.json). Budgets pre-VAT. Live numbers come from the daily feed.",
+ "updated": "2026-11-27",
+ "master_plan": "https://claude.ai/artifact/Sf3SGgnZBBm9rQuqtJJH9r",
+ "catalog_sheet": "https://docs.google.com/spreadsheets/d/1uJy4S4bM96H0zmS3EzWlAgCfHz8-yvMHi0doaQEitlM/edit",
+ "month_total_pre_vat": 320000,
+ "december": {
+  "base_pre_vat": 320000,
+  "reserve_pre_vat": 40000,
+  "reserve_rule": "Release only if real ROAS is 5x or more in the first 2 weeks. It goes to Marikina and the drips first, then Fairview.",
+  "daily_shape": "Dec 1-12 about 0.80x the normal daily budget; paydays (13-16, 27-31) about 1.4x. See the master plan chart."
+ },
+ "rules": [
+  "Never edit an ad set in learning, or within 7 days of its last edit.",
+  "Change budgets in steps of about 20%, at most once a week.",
+  "Scale when weekly real ROAS is 5x or more. Trim when it stays under 3.5x for 2 weeks.",
+  "Run 8-12 different concepts per ad set, not small variations of one (Andromeda).",
+  "No before/after, no regular-price text, no lightening claims, no needle close-ups in the first 3 seconds.",
+  "Every create, edit or budget increase needs CHRIS's OK on a preview."
+ ],
+ "lines": [
+  {
+   "branch": "QC_MAIN",
+   "service": "HIKO",
+   "ad_set_name": "QC_HIKO_4MI-XFVMK_BROAD_21-54_ALL_AUTO",
+   "status": "keep_and_refresh",
+   "audience": {
+    "mode": "advantage_plus",
+    "age_min": 21,
+    "age_max": 54,
+    "genders": "all",
+    "interests": [
+     "Beauty",
+     "Cosmetics",
+     "Make-up",
+     "K-beauty / Korean dramas",
+     "Selfies",
+     "Online shopping (Shopee, Lazada)"
+    ],
+    "behaviors": [
+     "Engaged shoppers"
+    ],
+    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+   },
+   "creatives": [
+    {
+     "v": null,
+     "ad_name": "Hiko nose failed x testimonial (Apr 2025)",
+     "role": "hook + proof",
+     "why": "Cheapest chats ever: ₱19.5* (QC) to ₱29.1* (SMB) per chat, but only ₱15k* spent at QC. The file is not in the library yet. Find it and upload it."
+    },
+    {
+     "v": null,
+     "ad_name": "Don't risk it",
+     "role": "hook",
+     "why": "₱650k* spent at ₱33.7* per chat, the biggest proven winner. The file is not in the library yet."
+    },
+    {
+     "v": "V037",
+     "role": "proof",
+     "why": "Hiko 2 years: ₱34.2* per chat, and still running"
+    },
+    {
+     "v": "V048",
+     "role": "objection (how long it lasts)",
+     "why": "₱37.1* per chat. Re-cut to 15s and drop the 6-second end card."
+    },
+    {
+     "v": "V028",
+     "role": "offer (all-in-1 package)",
+     "why": "₱40.1* per chat"
+    },
+    {
+     "v": "V040",
+     "role": "hook (trend)",
+     "why": "Bakit Trending: ₱40.9* per chat, and still running"
+    }
+   ],
+   "rationale": "Hiko drives ~64% of sales. QC Main Hiko returned 4.1x in 2026. In November, spend was halved while sales held, so the old budget was over-spending. Keep this ad set out of learning and rotate in 8-12 different concepts. All-genders ad sets got chats at ₱32.6* vs ₱47.9* for women-only (last 30 days), so keep all genders.",
+   "review_after_days": 7,
+   "daily_budget_pre_vat": 3125,
+   "service_name": "Hiko nose lift",
+   "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
+   "geo": {
+    "include": [
+     "4 mi around QC Main pin (Diliman, Cubao, Kamuning, Project 2-4, San Juan edge)"
+    ],
+    "exclude": [
+     "2 mi around Fairview branch",
+     "2 mi around Marikina branch"
+    ]
+   },
+   "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
+   "kpis": {
+    "target_cost_per_chat_vat": 35,
+    "scale_if_weekly_real_roas_at_least": 5.0,
+    "trim_if_real_roas_below_for_2_weeks": 3.5
+   }
+  },
+  {
+   "branch": "QC_MAIN",
+   "service": "GLUTA",
+   "ad_set_name": "QC_DRIP (off)",
+   "status": "off",
+   "audience": {
+    "mode": "advantage_plus",
+    "age_min": 21,
+    "age_max": 45,
+    "genders": "women",
+    "interests": [
+     "Beauty and luxury",
+     "Skin care",
+     "Spa",
+     "Wellness",
+     "Online shopping"
+    ],
+    "behaviors": [],
+    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+   },
+   "creatives": [],
+   "rationale": "QC Gluta returned only 1.2x in 2026. Leave it off and test new drip creative in ALL_TEST first. Bring it back only if a test ad reaches 4x real ROAS.",
+   "review_after_days": 28,
+   "daily_budget_pre_vat": 0,
+   "service_name": "Gluta / Lux Queen drips",
+   "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
+   "geo": {
+    "include": [
+     "4 mi around QC Main pin (Diliman, Cubao, Kamuning, Project 2-4, San Juan edge)"
+    ],
+    "exclude": [
+     "2 mi around Fairview branch",
+     "2 mi around Marikina branch"
+    ]
+   },
+   "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
+   "kpis": {
+    "target_cost_per_chat_vat": 35,
+    "scale_if_weekly_real_roas_at_least": 5.0,
+    "trim_if_real_roas_below_for_2_weeks": 3.5
+   }
+  },
+  {
+   "branch": "FAIRVIEW",
+   "service": "HIKO",
+   "ad_set_name": "FV_HIKO_5MI+SJDM-XQC_BROAD_21-54_ALL_AUTO",
+   "status": "rebuild",
+   "audience": {
+    "mode": "advantage_plus",
+    "age_min": 21,
+    "age_max": 54,
+    "genders": "all",
+    "interests": [
+     "Beauty",
+     "Cosmetics",
+     "Make-up",
+     "K-beauty / Korean dramas",
+     "Selfies",
+     "Online shopping (Shopee, Lazada)"
+    ],
+    "behaviors": [
+     "Engaged shoppers"
+    ],
+    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+   },
+   "creatives": [
+    {
+     "v": "V037",
+     "role": "proof",
+     "why": "Best Hiko proof clip in the library. Re-cut it with a Fairview end card (near Fairview Center Mall)."
+    },
+    {
+     "v": "V051",
+     "role": "testimonial",
+     "why": "Love testimonial: ₱43.9* per chat. Cut it from 96s down to 35s."
+    },
+    {
+     "v": "V048",
+     "role": "objection",
+     "why": "How long it lasts: ₱37.1* per chat"
+    },
+    {
+     "v": "V056",
+     "role": "natural-look angle",
+     "why": "Fits the 2026 'no overdone looks' trend: ₱46.9* per chat"
+    }
+   ],
+   "rationale": "Fairview Hiko is the weakest branch-service at 2.8x, and its live ad set pays ₱46.8* per chat. Rebuild the creative so it is local, and test this ad set on the QC Main page for 4 weeks in January. Details are in the Fairview revival section of the master plan.",
+   "review_after_days": 7,
+   "daily_budget_pre_vat": 1975,
+   "service_name": "Hiko nose lift",
+   "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
+   "geo": {
+    "include": [
+     "5 mi around Fairview branch (Fairview, Lagro, Novaliches, Commonwealth, North Caloocan)",
+     "San Jose del Monte, Bulacan"
+    ],
+    "exclude": [
+     "2 mi around QC Main"
+    ]
+   },
+   "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
+   "kpis": {
+    "target_cost_per_chat_vat": 35,
+    "scale_if_weekly_real_roas_at_least": 5.0,
+    "trim_if_real_roas_below_for_2_weeks": 3.5
+   }
+  },
+  {
+   "branch": "FAIRVIEW",
+   "service": "GLUTA",
+   "ad_set_name": "FV_DRIP_5MI+SJDM-XQC_BROAD_21-45_F_AUTO",
+   "status": "keep",
+   "audience": {
+    "mode": "advantage_plus",
+    "age_min": 21,
+    "age_max": 45,
+    "genders": "women",
+    "interests": [
+     "Beauty and luxury",
+     "Skin care",
+     "Spa",
+     "Wellness",
+     "Online shopping"
+    ],
+    "behaviors": [],
+    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+   },
+   "creatives": [
+    {
+     "v": null,
+     "ad_name": "Drip 082124",
+     "role": "hook",
+     "why": "₱33.0* per chat on ₱377k* spent"
+    },
+    {
+     "v": "V052",
+     "role": "ugc skit",
+     "why": "Glow-up skit. Add a voiceover and fix the grammar first."
+    },
+    {
+     "v": "V054",
+     "role": "testimonial",
+     "why": "Sulit ba Luxx Queen. Trim the 27 seconds of black screen at the end first."
+    }
+   ],
+   "rationale": "Fairview drips returned 3.1x. In the live ad sets, 'Beauty and Luxury' got ₱29.0* per chat and a 1-7% lookalike of message senders got ₱32.8*. Keep those audience ideas as suggestions. Glow and price claims only, never lightening.",
+   "review_after_days": 14,
+   "daily_budget_pre_vat": 495,
+   "service_name": "Gluta / Lux Queen drips",
+   "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
+   "geo": {
+    "include": [
+     "5 mi around Fairview branch (Fairview, Lagro, Novaliches, Commonwealth, North Caloocan)",
+     "San Jose del Monte, Bulacan"
+    ],
+    "exclude": [
+     "2 mi around QC Main"
+    ]
+   },
+   "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
+   "kpis": {
+    "target_cost_per_chat_vat": 35,
+    "scale_if_weekly_real_roas_at_least": 5.0,
+    "trim_if_real_roas_below_for_2_weeks": 3.5
+   }
+  },
+  {
+   "branch": "STA_MARIA",
+   "service": "HIKO",
+   "ad_set_name": "SM_HIKO_BULACAN8_BROAD_21-54_ALL_AUTO",
+   "status": "rebuild",
+   "audience": {
+    "mode": "advantage_plus",
+    "age_min": 21,
+    "age_max": 54,
+    "genders": "all",
+    "interests": [
+     "Beauty",
+     "Cosmetics",
+     "Make-up",
+     "K-beauty / Korean dramas",
+     "Selfies",
+     "Online shopping (Shopee, Lazada)"
+    ],
+    "behaviors": [
+     "Engaged shoppers"
+    ],
+    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+   },
+   "creatives": [
+    {
+     "v": "V044",
+     "role": "testimonial / why choose us",
+     "why": "The 'Why should I choose Hiko' cut got ₱29.0* per chat at SMB. Re-cut it from 98s down to 35s and remove the CapCut outro."
+    },
+    {
+     "v": null,
+     "ad_name": "Bulacan 042325 - where to book",
+     "role": "local hook",
+     "why": "₱34.7* per chat"
+    },
+    {
+     "v": "V037",
+     "role": "proof",
+     "why": "2-year results"
+    }
+   ],
+   "rationale": "SMB Hiko returned 3.0x. The current live ad set runs from the Main page on the QC pin (+4 mi, women only) at ₱44.2* per chat. Move it to the Bulacan towns and all genders.",
+   "review_after_days": 7,
+   "daily_budget_pre_vat": 1150,
+   "service_name": "Hiko nose lift",
+   "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
+   "geo": {
+    "include": [
+     "Sta. Maria",
+     "Bocaue",
+     "Marilao",
+     "Meycauayan",
+     "Balagtas",
+     "Pandi",
+     "Norzagaray",
+     "Angat",
+     "Guiguinto (Bulacan)"
+    ],
+    "exclude": []
+   },
+   "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
+   "kpis": {
+    "target_cost_per_chat_vat": 35,
+    "scale_if_weekly_real_roas_at_least": 5.0,
+    "trim_if_real_roas_below_for_2_weeks": 3.5
+   }
+  },
+  {
+   "branch": "STA_MARIA",
+   "service": "GLUTA",
+   "ad_set_name": "SM_DRIP_BULACAN8_BROAD_21-45_F_AUTO",
+   "status": "keep_untouched",
+   "audience": {
+    "mode": "advantage_plus",
+    "age_min": 21,
+    "age_max": 45,
+    "genders": "women",
+    "interests": [
+     "Beauty and luxury",
+     "Skin care",
+     "Spa",
+     "Wellness",
+     "Online shopping"
+    ],
+    "behaviors": [],
+    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+   },
+   "creatives": [
+    {
+     "v": null,
+     "ad_name": "Drip 082124 (live 'DRIP TOFU BULACAN' Broad Adv+)",
+     "role": "winner",
+     "why": "₱27.0* per chat in the last 30 days, with 10.5x real ROAS on SMB Gluta"
+    }
+   ],
+   "rationale": "This is the best return in the account. Don't edit it. Raise it about 20% only after 7 stable days at 5x or more.",
+   "review_after_days": 7,
+   "daily_budget_pre_vat": 660,
+   "service_name": "Gluta / Lux Queen drips",
+   "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
+   "geo": {
+    "include": [
+     "Sta. Maria",
+     "Bocaue",
+     "Marilao",
+     "Meycauayan",
+     "Balagtas",
+     "Pandi",
+     "Norzagaray",
+     "Angat",
+     "Guiguinto (Bulacan)"
+    ],
+    "exclude": []
+   },
+   "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
+   "kpis": {
+    "target_cost_per_chat_vat": 35,
+    "scale_if_weekly_real_roas_at_least": 5.0,
+    "trim_if_real_roas_below_for_2_weeks": 3.5
+   }
+  },
+  {
+   "branch": "MARIKINA",
+   "service": "HIKO",
+   "ad_set_name": "MK_HIKO_4MI+RIZAL-XQC_BROAD_21-54_ALL_AUTO",
+   "status": "keep_untouched",
+   "audience": {
+    "mode": "advantage_plus",
+    "age_min": 21,
+    "age_max": 54,
+    "genders": "all",
+    "interests": [
+     "Beauty",
+     "Cosmetics",
+     "Make-up",
+     "K-beauty / Korean dramas",
+     "Selfies",
+     "Online shopping (Shopee, Lazada)"
+    ],
+    "behaviors": [],
+    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+   },
+   "creatives": [
+    {
+     "v": null,
+     "ad_name": "NEW- AFFORDABLE HIKO NOSE MARIKINA",
+     "role": "winner",
+     "why": "₱28.6* per chat, the best Hiko creative of all"
+    },
+    {
+     "v": "V037",
+     "role": "proof",
+     "why": "The 2-year clip also runs here (OLD- HIKO NOSE 2 YEARS)"
+    }
+   ],
+   "rationale": "The live '2026.06.12 HIKO D. LAST WORKING' Broad Adv+ ad set gets ₱30.1* per chat, and Marikina Hiko returned 4.9x. It moves into the main account in January by reusing post IDs, so it keeps its social proof.",
+   "review_after_days": 7,
+   "daily_budget_pre_vat": 1645,
+   "service_name": "Hiko nose lift",
+   "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
+   "geo": {
+    "include": [
+     "4 mi around Marikina branch",
+     "Antipolo",
+     "Cainta",
+     "San Mateo",
+     "Rodriguez (Montalban)"
+    ],
+    "exclude": [
+     "2 mi around QC Main"
+    ]
+   },
+   "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
+   "kpis": {
+    "target_cost_per_chat_vat": 35,
+    "scale_if_weekly_real_roas_at_least": 5.0,
+    "trim_if_real_roas_below_for_2_weeks": 3.5
+   }
+  },
+  {
+   "branch": "MARIKINA",
+   "service": "GLUTA",
+   "ad_set_name": "MK_DRIP_4MI+RIZAL-XQC_BROAD_21-45_F_AUTO",
+   "status": "start",
+   "audience": {
+    "mode": "advantage_plus",
+    "age_min": 21,
+    "age_max": 45,
+    "genders": "women",
+    "interests": [
+     "Beauty and luxury",
+     "Skin care",
+     "Spa",
+     "Wellness",
+     "Online shopping"
+    ],
+    "behaviors": [],
+    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+   },
+   "creatives": [
+    {
+     "v": null,
+     "ad_name": "LUX DRIP 082124",
+     "role": "winner",
+     "why": "₱30.9* per chat on ₱226k* spent (Marikina)"
+    },
+    {
+     "v": "V052",
+     "role": "ugc",
+     "why": "New glow-up skit"
+    }
+   ],
+   "rationale": "Marikina Gluta returned 9.5x but has no drip ad running. Restart it with the old winner.",
+   "review_after_days": 14,
+   "daily_budget_pre_vat": 660,
+   "service_name": "Gluta / Lux Queen drips",
+   "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
+   "geo": {
+    "include": [
+     "4 mi around Marikina branch",
+     "Antipolo",
+     "Cainta",
+     "San Mateo",
+     "Rodriguez (Montalban)"
+    ],
+    "exclude": [
+     "2 mi around QC Main"
+    ]
+   },
+   "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
+   "kpis": {
+    "target_cost_per_chat_vat": 35,
+    "scale_if_weekly_real_roas_at_least": 5.0,
+    "trim_if_real_roas_below_for_2_weeks": 3.5
+   }
+  },
+  {
+   "branch": "ALL",
+   "service": "OTHER",
+   "service_name": "Retargeting (4 pages)",
+   "ad_set_name": "<BR>_RTG_MSG90+VV30_ALL_21-60_ALL_AUTO",
+   "status": "start",
+   "audience": {
+    "mode": "custom_audiences",
+    "age_min": 21,
+    "age_max": 60,
+    "genders": "all",
+    "interests": [],
+    "behaviors": [],
+    "custom": [
+     "Messaged the page in the last 90 days",
+     "Watched 50% of a video in the last 30 days",
+     "Engaged with FB/IG in the last 60 days"
+    ],
+    "exclude": [
+     "Customer list of clients from the last 30 days (only with CHRIS's OK)"
+    ]
+   },
+   "creatives": [
+    {
+     "v": "V048",
+     "role": "objection",
+     "why": "How long it lasts"
+    },
+    {
+     "v": "V056",
+     "role": "objection",
+     "why": "Natural, not overdone"
+    },
+    {
+     "v": "V046",
+     "role": "loyalty",
+     "why": "Refill journey"
+    },
+    {
+     "v": "V031",
+     "role": "offer",
+     "why": "What the ₱8,999 package includes (show current prices only)"
+    }
+   ],
+   "rationale": "One small ad set per page (about ₱80 a day each) answers the doubts people raise in chat. It is covered in radar.json under retargeting.",
+   "review_after_days": 14,
+   "daily_budget_pre_vat": 330,
+   "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
+   "geo": {
+    "include": [
+     "each branch's own area (see the branch lines)"
+    ],
+    "exclude": []
+   },
+   "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
+   "kpis": {
+    "target_cost_per_chat_vat": 35,
+    "scale_if_weekly_real_roas_at_least": 5.0,
+    "trim_if_real_roas_below_for_2_weeks": 3.5
+   }
+  },
+  {
+   "branch": "ALL",
+   "service": "OTHER",
+   "service_name": "Testing",
+   "ad_set_name": "ALL_TEST_<CONCEPT>_QC4MI_BROAD_21-54_ALL_AUTO",
+   "status": "start",
+   "audience": {
+    "mode": "advantage_plus",
+    "age_min": 21,
+    "age_max": 54,
+    "genders": "all",
+    "interests": [
+     "Beauty",
+     "Cosmetics",
+     "Make-up",
+     "K-beauty / Korean dramas",
+     "Selfies",
+     "Online shopping (Shopee, Lazada)"
+    ],
+    "behaviors": [],
+    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+   },
+   "creatives": [
+    {
+     "v": null,
+     "ad_name": "winner clones and untapped-service tests",
+     "role": "test",
+     "why": "See the untapped tests in radar.json"
+    }
+   ],
+   "rationale": "Test 2-3 new concepts a week. An ad graduates into a branch ad set when its cost per chat is ₱35* or less and it gets bookings.",
+   "review_after_days": 7,
+   "daily_budget_pre_vat": 495,
+   "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
+   "geo": {
+    "include": [
+     "each branch's own area (see the branch lines)"
+    ],
+    "exclude": []
+   },
+   "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
+   "kpis": {
+    "target_cost_per_chat_vat": 35,
+    "scale_if_weekly_real_roas_at_least": 5.0,
+    "trim_if_real_roas_below_for_2_weeks": 3.5
+   }
+  }
+ ],
+ "radar": {
+  "note": "Outside sources are mostly US agency or vendor blogs. Treat their numbers as directional. Our own ad log and the Hermosa OS sales numbers win.",
+  "untapped": [
+   {
+    "service": "NovoForm (doctor-guided weight management)",
+    "why": "Small NovoForm static ads got chats for ₱17-29* (Novoform Box/Vial), cheaper than any Hiko ad, but only about ₱8k* was ever spent. Interest in GLP-1 programs is rising globally.",
+    "evidence": [
+     "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)",
+     "https://iapam.com/2026-aesthetic-medicine-trends"
+    ],
+    "setup": "ALL_TEST ad set for 2 weeks. QC 4 mi + Fairview 5 mi, Advantage+, age 25-55 hard minimum 21. Doctor-guided, wellness framing only: no scale photos, no before/after, no weight or kilos claims, no 'lose X kg'.",
+    "budget_day_pre_vat": 300,
+    "creative_brief": "Doctor talking head (15s): 'Safe ba ang GLP-1? Dito, doctor-guided ka from day 1.' Then the consult is free, then Send message. Reuse V057 with the scale shots removed."
+   },
+   {
+    "service": "Barbie arms / Botox (jawtox, sweatox)",
+    "why": "The QC Barbie Arms ad got ₱36.3* per chat, close to the Hiko winners, on ₱49k*. Botox is already 10% of sales and is still the most-viewed noninvasive treatment globally.",
+    "evidence": [
+     "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)",
+     "https://www.realself.com/news/real-talk-q1-2026"
+    ],
+    "setup": "QC + Marikina, women 21-45 suggestion, Advantage+. Run it in ALL_TEST first.",
+    "budget_day_pre_vat": 300,
+    "creative_brief": "Re-cut V035 to 20s. Remove the before/after overlay and the syringe close-ups in the first 10s. Hook: 'Sleeveless season na. Ready na ba arms mo?' Current price only."
+   },
+   {
+    "service": "Skin tightening (Ultra V Lift / HIFU / RF)",
+    "why": "Non-surgical tightening is called a growing PH trend, but our HIFU ads (₱60-557* per chat) and the Ultra V Lift ad (₱116.6*) failed. The creative was static and generic, so the demand itself was never tested properly.",
+    "evidence": [
+     "https://www.thetrndsph.com/2026/03/non-surgical-skin-tightening.html",
+     "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)"
+    ],
+    "setup": "ALL_TEST, QC + Marikina, all genders 30-55 suggestion.",
+    "budget_day_pre_vat": 250,
+    "creative_brief": "Real client testimonial video (no B/A): 'Mukhang pagod lagi? Lifted look in 1 session, walang downtime.' Show the Ultra V Lift price as the current price."
+   },
+   {
+    "service": "Facials: carbon laser, acne, glass-skin",
+    "why": "Facials, acne and pigmentation are among the steadiest PH beauty searches. A carbon laser package (₱2,500 a session) is an easy first visit that leads into Hiko and drips.",
+    "evidence": [
+     "https://www.soiclinic.com/blog/most-googled-beauty-treatments-philippines-2026"
+    ],
+    "setup": "Each branch's own area, women 18-35 suggestion (hard minimum 21), Advantage+. Start with SMB and Marikina, where drips already convert.",
+    "budget_day_pre_vat": 250,
+    "creative_brief": "ASMR-style treatment clip (V020 facial raw) with the hook 'Glass skin without filter?'. Glow only: no whitening or lightening words, and no acne before/after."
+   },
+   {
+    "service": "Men (Hiko 'pogi', jawtox)",
+    "why": "All-genders Hiko ad sets get chats ~30% cheaper than women-only (₱32.6* vs ₱47.9*). Male aesthetics is called a fast-growing segment.",
+    "evidence": [
+     "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)",
+     "https://iapam.com/2026-aesthetic-medicine-trends"
+    ],
+    "setup": "Keep Hiko ad sets all-genders. Add 1-2 male-led creatives per ad set instead of a separate ad set.",
+    "budget_day_pre_vat": 0,
+    "creative_brief": "V055 'Ang ganda and pogi mo' re-cut to 15s with the male client in the first 2 seconds."
+   }
+  ],
+  "retargeting": {
+   "setup": "One small ad set per branch page inside ALL_MIX_AON_MSG (<BR>_RTG_...). Engagement > Messages, Advantage+ placements, no Advantage+ audience expansion.",
+   "audiences": [
+    "Messaged the page in the last 90 days",
+    "Watched 50%+ of any video in the last 30 days",
+    "Engaged with the FB page or IG in the last 60 days",
+    "Exclude: clients from the last 30 days (customer list upload, only with CHRIS's OK)"
+   ],
+   "budget_day_pre_vat": 330,
+   "creative_plan": "Answer objections from chat: how long it lasts (V048), natural not overdone (V056), what the package includes (V031), refill journey (V046), plus 'free consult' reminders on paydays.",
+   "benchmarks": [
+    {
+     "metric": "Retargeting ROAS (general D2C)",
+     "value": "2.5x-6.0x, vs 1.2x-2.5x prospecting",
+     "source": "https://www.adamigo.ai/blog/meta-ads-roas-benchmarks-by-industry-2026"
+    },
+    {
+     "metric": "Suggested warm share of budget (med spa)",
+     "value": "20-25% warm, 10-15% re-engagement",
+     "source": "https://scalehaven.io/blog/facebook-ads-for-med-spas/"
+    },
+    {
+     "metric": "Our start",
+     "value": "About 3% of budget (₱10k a month). Raise it only if real ROAS is 5x or more, because our audiences are small and chat-based.",
+     "source": "Hermosa master plan"
+    }
+   ]
+  },
+  "trends": [
+   {
+    "title": "Creative is the targeting (Andromeda)",
+    "detail": "Meta groups lookalike ads as one creative. Run 8-12 genuinely different concepts per ad set and add 2-4 new ones a week, instead of copies with small edits.",
+    "source": "https://adsuploader.com/blog/meta-andromeda ; https://alexneiman.com/broad-targeting-advantage-plus-audience-2026/"
+   },
+   {
+    "title": "Advantage+ audience is the default; detailed targeting shrank",
+    "detail": "Interest exclusions were removed on Mar 31, 2025. Interests were merged into broad clusters from Jun 2025. Campaigns using deprecated targeting stopped delivering after Jan 15, 2026. Interests are now suggestions only. Location and minimum age stay hard limits.",
+    "source": "https://lafactory.com/meta-broad-vs-detailed-targeting/"
+   },
+   {
+    "title": "Health targeting and 18+",
+    "detail": "Health-interest targeting has been gone since Jan 2022, and cosmetic procedure ads must be 18+. We use 21+.",
+    "source": "https://clickem.io/facebook-ads-for-med-spas/"
+   },
+   {
+    "title": "Before/after is still risky in practice",
+    "detail": "Sources disagree about whether cosmetic before/after is allowed. Our rule stays: no before/after in ads. Avoid 'fix', 'problem areas', 'stubborn fat'; use 'enhance', 'support', 'natural'.",
+    "source": "https://bowocreative.com/meta-ads-for-med-spas-2026/ ; https://scalehaven.io/blog/facebook-ads-for-med-spas/"
+   },
+   {
+    "title": "UGC and testimonial video beat polished studio ads",
+    "detail": "UGC-style video is claimed to beat studio video by 40-60%, and educational ads to beat promotional ones. Our own winners agree: 'Hiko failed x testimonial' at ₱19.5-29* and 'Don't risk it' at ₱33.7*.",
+    "source": "https://scalehaven.io/blog/facebook-ads-for-med-spas/ ; https://bowocreative.com/meta-ads-for-med-spas-2026/ ; Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)"
+   },
+   {
+    "title": "Natural, not overdone",
+    "detail": "PH and global trend toward subtle results, low downtime and skin quality. Lean on 'natural matangos' messaging (V056).",
+    "source": "https://iapam.com/2026-aesthetic-medicine-trends ; https://www.realself.com/news/real-talk-q1-2026"
+   },
+   {
+    "title": "Skeptical searchers",
+    "detail": "PH searchers type 'worth it', 'side effects', 'how many sessions'. Objection-answering ads fit both retargeting and cold audiences.",
+    "source": "https://www.soiclinic.com/blog/most-googled-beauty-treatments-philippines-2026"
+   },
+   {
+    "title": "Speed to reply",
+    "detail": "Replying within about 5 minutes is claimed to lift conversion up to 9x. CSR response time matters as much as the ad.",
+    "source": "https://prospyrmed.com/blog/post/paid-ad-roi-benchmarks-aesthetic-clinics"
+   },
+   {
+    "title": "Shorter ads",
+    "detail": "Our analysed ads run 20-190s. The recommended length for cold Reels is 15-30s. Most remakes cut the length in half and remove the 6s static end cards.",
+    "source": "Hermosa video analysis (Gemini, Nov 27 2026)"
+   }
+  ],
+  "benchmarks": [
+   {
+    "campaign_type": "Med spa Meta (US)",
+    "metric": "ROAS",
+    "value": "~1.8x average; beauty 2.31x; healthcare 1.49x",
+    "source": "https://prospyrmed.com/blog/post/paid-ad-roi-benchmarks-aesthetic-clinics"
+   },
+   {
+    "campaign_type": "Med spa Meta (US)",
+    "metric": "Cost per lead",
+    "value": "$50-$100 good, $75-$200 average; Instant Form $15-$50",
+    "source": "https://prospyrmed.com/blog/post/paid-ad-roi-benchmarks-aesthetic-clinics"
+   },
+   {
+    "campaign_type": "Med spa Meta by treatment (US agency)",
+    "metric": "Cost per lead",
+    "value": "Botox $15-25, fillers $18-30, GLP-1/laser $20-35, body $25-45",
+    "source": "https://scalehaven.io/blog/facebook-ads-for-med-spas/"
+   },
+   {
+    "campaign_type": "Hermosa click-to-Messenger (2026)",
+    "metric": "Cost per chat",
+    "value": "₱40-45* average; winners ₱19.5-33.7*",
+    "source": "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)"
+   },
+   {
+    "campaign_type": "Hermosa all branches (2026 Jan-Oct)",
+    "metric": "Real ROAS (declared sales / spend*)",
+    "value": "5.1x overall; QC 4.9x, FV 4.3x, SMB 5.5x, MK 6.8x",
+    "source": "Past-ads ROAS report https://claude.ai/artifact/NBhJKh5fqUpE7SG6pVQsTD"
+   },
+   {
+    "campaign_type": "Learning phase",
+    "metric": "Events to exit",
+    "value": "About 50 optimisation events in 7 days per ad set (sources vary: 25-50)",
+    "source": "https://nowoka.com/blog/meta-ads-andromeda-advantage-plus-guide-2026/ ; https://lafactory.com/meta-broad-vs-detailed-targeting/"
+   }
+  ]
+ },
+ "videos": {
+  "V001": {
+   "title": "hiko nose thread lift wiping procedure 01",
+   "kind": "procedure_clip",
+   "sec": 2.6
+  },
+  "V002": {
+   "title": "hiko nose thread lift procedure closeup",
+   "kind": "procedure_clip",
+   "sec": 16.6
+  },
+  "V003": {
+   "title": "hiko model profile front raw white bg",
+   "kind": "raw_footage",
+   "sec": 25.6
+  },
+  "V004": {
+   "title": "iv drip yellow broll closeup",
+   "kind": "b_roll",
+   "sec": 8.6
+  },
+  "V005": {
+   "title": "iv drip procedure client closeup",
+   "kind": "procedure_clip",
+   "sec": 2.6
+  },
+  "V006": {
+   "title": "lux queen iv drip procedure raw 01",
+   "kind": "procedure_clip",
+   "sec": 4.1
+  },
+  "V007": {
+   "title": "gluta iv drip two models sitting 01",
+   "kind": "raw_footage",
+   "sec": 3.6
+  },
+  "V008": {
+   "title": "lux queen iv drip clients relaxing 01",
+   "kind": "raw_footage",
+   "sec": 4.1
+  },
+  "V009": {
+   "title": "gluta drip group session broll",
+   "kind": "b_roll",
+   "sec": 8.1
+  },
+  "V010": {
+   "title": "iv drip client comfort 01",
+   "kind": "procedure_clip",
+   "sec": 4.1
+  },
+  "V011": {
+   "title": "iv drip client relaxing white robe 01",
+   "kind": "raw_footage",
+   "sec": 3.6
+  },
+  "V012": {
+   "title": "iv drip lounge raw 01",
+   "kind": "raw_footage",
+   "sec": 3.6
+  },
+  "V013": {
+   "title": "iv drip client relaxing broll",
+   "kind": "raw_footage",
+   "sec": 3.1
+  },
+  "V014": {
+   "title": "iv drip procedure comfort broll",
+   "kind": "procedure_clip",
+   "sec": 7.1
+  },
+  "V015": {
+   "title": "ultra v lift procedure closeup needles",
+   "kind": "procedure_clip",
+   "sec": 32.1
+  },
+  "V016": {
+   "title": "hermosa client walk in reception 01",
+   "kind": "raw_footage",
+   "sec": 15.1
+  },
+  "V017": {
+   "title": "hermosa aesthetics staff group pose 01",
+   "kind": "raw_footage",
+   "sec": 9.6
+  },
+  "V018": {
+   "title": "hermosa clinic room tour broll 01",
+   "kind": "b_roll",
+   "sec": 11.6
+  },
+  "V019": {
+   "title": "clinic treatment room broll zoom out",
+   "kind": "b_roll",
+   "sec": 22.1
+  },
+  "V020": {
+   "title": "facial cleaning raw procedure 01",
+   "kind": "procedure_clip",
+   "sec": 2.6
+  },
+  "V021": {
+   "title": "fillers chin marking raw 01",
+   "kind": "procedure_clip",
+   "sec": 19.1
+  },
+  "V022": {
+   "title": "lip filler prep cleaning 01",
+   "kind": "procedure_clip",
+   "sec": 16.1
+  },
+  "V023": {
+   "title": "hifu ultraformer prep procedure 01",
+   "kind": "procedure_clip",
+   "sec": 13.0
+  },
+  "V024": {
+   "title": "novoform glp weight loss client results ad",
+   "kind": "finished_ad",
+   "sec": 13.8
+  },
+  "V025": {
+   "title": "LUXX DRIP X TESTIMONIAL",
+   "kind": "finished_ad",
+   "cpc": null,
+   "running": null
+  },
+  "V026": {
+   "title": "version 2 luxx drip x testimonial",
+   "kind": "finished_ad",
+   "cpc": null,
+   "running": null
+  },
+  "V027": {
+   "title": "AA- Revised-What’s stopping you from getting your nose done_",
+   "kind": "finished_ad",
+   "cpc": null,
+   "running": null
+  },
+  "V028": {
+   "title": "AB-HIKO ALL IN 1 PACKAGE",
+   "kind": "finished_ad",
+   "cpc": "40.1",
+   "running": ""
+  },
+  "V029": {
+   "title": "AC-HIKO WITH CLIENT TESTIMONIAL",
+   "kind": "finished_ad",
+   "cpc": null,
+   "running": null
+  },
+  "V030": {
+   "title": "AD-What happen in your Hiko after 2 years_",
+   "kind": "finished_ad",
+   "cpc": "44.6",
+   "running": ""
+  },
+  "V031": {
+   "title": "AE-WHAT TO EXPECT IN 8,999 PACKAGE_",
+   "kind": "finished_ad",
+   "cpc": "64.8",
+   "running": ""
+  },
+  "V032": {
+   "title": "AF-WORTH IT BA MAG PA HIKO_",
+   "kind": "finished_ad",
+   "cpc": "68.3",
+   "running": ""
+  },
+  "V033": {
+   "title": "Dermal Fillers",
+   "kind": "finished_ad",
+   "cpc": null,
+   "running": null
+  },
+  "V034": {
+   "title": "HIKO RECONSTRUCTION",
+   "kind": "finished_ad",
+   "cpc": "79.2",
+   "running": ""
+  },
+  "V035": {
+   "title": "BARBIE ARMS PACKAGE",
+   "kind": "finished_ad",
+   "cpc": "36.3",
+   "running": ""
+  },
+  "V036": {
+   "title": "CHIN FILLER",
+   "kind": "finished_ad",
+   "cpc": null,
+   "running": null
+  },
+  "V037": {
+   "title": "What happens after 2 years Hiko",
+   "kind": "finished_ad",
+   "cpc": "34.2",
+   "running": "Yes"
+  },
+  "V038": {
+   "title": "Get your non-surgical rhinoplasty this summer!",
+   "kind": "finished_ad",
+   "cpc": "50.3",
+   "running": ""
+  },
+  "V039": {
+   "title": "Luxx Drip Journey",
+   "kind": "finished_ad",
+   "cpc": null,
+   "running": null
+  },
+  "V040": {
+   "title": "Bakit Trending",
+   "kind": "finished_ad",
+   "cpc": "40.9",
+   "running": "Yes"
+  },
+  "V041": {
+   "title": "Hiko nose disappointment",
+   "kind": "finished_ad",
+   "cpc": "71.3",
+   "running": "Yes"
+  },
+  "V042": {
+   "title": "Hiko nose In_VO",
+   "kind": "finished_ad",
+   "cpc": "41.9",
+   "running": ""
+  },
+  "V043": {
+   "title": "DO LIP FILLERS DAMAGE YOUR LIPS",
+   "kind": "finished_ad",
+   "cpc": "61.9",
+   "running": ""
+  },
+  "V044": {
+   "title": "EDITED WHY SHOULD I CHOOSE HERMOSA HIKO",
+   "kind": "finished_ad",
+   "cpc": "45.6",
+   "running": ""
+  },
+  "V045": {
+   "title": "HIFU REELS",
+   "kind": "finished_ad",
+   "cpc": "67.3",
+   "running": ""
+  },
+  "V046": {
+   "title": "HIKO NOSE REFILL JOURNEY",
+   "kind": "finished_ad",
+   "cpc": null,
+   "running": null
+  },
+  "V047": {
+   "title": "HIKO SKYE LONG FORM",
+   "kind": "finished_ad",
+   "cpc": "41.3",
+   "running": ""
+  },
+  "V048": {
+   "title": "HOW LONG WILL YOUR HIKO NOSE LIFT LAST_",
+   "kind": "finished_ad",
+   "cpc": "37.1",
+   "running": ""
+  },
+  "V049": {
+   "title": "LOVE HIKO TRANSFORMATION VID",
+   "kind": "finished_ad",
+   "cpc": "44.3",
+   "running": ""
+  },
+  "V050": {
+   "title": "LOVE ORIGINAL CLIPS",
+   "kind": "finished_ad",
+   "cpc": "46.9",
+   "running": ""
+  },
+  "V051": {
+   "title": "WHY SHOULD I CHOOSE HERMOSA FOR HIKO. LOVE",
+   "kind": "finished_ad",
+   "cpc": "43.9",
+   "running": ""
+  },
+  "V052": {
+   "title": "Ano ang dahilan ng glow up mo lately_",
+   "kind": "finished_ad",
+   "cpc": null,
+   "running": null
+  },
+  "V053": {
+   "title": "luxx- testimonial geraldine",
+   "kind": "finished_ad",
+   "cpc": "63.3",
+   "running": ""
+  },
+  "V054": {
+   "title": "SULIT BA ANG LUXX QUEEN",
+   "kind": "finished_ad",
+   "cpc": null,
+   "running": null
+  },
+  "V055": {
+   "title": "Hiko-Ang Ganda and pogi mo",
+   "kind": "finished_ad",
+   "cpc": null,
+   "running": null
+  },
+  "V056": {
+   "title": "NO TO EXAGGERATED ENHANCEMENT",
+   "kind": "finished_ad",
+   "cpc": "46.9",
+   "running": ""
+  },
+  "V057": {
+   "title": "Here’s why i trust hermosa aesthetics",
+   "kind": "finished_ad",
+   "cpc": null,
+   "running": null
+  }
+ }
+}

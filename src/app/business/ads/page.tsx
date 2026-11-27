@@ -137,6 +137,7 @@ export default async function Ads({ searchParams }: { searchParams: Promise<{ p?
         <nav className="ads-periods" aria-label="Period">
           {opts.map((o) => <Link key={o.key} href={qp(o.key)} className={o.key === period.key ? "on" : ""} aria-current={o.key === period.key ? "page" : undefined}>{o.label}</Link>)}
         </nav>
+        <Link href="/business/ads/advisor" className="card adv-link"><b>Ad advisor</b><span>This week&apos;s budget moves, ads to turn off or copy, ad set set-up, videos and market radar</span><span aria-hidden>→</span></Link>
         {sp.ok && <div className="notice ok">✓ {sp.ok}</div>}
         {sp.err && <div className="notice error">{sp.err}</div>}
 
