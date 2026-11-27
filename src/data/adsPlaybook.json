@@ -16,7 +16,8 @@
   "Scale when weekly real ROAS is 5x or more. Trim when it stays under 3.5x for 2 weeks.",
   "Run 8-12 different concepts per ad set, not small variations of one (Andromeda).",
   "No before/after, no regular-price text, no lightening claims, no needle close-ups in the first 3 seconds.",
-  "Every create, edit or budget increase needs CHRIS's OK on a preview."
+  "Every create, edit or budget increase needs CHRIS's OK on a preview.",
+  "When a branch's sales hold after a budget cut, move the freed money into a NEW offer or audience test (another tier, service or branch gap), not back into the same ad set."
  ],
  "lines": [
   {
@@ -566,7 +567,7 @@
    "service": "OTHER",
    "service_name": "Testing",
    "ad_set_name": "ALL_TEST_<CONCEPT>_QC4MI_BROAD_21-54_ALL_AUTO",
-   "status": "start",
+   "status": "hold",
    "audience": {
     "mode": "advantage_plus",
     "age_min": 21,
@@ -591,9 +592,9 @@
      "why": "See the untapped tests in radar.json"
     }
    ],
-   "rationale": "Test 2-3 new concepts a week. An ad graduates into a branch ad set when its cost per chat is ₱35* or less and it gets bookings.",
+   "rationale": "Its ₱495/day goes into the three proposed tests (Ultra Max, Botox family, NovoForm) for their first 2 weeks. Restart it for new concepts after they graduate or stop.",
    "review_after_days": 7,
-   "daily_budget_pre_vat": 495,
+   "daily_budget_pre_vat": 0,
    "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
    "geo": {
     "include": [
@@ -607,8 +608,166 @@
     "scale_if_weekly_real_roas_at_least": 5.0,
     "trim_if_real_roas_below_for_2_weeks": 3.5
    }
+  },
+  {
+   "branch": "QC_MAIN",
+   "service": "HIKO",
+   "service_name": "Ultra Max Hiko ₱13,999 (premium tier)",
+   "ad_set_name": "QC_HIKO-ULTRAMAX_QC6MI_ADV_27-50_ALL_AUTO",
+   "status": "proposed",
+   "daily_budget_pre_vat": 1000,
+   "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
+   "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
+   "audience": {
+    "mode": "advantage_plus",
+    "age_min": 25,
+    "age_max": 50,
+    "genders": "all",
+    "interests": [
+     "Luxury goods",
+     "Frequent international travelers",
+     "Fine dining",
+     "Designer clothing",
+     "Engaged shoppers"
+    ],
+    "behaviors": [],
+    "note": "Income targeting does not exist in the Philippines. Interests are only suggestions under Advantage+. The premium offer and creative do the real filtering (Andromeda matches the ad to people like the ones who respond). Past 'Luxury' interest ad sets cost ₱48-64* per chat vs ₱34-48* for Broad, while still selling the ₱8,999 offer, so the interest alone did not help."
+   },
+   "geo": {
+    "include": [
+     "QC Main pin, 6 mi radius (same as QC_HIKO)"
+    ],
+    "exclude": []
+   },
+   "creatives": [
+    {
+     "v": null,
+     "ad_name": "NEW: Why clients upgrade to Ultra Max (doctor/CSR explainer, 20s)",
+     "role": "hero",
+     "why": "No past ad ever led with Ultra Max, yet it is 22% of all Nov 1-24 sales"
+    },
+    {
+     "v": null,
+     "ad_name": "NEW: Ultra Max client testimonial (consented, no before/after)",
+     "role": "proof",
+     "why": "Testimonials are the cheapest Hiko format in the ad log"
+    },
+    {
+     "v": null,
+     "ad_name": "NEW: Ultra Max static, model + ₱13,999 + unlimited premium threads + Diamond Tip",
+     "role": "static",
+     "why": "Statics are cheap to test; current price only"
+    }
+   ],
+   "rationale": "Nov 1-24: 25 Ultra Max first sessions = ₱348.5k (22% of all sales, 37% of Hiko revenue) with zero ads behind it: they come from CSR upsell. QC Main sells 16 (29% of its Hiko clients). QC sales held when spend was halved, so the freed money goes to a NEW offer instead of back into QC_HIKO. Break-even for 5x ROAS at ₱50* per chat = 1 Ultra Max sale per 56 chats (1.8%). Tag chats from this ad set in the service log sources to measure.",
+   "review_after_days": 14,
+   "kpis": {
+    "target_cost_per_chat_vat": 50,
+    "scale_if_weekly_real_roas_at_least": 5.0,
+    "trim_if_real_roas_below_for_2_weeks": 3.5
+   }
+  },
+  {
+   "branch": "ALL",
+   "service": "OTHER",
+   "service_name": "Botox family: Jawtox, Barbie Arms, Botox per unit",
+   "ad_set_name": "ALL_BOTOX_4PINS_ADV_23-45_ALL_AUTO",
+   "status": "proposed",
+   "daily_budget_pre_vat": 600,
+   "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
+   "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
+   "audience": {
+    "mode": "advantage_plus",
+    "age_min": 21,
+    "age_max": 45,
+    "genders": "all",
+    "interests": [
+     "Beauty",
+     "Fitness and wellness",
+     "Fashion"
+    ],
+    "behaviors": [],
+    "note": "Suggestions only."
+   },
+   "geo": {
+    "include": [
+     "Fairview 5 mi",
+     "Marikina 5 mi",
+     "QC Main 6 mi",
+     "Sta. Maria 4 mi"
+    ],
+    "exclude": []
+   },
+   "creatives": [
+    {
+     "v": "V035",
+     "ad_name": "Barbie arms (re-cut 20s, no before/after, no syringe in first 10s)",
+     "role": "hero",
+     "why": "₱36.3* per chat, close to Hiko winners"
+    },
+    {
+     "v": null,
+     "ad_name": "NEW: Jawtox 'slim face, no surgery' 15s",
+     "role": "test",
+     "why": "Jawtox is ₱81k in Nov at QC/SMB but ₱0 at Fairview and Marikina"
+    }
+   ],
+   "rationale": "Botox family = ₱151k in Nov 1-24 (10% of sales) with no ads running. Jawtox sells ₱63k at QC and ₱0 at Fairview/Marikina: a branch gap. Tickets ₱8-9k; break-even for 5x at ₱40* per chat = 1 sale per 45 chats.",
+   "review_after_days": 14,
+   "kpis": {
+    "target_cost_per_chat_vat": 40,
+    "scale_if_weekly_real_roas_at_least": 5.0,
+    "trim_if_real_roas_below_for_2_weeks": 3.5
+   }
+  },
+  {
+   "branch": "FAIRVIEW",
+   "service": "OTHER",
+   "service_name": "NovoForm (doctor-guided)",
+   "ad_set_name": "FV_NOVOFORM_FV5MI+QC6MI_ADV_25-55_ALL_AUTO",
+   "status": "proposed",
+   "daily_budget_pre_vat": 300,
+   "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
+   "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
+   "audience": {
+    "mode": "advantage_plus",
+    "age_min": 25,
+    "age_max": 55,
+    "genders": "all",
+    "interests": [
+     "Health and wellness",
+     "Weight management",
+     "Fitness"
+    ],
+    "behaviors": [],
+    "note": "Suggestions only. Wellness framing: no scale photos, no kilos claims, no before/after."
+   },
+   "geo": {
+    "include": [
+     "Fairview 5 mi",
+     "QC Main 6 mi"
+    ],
+    "exclude": []
+   },
+   "creatives": [
+    {
+     "v": "V057",
+     "ad_name": "NovoForm trust (scale shots removed)",
+     "role": "hero",
+     "why": "NovoForm statics got chats for ₱17-29*, the cheapest in the ad log"
+    }
+   ],
+   "rationale": "NovoForm = ₱31k in Nov, almost all at Fairview (₱25.5k), on ~₱8k* lifetime ad spend. Multi-phase program, so one client is worth several payments. Helps the Fairview revival.",
+   "review_after_days": 14,
+   "kpis": {
+    "target_cost_per_chat_vat": 30,
+    "scale_if_weekly_real_roas_at_least": 5.0,
+    "trim_if_real_roas_below_for_2_weeks": 3.5
+   }
   }
  ],
+ "proposed_note": "Lines with status 'proposed' (Ultra Max ₱1,000, Botox family ₱600, NovoForm ₱300 per day) wait on CHRIS's OK. They take the ALL_TEST ₱495/day. Total ₱11,940/day, about ₱363k a month pre-VAT, still under the 2026 average of ~₱367k pre-VAT (₱411k*).",
+ "version": "1.1",
  "radar": {
   "note": "Outside sources are mostly US agency or vendor blogs. Treat their numbers as directional. Our own ad log and the Hermosa OS sales numbers win.",
   "untapped": [
@@ -779,7 +938,109 @@
     "value": "About 50 optimisation events in 7 days per ad set (sources vary: 25-50)",
     "source": "https://nowoka.com/blog/meta-ads-andromeda-advantage-plus-guide-2026/ ; https://lafactory.com/meta-broad-vs-detailed-targeting/"
    }
-  ]
+  ],
+  "service_gaps": [
+   {
+    "service": "Ultra Max Hiko",
+    "nov1_24_sales_php": 348500,
+    "new_clients": 25,
+    "typical_ticket_php": 14000,
+    "ad_spend_share_last30d": "0% (no ad ever led with it)",
+    "by_branch": "QC 222.5k / FV 56k / SM 28k / MK 42k",
+    "break_even_close_rate_for_5x": "1.8%",
+    "assumed_cost_per_chat_vat": 50,
+    "verdict": "EXPAND: own ad set, QC first (₱1,000/day)"
+   },
+   {
+    "service": "Hiko Deluxe + Pro",
+    "nov1_24_sales_php": 587999,
+    "new_clients": 67,
+    "typical_ticket_php": 9000,
+    "ad_spend_share_last30d": "~90% of all spend",
+    "by_branch": "QC 345k / FV 81k / SM 63k / MK 99k",
+    "break_even_close_rate_for_5x": "2.2%",
+    "assumed_cost_per_chat_vat": 40,
+    "verdict": "KEEP: main ad sets; halving QC spend did not drop sales"
+   },
+   {
+    "service": "Botox family (Jawtox, Botox, Barbie Arms/Shoulder, Sweatox)",
+    "nov1_24_sales_php": 151000,
+    "new_clients": 28,
+    "typical_ticket_php": 8500,
+    "ad_spend_share_last30d": "0%",
+    "by_branch": "Jawtox QC 63k / SM 18k / FV 0 / MK 0",
+    "break_even_close_rate_for_5x": "2.4%",
+    "assumed_cost_per_chat_vat": 40,
+    "verdict": "EXPAND: ALL_BOTOX ad set (₱600/day), fills FV/MK Jawtox gap"
+   },
+   {
+    "service": "Lux Queen + Brilliant drips",
+    "nov1_24_sales_php": 176200,
+    "new_clients": 25,
+    "typical_ticket_php": 3000,
+    "ad_spend_share_last30d": "~8%",
+    "by_branch": "QC 13.7k / FV 32.4k / SM 56.6k / MK 73.5k",
+    "break_even_close_rate_for_5x": "5.8%",
+    "assumed_cost_per_chat_vat": 35,
+    "verdict": "KEEP: FV/SM/MK drip ad sets; QC drips stay off (1.2x)"
+   },
+   {
+    "service": "NovoForm",
+    "nov1_24_sales_php": 31000,
+    "new_clients": 4,
+    "typical_ticket_php": 8500,
+    "ad_spend_share_last30d": "0% (₱8k* lifetime)",
+    "by_branch": "FV 25.5k / SM 5.5k",
+    "break_even_close_rate_for_5x": "1.8%",
+    "assumed_cost_per_chat_vat": 30,
+    "verdict": "EXPAND: FV+QC NovoForm (₱300/day)"
+   },
+   {
+    "service": "Ultra V Lift",
+    "nov1_24_sales_php": 40000,
+    "new_clients": 4,
+    "typical_ticket_php": 10000,
+    "ad_spend_share_last30d": "0% now; past ads ₱52-117* per chat",
+    "by_branch": "₱10k each branch",
+    "break_even_close_rate_for_5x": "3.5%",
+    "assumed_cost_per_chat_vat": 70,
+    "verdict": "LATER: past ads too costly; upsell in chat first"
+   },
+   {
+    "service": "HIFU",
+    "nov1_24_sales_php": 35999,
+    "new_clients": 9,
+    "typical_ticket_php": 4000,
+    "ad_spend_share_last30d": "0%",
+    "by_branch": "QC 20k / MK 12k / SM 4k / FV 0",
+    "break_even_close_rate_for_5x": "6.2%",
+    "assumed_cost_per_chat_vat": 50,
+    "verdict": "UPSELL: low ticket for cold ads; retarget past chatters"
+   },
+   {
+    "service": "Diamond Tip, mono/add-on threads, meds",
+    "nov1_24_sales_php": 114300,
+    "new_clients": 76,
+    "typical_ticket_php": 1500,
+    "ad_spend_share_last30d": "0%",
+    "by_branch": "mostly QC",
+    "break_even_close_rate_for_5x": "",
+    "assumed_cost_per_chat_vat": "",
+    "verdict": "UPSELL: CSR add-ons on Hiko visits; no ads"
+   },
+   {
+    "service": "Fillers",
+    "nov1_24_sales_php": 27000,
+    "new_clients": 3,
+    "typical_ticket_php": 9000,
+    "ad_spend_share_last30d": "0%",
+    "by_branch": "QC/FV/SM 9k each",
+    "break_even_close_rate_for_5x": "2.5%",
+    "assumed_cost_per_chat_vat": 45,
+    "verdict": "LATER: test after Botox family proves out"
+   }
+  ],
+  "service_gaps_note": "Sales from the Nov 1-24 service log (₱1.58M, all branches). Break-even close rate = share of chats that must buy for 5x ROAS = 5 x cost per chat / ticket."
  },
  "videos": {
   "V001": {

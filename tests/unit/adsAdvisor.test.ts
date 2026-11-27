@@ -1,7 +1,7 @@
 // update-0099: Ad advisor rules. Synthetic DEMO feed rows only.
 import { describe, expect, it } from "vitest";
 import { addDay, advise, parseTargeting, serviceOfAd, targetingText, type FeedRow } from "../../src/lib/adsAdvisor";
-import { planMap, PLAYBOOK } from "../../src/lib/adsPlaybook";
+import { newAdSets, planMap, planPerDay, PLAYBOOK } from "../../src/lib/adsPlaybook";
 
 const QC = "103117851723422", SMB = "112393681804031";
 const TODAY = "2026-12-15";
@@ -112,8 +112,10 @@ describe("names and targeting", () => {
   it("the shipped playbook has a line per branch × Hiko/Gluta and adds up to the monthly plan", () => {
     const m = planMap();
     for (const b of ["QC_MAIN", "FAIRVIEW", "STA_MARIA", "MARIKINA"]) for (const s of ["HIKO", "GLUTA"]) expect(m.has(`${b}|${s}`)).toBe(true);
-    const perDay = PLAYBOOK.lines.reduce((s, l) => s + l.daily_budget_pre_vat, 0);
-    expect(Math.abs(perDay * 30.4 - PLAYBOOK.month_total_pre_vat)).toBeLessThan(5000);
+    // The agreed plan fits the month; proposals (waiting for CHRIS's OK) don't count and never take over a branch line.
+    expect(planPerDay() * 30.4).toBeLessThanOrEqual(PLAYBOOK.month_total_pre_vat + 5000);
+    expect(m.get("QC_MAIN|HIKO")!.status).not.toBe("proposed");
+    for (const l of newAdSets()) expect(l.branch === "ALL" || l.status === "proposed").toBe(true);
   });
 });
 
