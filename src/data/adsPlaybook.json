@@ -824,10 +824,10 @@
   "untapped": [
    {
     "service": "NovoForm (doctor-guided weight management)",
-    "why": "Small NovoForm static ads got chats for ₱17-29* (Novoform Box/Vial), cheaper than any Hiko ad, but only about ₱8k* was ever spent. Interest in GLP-1 programs is rising globally.",
+    "why": "Small NovoForm static ads got chats for ₱17-29* (Novoform Box/Vial), cheaper than any Hiko ad, but only about ₱8k* was ever spent. Our own sales: ₱31,000 from 4 NovoForm clients in Nov 1-24 (Fairview ₱25.5k) with no ads running.",
     "evidence": [
      "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)",
-     "https://iapam.com/2026-aesthetic-medicine-trends"
+     "Hermosa service log Nov 1-24 (playbook/service-gaps-nov2026.csv)"
     ],
     "setup": "ALL_TEST ad set for 2 weeks. QC 4 mi + Fairview 5 mi, Advantage+, age 25-55 hard minimum 21. Doctor-guided, wellness framing only: no scale photos, no before/after, no weight or kilos claims, no 'lose X kg'.",
     "budget_day_pre_vat": 300,
@@ -835,10 +835,10 @@
    },
    {
     "service": "Barbie arms / Botox (jawtox, sweatox)",
-    "why": "The QC Barbie Arms ad got ₱36.3* per chat, close to the Hiko winners, on ₱49k*. Botox is already 10% of sales and is still the most-viewed noninvasive treatment globally.",
+    "why": "The QC Barbie Arms ad got ₱36.3* per chat, close to the Hiko winners, on ₱49k*. The Botox family made ₱151,000 from 28 clients in Nov 1-24 with no ad running, but Fairview and Marikina sold zero Jawtox.",
     "evidence": [
      "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)",
-     "https://www.realself.com/news/real-talk-q1-2026"
+     "Hermosa service log Nov 1-24 (playbook/service-gaps-nov2026.csv)"
     ],
     "setup": "QC + Marikina, women 21-45 suggestion, Advantage+. Run it in ALL_TEST first.",
     "budget_day_pre_vat": 300,
@@ -867,10 +867,9 @@
    },
    {
     "service": "Men (Hiko 'pogi', jawtox)",
-    "why": "All-genders Hiko ad sets get chats ~30% cheaper than women-only (₱32.6* vs ₱47.9*). Male aesthetics is called a fast-growing segment.",
+    "why": "All-genders Hiko ad sets get chats ~30% cheaper than women-only (₱32.6* vs ₱47.9*). This is our own ad data; no PH source yet measures male demand.",
     "evidence": [
-     "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)",
-     "https://iapam.com/2026-aesthetic-medicine-trends"
+     "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)"
     ],
     "setup": "Keep Hiko ad sets all-genders. Add 1-2 male-led creatives per ad set instead of a separate ad set.",
     "budget_day_pre_vat": 0,
@@ -889,52 +888,42 @@
    "creative_plan": "Answer objections from chat: how long it lasts (V048), natural not overdone (V056), what the package includes (V031), refill journey (V046), plus 'free consult' reminders on paydays.",
    "benchmarks": [
     {
-     "metric": "Retargeting ROAS (general D2C)",
-     "value": "2.5x-6.0x, vs 1.2x-2.5x prospecting",
-     "source": "https://www.adamigo.ai/blog/meta-ads-roas-benchmarks-by-industry-2026"
-    },
-    {
-     "metric": "Suggested warm share of budget (med spa)",
-     "value": "20-25% warm, 10-15% re-engagement",
-     "source": "https://scalehaven.io/blog/facebook-ads-for-med-spas/"
-    },
-    {
      "metric": "Our start",
-     "value": "About 3% of budget (₱10k a month). Raise it only if real ROAS is 5x or more, because our audiences are small and chat-based.",
+     "value": "About 3% of budget (₱10k a month). Raise it only if real ROAS is 5x or more, because our audiences are small and chat-based. No PH retargeting benchmark exists, so we judge it by our own ROAS after 4 weeks.",
      "source": "Hermosa master plan"
     }
    ]
   },
   "trends": [
    {
-    "title": "Creative is the targeting (Andromeda)",
+    "title": "PH Hiko price war at the low end",
+    "detail": "Deal sites and budget clinics sell Hiko at ₱5,000-6,999, mid-market clinics at ₱10,599-11,999, premium brands from ₱35,000. Competing on ₱8,999 alone puts us in the price war; Ultra Max (₱13,999, unlimited premium threads) is the gap between mid-market and premium.",
+    "source": "PH clinic pages (see benchmarks tier 2)"
+   },
+   {
+    "title": "Creative is the targeting (Andromeda) (Meta platform rule, applies in PH)",
     "detail": "Meta groups lookalike ads as one creative. Run 8-12 genuinely different concepts per ad set and add 2-4 new ones a week, instead of copies with small edits.",
     "source": "https://adsuploader.com/blog/meta-andromeda ; https://alexneiman.com/broad-targeting-advantage-plus-audience-2026/"
    },
    {
-    "title": "Advantage+ audience is the default; detailed targeting shrank",
+    "title": "Advantage+ audience is the default; detailed targeting shrank (Meta platform rule, applies in PH)",
     "detail": "Interest exclusions were removed on Mar 31, 2025. Interests were merged into broad clusters from Jun 2025. Campaigns using deprecated targeting stopped delivering after Jan 15, 2026. Interests are now suggestions only. Location and minimum age stay hard limits.",
     "source": "https://lafactory.com/meta-broad-vs-detailed-targeting/"
    },
    {
-    "title": "Health targeting and 18+",
+    "title": "Health targeting and 18+ (Meta platform rule, applies in PH)",
     "detail": "Health-interest targeting has been gone since Jan 2022, and cosmetic procedure ads must be 18+. We use 21+.",
     "source": "https://clickem.io/facebook-ads-for-med-spas/"
    },
    {
     "title": "Before/after is still risky in practice",
     "detail": "Sources disagree about whether cosmetic before/after is allowed. Our rule stays: no before/after in ads. Avoid 'fix', 'problem areas', 'stubborn fat'; use 'enhance', 'support', 'natural'.",
-    "source": "https://bowocreative.com/meta-ads-for-med-spas-2026/ ; https://scalehaven.io/blog/facebook-ads-for-med-spas/"
+    "source": "Hermosa rule (CHRIS) + Meta advertising standards"
    },
    {
-    "title": "UGC and testimonial video beat polished studio ads",
-    "detail": "UGC-style video is claimed to beat studio video by 40-60%, and educational ads to beat promotional ones. Our own winners agree: 'Hiko failed x testimonial' at ₱19.5-29* and 'Don't risk it' at ₱33.7*.",
-    "source": "https://scalehaven.io/blog/facebook-ads-for-med-spas/ ; https://bowocreative.com/meta-ads-for-med-spas-2026/ ; Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)"
-   },
-   {
-    "title": "Natural, not overdone",
-    "detail": "PH and global trend toward subtle results, low downtime and skin quality. Lean on 'natural matangos' messaging (V056).",
-    "source": "https://iapam.com/2026-aesthetic-medicine-trends ; https://www.realself.com/news/real-talk-q1-2026"
+    "title": "Testimonial and talking-head video win for us",
+    "detail": "Our own winners: 'Hiko failed x testimonial' ₱19.5-29* per chat, 'Don't risk it' ₱33.7*, 'Affordable Hiko Marikina' ₱28.6*. Polished/AI-voice ads did worse (₱64-79*).",
+    "source": "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)"
    },
    {
     "title": "Skeptical searchers",
@@ -943,8 +932,8 @@
    },
    {
     "title": "Speed to reply",
-    "detail": "Replying within about 5 minutes is claimed to lift conversion up to 9x. CSR response time matters as much as the ad.",
-    "source": "https://prospyrmed.com/blog/post/paid-ad-roi-benchmarks-aesthetic-clinics"
+    "detail": "To be measured from our own Messenger export (reply time vs booking). Until then, no outside number is used.",
+    "source": "pending: Messenger export (To-Do ads-chat-funnel-material)"
    },
    {
     "title": "Shorter ads",
@@ -954,40 +943,95 @@
   ],
   "benchmarks": [
    {
-    "campaign_type": "Med spa Meta (US)",
-    "metric": "ROAS",
-    "value": "~1.8x average; beauty 2.31x; healthcare 1.49x",
-    "source": "https://prospyrmed.com/blog/post/paid-ad-roi-benchmarks-aesthetic-clinics"
+    "tier": 1,
+    "campaign_type": "Hermosa, all branches (2026 Jan-Nov 21)",
+    "metric": "Cost per Messenger chat*",
+    "value": "QC Main ₱43.9*, Fairview ₱45.1*, Sta. Maria ₱39.0*, Marikina ₱38.5*. Winners ₱19.5-33.7*",
+    "source": "Hermosa Meta data by page (Windsor) + ad log"
    },
    {
-    "campaign_type": "Med spa Meta (US)",
-    "metric": "Cost per lead",
-    "value": "$50-$100 good, $75-$200 average; Instant Form $15-$50",
-    "source": "https://prospyrmed.com/blog/post/paid-ad-roi-benchmarks-aesthetic-clinics"
+    "tier": 1,
+    "campaign_type": "Hermosa, all branches (2026 Jan-Nov 21)",
+    "metric": "Declared sales per chat",
+    "value": "QC ₱224, Fairview ₱193, Sta. Maria ₱210, Marikina ₱259. QC fell from ₱370 (Apr) to ₱155 (Aug-Sep)",
+    "source": "Hermosa declared daily sales / Meta chats (playbook/branch-month-2026.csv)"
    },
    {
-    "campaign_type": "Med spa Meta by treatment (US agency)",
-    "metric": "Cost per lead",
-    "value": "Botox $15-25, fillers $18-30, GLP-1/laser $20-35, body $25-45",
-    "source": "https://scalehaven.io/blog/facebook-ads-for-med-spas/"
-   },
-   {
-    "campaign_type": "Hermosa click-to-Messenger (2026)",
-    "metric": "Cost per chat",
-    "value": "₱40-45* average; winners ₱19.5-33.7*",
-    "source": "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)"
-   },
-   {
-    "campaign_type": "Hermosa all branches (2026 Jan-Oct)",
+    "tier": 1,
+    "campaign_type": "Hermosa, all branches (2026 Jan-Nov 21)",
     "metric": "Real ROAS (declared sales / spend*)",
-    "value": "5.1x overall; QC 4.9x, FV 4.3x, SMB 5.5x, MK 6.8x",
-    "source": "Past-ads ROAS report https://claude.ai/artifact/NBhJKh5fqUpE7SG6pVQsTD"
+    "value": "QC 5.1x, Fairview 4.3x, Sta. Maria 5.4x, Marikina 6.7x. Extra spend week to week returned only 0.5-1.8x",
+    "source": "Hermosa sales + Meta spend by page (radar growth_signals)"
    },
    {
-    "campaign_type": "Learning phase",
-    "metric": "Events to exit",
-    "value": "About 50 optimisation events in 7 days per ad set (sources vary: 25-50)",
-    "source": "https://nowoka.com/blog/meta-ads-andromeda-advantage-plus-guide-2026/ ; https://lafactory.com/meta-broad-vs-detailed-targeting/"
+    "tier": 1,
+    "campaign_type": "Hermosa delivery (Aug-Nov 2026)",
+    "metric": "CPM* and CTR",
+    "value": "CPM ₱122-129* (₱109-115 before VAT); CTR 2.8%",
+    "source": "Hermosa Meta data (Windsor)"
+   },
+   {
+    "tier": 1,
+    "campaign_type": "Hermosa Hiko tiers (Nov 1-24 2026)",
+    "metric": "Sales mix",
+    "value": "Hiko Deluxe/Pro 67 clients ₱588k; Ultra Max 25 clients ₱348.5k (27% of Hiko clients, 37% of Hiko money)",
+    "source": "Hermosa service log Nov 1-24"
+   },
+   {
+    "tier": 2,
+    "campaign_type": "PH competitor price: Hiko / nose threads",
+    "metric": "Budget clinics and deal sites",
+    "value": "₱5,000 (Sansage, min 4 threads); ₱6,999 deal, normally ₱12,500 (The Perfect Beauty, Pasig, 5 threads, Parlon voucher valid to Jan 15 2027)",
+    "source": "https://www.sansage.ph/product-page/hiko-noselift ; https://parlon.ph/beauty-bag-deals/1677734653-nose-thread-lift"
+   },
+   {
+    "tier": 2,
+    "campaign_type": "PH competitor price: Hiko / nose threads",
+    "metric": "Mid-market clinics",
+    "value": "₱10,599 (Serenease, Quezon City); ₱11,999 (Glamér, BGC/Pasig). Hermosa Deluxe ₱8,999 sits below these; Ultra Max ₱13,999 just above",
+    "source": "https://sereneaseph.com/products/hiko-nose ; https://www.glamer.ph/price-list"
+   },
+   {
+    "tier": 2,
+    "campaign_type": "PH competitor price: Hiko / nose threads",
+    "metric": "Premium brands",
+    "value": "From ₱35,000 (One Nadela, PCL threads, BGC/Makati/Cebu); from ₱48,600 (Belo). Ultra Max (unlimited premium threads, ₱13,999) is about a third of these",
+    "source": "https://www.onenadelamed.ph/product/nose-thread-lift-pcl-nose-threads-hiko ; https://belomed.com/services/nose-threads/"
+   },
+   {
+    "tier": 2,
+    "campaign_type": "PH competitor ads (Meta Ad Library)",
+    "metric": "Active ads, offers, run length",
+    "value": "Not yet read: Facebook is blocked from Claude's cloud machine. Next step: read the Ad Library through the browser on CHRIS's PC (Metro Manila + Bulacan clinics: Hiko, Botox, drips) and log offers, prices and how long each ad has run",
+    "source": "pending"
+   },
+   {
+    "tier": 3,
+    "campaign_type": "PH Meta market (all industries)",
+    "metric": "CPM / CPC",
+    "value": "Median CPM about ₱87 (monthly ₱48-212); CPC about ₱4.70. Ours is above the PH median, normal for beauty/health audiences in Metro Manila",
+    "source": "https://anahawdigital.com/philippine-ad-cost-index/ (PH agency, from Superads data Jul 2025-Sep 2026) ; https://www.superads.ai/facebook-ads-costs/cpm-cost-per-mille/philippines"
+   },
+   {
+    "tier": 3,
+    "campaign_type": "PH Meta, messaging objective",
+    "metric": "Cost per message",
+    "value": "₱15-50 per message (agency range, no sample size). Hermosa ₱38-45* sits mid-range",
+    "source": "https://modernchameleon.com/how-much-are-facebook-ads-in-the-philippines-the-2026-reality-check/ (Cebu agency)"
+   },
+   {
+    "tier": 3,
+    "campaign_type": "PH tax",
+    "metric": "VAT on digital ads",
+    "value": "12% VAT on Meta ad spend since Jun 2 2025 (RA 12023); all spent values here include it (*)",
+    "source": "https://anahawdigital.com/philippine-ad-cost-index/"
+   },
+   {
+    "tier": 3,
+    "campaign_type": "Meta platform rule (applies in PH)",
+    "metric": "Learning phase",
+    "value": "About 50 optimisation events in 7 days per ad set",
+    "source": "Meta Business Help Center (learning phase)"
    }
   ],
   "service_gaps": [
@@ -1123,7 +1167,8 @@
     }
    ],
    "emerging_service_rule": "Monthly from the Hermosa OS service log: flag a branch x service when sales grow 30%+ month on month for 2 months with 5+ new clients, or when a service sells at 1-2 branches and ₱0 at the others (e.g. Jawtox ₱0 at Fairview/Marikina in Nov). Only November service data exists so far, so trends start from December."
-  }
+  },
+  "benchmarks_note": "Order: (1) our own data, (2) PH competitors, (3) PH/SEA Meta cost figures from PH sources. US figures removed (us_reference_hidden). No PH source publishes clinic-specific Meta costs, so our own numbers are the real benchmark."
  },
  "videos": {
   "V001": {

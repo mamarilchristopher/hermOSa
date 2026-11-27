@@ -173,3 +173,26 @@ describe("ad states (playbook refresh_rule, CHRIS Nov 27): judged by results, no
     expect(states(long("dud", [0, 0], [100, 0], [100, 0]))).toEqual({ dud: "LOSER" });
   });
 });
+
+describe("dashboard series (v0.99.4)", () => {
+  it("gives each line 28 days of spend and chats, and 4 weeks of ROAS", () => {
+    const l = run(ad({ aid: "a1", a: "DEMO Hiko", sp: [3000, 2000], m: [100, 80] }), 3000 * 1.12 * 6 * 100).lines[0];
+    expect(l.days).toHaveLength(28);
+    expect(l.days[27]).toEqual({ d: addDay(TODAY, -1), sp: 3000, m: 100 });
+    expect(l.days[0].sp).toBe(0);
+    expect(l.roasWeeks).toHaveLength(4);
+    expect(l.roasWeeks[0]).toBeNull();
+    expect(l.roasWeeks[3]).toBeCloseTo(6, 5);
+    expect(l.roasWeeks[2]).toBeCloseTo(9, 5);
+  });
+});
+
+describe("source links", () => {
+  it("splits a URL from the note after it", async () => {
+    const { links } = await import("../../src/lib/adsPlaybook");
+    expect(links("https://www.anahaw.ph/x (PH agency) ; Hermosa ad log")).toEqual([
+      { href: "https://www.anahaw.ph/x", label: "anahaw.ph (PH agency)" },
+      { href: null, label: "Hermosa ad log" },
+    ]);
+  });
+});

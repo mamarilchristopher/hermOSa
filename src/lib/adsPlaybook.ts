@@ -31,7 +31,8 @@ export type Playbook = {
     untapped: Untapped[];
     retargeting: { setup: string; audiences: string[]; budget_day_pre_vat: number; creative_plan: string; benchmarks: { metric: string; value: string; source: string }[] };
     trends: { title: string; detail: string; source: string }[];
-    benchmarks: { campaign_type: string; metric: string; value: string; source: string }[];
+    benchmarks: { tier?: number; campaign_type: string; metric: string; value: string; source: string }[];
+    benchmarks_note?: string | null;
     service_gaps?: ServiceGap[] | null; service_gaps_note?: string | null;
     growth_signals?: { updated: string; source: string; findings: string[]; actions: { what: string; budget_day_pre_vat: number; status?: string }[]; emerging_service_rule?: string } | null;
   };
@@ -59,5 +60,11 @@ const STATUS: Record<string, string> = {
   keep: "Keep", keep_untouched: "Keep, don't touch", keep_and_refresh: "Keep, add fresh ads", rebuild: "Rebuild the ads", off: "Off", start: "Start", proposed: "Waiting for your OK", hold: "On hold",
 };
 export const statusLabel = (s: string) => STATUS[s] ?? s.replace(/_/g, " ");
-/** Source strings may hold several URLs split by " ; ". */
-export const links = (s: string) => s.split(/\s*;\s*/).filter(Boolean).map((x) => ({ href: /^https?:\/\//.test(x) ? x : null, label: /^https?:\/\//.test(x) ? new URL(x).hostname.replace(/^www\./, "") : x }));
+/** Source strings may hold several URLs split by " ; ", each optionally followed by a note ("https://x.ph/a (PH agency)"). */
+export const links = (s: string) => s.split(/\s*;\s*/).filter(Boolean).map((x) => {
+  const m = x.match(/^(https?:\/\/\S+)\s*(.*)$/);
+  if (!m) return { href: null, label: x };
+  let host = m[1];
+  try { host = new URL(m[1]).hostname.replace(/^www\./, ""); } catch { /* keep the raw text */ }
+  return { href: m[1], label: m[2] ? `${host} ${m[2]}` : host };
+});

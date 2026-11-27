@@ -128,6 +128,10 @@ export type LineView = {
   t7: Totals; p7: Totals; t28: Totals; sales7: number; salesP7: number; roas7: number | null; roasP7: number | null;
   share: number; salesPerChat: number | null; action: Action; newBudget: number; headline: string; why: string; nextReview: string;
   ads: AdView[]; adsets: AdSetView[];
+  /** Last 28 days, oldest first (spend pre-VAT pesos, chats), for sparklines. */
+  days: { d: string; sp: number; m: number }[];
+  /** ROAS for the last 4 weeks, oldest first (null = no spend that week). */
+  roasWeeks: (number | null)[];
 };
 
 /** Round a pre-VAT daily budget to ₱50. */
@@ -206,6 +210,7 @@ export function advise(inp: AdvisorInput) {
   const lines = new Map<string, Acc>();
   const ads = new Map<string, Acc & { key: string; first: string }>();
   const daily = new Map<string, Map<string, { sp: number; m: number; im: number; cl: number }>>();
+  const lineDaily = new Map<string, Map<string, { sp: number; m: number }>>();
   const feedStart = rows.reduce((m, r) => (m === "" || r.d < m ? r.d : m), "");
   const sets = new Map<string, Acc & { key: string; name: string; campaign: string }>();
   const campSpend7 = new Map<string, Map<string, number>>(); // campaign → line → spend (to split a campaign budget)
@@ -217,6 +222,9 @@ export function advise(inp: AdvisorInput) {
     const dm = daily.get(r.aid) ?? new Map(); daily.set(r.aid, dm);
     const dd = dm.get(r.d) ?? { sp: 0, m: 0, im: 0, cl: 0 };
     dd.sp += n(r.sp); dd.m += n(r.m); dd.im += n(r.im); dd.cl += n(r.cl); dm.set(r.d, dd);
+    const lm = lineDaily.get(key) ?? new Map(); lineDaily.set(key, lm);
+    const ld = lm.get(r.d) ?? { sp: 0, m: 0 };
+    ld.sp += n(r.sp); ld.m += n(r.m); lm.set(r.d, ld);
     const sid = r.sid ?? `${r.cid}-none`;
     const S = sets.get(sid) ?? { ...acc(), key, name: r.s ?? "", campaign: r.c ?? "" }; sets.set(sid, S);
     for (const X of [L, A, S]) {
@@ -333,12 +341,20 @@ export function advise(inp: AdvisorInput) {
     }
     setViews.sort((a, b) => b.t7.spend - a.t7.spend);
 
+    const lm = lineDaily.get(key);
+    const days = Array.from({ length: 28 }, (_, i) => { const d = addDay(w28, i), x = lm?.get(d); return { d, sp: x?.sp ?? 0, m: x?.m ?? 0 }; });
+    const roasWeeks = [3, 2, 1, 0].map((k) => {
+      const b = addDay(end, -7 * k), a = addDay(b, -6);
+      const sp = days.filter((x) => x.d >= a && x.d <= b).reduce((t, x) => t + x.sp, 0);
+      return sp > 0 ? (sumSales(inp.sales.get(branch), a, b) * share) / 100 / (sp * 1.12) : null;
+    });
+
     const reviewDays = Math.max(LOCK_DAYS, plan?.reviewDays ?? LOCK_DAYS);
     const nextReview = lockedUntil ?? (lb?.changed && daysBetween(lb.changed, today) < reviewDays ? addDay(lb.changed, reviewDays) : today);
     out.push({
       branch, service, key, budget, budgetSource: lb?.source ?? "none", lastChange: lb?.changed ?? null, lockedUntil,
       t7: L.t7, p7: L.p7, t28: L.t28, sales7, salesP7, roas7, roasP7, share, salesPerChat: L.t7.msgs > 0 ? sales7 / 100 / L.t7.msgs : null, action, newBudget, headline: headlineOf(action, budget, newBudget), why, nextReview,
-      ads: adViews, adsets: setViews,
+      ads: adViews, adsets: setViews, days, roasWeeks,
     });
   }
   out.sort((a, b) => BRANCH_ORDER.indexOf(a.branch) - BRANCH_ORDER.indexOf(b.branch) || b.share - a.share);
