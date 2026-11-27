@@ -33,7 +33,7 @@ export default async function FollowUpsPage() {
   const since = new Date(Date.parse(`${month}-01T00:00:00+08:00`) - 31 * 86400000).toISOString();
   const [{ data: open, error }, { data: logs, error: logErr }, { data: ppl }] = await Promise.all([
     supabase.from("bookings").select("id, client_name, contact, platform, services, appointment_date, branch_id, deposit_cents, note, status_note, status_by, status_at, csr_employee_id")
-      .eq("status", "UNRESPONSIVE").order("appointment_date", { ascending: false }).limit(500),
+      .in("status", ["UNRESPONSIVE", "NO_SHOW"]).order("appointment_date", { ascending: false }).limit(500),
     supabase.from("booking_followups").select("id, booking_id, channel, outcome, old_date, new_date, note, created_by, created_at, bookings(client_name, branch_id, services)")
       .gte("created_at", since).order("created_at", { ascending: false }).limit(2000),
     supabase.rpc("chat_people"),
@@ -56,7 +56,7 @@ export default async function FollowUpsPage() {
       <TopBar access={access} />
       <main>
         <h1 className="title-row">Sales follow-ups <LiveBookings /></h1>
-        <p className="muted small">Every client marked Unresponsive on <Link href="/bookings">Bookings</Link>. Call or message them, then log what happened. Rebooked clients go back on Bookings on their new date. Each follow-up is counted.</p>
+        <p className="muted small">Every client marked Unresponsive or Did not arrive on <Link href="/bookings">Bookings</Link>. Call or message them, then log what happened. Rebooked clients go back on Bookings on their new date. Each follow-up is counted.</p>
         {(error || logErr) && <div className="notice info">{(logErr ?? error)?.code === "42P01" ? "The owner needs to run update-0081 in Supabase first." : "Could not load. Try again."}</div>}
 
         <div className="fu-stats">

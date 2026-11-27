@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { dayLabel } from "@/lib/homeGlance";
-import { firstName, nteCount, type Nte, type TrackerRow } from "@/lib/nte";
+import { firstName, nteCount, type Nte, type TrackerRow, nteId } from "@/lib/nte";
 import { Uid } from "@/components/Uid";
 
 /** Where a Late NTE stands, in CHRIS's words: Accepted reason / Rejected reason (with the reviewer's note). */
@@ -40,7 +40,7 @@ export function HomeTardiness({ month, ntes, people }: { month: string; ntes: Nt
                 const s = nteStatus(n);
                 return (
                   <tr key={n.id}>
-                    <td className="nowrap">{dayLabel(n.work_date)}<br /><span className="small muted">NTE no. {n.nte_no}</span></td>
+                    <td className="nowrap">{dayLabel(n.work_date)}<br /><span className="small muted">{nteId(n.nte_no)}</span></td>
                     <td><Link href={`/nte/staff/${n.employee_id}`}>{firstName(n.name)}</Link>{n.branch && <><br /><span className="small muted">{n.branch}</span></>}</td>
                     <td className="num">{n.late_minutes} min</td>
                     <td><span className={`nte-st ${s.tone}`}>{s.label}</span></td>

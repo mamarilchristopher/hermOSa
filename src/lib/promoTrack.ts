@@ -5,10 +5,12 @@
 import { promoSchedule, shortName, type PlanStep } from "./promoRules";
 
 export type PromoPart = { service_id: string; base_id: string; name: string; sessions: number; unit_cents: number; commission_cents: number };
-export type PromoOpt = { id: string; title: string; state: "APPROVED" | "ENDED" | "DRAFT"; months: number; price_cents: number; pay_service_id: string | null; parts: PromoPart[] };
+export type PromoOpt = { id: string; title: string; state: "APPROVED" | "ENDED" | "DRAFT"; months: number; price_cents: number; pay_service_id: string | null; parts: PromoPart[];
+  // update-0091
+  sessions?: number; pay_options?: "FULL" | "INSTALLMENT" | null; max_payments?: number | null };
 export type PromoClientOpt = {
   id: string; promo_id: string; client: string; branch_id: string; start_on: string; ends_on: string;
-  price_cents: number; paid_cents: number; used: Record<string, number>;
+  price_cents: number; paid_cents: number; used: Record<string, number>; payments?: number;
 };
 export type PromoOptions = { promos: PromoOpt[]; clients: PromoClientOpt[] };
 

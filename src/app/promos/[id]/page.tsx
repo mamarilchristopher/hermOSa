@@ -7,8 +7,10 @@ import { manilaToday } from "@/lib/dates";
 import { justify, peso, shortName, type PlanStep, type Pkg } from "@/lib/promoRules";
 import { nextDue, promoMoney, type ClientRow, type LogRow, type PromoPart } from "@/lib/promoTrack";
 import { CostForm } from "./CostForm";
+import { payStatus, SLOT_LABEL, type PostSlot } from "@/lib/promoPay";
+import { CopyText } from "../post/PostCard";
 
-type Client = ClientRow & { client_name: string; branch_id: string; start_on: string; ends_on: string; schedule: PlanStep[]; contact: string | null };
+type Client = ClientRow & { payments?: number; client_name: string; branch_id: string; start_on: string; ends_on: string; schedule: PlanStep[]; contact: string | null };
 type L = { id: string; promo_client_id: string; service_id: string; service_date: string; session_no: number; amount_paid_cents: number };
 
 async function chunks<T>(ids: string[], f: (part: string[]) => PromiseLike<{ data: T[] | null }>): Promise<T[]> {
@@ -30,6 +32,7 @@ export default async function PromoTracker({ params }: { params: Promise<{ id: s
   const { data: p } = await supabase.from("promos").select("*").eq("id", id).maybeSingle();
   if (!p) notFound();
   const parts = (p.parts ?? []) as PromoPart[];
+  const installment = p.pay_options === "INSTALLMENT";
   if (!parts.length) {
     return (<><TopBar access={access} /><main className="promos"><p className="small"><Link href="/promos">← Promos</Link></p><h1>{p.title}</h1>
       <div className="notice info">{p.state === "DRAFT" ? "This promo is still a draft. Approve it on the Promos page to start tracking clients." : "The owner needs to run update-0087 in Supabase first, then this promo's clients are tracked here."}</div></main></>);
@@ -63,10 +66,17 @@ export default async function PromoTracker({ params }: { params: Promise<{ id: s
     const paid = ls.reduce((s, l) => s + l.amount_cents, 0);
     const next = c.state === "ACTIVE" ? nextDue(c.schedule ?? [], ls, today) : null;
     const last = ls.map((l) => l.date).sort().at(-1) ?? null;
-    return { c, doneN, paid, next, last };
+    // update-0091: a client on monthly payments: their next payment and whether they're behind.
+    const plan = installment && (c.payments ?? 1) > 1 && c.state === "ACTIVE" ? payStatus(Number(c.price_cents), c.payments ?? 1, c.start_on, paid, today) : null;
+    return { c, doneN, paid, next, last, plan };
   });
+  const latePay = list.filter((x) => x.plan?.late);
   const all = parts.reduce((s, x) => s + x.sessions, 0);
   const names = Object.fromEntries(parts.map((x) => [x.service_id, shortName(x.name)]));
+  // update-0091: the posting calendar and the pricing reply the CSRs use.
+  const { data: postRows } = await supabase.from("promo_posts").select("slot, due_on, state, via, pricing_text").eq("promo_id", id).order("due_on");
+  const posts = (postRows ?? []) as { slot: PostSlot; due_on: string; state: string; via: string | null; pricing_text: string | null }[];
+  const pricing = posts.find((x) => x.pricing_text)?.pricing_text ?? null;
   const follow = list.filter((x) => x.next && (x.next.overdue || x.next.late >= -7)).sort((a, b) => (a.next!.d < b.next!.d ? -1 : 1));
 
   return (
@@ -78,6 +88,7 @@ export default async function PromoTracker({ params }: { params: Promise<{ id: s
         <p className="muted small">
           {p.state === "APPROVED" ? "Running" : p.state === "ENDED" ? "Ended (no new clients)" : "Draft"} · {peso(Number(p.price_cents))} for {all} sessions · use within {p.valid_months} month{p.valid_months === 1 ? "" : "s"}
           {p.approved_at ? ` · approved ${day(String(p.approved_at).slice(0, 10))}` : ""}
+          {installment ? ` · full payment or up to ${p.max_payments} monthly payments` : p.pay_options === "FULL" ? " · full payment" : ""}
         </p>
 
         <div className="grid">
@@ -129,6 +140,38 @@ export default async function PromoTracker({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
+        {(posts.length > 0 || pricing) && (
+          <div className="card">
+            <div className="card-head"><h2 style={{ marginTop: 0 }}>Posting calendar</h2><Link className="small" href="/promos/post">Promo posts →</Link></div>
+            <ul className="promo-follow">
+              {posts.map((x) => (
+                <li key={x.slot}>{SLOT_LABEL[x.slot]} · {day(x.due_on)}{x.slot === "LAUNCH" ? " · FB post + Story" : " · Story"}: {" "}
+                  {x.state === "POSTED" ? <span className="pill PUBLISHED">Posted{x.via === "META" ? " by the app" : ""}</span> : x.state === "SKIPPED" ? <span className="pill REVERSED">Skipped</span> : x.due_on <= today ? <span className="pill STAGED">Due</span> : <span className="muted">coming up</span>}
+                </li>
+              ))}
+            </ul>
+            {pricing && (
+              <details className="promo-pricing">
+                <summary className="small"><strong>Reply for clients who ask</strong> (pricing)</summary>
+                <pre>{pricing}</pre>
+                <CopyText text={pricing} label="Copy reply" />
+              </details>
+            )}
+          </div>
+        )}
+
+        {latePay.length > 0 && (
+          <div className="card">
+            <h2 style={{ marginTop: 0 }}>Payments late</h2>
+            <p className="small muted">Clients on monthly payments who are behind. Their next session can be logged once they pay.</p>
+            <ul className="promo-follow">
+              {latePay.map(({ c, plan }) => (
+                <li key={c.id}><Link href={`/promos/client/${c.id}`}>{c.client_name}</Link>{c.contact ? ` · ${c.contact}` : ""}: <span className="delta down">{peso(plan!.behind)} behind</span>{plan!.next ? ` · next ${peso(plan!.next.amount)} (payment ${plan!.next.k} of ${c.payments}, due ${day(plan!.next.due)})` : ""}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {follow.length > 0 && (
           <div className="card">
             <h2 style={{ marginTop: 0 }}>Follow up this week</h2>
@@ -150,15 +193,16 @@ export default async function PromoTracker({ params }: { params: Promise<{ id: s
           {list.length > 0 && (
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Client</th><th>Branch</th><th>Started</th><th className="num">Sessions</th><th className="num">Paid</th><th>Next</th></tr></thead>
+                <thead><tr><th>Client</th><th>Branch</th><th>Started</th><th className="num">Sessions</th><th className="num">Paid</th>{installment && <th>Payments</th>}<th>Next</th></tr></thead>
                 <tbody>
-                  {list.map(({ c, doneN, paid, next, last }) => (
+                  {list.map(({ c, doneN, paid, next, last, plan }) => (
                     <tr key={c.id}>
                       <td><Link href={`/promos/client/${c.id}`}>{c.client_name}</Link>{c.state !== "ACTIVE" && <span className="muted small"> · {c.state === "DONE" ? "finished" : "cancelled"}</span>}</td>
                       <td>{bName[c.branch_id] ?? ""}</td>
                       <td>{day(c.start_on)}</td>
                       <td className="num">{doneN} / {all}</td>
                       <td className="num">{peso(paid)}{paid < Number(c.price_cents) && c.state !== "CANCELLED" ? <span className="muted small"> ({peso(Number(c.price_cents) - paid)} left)</span> : ""}</td>
+                      {installment && <td className="small">{(c.payments ?? 1) <= 1 ? "Full" : plan ? <>{c.payments} monthly{plan.next ? <> · next {peso(plan.next.amount)} {day(plan.next.due)}</> : ""}{plan.late && <span className="delta down"> late</span>}</> : `${c.payments} monthly`}</td>}
                       <td className="small">{next ? <>{names[next.s]} {next.n} · {day(next.d)}{next.overdue && <span className="delta down"> late</span>}</> : c.state === "ACTIVE" ? (last ? `last visit ${day(last)}` : "") : ""}</td>
                     </tr>
                   ))}

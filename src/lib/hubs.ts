@@ -22,6 +22,10 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
   // Bookings (update-0040, update-0071): CSRs, owners and the GM book; every employee sees them.
   const booker = has(["CSR", "OWNER", "MANAGER", "CLINICIAN", "CASHIER"]);
   const n = (x?: number) => (x && x > 0 ? x : undefined);
+  // update-0091 (CHRIS Nov 27): CSRs and marketing post the promos; owners and the GM too.
+  const poster = owner || gm || has(["CSR", "MARKETING"]);
+  // CHRIS Nov 27: for everyone but management, Bookings is its own button and takes Chat's place on the phone bar.
+  const ownBookings = !management && (booker || archiver);
   return ([
     // CHRIS Nov 27 (v0.89.1): My day sits on Home for the GM and the owners.
     { key: "home", label: "Home", short: "Home", icon: "home", tabs: [{ href: "/me", label: "Home" }, ...(owner || gm ? [{ href: "/focus", label: "My day" }] : [])] },
@@ -32,8 +36,12 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
     { key: "business", label: "Business", short: "Business", icon: "briefcase", tabs: [
       ...(management ? [{ href: "/business", label: "Business" }, { href: "/", label: "Dashboard" }] : []),
       // update-0086 (CHRIS Nov 27): promo ideas every Monday, and the builder. Owners and the GM.
-      ...(owner || gm ? [{ href: "/promos", label: "Promos" }] : []),
+      ...(owner || gm ? [{ href: "/promos", label: "Promos" }, { href: "/promos/post", label: "Promo posts" }] : []),
     ] },
+    { key: "bookings", label: "Bookings", short: "Bookings", icon: "calendar", tabs: ownBookings ? [
+      { href: "/bookings", label: "Bookings" },
+      ...(poster ? [{ href: "/promos/post", label: "Promo posts" }] : []),
+    ] : [] },
     { key: "sales", label: "Sales", short: "Sales", icon: "chart", tabs: [
       ...(filler ? [{ href: "/sales/daily", label: "Daily sales" }] : []),
       ...(filler ? [{ href: "/sales/missing", label: "Missing days" }] : []),
@@ -43,7 +51,7 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
     ] },
     { key: "clinic", label: "Clinic", short: "Clinic", icon: "clipboard", tabs: [
       ...(logger ? [{ href: "/services", label: "Service log", badge: n(c.overdue) }] : []),
-      ...(booker || archiver ? [{ href: "/bookings", label: "Bookings" }] : []),
+      ...((booker || archiver) && !ownBookings ? [{ href: "/bookings", label: "Bookings" }] : []),
       ...(owner || gm ? [{ href: "/services/prices", label: "Price list" }] : []),
       // update-0088 (CHRIS Nov 27): backjobs per staff, client and service.
       ...(owner || gm ? [{ href: "/clinic/backjobs", label: "Backjobs" }] : []),
@@ -77,9 +85,10 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
 }
 
 /** Menu order (CHRIS Nov 27, v0.89.1). Management: Home, Business, Clinic, Sales, then the rest, Time clock last (they
- *  don't clock in). Everyone else: Home, Clinic, Chat, Time clock (4th on the phone bar), then the rest. */
+ *  don't clock in). Everyone else: Home, Clinic, Bookings (CHRIS Nov 27: in Chat's place), Time clock (4th on the phone bar),
+ *  then Chat and the rest. */
 const MGMT_ORDER = ["home", "business", "clinic", "sales", "chat", "team", "pay", "people", "settings", "time"];
-const STAFF_ORDER = ["home", "clinic", "chat", "time", "team", "sales", "pay", "people", "settings", "business"];
+const STAFF_ORDER = ["home", "clinic", "bookings", "time", "chat", "team", "sales", "pay", "people", "settings", "business"];
 export function hubRank(key: string, management: boolean): number {
   const i = (management ? MGMT_ORDER : STAFF_ORDER).indexOf(key);
   return i < 0 ? 99 : i;

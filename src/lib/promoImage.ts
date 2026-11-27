@@ -5,7 +5,9 @@
  */
 import { adName, BRANCH_LINE, mechanic, peso, sessionsOf, type PromoItem } from "./promoRules";
 
-export type PromoArt = { title: string; tagline: string; items: PromoItem[]; price: number; months: number; endsOn?: string | null; photo: string };
+export type PromoArt = { title: string; tagline: string; items: PromoItem[]; price: number; months: number; endsOn?: string | null; photo: string;
+  /** update-0091: a ribbon on reminder stories, e.g. "LAST 3 DAYS". */
+  badge?: string | null };
 export type Fonts = { sans: string; serif: string };
 
 const INK = "#2f241d", INK2 = "#5b4a3f", GOLD = "#b8914a", GOLD_DARK = "#9a7536", IVORY = "#fbf8f4";
@@ -59,6 +61,12 @@ function goldBand(g: CanvasRenderingContext2D, x: number, y: number, w: number, 
   b.addColorStop(0, GOLD_DARK); b.addColorStop(0.35, "#d4b06a"); b.addColorStop(0.6, GOLD); b.addColorStop(1, GOLD_DARK);
   g.fillStyle = b; g.fillRect(x, y, w, h);
   g.fillStyle = "rgba(255,255,255,0.35)"; g.fillRect(x, y + 4, w, 2); g.fillRect(x, y + h - 6, w, 2);
+}
+
+function goldBandRound(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+  const b = g.createLinearGradient(x, y, x + w, y);
+  b.addColorStop(0, GOLD_DARK); b.addColorStop(0.35, "#d4b06a"); b.addColorStop(0.6, GOLD); b.addColorStop(1, GOLD_DARK);
+  g.fillStyle = b; g.beginPath(); g.roundRect(x, y, w, h, h / 2); g.fill();
 }
 
 function pill(g: CanvasRenderingContext2D, cx: number, y: number, text: string, font: string) {
@@ -122,6 +130,13 @@ export async function drawPromo(kind: "story" | "feed", a: PromoArt, f: Fonts): 
     g.font = S(600, 36); g.fillStyle = GOLD_DARK; g.fillText(per, W / 2, priceBase + 62);
     pill(g, W / 2, H - 200, "Message us to book", S(700, 34));
     g.font = S(500, 26); g.fillStyle = INK2; g.fillText(`${untilText(a.endsOn)} · ${BRANCH_LINE}`, W / 2, H - 70);
+    if (a.badge) {
+      g.font = S(800, 54);
+      const bw = g.measureText(a.badge).width + 120, bh = 104, by = 120;
+      g.save(); g.shadowColor = "rgba(47,36,29,0.35)"; g.shadowBlur = 24; g.shadowOffsetY = 6;
+      goldBandRound(g, (W - bw) / 2, by, bw, bh); g.restore();
+      g.fillStyle = "#fff"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(a.badge, W / 2, by + bh / 2 + 3); g.textBaseline = "alphabetic";
+    }
     return c;
   }
 

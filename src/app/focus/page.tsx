@@ -34,7 +34,7 @@ export default async function MyDay() {
   ]);
   const [{ data: st }, bk, fu, drafts, live, signoff, payments, { data: lateData }, { data: bjData }, { data: empData }, ideas, promo] = await Promise.all([
     supabase.rpc("daily_sales_status", { p_start: start, p_end: today }),
-    supabase.from("bookings").select("id", { count: "exact", head: true }).eq("appointment_date", today).in("status", ["BOOKED", "CONFIRMED", "ARRIVED", "DONE"]),
+    supabase.from("bookings").select("id", { count: "exact", head: true }).eq("appointment_date", today).in("status", ["BOOKED", "CONFIRMED", "ARRIVING", "ARRIVED", "DONE"]),
     supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "UNRESPONSIVE"),
     supabase.from("promos").select("id", { count: "exact", head: true }).eq("state", "DRAFT"),
     supabase.from("promos").select("id, title, approved_at").eq("state", "APPROVED"),

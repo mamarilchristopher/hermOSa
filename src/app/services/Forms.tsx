@@ -8,6 +8,7 @@ import { centsToPhp } from "@/lib/csv";
 import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
 import { ProofGroup, useProofSlots } from "./PaymentProof";
 import { promoItemLabel, promoOf, promoServiceIds, type PromoOptions } from "@/lib/promoTrack";
+import { payStatus, planDues, sessionsUnlocked } from "@/lib/promoPay";
 
 type Opt = { id: string; name: string; eligible?: boolean; here?: boolean; price?: number | null; commission?: number | null; sessions?: number[] | null };
 
@@ -97,7 +98,10 @@ export function BranchEntryForm({ branches, start, employees, ...rest }: Omit<Pa
 export type AddonOpt = { id: string; name: string; price: number | null };
 type AddonRow = { service: string; amount: string };
 
-export function EntryForm({ branch, date, today, services, employees, noCommission = false, photosOptional = false, meds = [], addons = [], promos = null }: { branch: string; date: string; today?: string; services: Opt[]; employees: Opt[]; noCommission?: boolean; photosOptional?: boolean; meds?: MedsOpt[]; addons?: AddonOpt[]; promos?: PromoOptions | null }) {
+/** update-0091 (CHRIS Nov 27): the booking this sale is logged from (tapped on Bookings), so the visit isn't recorded twice. */
+export type FromBooking = { id: string; fbName: string; waiverName: string | null; serviceId: string | null };
+
+export function EntryForm({ branch, date, today, services, employees, noCommission = false, photosOptional = false, meds = [], addons = [], promos = null, booking = null }: { branch: string; date: string; today?: string; services: Opt[]; employees: Opt[]; noCommission?: boolean; photosOptional?: boolean; meds?: MedsOpt[]; addons?: AddonOpt[]; promos?: PromoOptions | null; booking?: FromBooking | null }) {
   // CHRIS Nov 26: owners and the GM pick the service date (default today) to batch-log older days; it stays set between saves.
   const [day, setDay] = useState(today ?? date);
   const [state, action, pending] = useActionState(logService, undefined);
@@ -109,9 +113,11 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const [amount, setAmount] = useState("");
   const [who, setWho] = useState("");
   // Controlled so the fields survive a "log it anyway?" round trip (React resets uncontrolled fields after an action).
-  const [service, setService] = useState("");
+  const [service, setService] = useState(booking?.serviceId ?? "");
   const [partner, setPartner] = useState("");
-  const [client, setClient] = useState("");
+  const [client, setClient] = useState(booking ? booking.waiverName ?? booking.fbName : "");
+  // "Same Facebook and waiver name?" (ticked by default). Unticked, the waiver name is typed and takes priority in all records.
+  const [sameName, setSameName] = useState(!booking?.waiverName);
   const [priceNote, setPriceNote] = useState("");
   const [share, setShare] = useState(false);
   const [note, setNote] = useState("");
@@ -121,6 +127,10 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const [afterDp, setAfterDp] = useState(false); // update-0085: balance paid after a down payment
   // update-0087: the client's promo for a promo item ("" = not picked, "new" = starts the promo with this visit).
   const [promoClient, setPromoClient] = useState("");
+  // update-0091: on an installment promo, the new client's plan (1 = full payment).
+  const [payPlan, setPayPlan] = useState("1");
+  // CHRIS Nov 27 (update-0091): "Service has before and after photo?" ticked by default; unticked, only the waiver is needed.
+  const [hasBa, setHasBa] = useState(true);
   const [contact, setContact] = useState("");
   const photos = usePhotoSlots(branch);
   const proofs = useProofSlots(branch); // update-0075: optional proof of payment
@@ -132,7 +142,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       setAmount("");
       setKind("PAID");
       setWho("");
-      setService(""); setPartner(""); setClient(""); setPriceNote(""); setShare(false); setNote(""); setSession("1"); setMed(""); setExtras([]); setAfterDp(false); setPromoClient(""); setContact("");
+      setService(""); setPartner(""); setClient(booking ? (sameName ? booking.fbName : client) : ""); setPriceNote(""); setShare(false); setNote(""); setSession("1"); setMed(""); setExtras([]); setAfterDp(false); setPromoClient(""); setContact(""); setPayPlan("1"); setHasBa(true);
       photos.reset();
       proofs.reset();
     }
@@ -149,6 +159,11 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const pmUsed = pc && svc ? pc.used[svc.id] ?? 0 : 0;
   const pmBalance = pm ? (pc ? Math.max(0, pc.price_cents - pc.paid_cents) : pm.promo.price_cents) : 0;
   const pmDone = pm?.part ? pmUsed >= pm.part.sessions : false;
+  const pmInstall = !!pm && pm.promo.pay_options === "INSTALLMENT" && (pm.promo.max_payments ?? 0) >= 2;
+  const pmGated = !!pm && !!pm.promo.pay_options && !!pm.promo.pay_service_id;
+  const pmUsedAll = pc ? Object.values(pc.used).reduce((a, b) => a + b, 0) : 0;
+  const pmUnlocked = pc && pm ? sessionsUnlocked(pm.promo.sessions ?? pmUsedAll, pc.paid_cents, pc.price_cents) : 0;
+  const pmPay = pc && pmInstall ? payStatus(pc.price_cents, pc.payments ?? 1, pc.start_on, pc.paid_cents, today ?? date) : null;
   /** Picking the client's promo fills in their name, their next session and its amount. */
   function pickPromoClient(v: string, sv = svc) {
     setPromoClient(v);
@@ -157,7 +172,13 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
     const c = (promos?.clients ?? []).find((x) => x.id === v);
     if (c) setClient(c.client);
     const used = c ? c.used[sv.id] ?? 0 : 0;
-    if (m.pay) { const bal = c ? Math.max(0, c.price_cents - c.paid_cents) : m.promo.price_cents; setAmount(bal > 0 ? String(bal / 100) : ""); return; }
+    if (m.pay) {
+      // update-0091: a client on installments pays their next payment; a new one their first (or the full price).
+      const bal = c ? Math.max(0, c.price_cents - c.paid_cents) : m.promo.price_cents;
+      const plan = c ? c.payments ?? 1 : Number(payPlan) || 1;
+      const nextAmt = plan > 1 ? (c ? payStatus(c.price_cents, plan, c.start_on, c.paid_cents, c.start_on).next?.amount ?? bal : planDues(m.promo.price_cents, plan, "2000-01-01")[0].amount) : bal;
+      setAmount(nextAmt > 0 ? String(nextAmt / 100) : ""); return;
+    }
     if (sv.sessions?.length) { const n = Math.min(sv.sessions.length, used + 1); setSession(String(n)); setAmount(String((sv.sessions[n - 1] ?? 0) / 100)); return; }
     setSession("1"); setAmount("0");
   }
@@ -193,7 +214,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const priceDiffers = paid && listPrice != null && (scheduled != null ? amount.trim() !== "" && cents !== scheduled : listPrice > 0 && cents > 0 && cents !== listPrice);
   const needsPhotos = kind === "PAID" || kind === "BACKJOB";
   const missingPhotos = !needsPhotos ? null
-    : photos.count("BEFORE") < 1 || photos.count("AFTER") < 1 ? "Add at least one before and one after photo."
+    : hasBa && (photos.count("BEFORE") < 1 || photos.count("AFTER") < 1) ? "Add at least one before and one after photo."
     : photos.count("WAIVER") < 2 ? "Add both pages of the signed waiver." : null;
   // update-0054: owners and the GM may save without photos; the lead and assist are then asked to add them.
   const missing = photosOptional ? null : missingPhotos;
@@ -221,6 +242,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       <input type="hidden" name="photos" value={photos.json} />
       <input type="hidden" name="proofs" value={proofs.json} />
       <input type="hidden" name="addons" value={addonsJson} />
+      {needsPhotos && !hasBa && <input type="hidden" name="no_ba" value="1" />}
       <div className="field">
         <span className="field-label">Did the client pay?</span>
         <div className="segmented choice" role="radiogroup" aria-label="Did the client pay?">
@@ -258,9 +280,26 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
             {today && day !== today && <span className="small" style={{ color: "var(--bad)" }}>Logging for an earlier day ({new Date(`${day}T00:00:00Z`).toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}).</span>}
           </label>
         )}
-        <label className="span2">Client name
-          <input name="client" required minLength={2} maxLength={120} autoComplete="off" placeholder="Full name, as on the waiver" value={client} onChange={(e) => setClient(e.target.value)} />
-        </label>
+        {booking ? (
+          <div className="span2 booking-name">
+            <input type="hidden" name="booking" value={booking.id} />
+            <label className="check-row">
+              <input type="checkbox" checked={sameName} onChange={(e) => { setSameName(e.target.checked); setClient(e.target.checked ? booking.fbName : booking.waiverName ?? ""); }} />
+              <span>Same Facebook and waiver name? <span className="muted">(booked as {booking.fbName})</span></span>
+            </label>
+            {sameName ? (
+              <label>Client name<input name="client" readOnly value={booking.fbName} /></label>
+            ) : (
+              <label><span>Waiver name <span className="muted">(used in all records; the booking keeps {booking.fbName} as the Facebook name)</span></span>
+                <input name="client" required minLength={2} maxLength={120} autoComplete="off" placeholder="Full name, as on the waiver" value={client} onChange={(e) => setClient(e.target.value)} autoFocus={!client} />
+              </label>
+            )}
+          </div>
+        ) : (
+          <label className="span2">Client name
+            <input name="client" required minLength={2} maxLength={120} autoComplete="off" placeholder="Full name, as on the waiver" value={client} onChange={(e) => setClient(e.target.value)} />
+          </label>
+        )}
         {/* CHRIS Nov 26: Session No. – Service – Amount paid on one row. Most services are session 1; packages (e.g. Gluta) go up to 15. */}
         <div className={`span2 service-row ${paid ? "" : "unpaid"} ${svc?.sessions?.length ? "bundle" : ""}`}>
         {pm ? (
@@ -325,6 +364,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
           <div className="span2 promo-pick">
             <input type="hidden" name="promo_client" value={promoClient} />
             <input type="hidden" name="promo_contact" value={contact} />
+            <input type="hidden" name="promo_payments" value={pmInstall && promoClient === "new" ? payPlan : "1"} />
             <label>Client&apos;s promo ({pm.promo.title})
               <select value={promoClient} required onChange={(e) => pickPromoClient(e.target.value)}>
                 <option value="" disabled>Choose the client…</option>
@@ -341,6 +381,18 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
                 <label>Client&apos;s mobile number <span className="muted">(optional, for reminders)</span>
                   <input inputMode="tel" maxLength={40} value={contact} onChange={(e) => setContact(e.target.value)} placeholder="09xx xxx xxxx" />
                 </label>
+                {pmInstall && (
+                  <label>How will they pay?
+                    <select value={payPlan} onChange={(e) => { setPayPlan(e.target.value); if (pm.pay) { const n = Number(e.target.value); setAmount(String((n > 1 ? planDues(pm.promo.price_cents, n, "2000-01-01")[0].amount : pm.promo.price_cents) / 100)); } }}>
+                      <option value="1">Full payment today: {centsToPhp(pm.promo.price_cents)}</option>
+                      {Array.from({ length: (pm.promo.max_payments ?? 1) - 1 }, (_, i) => i + 2).map((n) => {
+                        const d = planDues(pm.promo.price_cents, n, "2000-01-01");
+                        return <option key={n} value={n}>{n} monthly payments: {centsToPhp(d[0].amount)} today, then {centsToPhp(d[1].amount)} a month</option>;
+                      })}
+                    </select>
+                  </label>
+                )}
+                {pmGated && !pm.pay && <span className="small" style={{ color: "var(--bad)" }}>Log their payment first: pick &quot;{pm.promo.title}: payment&quot; and choose New client there. Sessions open as they pay.</span>}
                 <span className="small muted">
                   Starts {pm.promo.title} for {client.trim() || "this client"} today: {pm.promo.parts.map((x) => `${x.sessions} ${x.name.replace(/\s*single session$/i, "")}`).join(", ")}, {centsToPhp(pm.promo.price_cents)}, valid {pm.promo.months} month{pm.promo.months === 1 ? "" : "s"}.
                   {" "}After saving you get their recommended schedule to send them.
@@ -350,6 +402,8 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
             )}
             {pc && pm.part && <span className="small muted">{pmDone ? <span style={{ color: "var(--bad)" }}>All {pm.part.sessions} sessions are used.</span> : `Session ${pmUsed + 1} of ${pm.part.sessions} for ${pc.client}.`}{pm.promo.pay_service_id ? " Already paid in the promo, so ₱0." : ""} {centsToPhp(Math.max(0, pc.price_cents - pc.paid_cents))} left to pay. <a href={`/promos/client/${pc.id}`}>Schedule</a></span>}
             {pc && pm.pay && <span className="small muted">{centsToPhp(pmBalance)} left to pay of {centsToPhp(pc.price_cents)}. <a href={`/promos/client/${pc.id}`}>Schedule</a></span>}
+            {pc && pmPay && (pmPay.next ? <span className="small" style={{ color: pmPay.late ? "var(--bad)" : undefined }}>{pc.payments} monthly payments: next {centsToPhp(pmPay.next.amount)} due {pmPay.next.due}{pmPay.late ? ` (behind by ${centsToPhp(pmPay.behind)})` : ""}.</span> : <span className="small muted">Fully paid.</span>)}
+            {pc && pm.part && pmGated && pmUsedAll >= pmUnlocked && pmUnlocked < (pm.promo.sessions ?? 0) && <span className="small" style={{ color: "var(--bad)" }}>Sessions follow payments: {pc.client} has used the {pmUnlocked} session{pmUnlocked === 1 ? "" : "s"} paid so far. Log their next payment first.</span>}
           </div>
         )}
         {meds.length > 0 && (
@@ -397,7 +451,13 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
           </label>
         )}
       </div>
-      <PhotoGroup api={photos} title="Before and after photos" hint={needsPhotos ? "Pick them all at once (at least one before and one after). Tap a photo's label to switch Before / After." : "Optional for this visit. Tap a photo's label to switch Before / After."}
+      {needsPhotos && (
+        <label className="check-row">
+          <input type="checkbox" checked={hasBa} onChange={(e) => setHasBa(e.target.checked)} />
+          <span>Service has before and after photo? <span className="muted">{hasBa ? "(Yes: add at least one before and one after)" : "(No: only the signed waiver is needed)"}</span></span>
+        </label>
+      )}
+      <PhotoGroup api={photos} title="Before and after photos" hint={needsPhotos && hasBa ? "Pick them all at once (at least one before and one after). Tap a photo's label to switch Before / After." : "Optional for this visit. Tap a photo's label to switch Before / After."}
         kinds={[{ kind: "AUTO", label: "Add before & after photos" }]} />
       <label className="check-row">
         <input type="checkbox" name="share" value="1" checked={share} onChange={(e) => setShare(e.target.checked)} />

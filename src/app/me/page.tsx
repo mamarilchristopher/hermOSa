@@ -17,7 +17,7 @@ import { noticeButton, noticeHref } from "@/lib/noticeLink";
 import { computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
 import { addDays, sortBranches } from "@/lib/insights";
 import { missingRequired, type Details } from "@/lib/employeeDetails";
-import { tracker, type NteList } from "@/lib/nte";
+import { tracker, type NteList, nteId } from "@/lib/nte";
 import { NteDeadline, NteExplainForm } from "../nte/Forms";
 import { HomeBookings, loadHomeBookings } from "./HomeBookings";
 import { HomeTardiness } from "./HomeTardiness";
@@ -141,7 +141,7 @@ export default async function Me() {
             <h2>Late NTE: please explain<span className="nav-badge inline">{myNtes.length}</span></h2>
             {myNtes.map((n) => (
               <div key={n.id} className="nte-box">
-                <p className="small" style={{ margin: 0 }}><strong>NTE no. {n.nte_no} · {dayLabel(n.work_date)}</strong>: your shift started {timeLabel(n.shift_start)} and you timed in{" "}
+                <p className="small" style={{ margin: 0 }}><strong>{nteId(n.nte_no)} · {dayLabel(n.work_date)}</strong>: your shift started {timeLabel(n.shift_start)} and you timed in{" "}
                   {new Date(n.time_in).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" })} ({n.late_minutes} minutes late).</p>
                 <NteDeadline n={n} />
                 <NteExplainForm id={n.id} prompt={`Why were you late, ${first}?`} />

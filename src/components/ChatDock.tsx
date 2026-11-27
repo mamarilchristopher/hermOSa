@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { Avatar } from "./Avatar";
-import { IconChat, IconSend } from "./Icons";
+import { IconChat, IconImage, IconSend } from "./Icons";
+import { shrinkPhoto } from "@/lib/chatPhoto";
 import { CHAT_READ_EVENT } from "@/lib/chatSounds";
 
 /**
@@ -208,6 +209,7 @@ function MiniChat({ room, me, face, online, incoming, sign, photos, onClose, onE
   const [error, setError] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const toEnd = () => requestAnimationFrame(() => scroller.current?.scrollTo({ top: scroller.current.scrollHeight }));
   const markRead = useCallback(() => {
     void supabase.rpc("chat_mark_read", { p_room: room.id }).then(() => window.dispatchEvent(new Event(CHAT_READ_EVENT)));
@@ -260,9 +262,35 @@ function MiniChat({ room, me, face, online, incoming, sign, photos, onClose, onE
     onSent();
   };
 
+  // CHRIS Nov 27 (v0.91.0): paste or pick a photo right in the chat bubble, on every page (not only on Chat).
+  const sendPhoto = async (file: File | undefined) => {
+    if (!file || busy) return;
+    if (!file.type.startsWith("image/")) { setError("Only photos can be sent."); return; }
+    setBusy(true); setError(null);
+    try {
+      const blob = await shrinkPhoto(file);
+      const path = `${room.id}/${me}/${crypto.randomUUID()}.${blob.type === "image/gif" ? "gif" : "jpg"}`;
+      const { error: up } = await supabase.storage.from("chat").upload(path, blob, { contentType: blob.type || "image/jpeg" });
+      if (up) throw up;
+      const { data, error: e } = await supabase.rpc("chat_send", { p_room: room.id, p_body: null, p_photo_path: path, p_gif_url: null, p_mentions: [], p_all: false });
+      if (e || !data?.ok) { void supabase.storage.from("chat").remove([path]); throw new Error("send"); }
+      const m = data.message as Msg;
+      setMsgs((list) => (list && !list.some((x) => x.id === m.id) ? [...list, m] : list));
+      void sign("chat", [path]);
+      toEnd();
+      onSent();
+    } catch {
+      setError("The photo didn't send. Try again.");
+    } finally {
+      setBusy(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  };
+
   const group = room.kind === "GROUP";
   return (
-    <section className="mini-chat" aria-label={room.name ?? "Chat"}>
+    <section className="mini-chat" aria-label={room.name ?? "Chat"}
+      onPaste={(e) => { const f = [...e.clipboardData.files].find((x) => x.type.startsWith("image/")); if (f) { e.preventDefault(); void sendPhoto(f); } }}>
       <header className="mini-head">
         <span className="dock-face">{face}{online && <span className="dock-dot" aria-hidden />}</span>
         <span className="mini-title"><strong>{room.name ?? "Chat"}</strong>{online ? <span className="mini-on">Active now</span> : group ? <span className="small muted">{room.members} people</span> : null}</span>
@@ -290,6 +318,8 @@ function MiniChat({ room, me, face, online, incoming, sign, photos, onClose, onE
       </div>
       {error && <p className="error small mini-note">{error}</p>}
       <form className="mini-send" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+        <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => void sendPhoto(e.target.files?.[0])} />
+        <button type="button" className="icon-btn" aria-label="Send a photo" title="Send a photo (or paste one)" disabled={busy} onClick={() => fileInput.current?.click()}><IconImage /></button>
         <textarea ref={box} rows={1} value={text} placeholder="Type a message…" aria-label="Message" maxLength={4000}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} />

@@ -34,13 +34,16 @@ export default async function PromosPage({ searchParams }: { searchParams: Promi
     if (c.state === "ACTIVE") x.active++;
   }
   const seasons = upcomingSeasons(today).map((s) => s.name);
+  // update-0091: Approve and post needs the All staff chat (announcement photo) and whether Meta is connected.
+  const { data: allRoom } = await supabase.from("chat_rooms").select("id").eq("auto_key", "ALL").maybeSingle();
+  const metaOn = !!process.env.META_SYSTEM_TOKEN;
   return (
     <>
       <TopBar access={access} />
       <main className="promos">
         <h1>Promos</h1>
         <p className="muted small">Ideas are worked out from the last 8 weeks of the Service log, slow services and the coming season. Open one, change the sessions with + and −, and the price, captions and post images update as you go. Approving adds the promo to the Service log with its per-session commission; each client who buys it gets a recommended schedule, and the promo&apos;s page tracks their sessions and the running profit.</p>
-        <PromoBuilder services={services} ideas={ideas} seasons={seasons} today={today} saved={(promos.data ?? []) as SavedPromo[]} serif={serif.style.fontFamily} serifClass={serif.className} pkgs={pkgs} clients={clientCount} initialIdea={idea} />
+        <PromoBuilder services={services} ideas={ideas} seasons={seasons} today={today} saved={(promos.data ?? []) as SavedPromo[]} serif={serif.style.fontFamily} serifClass={serif.className} pkgs={pkgs} clients={clientCount} initialIdea={idea} me={access.user_id} allRoom={allRoom?.id ?? null} metaOn={metaOn} />
       </main>
     </>
   );

@@ -25,7 +25,7 @@ type Log = {
 const VISIT_TEXT: Record<string, string> = { BACKJOB: "Backjob (unpaid)", CHECKUP: "Check-up (unpaid)", NO_CHARGE: "No charge" };
 type Line = { service_log_id: string; employee_id: string; role: string; amount_cents: number };
 
-export default async function ServiceLog({ searchParams }: { searchParams: Promise<{ date?: string; branch?: string; entry?: string; days?: string; staff?: string }> }) {
+export default async function ServiceLog({ searchParams }: { searchParams: Promise<{ date?: string; branch?: string; entry?: string; days?: string; staff?: string; booking?: string }> }) {
   const { supabase, access, branches } = await requireAccess();
   const sp = await searchParams;
   const viewable = branchesFor(access, branches, ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"]);
@@ -50,6 +50,10 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const topMgmt = can(access, ["OWNER"], null) || can(access, ["MANAGER"], null);
   const isManager = can(access, ["OWNER", "MANAGER"], null) || branchesFor(access, branches, ["MANAGER"]).length > 0;
 
+  // update-0091 (CHRIS Nov 27): "Log the sale" from a booking (Arriving or Arrived): the form starts filled in from it.
+  const { data: bk } = sp.booking && /^[0-9a-f-]{36}$/.test(sp.booking)
+    ? await supabase.from("bookings").select("id, client_name, waiver_name, services, branch_id, status, appointment_date").eq("id", sp.booking).maybeSingle()
+    : { data: null };
   const [{ data: services }, { data: emps }, { data: logs }, { data: ppl }] = await Promise.all([
     supabase.from("services").select("*").eq("active", true).order("name"), // "*": session_prices exists only after update-0068
     supabase.from("employees").select("id, full_name, branch_id, commission_eligible, app_user_id, position").eq("active", true).order("full_name"),
@@ -116,6 +120,12 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const pendingAll = pendingMine.length;
   const groups = [...new Set(all.map((l) => l.service_date))].map((d) => [d, all.filter((l) => l.service_date === d)] as const);
   const here = branch?.code ?? "ALL";
+  // The booking's sale can be logged only at its own branch, by someone who logs services there.
+  const fromBooking = bk && logBranches.some((b) => b.id === bk.branch_id) && ["ARRIVING", "ARRIVED", "DONE"].includes(bk.status) ? {
+    id: bk.id as string, fbName: bk.client_name as string, waiverName: (bk.waiver_name as string | null) ?? null,
+    // The booked service, when it matches a price list name (the CSR may have typed something else).
+    serviceId: ((services ?? []) as { id: string; name: string; is_meds?: boolean }[]).find((x) => !x.is_meds && x.name.trim().toLowerCase() === String(bk.services ?? "").trim().toLowerCase())?.id ?? null,
+  } : null;
   const link = (d: string, b = here) => `/services?date=${d}&branch=${b}${staffPick && b === here ? `&staff=${staffPick}` : ""}`;
   // All branches: each branch's total for the chosen day, in branch order.
   const perBranch = branch ? [] : scope.map((b) => ({ name: b.name, cents: list.filter((l) => l.branch_id === b.id && l.state !== "REJECTED").reduce((x, l) => x + Number(l.amount_paid_cents), 0) }));
@@ -164,7 +174,14 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 {(services ?? []).length === 0 ? "Add your services below first." : null}
               </div>
             ) : (
-              <BranchEntryForm key={here} branches={logBranches.map((b) => ({ id: b.id, name: b.name }))} start={logBranches.find((b) => b.id === myEmp?.branch_id)?.id ?? (logBranches.length === 1 ? logBranches[0].id : "")} date={date} today={today} meds={(services ?? []).filter((s) => s.is_meds).map((s) => ({ id: s.id, name: s.name, price: Number(s.price_cents ?? 0) }))} services={sortServices((services ?? []).filter((s) => !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null, sessions: Array.isArray(s.session_prices) ? (s.session_prices as (number | string)[]).map(Number) : null }))} promos={promoOpts} addons={sortServices((services ?? []).filter((s) => s.is_addon && !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
+              <>
+            {fromBooking && bk && (
+              <div className="notice info booking-from">
+                Logging the sale for <strong>{bk.waiver_name ?? bk.client_name}</strong>{bk.waiver_name ? <span className="muted"> (FB: {bk.client_name})</span> : null}, booked for {bk.services} at {bName[bk.branch_id] ?? "the branch"}. Saving links it to the booking, so it&apos;s not recorded twice. <Link href={`/bookings?d=${bk.appointment_date}&focus=${bk.id}`}>Back to Bookings</Link>
+              </div>
+            )}
+            <BranchEntryForm key={`${here}-${fromBooking?.id ?? ""}`} booking={fromBooking} branches={(fromBooking ? logBranches.filter((b) => b.id === bk!.branch_id) : logBranches).map((b) => ({ id: b.id, name: b.name }))} start={fromBooking ? bk!.branch_id : logBranches.find((b) => b.id === myEmp?.branch_id)?.id ?? (logBranches.length === 1 ? logBranches[0].id : "")} date={date} today={today} meds={(services ?? []).filter((s) => s.is_meds).map((s) => ({ id: s.id, name: s.name, price: Number(s.price_cents ?? 0) }))} services={sortServices((services ?? []).filter((s) => !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null, sessions: Array.isArray(s.session_prices) ? (s.session_prices as (number | string)[]).map(Number) : null }))} promos={promoOpts} addons={sortServices((services ?? []).filter((s) => s.is_addon && !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
+            </>
             )}
             {isManager && <p className="small" style={{ marginTop: 12 }}><Link href="/services/prices">Price list and commissions</Link> (add a service, set its price and commission)</p>}
           </div>

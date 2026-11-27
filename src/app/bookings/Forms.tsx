@@ -57,8 +57,10 @@ export function StatusForm({ id, status, booker, today }: { id: string; status: 
       <input type="hidden" name="id" value={id} />
       <div className="status-pick">
         {booker && btn("CONFIRMED", "Confirmed")}
+        {btn("ARRIVING", "Arriving")}
         {btn("ARRIVED", "Arrived")}
         {btn("DONE", "Done")}
+        {btn("NO_SHOW", "Did not arrive")}
         {btn("UNRESPONSIVE", "Unresponsive")}
         <button type="button" className={resched ? "on" : ""} onClick={() => setResched(!resched)}>Re-sched…</button>
         {booker && btn("CANCELLED", "Cancelled")}

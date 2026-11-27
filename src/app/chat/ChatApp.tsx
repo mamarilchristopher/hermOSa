@@ -1,5 +1,6 @@
 "use client";
 import { viewPhoto } from "@/components/PhotoViewer";
+import { shrinkPhoto as shrink } from "@/lib/chatPhoto";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { Avatar } from "@/components/Avatar";
@@ -42,20 +43,6 @@ const dayLabel = (iso: string) => {
 };
 const listTime = (iso: string) => (dayKey(iso) === dayKey(new Date().toISOString()) ? time(iso) : new Date(iso).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" }));
 const uuid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`);
-
-/** Phone photos are big: shrink to at most 1600px and save as JPEG before upload. */
-async function shrink(file: File): Promise<Blob> {
-  if (file.type === "image/gif") return file;
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = url; });
-    const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
-    const c = document.createElement("canvas");
-    c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
-    c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-    return await new Promise<Blob>((ok, bad) => c.toBlob((b) => (b ? ok(b) : bad(new Error("photo"))), "image/jpeg", 0.82));
-  } finally { URL.revokeObjectURL(url); }
-}
 
 export function ChatApp({ me, initialRooms, people, initialRoom, management = false }: {
   me: { id: string; name: string; photo_url: string | null }; management?: boolean; initialRooms: ChatRoomRow[]; people: ChatPerson[]; initialRoom: string | null;

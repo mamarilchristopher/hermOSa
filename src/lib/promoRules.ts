@@ -212,7 +212,7 @@ export function adIssues(...texts: string[]): string[] {
 
 export const BRANCH_LINE = "QC Main · Fairview · Sta. Maria · Marikina";
 
-export function captions(p: { title: string; tagline?: string; items: PromoItem[]; price: number; months: number; endsOn?: string | null }) {
+export function captions(p: { title: string; tagline?: string; items: PromoItem[]; price: number; months: number; endsOn?: string | null; payNote?: string | null }) {
   const n = sessionsOf(p.items);
   const per = peso(Math.round(p.price / Math.max(1, n)));
   const until = p.endsOn ? ` until ${new Date(`${p.endsOn}T00:00:00Z`).toLocaleDateString("en-PH", { month: "long", day: "numeric", timeZone: "UTC" })}` : "";
@@ -220,7 +220,7 @@ export function captions(p: { title: string; tagline?: string; items: PromoItem[
     ? `${p.items[0].paid}${p.items[0].free ? ` + ${p.items[0].free} FREE` : ""} sessions of ${adNameLong(p.items[0].name)}`
     : p.items.map((i) => `${i.paid + i.free} × ${adName(i.name)}`).join("\n• ");
   const story = `${p.title.toUpperCase()} ✨\n${p.items.length === 1 ? `${mechanic(p.items)} sessions of ${adNameLong(p.items[0].name)}`.replace("sessions sessions", "sessions") : `${n} sessions, one price`}\n${peso(p.price)} only (${per}/session)\nAvailable${until} 💛 DM us to book!`;
-  const feed = `${p.title} ✨${p.tagline ? `\n${p.tagline}` : ""}\n\n${p.items.length === 1 ? what : `What's inside:\n• ${what}`}\n\n💛 ${peso(p.price)} for ${n} sessions, just ${per} per session\n🗓️ Use within ${p.months} month${p.months === 1 ? "" : "s"}${until ? `\n⏳ Promo runs${until}` : ""}\n\n📍 ${BRANCH_LINE}\n📩 Send us a message to book your slot. Slots are limited!\n\n#HermosaAesthetics #LetYourBeautyShine #GlowUp #AestheticClinic #SkincarePH`;
+  const feed = `${p.title} ✨${p.tagline ? `\n${p.tagline}` : ""}\n\n${p.items.length === 1 ? what : `What's inside:\n• ${what}`}\n\n💛 ${peso(p.price)} for ${n} sessions, just ${per} per session\n${p.payNote ? `💳 ${p.payNote.replace(/^₱[\d,]+ in full, or /, "Pay in full or in ")}\n` : ""}🗓️ Use within ${p.months} month${p.months === 1 ? "" : "s"}${until ? `\n⏳ Promo runs${until}` : ""}\n\n📍 ${BRANCH_LINE}\n📩 Send us a message to book your slot. Slots are limited!\n\n#HermosaAesthetics #LetYourBeautyShine #GlowUp #AestheticClinic #SkincarePH`;
   return { story, feed };
 }
 
@@ -311,8 +311,8 @@ export function suggest(stats: SvcStat[], today: string, pkgs: Pkg[] = []): Sugg
 /** One planned session: date, the Service log item (or service) id, and its number for that item. */
 export type PlanStep = { d: string; s: string; n: number };
 export type PlanPart = { id: string; name: string; sessions: number; from?: number };
-const addD = (d: string, n: number) => new Date(new Date(`${d}T00:00:00Z`).getTime() + n * 86400000).toISOString().slice(0, 10);
-const addM = (d: string, m: number) => { const x = new Date(`${d}T00:00:00Z`); x.setUTCMonth(x.getUTCMonth() + m); return x.toISOString().slice(0, 10); };
+export const addD = (d: string, n: number) => new Date(new Date(`${d}T00:00:00Z`).getTime() + n * 86400000).toISOString().slice(0, 10);
+export const addM = (d: string, m: number) => { const x = new Date(`${d}T00:00:00Z`); x.setUTCMonth(x.getUTCMonth() + m); return x.toISOString().slice(0, 10); };
 export const promoEnds = (start: string, months: number) => addD(addM(start, months), -1);
 
 /** Spread each item's sessions over the months at its usual pace (weekly drips, monthly facials, face HIFU every 6 months),

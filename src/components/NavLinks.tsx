@@ -7,7 +7,7 @@ import { IconCalendar, IconChart, IconClipboard, IconCoins, IconHome, IconIdCard
 const ICONS = { chart: IconChart, calendar: IconCalendar, upload: IconUpload, users: IconUsers, clipboard: IconClipboard, people: IconPeople, coins: IconCoins, home: IconHome, idcard: IconIdCard, pen: IconPen, week: IconWeek, clock: IconClock, settings: IconSettings, chat: IconChat, briefcase: IconBriefcase };
 
 /** Colored menu icons (CHRIS Nov 27, v0.90.1): emoji per hub, same on the side menu and the phone bar. */
-const EMOJI: Record<string, string> = { home: "🏠", business: "💼", clinic: "📋", sales: "📈", chat: "💬", time: "⏰", team: "📅", pay: "💰", people: "👥", settings: "⚙️" };
+const EMOJI: Record<string, string> = { home: "🏠", business: "💼", clinic: "📋", sales: "📈", chat: "💬", bookings: "📆", time: "⏰", team: "📅", pay: "💰", people: "👥", settings: "⚙️" };
 const HubIcon = ({ hub }: { hub: Hub }) => {
   const e = EMOJI[hub.key];
   if (e) return <span className="nav-emoji" aria-hidden>{e}</span>;

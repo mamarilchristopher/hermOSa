@@ -9,27 +9,30 @@ import { drawPromo } from "@/lib/promoImage";
 import { PromoMockup } from "@/components/PromoMockup";
 import { COPY_FAIL, copyCanvas, fontsOf, photoFile, saveCanvas, savePhoto } from "@/lib/canvasShare";
 import { approvePromo, endPromo, savePromo, type PromoInput } from "./actions";
+import { installmentPlans, payLine, planDues, type PayOptions } from "@/lib/promoPay";
+import { sendToPost } from "./postKit";
 
 export type Svc = { id: string; name: string; price: number; commission?: number | null; cost?: number | null };
 export type SavedPromo = {
   id: string; title: string; tagline: string | null; items: { service_id: string; name: string; paid: number; free: number; unit_cents: number }[];
   price_cents: number; value_cents: number; sessions: number; valid_months: number; ends_on: string | null; model: string | null;
   source: "MANUAL" | "SUGGESTED"; state: "DRAFT" | "APPROVED" | "ENDED"; created_at: string; approved_at: string | null;
+  pay_options?: PayOptions | null; max_payments?: number | null; // update-0091
 };
 
-type Draft = { why?: string; id: string | null; title: string; tagline: string; items: PromoItem[]; price: number; auto: boolean; months: number; endsOn: string; model: string; season: string; source: "MANUAL" | "SUGGESTED" };
+type Draft = { why?: string; id: string | null; title: string; tagline: string; items: PromoItem[]; price: number; auto: boolean; months: number; endsOn: string; model: string; season: string; source: "MANUAL" | "SUGGESTED"; pay: PayOptions; maxPay: number };
 
 const addDays = (d: string, n: number) => new Date(new Date(`${d}T00:00:00Z`).getTime() + n * 86400000).toISOString().slice(0, 10);
 const KIND: Record<Suggestion["kind"], string> = { SEASON: "Season", SLOW: "Slow seller", PROGRAM: "Year-long program" };
 
 function blank(today: string): Draft {
-  return { id: null, title: "", tagline: "", items: [], price: 0, auto: true, months: 3, endsOn: addDays(today, 13), model: "", season: "", source: "MANUAL" };
+  return { id: null, title: "", tagline: "", items: [], price: 0, auto: true, months: 3, endsOn: addDays(today, 13), model: "", season: "", source: "MANUAL", pay: "FULL", maxPay: 0 };
 }
 const php = (c: number) => String(Math.round(c / 100));
 
 /** The promo builder (update-0086): +/− sessions, live price and images, captions, save and approve. */
-export function PromoBuilder({ services, ideas, seasons, today, saved, serif, serifClass, pkgs = [], clients = {}, initialIdea }: {
-  initialIdea?: string; pkgs?: Pkg[]; clients?: Record<string, { active: number; all: number }>; services: Svc[]; ideas: Suggestion[]; seasons: string[]; today: string; saved: SavedPromo[]; serif: string; serifClass: string;
+export function PromoBuilder({ services, ideas, seasons, today, saved, serif, serifClass, pkgs = [], clients = {}, initialIdea, me, allRoom = null, metaOn = false }: {
+  me: string; allRoom?: string | null; metaOn?: boolean; initialIdea?: string; pkgs?: Pkg[]; clients?: Record<string, { active: number; all: number }>; services: Svc[]; ideas: Suggestion[]; seasons: string[]; today: string; saved: SavedPromo[]; serif: string; serifClass: string;
 }) {
   const [d, setD] = useState<Draft>(() => blank(today));
   const [story, setStory] = useState<string | null>(null);
@@ -48,7 +51,11 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
   const model = d.model || models[0]?.m || "M01";
   const issues = safetyIssues(d.items, d.months);
   const ideasForTitle = titleIdeas(d.items, season);
-  const caps = d.items.length ? captions({ title: d.title || "Your promo title", tagline: d.tagline, items: d.items, price, months: d.months, endsOn: d.endsOn || null }) : null;
+  // update-0091: payment options. Installments only where the price allows; the plan list follows the price.
+  const plans = installmentPlans(price);
+  const maxPay = d.pay === "INSTALLMENT" && plans.allowed.length ? (plans.allowed.includes(d.maxPay) ? d.maxPay : plans.recommended ?? plans.allowed[0]) : 0;
+  const pay: PayOptions = maxPay ? "INSTALLMENT" : "FULL";
+  const caps = d.items.length ? captions({ title: d.title || "Your promo title", tagline: d.tagline, items: d.items, price, months: d.months, endsOn: d.endsOn || null, payNote: pay === "INSTALLMENT" ? payLine(price, pay, maxPay) : null }) : null;
   const thin = thinItems(d.items, d.months);
   const ads = caps ? [...organicOnly(d.items), ...adIssues(d.title, d.tagline, caps.story, caps.feed)] : [];
   const change = (p: Partial<Draft>) => { setD((x) => ({ ...x, ...p })); setMsg(null); };
@@ -83,12 +90,13 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
     return () => { live = false; clearTimeout(t); };
   }, [d, price, model, serif]);
 
+  const artNow = () => ({ title: d.title || "Promo", tagline: d.tagline, items: d.items, price, months: d.months, endsOn: d.endsOn || null, photo: modelSrc(model) });
   function open(next: Draft) {
     setD(next); setMsg(null);
     setTimeout(() => builderRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }
   function openIdea(s: Suggestion) {
-    open({ ...blank(today), why: s.why, title: s.title, tagline: s.tagline, items: s.items.map((i) => ({ ...i })), price: s.price, auto: s.price === defaultPrice(s.items, pkgs), months: s.months, season: s.season ?? "", source: "SUGGESTED" });
+    open({ ...blank(today), why: s.why, title: s.title, tagline: s.tagline, items: s.items.map((i) => ({ ...i })), price: s.price, auto: s.price === defaultPrice(s.items, pkgs), months: s.months, season: s.season ?? "", source: "SUGGESTED", pay: "FULL", maxPay: 0 });
   }
   // Business dashboard's "Open in builder" (/promos?idea=<id>): open that idea once.
   const opened = useRef(false);
@@ -102,7 +110,8 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
   function openSaved(p: SavedPromo) {
     const items = p.items.map((i) => ({ service_id: i.service_id, name: i.name, unit: i.unit_cents, paid: i.paid, free: i.free }));
     open({ id: p.state === "DRAFT" ? p.id : null, title: p.title, tagline: p.tagline ?? "", items, price: p.price_cents, auto: p.price_cents === defaultPrice(items, pkgs),
-      months: p.valid_months, endsOn: p.ends_on ?? "", model: p.model ?? "", season: "", source: p.source });
+      months: p.valid_months, endsOn: p.ends_on ?? "", model: p.model ?? "", season: "", source: p.source,
+      pay: p.pay_options === "INSTALLMENT" ? "INSTALLMENT" : "FULL", maxPay: p.max_payments ?? 0 });
   }
   function setItem(k: number, p: Partial<PromoItem>) {
     change({ items: d.items.map((it, i) => (i === k ? { ...it, ...p } : it)) });
@@ -115,15 +124,22 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
   }
   const input = (): PromoInput => ({
     id: d.id, title: d.title.trim(), tagline: d.tagline.trim(), items: d.items.map((i) => ({ service_id: i.service_id, paid: i.paid, free: i.free })),
-    price, months: d.months, endsOn: d.endsOn || null, model, source: d.source,
+    price, months: d.months, endsOn: d.endsOn || null, model, source: d.source, pay, maxPay: maxPay || null,
   });
-  function save(approve: boolean) {
-    if (approve && !confirm(`Approve "${d.title}" at ${peso(price)}? It will be added to the Service log with its per-session commission, and each client who buys it gets a schedule.`)) return;
+  function save(approve: boolean, post = false) {
+    const what = post
+      ? `Approve and post "${d.title}" at ${peso(price)}? It goes in the Service log with its per-session commission, the FB post and Story go up on all 4 pages${metaOn ? "" : " (the CSRs post them)"}, and All staff gets the announcement.`
+      : `Approve "${d.title}" at ${peso(price)}? It will be added to the Service log with its per-session commission, and each client who buys it gets a schedule.`;
+    if (approve && !confirm(what)) return;
     start(async () => {
       const r = approve ? await approvePromo(input()) : await savePromo(input());
-      setMsg(r);
       if (r.id && !approve) setD((x) => ({ ...x, id: r.id ?? null }));
-      if (r.ok && approve) setD((x) => ({ ...x, id: null }));
+      if (!(r.ok && approve)) { setMsg(r); return; }
+      setD((x) => ({ ...x, id: null }));
+      if (!post || !r.id) { setMsg(r); return; }
+      setMsg({ ok: "Approved. Posting…" });
+      const fonts = await fontsOf(serif);
+      setMsg(await sendToPost({ id: r.id, art: artNow(), pay, maxPayments: maxPay || null }, { fonts, today, me, allRoom }));
     });
   }
   function end(p: SavedPromo) {
@@ -248,6 +264,26 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
                   {why?.deep && <div className="notice warn small">That&apos;s {vsChip(why.off, why.basis)}. That cuts into profit: try fewer free sessions, or a free add-on (like L-Carnitine) instead of a lower price.</div>}
                 </div>
 
+                <div className="promo-pay">
+                  <span className="small"><strong>Payment</strong></span>
+                  <span className="promo-lightbox-tabs" role="group" aria-label="Payment">
+                    <button type="button" className={pay === "FULL" ? "on" : ""} aria-pressed={pay === "FULL"} onClick={() => change({ pay: "FULL" })}>Full payment</button>
+                    <button type="button" className={pay === "INSTALLMENT" ? "on" : ""} aria-pressed={pay === "INSTALLMENT"} disabled={!plans.allowed.length}
+                      onClick={() => change({ pay: "INSTALLMENT", maxPay: plans.recommended ?? 0 })}>Installment</button>
+                  </span>
+                  {pay === "INSTALLMENT" && (
+                    <label className="small">Up to
+                      <select value={maxPay} onChange={(e) => change({ maxPay: Number(e.target.value) })}>
+                        {plans.allowed.map((k) => {
+                          const dd = planDues(price, k, today);
+                          return <option key={k} value={k}>{k} monthly payments of {peso(dd[1].amount)}{k === plans.recommended ? " (recommended)" : ""}</option>;
+                        })}
+                      </select>
+                    </label>
+                  )}
+                  <span className="small muted">{pay === "INSTALLMENT" ? `Same ${peso(price)} total, no interest. Each client picks full or monthly on their first visit, and their sessions follow their payments. ${plans.why}` : plans.allowed.length ? `Clients pay ${peso(price)} on their first visit. Recommended: ${plans.recommended} monthly payments (${plans.why.split(": ")[1] ?? ""})` : plans.why}</span>
+                </div>
+
                 <div className="promo-row">
                   <label>Use within (months)
                     <Stepper label="Months" v={d.months} min={1} max={24} onChange={(v) => change({ months: v })} />
@@ -321,7 +357,8 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
 
                 <div className="row-buttons">
                   <button type="button" className="secondary" disabled={pending} onClick={() => save(false)}>{pending ? "Saving…" : "Save draft"}</button>
-                  <button type="button" disabled={pending || price > value || !d.title.trim()} onClick={() => save(true)}>Approve and add to the Service log</button>
+                  <button type="button" disabled={pending || price > value || !d.title.trim()} onClick={() => save(true, true)}>Approve and post</button>
+                  <button type="button" className="secondary" disabled={pending || price > value || !d.title.trim()} onClick={() => save(true)}>Approve only</button>
                 </div>
               </>
             )}
@@ -372,7 +409,7 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
                   {p.state !== "DRAFT" && (
                     <div className="small"><a href={`/promos/${p.id}`}><strong>Clients and profit →</strong></a>{clients[p.id] ? ` ${clients[p.id].all} client${clients[p.id].all === 1 ? "" : "s"}, ${clients[p.id].active} active` : " No clients yet"}</div>
                   )}
-                  {p.state === "APPROVED" && <PromoPhotos p={p} serif={serif} fileName={fileName} />}
+                    {p.state === "APPROVED" && <PromoPhotos p={p} serif={serif} fileName={fileName} post={{ today, me, allRoom, metaOn }} />}
                   <span className="row-buttons">
                     <button type="button" className="secondary small" onClick={() => openSaved(p)}>{p.state === "DRAFT" ? "Open" : "Copy into builder"}</button>
                     {p.state !== "ENDED" && <button type="button" className="secondary small" disabled={pending} onClick={() => end(p)}>{p.state === "DRAFT" ? "Delete" : "End"}</button>}
@@ -388,13 +425,21 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
 }
 
 /** Save as photo / Copy as photo (story and FB post) and Copy caption for an approved, running promo (CHRIS Nov 27). */
-function PromoPhotos({ p, serif, fileName }: { p: SavedPromo; serif: string; fileName: (t: string, k: "story" | "feed") => string }) {
+function PromoPhotos({ p, serif, fileName, post }: { p: SavedPromo; serif: string; fileName: (t: string, k: "story" | "feed") => string; post: { today: string; me: string; allRoom: string | null; metaOn: boolean } }) {
+  const [posting, setPosting] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const items: PromoItem[] = p.items.map((i) => ({ service_id: i.service_id, name: i.name, unit: i.unit_cents, paid: i.paid, free: i.free }));
   const model = p.model || modelsFor(items.map((i) => i.name))[0]?.m || "M01";
   const art = { title: p.title, tagline: p.tagline ?? "", items, price: p.price_cents, months: p.valid_months, endsOn: p.ends_on, photo: modelSrc(model) };
   const draw = (kind: "story" | "feed") => fontsOf(serif).then((f) => drawPromo(kind, art, f));
-  const caps = captions({ title: p.title, tagline: p.tagline ?? "", items, price: p.price_cents, months: p.valid_months, endsOn: p.ends_on });
+  const caps = captions({ title: p.title, tagline: p.tagline ?? "", items, price: p.price_cents, months: p.valid_months, endsOn: p.ends_on,
+    payNote: p.pay_options === "INSTALLMENT" ? payLine(p.price_cents, "INSTALLMENT", p.max_payments) : null });
+  async function postIt() {
+    if (!confirm(`Post "${p.title}" now? The FB post and Story go up on all 4 pages${post.metaOn ? "" : " (the CSRs post them)"}, and All staff gets the announcement once it's up.`)) return;
+    setPosting(true); setNote("Posting…");
+    const r = await sendToPost({ id: p.id, art, pay: p.pay_options ?? null, maxPayments: p.max_payments ?? null }, { fonts: await fontsOf(serif), ...post });
+    setPosting(false); setNote(r.ok ?? r.error ?? null);
+  }
   const label = (k: "story" | "feed") => (k === "story" ? "Story" : "FB post");
   async function copyText(t: string, what: string) {
     try { await navigator.clipboard.writeText(t); setNote(`${what} copied.`); } catch { setNote("Could not copy. Try again."); }
@@ -409,6 +454,10 @@ function PromoPhotos({ p, serif, fileName }: { p: SavedPromo; serif: string; fil
           <button type="button" className="secondary small" onClick={() => copyText(k === "story" ? caps.story : caps.feed, `${label(k)} caption`)}>Copy caption</button>
         </span>
       ))}
+      <span className="row-buttons">
+        <button type="button" className="small" disabled={posting} onClick={postIt}>{posting ? "Posting…" : "Post this promo"}</button>
+        <a className="small" href="/promos/post">Posting calendar →</a>
+      </span>
       {note && <span className="small">{note}</span>}
     </div>
   );

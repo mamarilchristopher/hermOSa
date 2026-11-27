@@ -5,7 +5,7 @@ import { manilaToday } from "@/lib/dates";
 import { monthLabel } from "@/lib/insights";
 import { dayLabel } from "@/lib/homeGlance";
 import { timeLabel } from "@/lib/schedule";
-import { firstName, times, tracker, type NteList } from "@/lib/nte";
+import { firstName, nteId, times, tracker, type NteList } from "@/lib/nte";
 import { NteDeadline, NteExplainForm, NteProofs } from "./Forms";
 import { photoUrls } from "@/lib/photos";
 import { Uid } from "@/components/Uid";
@@ -32,6 +32,14 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
   const proofs = await photoUrls(supabase, mine.flatMap((n) => n.proof_paths ?? []), "nte-proofs");
   const rows = tracker(list.ntes, list.ir_minutes);
   const manager = access.grants.some((g) => g.role === "OWNER" || g.role === "MANAGER");
+  // CHRIS Nov 27 (v0.91.0): the 20 most recently issued Late NTEs (any month), each opening its person's NTEs.
+  type Recent = { id: string; nte_no: number; employee_id: string; work_date: string; late_minutes: number; state: string; review?: string | null; ir_id: string | null; created_at: string; employees: { full_name: string; uid?: string | null } | null };
+  const { data: recentData } = manager
+    ? await supabase.from("late_ntes").select("id, nte_no, employee_id, work_date, late_minutes, state, review, ir_id, created_at, employees(full_name, uid)").order("created_at", { ascending: false }).order("nte_no", { ascending: false }).limit(20)
+    : { data: [] };
+  const recent = (recentData ?? []) as unknown as Recent[];
+  const stateText = (r: Recent) => r.state === "VOID" ? ["Doesn't count", "REVERSED"] : r.state === "ACCEPTED" || r.review === "ACCEPTED" ? ["Reason accepted", "PUBLISHED"]
+    : r.review === "REJECTED" ? ["Reason rejected", "REVERSED"] : r.state === "EXPLAINED" ? ["Explained", "PUBLISHED"] : ["Waiting for explanation", "STAGED"];
 
   return (
     <>
@@ -65,6 +73,25 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
           </div>
         )}
 
+        {manager && recent.length > 0 && (
+          <div className="card">
+            <h2>Recently issued Late NTEs</h2>
+            <p className="small muted">The last {recent.length} issued, newest first. Tap one to open it.</p>
+            <ul className="plain-list nte-recent">
+              {recent.map((r) => (
+                <li key={r.id}>
+                  <Link className="nte-recent-row" href={`/nte/staff/${r.employee_id}?month=${r.work_date.slice(0, 7)}&nte=${r.id}#nte-${r.id}`}>
+                    <span className="uid">{nteId(r.nte_no)}</span>
+                    <span><strong>{r.employees?.full_name ?? "Staff"}</strong>{r.employees?.uid ? <Uid v={r.employees.uid} /> : null}
+                      <br /><span className="small muted">{dayLabel(r.work_date)} · {r.late_minutes} minutes late{r.ir_id ? " · in an IR" : ""}</span></span>
+                    <span className={`pill ${stateText(r)[1]}`}>{stateText(r)[0]}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {(mine.length > 0 || !manager) && (
           <div className="card">
             <h2>My Late NTEs, {monthLabel(ym)}</h2>
@@ -73,7 +100,7 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
                 {mine.map((n) => (
                   <li key={n.id} className={n.state === "OPEN" ? "urgent" : ""}>
                     <div className="nte-body">
-                      <span><strong>NTE no. {n.nte_no} · {dayLabel(n.work_date)}</strong>
+                      <span><strong><span className="uid">{nteId(n.nte_no)}</span> {dayLabel(n.work_date)}</strong>
                         <br /><span className="small muted">Shift starts {timeLabel(n.shift_start)}, timed in {timeLabel(n.time_in)} ({n.late_minutes} minutes late){n.branch ? ` · ${n.branch}` : ""}</span></span>
                       {n.state === "OPEN" && <><NteDeadline n={n} /><NteExplainForm id={n.id} prompt={`Why were you late, ${firstName(n.name)}?`} /></>}
                       {(n.state === "EXPLAINED" || n.state === "ACCEPTED") && <p className="small" style={{ margin: 0 }}>Your explanation: {n.explanation}</p>}

@@ -7,7 +7,7 @@ import { manilaToday } from "@/lib/dates";
 import { monthLabel } from "@/lib/insights";
 import { dayLabel } from "@/lib/homeGlance";
 import { timeLabel } from "@/lib/schedule";
-import { firstName, irReason, IR_MINUTES_DEFAULT, IR_NTE_COUNT, nteCount, type NteList } from "@/lib/nte";
+import { firstName, irReason, IR_MINUTES_DEFAULT, IR_NTE_COUNT, nteCount, nteId, type NteList } from "@/lib/nte";
 import { IssueLateIrForm, NteDeadline, NteProofs, ReviewNteForm, VoidNteForm } from "../../Forms";
 import { photoUrls } from "@/lib/photos";
 import { Uid } from "@/components/Uid";
@@ -20,7 +20,7 @@ const STATE: Record<string, { label: string; cls: string }> = {
 };
 
 /** One person's Late NTEs for a month, with the "issue an IR?" reminder. Management only. */
-export default async function StaffNtePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ month?: string }> }) {
+export default async function StaffNtePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ month?: string; nte?: string }> }) {
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) notFound();
   const { supabase, access } = await requireAccess();
@@ -75,9 +75,9 @@ export default async function StaffNtePage({ params, searchParams }: { params: P
           {ntes.length === 0 ? <p className="muted" style={{ margin: 0 }}>No Late NTEs this month.</p> : (
             <ul className="plain-list nte-list">
               {ntes.map((n) => (
-                <li key={n.id}>
+                <li key={n.id} id={`nte-${n.id}`} className={sp.nte === n.id ? "focused" : undefined}>
                   <div className="nte-body">
-                    <span><strong>NTE no. {n.nte_no} · {dayLabel(n.work_date)}</strong> <span className={`pill ${STATE[n.state].cls}`}>{STATE[n.state].label}</span>
+                    <span><strong><span className="uid">{nteId(n.nte_no)}</span> {dayLabel(n.work_date)}</strong> <span className={`pill ${STATE[n.state].cls}`}>{STATE[n.state].label}</span>
                       <br /><span className="small muted">Shift starts {timeLabel(n.shift_start)}, timed in {timeLabel(n.time_in)} ({n.late_minutes} minutes late){n.branch ? ` · ${n.branch}` : ""}{n.ir_id ? " · in an IR" : ""}</span></span>
                     {n.explanation && <p className="small" style={{ margin: 0 }}>Explanation: {n.explanation}</p>}
                     <NteProofs urls={(n.proof_paths ?? []).map((p) => proofs.get(p)).filter((u): u is string => !!u)} />

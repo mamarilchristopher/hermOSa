@@ -1,3 +1,4 @@
+import { nteId } from "@/lib/nte";
 import type { Ir } from "./incidents";
 
 /**
@@ -71,7 +72,7 @@ export async function drawIrImage(r: Ir, logoSrc: string, font: string): Promise
 
   // Late days table.
   const nte = r.basis === "LATE_NTE";
-  const cols = nte ? [["Date", 0], ["NTE no.", 0.2], ["Branch", 0.32], ["Shift start", 0.55], ["Time in", 0.7], ["Min. late", 0.85]] as const
+  const cols = nte ? [["Date", 0], ["NTE ID", 0.2], ["Branch", 0.32], ["Shift start", 0.55], ["Time in", 0.7], ["Min. late", 0.85]] as const
     : [["Date", 0], ["Branch", 0.24], ["Shift start", 0.5], ["Time in", 0.67], ["Min. late", 0.84]] as const;
   const tw = W - 2 * M;
   g.font = F(800, 21);
@@ -79,7 +80,7 @@ export async function drawIrImage(r: Ir, logoSrc: string, font: string): Promise
   y += 12; g.fillRect(M, y, tw, 2); y += 32;
   for (const d of r.details.slice(0, 14)) {
     g.font = F(400, 21);
-    const vals = nte ? [day(d.date), d.nte_no ? `#${d.nte_no}` : "", d.branch ?? "", time(d.start), time(d.time_in), String(d.late_min)]
+    const vals = nte ? [day(d.date), d.nte_no ? nteId(d.nte_no) : "", d.branch ?? "", time(d.start), time(d.time_in), String(d.late_min)]
       : [day(d.date), d.branch ?? "", time(d.start), time(d.time_in), String(d.late_min)];
     vals.forEach((v, i) => g.fillText(v, M + 10 + cols[i][1] * tw, y));
     y += 34;

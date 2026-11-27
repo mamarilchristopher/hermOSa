@@ -1,3 +1,4 @@
+import { nteId } from "@/lib/nte";
 import { Fragment } from "react";
 import { dayLabel } from "@/lib/homeGlance";
 import { monthLabel } from "@/lib/insights";
@@ -29,11 +30,11 @@ export function IrDocument({ r }: { r: Ir }) {
             ? <>Late {r.late_days} time{r.late_days === 1 ? "" : "s"} this month, {minutesText(r.late_minutes)} in total. A Late NTE was issued for each. Times are from the Hermosa OS time clock.</>
             : <>Late {r.late_days} time{r.late_days === 1 ? "" : "s"} in this cutoff, {minutesText(r.late_minutes)} in total. The limit is {r.limit_minutes} minutes per cutoff. Times are from the Hermosa OS time clock.</>}</p>
           <table className="ir-days">
-            <thead><tr><th>Date</th>{nte && <th>NTE no.</th>}<th>Branch</th><th>Shift start</th><th>Time in</th><th>Minutes late</th></tr></thead>
+            <thead><tr><th>Date</th>{nte && <th>NTE ID</th>}<th>Branch</th><th>Shift start</th><th>Time in</th><th>Minutes late</th></tr></thead>
             <tbody>
               {r.details.map((d) => (
                 <Fragment key={d.date}>
-                  <tr><td>{dayLabel(d.date)}</td>{nte && <td>{d.nte_no ?? ""}</td>}<td>{d.branch ?? ""}</td><td>{timeLabel(d.start)}</td><td>{timeLabel(d.time_in)}</td><td>{d.late_min}</td></tr>
+                  <tr><td>{dayLabel(d.date)}</td>{nte && <td>{d.nte_no ? nteId(d.nte_no) : ""}</td>}<td>{d.branch ?? ""}</td><td>{timeLabel(d.start)}</td><td>{timeLabel(d.time_in)}</td><td>{d.late_min}</td></tr>
                   {nte && d.explanation && <tr className="ir-nte-why"><td colSpan={6}>NTE explanation: {d.explanation}</td></tr>}
                 </Fragment>
               ))}

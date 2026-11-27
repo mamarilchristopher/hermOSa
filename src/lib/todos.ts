@@ -68,12 +68,25 @@ export async function loadTodos(supabase: SupabaseClient, access: Access, today:
   const branchStaff = access.grants.some((g) => ["MANAGER", "CLINICIAN", "CASHIER"].includes(g.role) && g.branch_id !== null);
   if (csr || branchStaff) {
     const tomorrow = addDays(today, 1);
-    const [{ count: toConfirm, error: bErr }, { count: todayVisits }] = await Promise.all([
+    // update-0091 (CHRIS Nov 27): every client booked for a day is closed out (Arrived or Did not arrive) within clinic hours.
+    const afterHours = Number(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila", hour: "numeric", hour12: false })) % 24 >= 19;
+    const [{ count: toConfirm, error: bErr }, { count: todayVisits }, { data: openPast }] = await Promise.all([
       csr ? supabase.from("bookings").select("id", { count: "exact", head: true }).eq("appointment_date", tomorrow).eq("status", "BOOKED") : Promise.resolve({ count: 0, error: null }),
-      branchStaff ? supabase.from("bookings").select("id", { count: "exact", head: true }).eq("appointment_date", today).in("status", ["BOOKED", "CONFIRMED"]) : Promise.resolve({ count: 0 }),
+      supabase.from("bookings").select("id", { count: "exact", head: true }).eq("appointment_date", today).in("status", ["BOOKED", "CONFIRMED", "ARRIVING"]),
+      csr ? supabase.from("bookings").select("appointment_date").gte("appointment_date", addDays(today, -7)).lt("appointment_date", today).in("status", ["BOOKED", "CONFIRMED", "ARRIVING"]).order("appointment_date").limit(200) : Promise.resolve({ data: [] }),
     ]);
     if (!bErr && toConfirm) todos.unshift({ text: `${toConfirm} visit${toConfirm === 1 ? "" : "s"} tomorrow still to confirm. Message them and mark Confirmed`, href: `/bookings?d=${tomorrow}`, urgent: true });
-    if (todayVisits) todos.push({ text: `${todayVisits} online booking${todayVisits === 1 ? "" : "s"} today not marked yet. Tap Arrived when they come in`, href: "/bookings" });
+    const past = (openPast ?? []) as { appointment_date: string }[];
+    if (past.length) todos.unshift({ text: `${past.length} booked client${past.length === 1 ? "" : "s"} from earlier days not closed out. Confirm if they arrived: set Arrived or Did not arrive`, href: `/bookings?d=${past[0].appointment_date}`, urgent: true });
+    if (todayVisits && csr) {
+      const t = { text: afterHours ? `${todayVisits} client${todayVisits === 1 ? "" : "s"} booked today still not closed out. Confirm with the branch if they arrived: set Arrived or Did not arrive` : `${todayVisits} client${todayVisits === 1 ? "" : "s"} booked today still to arrive. Confirm with the branch and set Arrived or Did not arrive before 7 PM`, href: "/bookings", urgent: afterHours };
+      if (afterHours) todos.unshift(t); else todos.push(t);
+    } else if (todayVisits) todos.push({ text: `${todayVisits} booking${todayVisits === 1 ? "" : "s"} today not marked yet. Tap Arrived when they come in, or Did not arrive`, href: "/bookings", urgent: afterHours });
+  }
+  // update-0091: promo posts due today for the CSRs (and owners / the GM) who post them.
+  if (csr || ownerLevel || access.grants.some((g) => g.role === "MARKETING")) {
+    const { count: postsDue, error: pErr } = await supabase.from("promo_posts").select("id", { count: "exact", head: true }).eq("state", "READY").lte("due_on", today);
+    if (!pErr && postsDue) todos.unshift({ text: `${plural(postsDue, "promo post is", "promo posts are")} due today on all 4 Facebook pages. Open Promo posts`, href: "/promos/post", urgent: true });
   }
   if (management && !isOwner && detailState !== "APPROVED" && detailState !== "PENDING") {
     todos.push({ text: detailState === "RETURNED" ? "The owner sent your employee details back. Please fix them" : "Fill in your employee details (needed for payroll and government reports)", href: "/me/details" });

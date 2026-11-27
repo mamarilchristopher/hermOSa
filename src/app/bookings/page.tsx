@@ -9,15 +9,18 @@ import { LiveBookings } from "./LiveBookings";
 type Booking = {
   id: string; booked_on: string; csr_employee_id: string | null; client_name: string; contact: string | null; platform: string; services: string;
   expected_cents: number | null; appointment_date: string; appointment_time: string | null; branch_id: string; deposit_cents: number | null; follow_up: boolean; note: string | null;
-  status: string; resched_count: number; rescheduled_from: string | null; status_note: string | null; status_by: string | null; status_at: string | null;
+  status: string; waiver_name?: string | null; resched_count: number; rescheduled_from: string | null; status_note: string | null; status_by: string | null; status_at: string | null;
 };
 
 const STATUS: Record<string, [string, string]> = {
-  BOOKED: ["Booked", "STAGED"], CONFIRMED: ["Confirmed", "STAGED"], ARRIVED: ["Arrived", "PUBLISHED"], DONE: ["Done", "PUBLISHED"],
-  UNRESPONSIVE: ["Unresponsive", "REVERSED"], CANCELLED: ["Cancelled", "REVERSED"],
+  BOOKED: ["Booked", "STAGED"], CONFIRMED: ["Confirmed", "STAGED"], ARRIVING: ["Arriving", "ARRIVING"], ARRIVED: ["Arrived", "PUBLISHED"], DONE: ["Done", "PUBLISHED"],
+  NO_SHOW: ["Did not arrive", "REVERSED"], UNRESPONSIVE: ["Unresponsive", "REVERSED"], CANCELLED: ["Cancelled", "REVERSED"],
 };
+/** update-0091 (CHRIS Nov 27): still to be closed out today (Arrived or Did not arrive, within clinic hours). */
+const WAITING = ["BOOKED", "CONFIRMED", "ARRIVING"];
+const LOG_ROLES = ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN"] as const;
 const GC_NAME: Record<string, string> = { QC_MAIN: "MAIN", FAIRVIEW: "FAIRVIEW", STA_MARIA: "SMB", MARIKINA: "MARIKINA" };
-const GC_STATUS: Record<string, string> = { ARRIVED: "ARRIVED", DONE: "DONE", UNRESPONSIVE: "UNRESPONSIVE", CANCELLED: "CANCELLED", CONFIRMED: "CONFIRMED" };
+const GC_STATUS: Record<string, string> = { ARRIVING: "ARRIVING", ARRIVED: "ARRIVED", DONE: "DONE", NO_SHOW: "DID NOT ARRIVE", UNRESPONSIVE: "UNRESPONSIVE", CANCELLED: "CANCELLED", CONFIRMED: "CONFIRMED" };
 const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
 const fmt = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-PH", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
 const mdy = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}/${d.slice(2, 4)}`;
@@ -38,7 +41,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
   const shown = only ? [only] : clinics;
 
   // Bookings FOR this day (the visit date), plus any that were moved away from it (CHRIS Nov 26).
-  const cols = "id, booked_on, csr_employee_id, client_name, contact, platform, services, appointment_date, appointment_time, branch_id, deposit_cents, expected_cents, follow_up, note, status, resched_count, rescheduled_from, status_note, status_by, status_at";
+  const cols = "id, booked_on, csr_employee_id, client_name, contact, platform, services, appointment_date, appointment_time, branch_id, deposit_cents, expected_cents, follow_up, note, status, resched_count, rescheduled_from, status_note, status_by, status_at, waiver_name";
   const forDay = (withMoves: boolean) => supabase.from("bookings").select(cols)
     .or(`appointment_date.eq.${day},rescheduled_from.eq.${day}${withMoves ? `,moved_from.cs.{${day}}` : ""}`)
     .order("appointment_time", { ascending: true, nullsFirst: false }).order("created_at").limit(500);
@@ -49,7 +52,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
     booker ? supabase.from("services").select("name, price_cents").eq("active", true).order("name") : Promise.resolve({ data: [] }),
     supabase.rpc("chat_people"), // names, for "Arrived · by Ana, 3:05 PM"
     // update-0081: Unresponsive bookings waiting on Sales follow-ups (CSRs, owners and the GM).
-    booker ? supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "UNRESPONSIVE") : Promise.resolve({ count: 0 }),
+    booker ? supabase.from("bookings").select("id", { count: "exact", head: true }).in("status", ["UNRESPONSIVE", "NO_SHOW"]) : Promise.resolve({ count: 0 }),
   ]);
   const who = new Map(((Array.isArray(ppl) ? ppl : []) as { id: string; name: string }[]).map((x) => [x.id, x.name]));
   const at = (ts: string) => new Date(ts).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
@@ -57,6 +60,14 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
   // moved_from comes with update-0071; until it runs, fall back to the last move only.
   const { data, error } = first.error?.code === "42703" ? await forDay(false) : first;
   const rows = (data ?? []) as Booking[];
+  // update-0091: bookings whose sale is already in the Service log (so nobody logs it twice).
+  const { data: linked } = rows.length ? await supabase.from("service_logs").select("booking_id").in("booking_id", rows.map((r) => r.id)).neq("state", "REJECTED") : { data: [] };
+  const sold = new Set(((linked ?? []) as { booking_id: string }[]).map((x) => x.booking_id));
+  const codeOf = new Map(clinics.map((b) => [b.id, b.code]));
+  const canLog = (branchId: string) => can(access, [...LOG_ROLES], branchId);
+  // Clinic hours end at 7 PM: after that (or for an earlier day) anyone still Booked, Confirmed or Arriving needs closing out.
+  const manilaHour = Number(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila", hour: "numeric", hour12: false })) % 24;
+  const closingTime = day < today || (day === today && manilaHour >= 19);
   const name = new Map(((emps ?? []) as { id: string; full_name: string }[]).map((e) => [e.id, e.full_name]));
   const perCsr = new Map<string, number>(), perCsrValue = new Map<string, number>();
   for (const r of (madeToday ?? []) as { csr_employee_id: string | null; expected_cents: number | null }[]) {
@@ -71,7 +82,8 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
   // Expected value (CHRIS): owners and managers see what the day's bookings are worth, and how much of it showed up.
   const seesValue = can(access, ["OWNER", "MANAGER"], null) || clinics.some((b) => can(access, ["MANAGER"], b.id));
   const worth = (list: Booking[]) => list.reduce((t, r) => t + (r.expected_cents ?? 0), 0);
-  const open = (list: Booking[]) => list.filter((r) => !moved(r) && r.status !== "CANCELLED" && r.status !== "UNRESPONSIVE");
+  const open = (list: Booking[]) => list.filter((r) => !moved(r) && r.status !== "CANCELLED" && r.status !== "UNRESPONSIVE" && r.status !== "NO_SHOW");
+  const toClose = live.filter((r) => WAITING.includes(r.status));
   const came = (list: Booking[]) => list.filter((r) => !moved(r) && (r.status === "ARRIVED" || r.status === "DONE"));
   const noValue = open(live).filter((r) => r.expected_cents == null).length;
 
@@ -93,7 +105,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
       <TopBar access={access} />
       <main>
         <h1 className="title-row">Bookings <LiveBookings /></h1>
-        <p className="muted small">{booker ? "Log each booking here, from Facebook, calls, texts or walk-ins. The branch marks Arrived or Done, and you see it right away." : "Who is booked for this day at every branch, and their status. Your branch taps Arrived when they come in and Done when finished."}</p>
+        <p className="muted small">{booker ? "Log each booking here, from Facebook, calls, texts or walk-ins. Tap Arriving when the client says they're on the way; the branch marks Arrived, and every booking is closed out (Arrived or Did not arrive) by 7 PM." : "Who is booked for this day at every branch, and their status. Tap Arriving when the client is on the way, Arrived when they come in, then tap their name to log the sale. Close out everyone (Arrived or Did not arrive) by 7 PM."}</p>
         {error && <div className="notice info">{error.code === "42P01" ? "The owner needs to run update-0040 in Supabase first." : "Could not load. Try again."}</div>}
 
         <div className="card">
@@ -110,12 +122,19 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
             </div>
           )}
           <p className="small muted" style={{ margin: "8px 0 0" }}>
-            {live.length} booked · {count("ARRIVED")} arrived · {count("DONE")} done · {count("UNRESPONSIVE")} unresponsive · {rows.filter(moved).length} re-sched · {count("CANCELLED")} cancelled
+            {live.length} booked · {count("ARRIVING")} arriving · {count("ARRIVED")} arrived · {count("DONE")} done · {count("NO_SHOW")} did not arrive · {count("UNRESPONSIVE")} unresponsive · {rows.filter(moved).length} re-sched · {count("CANCELLED")} cancelled
           </p>
           {seesValue && live.length > 0 && (
             <p style={{ margin: "8px 0 0" }}>
               Expected value: <strong>{peso(worth(open(live)))}</strong> · arrived or done: <strong>{peso(worth(came(live)))}</strong>
               {noValue > 0 && <span className="small muted"> · {noValue} booking{noValue === 1 ? "" : "s"} without a value</span>}
+            </p>
+          )}
+          {toClose.length > 0 && day <= today && (
+            <p className={`small ${closingTime ? "notice error" : ""}`} style={{ margin: "8px 0 0" }}>
+              {closingTime
+                ? <>⚠ {toClose.length} client{toClose.length === 1 ? "" : "s"} still not closed out. Set each one to <strong>Arrived</strong> or <strong>Did not arrive</strong>.</>
+                : <>{toClose.length} still to come today. Before 7 PM, set each one to <strong>Arrived</strong> or <strong>Did not arrive</strong>.</>}
             </p>
           )}
           {booker && (toFollow ?? 0) > 0 && <p className="small" style={{ margin: "8px 0 0" }}><Link href="/bookings/followups">{toFollow} unresponsive client{toFollow === 1 ? "" : "s"} to follow up ›</Link></p>}
@@ -135,9 +154,13 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
             <h2>{b.name} ({list.filter((r) => !moved(r)).length}){seesValue && worth(open(list)) > 0 && <span className="small muted" style={{ fontWeight: 500 }}> · expected {peso(worth(open(list)))}</span>}</h2>
             {list.length === 0 && <p className="muted small" style={{ margin: 0 }}>No bookings.</p>}
             {list.map((r) => (
-              <div key={r.id} id={`bk-${r.id}`} className={`booking-row${sp.focus === r.id ? " focused" : ""}`}>
+              <div key={r.id} id={`bk-${r.id}`} className={`booking-row${sp.focus === r.id ? " focused" : ""}${closingTime && !moved(r) && WAITING.includes(r.status) ? " closeout" : ""}`}>
                 <p style={{ margin: "0 0 2px" }}>
-                  <strong>{r.client_name}</strong>{" "}
+                  {/* update-0091: Arriving / Arrived (or Done without a sale yet): the name opens the Service log, filled in from the booking. */}
+                  {!moved(r) && canLog(r.branch_id) && (r.status === "ARRIVING" || r.status === "ARRIVED" || (r.status === "DONE" && !sold.has(r.id)))
+                    ? <Link className="booking-client" href={`/services?branch=${codeOf.get(r.branch_id) ?? ""}&booking=${r.id}`} title="Log the sale for this client"><strong>{r.waiver_name ?? r.client_name}</strong> ›</Link>
+                    : <strong>{r.waiver_name ?? r.client_name}</strong>}{" "}
+                  {r.waiver_name && <span className="small muted">(FB: {r.client_name}) </span>}
                   {r.contact ? <a className="small" href={`tel:${r.contact.replace(/\s/g, "")}`}>{r.contact}</a> : <span className="small muted">no number</span>}{" "}
                   {moved(r) ? <span className="pill REVERSED">Re-sched to {fmt(r.appointment_date)}</span> : <span className={`pill ${STATUS[r.status]?.[1] ?? ""}`}>{STATUS[r.status]?.[0] ?? r.status}</span>}
                 </p>
@@ -156,6 +179,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
                   Logged {fmt(r.booked_on)}{r.csr_employee_id && name.get(r.csr_employee_id) ? ` by ${name.get(r.csr_employee_id)}` : r.csr_employee_id ? "" : " by owner / GM"}
                   {r.platform !== "FACEBOOK" && ` · ${r.platform.replace("_", "-").toLowerCase()}`}
                 </p>
+                {sold.has(r.id) && <p className="small" style={{ margin: "0 0 6px", color: "var(--good)" }}>✓ Sale logged in the Service log{canLog(r.branch_id) && <> · <Link href={`/services?branch=${codeOf.get(r.branch_id) ?? ""}&booking=${r.id}`}>Add another service</Link></>}</p>}
                 {!moved(r) && canMark(r.branch_id) && <><StatusForm id={r.id} status={r.status} booker={booker} today={today} /> <NoteForm id={r.id} note={r.status_note} /></>}
               </div>
             ))}

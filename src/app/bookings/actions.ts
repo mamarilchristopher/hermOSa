@@ -9,6 +9,7 @@ export type BookingState = { ok?: string; error?: string; n?: number } | undefin
 
 const missing = (code?: string) => code === "PGRST202" || code === "42P01";
 const NEEDS_SQL = "The owner needs to run update-0040 and update-0042 in Supabase first.";
+const NEEDS_0091 = "Arriving and Did not arrive need database update-0091. Ask the owner to run it.";
 const PLATFORMS = ["FACEBOOK", "INSTAGRAM", "CALL", "SMS", "WALK_IN", "OTHER"];
 
 export async function addBooking(prev: BookingState, fd: FormData): Promise<BookingState> {
@@ -43,12 +44,12 @@ export async function setStatus(_prev: BookingState, fd: FormData): Promise<Book
   const newDate = String(fd.get("new_date") ?? "");
   const note = String(fd.get("note") ?? "").trim();
   if (!id.success) return { error: "Refresh the page and try again." };
-  if (!["ARRIVED", "DONE", "UNRESPONSIVE", "RESCHEDULED", "CONFIRMED", "CANCELLED", "BOOKED", "NOTE"].includes(status)) return { error: "Tap a status." };
+  if (!["ARRIVING", "ARRIVED", "DONE", "NO_SHOW", "UNRESPONSIVE", "RESCHEDULED", "CONFIRMED", "CANCELLED", "BOOKED", "NOTE"].includes(status)) return { error: "Tap a status." };
   if (status === "RESCHEDULED" && !isIsoDate(newDate)) return { error: "Choose the new date first." };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("set_booking_status", { p_id: id.data, p_status: status, p_new_date: status === "RESCHEDULED" ? newDate : null, p_note: note || null });
   if (error) return { error: missing(error.code) ? NEEDS_SQL : "Could not save. Try again." };
-  if (!data?.ok) return { error: errorText(data?.error) };
+  if (!data?.ok) return { error: data?.error === "BAD_REQUEST" && (status === "ARRIVING" || status === "NO_SHOW") ? NEEDS_0091 : errorText(data?.error) };
   revalidatePath("/bookings"); revalidatePath("/me");
   return { ok: "Saved." };
 }

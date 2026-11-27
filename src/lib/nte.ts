@@ -9,6 +9,8 @@ export type Nte = {
 export type NteList = { month: string; grace: number; ir_minutes?: number; ntes: Nte[] };
 
 /** An IR is suggested at 3 Late NTEs in a month, or earlier once total minutes late pass the limit (CHRIS, Nov 25). */
+/** The NTE ID shown everywhere (CHRIS Nov 27, v0.91.0): company-wide number, e.g. NTE-0003. */
+export const nteId = (no: number) => `NTE-${String(no).padStart(4, "0")}`;
 export const IR_NTE_COUNT = 3;
 export const IR_MINUTES_DEFAULT = 60;
 export function irReason(count: number, minutes: number, limit = IR_MINUTES_DEFAULT): string | null {

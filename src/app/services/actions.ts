@@ -32,11 +32,14 @@ const Log = z.object({
   addons: z.string().max(2000).optional(),
   promo_client: z.union([z.uuid(), z.literal("new"), z.literal("")]).optional(),
   promo_contact: z.string().trim().max(40).optional(),
+  promo_payments: z.coerce.number().int().min(1).max(6).optional(),
+  no_ba: z.literal("1").optional(),
+  booking: z.uuid().optional(),
 });
 const Photos = z.array(z.object({ kind: z.enum(["WAIVER", "BEFORE", "AFTER"]), path: z.string().max(300), thumb: z.string().max(300).nullable() })).max(20);
 
 export async function logService(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session", "meds", "proofs", "addons", "promo_client", "promo_contact"].map((k) => [k, fd.get(k) ?? undefined])));
+  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session", "meds", "proofs", "addons", "promo_client", "promo_contact", "promo_payments", "no_ba", "booking"].map((k) => [k, fd.get(k) ?? undefined])));
   if (!p.success) return { error: "Fill in the client's name, the service, the amount paid and who did it." };
   let photos;
   try { photos = Photos.parse(JSON.parse(p.data.photos || "[]")); } catch { return { error: "The photos didn't attach. Remove them and add them again." }; }
@@ -85,9 +88,10 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
       return { duplicate: `${p.data.client.trim()} already has this service logged today (at ${at}). Is this a separate visit?`, at: Date.now() };
     }
   }
+  const noBa = p.data.no_ba === "1";
   const promoArgs = pm ? {
     p_promo_client: p.data.promo_client === "new" ? null : p.data.promo_client,
-    p_new: p.data.promo_client === "new" ? { promo_id: pm.promo.id, contact: p.data.promo_contact || null, schedule: firstPlan(pm.promo, p.data.date) } : null,
+    p_new: p.data.promo_client === "new" ? { promo_id: pm.promo.id, contact: p.data.promo_contact || null, schedule: firstPlan(pm.promo, p.data.date), payments: p.data.promo_payments ?? 1 } : null,
     p_session: pm.part && !pm.promo.pay_service_id ? p.data.session : null,
   } : null;
   const { data, error } = pm ? await supabase.rpc("log_promo_visit", {
@@ -95,15 +99,18 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     p_branch: p.data.branch, p_date: p.data.date, p_service: p.data.service, p_amount_cents: cents, p_type: p.data.type === "LEAD" && !p.data.partner ? "SOLO" : p.data.type,
     p_employee: p.data.employee, p_partner: p.data.partner || null, p_note: p.data.note || null,
     p_client: p.data.client, p_price_note: p.data.price_note || null, p_folder: p.data.folder, p_photos: photos, p_share: p.data.share === "1",
+    ...(noBa ? { p_before_after: false } : {}),
   }) : await supabase.rpc("log_client_visit", {
     p_branch: p.data.branch, p_date: p.data.date, p_service: p.data.service, p_amount_cents: cents, p_type: !paid ? "NONCOMMI" : p.data.type === "LEAD" && !p.data.partner ? "SOLO" : p.data.type,
     p_employee: p.data.employee, p_partner: paid ? p.data.partner || null : null, p_note: p.data.note || null,
     p_kind: p.data.kind, p_confirm: true, // the client + service check above replaces the old staff + amount check
     p_client: p.data.client, p_price_note: p.data.price_note || null, p_folder: p.data.folder, p_photos: photos, p_share: p.data.share === "1",
     // CHRIS Nov 26: session number (update-0064). Session 1 is the default, so it is sent only when it's 2 to 15.
-    ...(p.data.session > 1 ? { p_session: p.data.session } : {}),
+    // update-0091: "Service has before and after photo?" unticked. Sent with the session number (both go to the same call).
+    ...(p.data.session > 1 || noBa ? { p_session: p.data.session } : {}),
+    ...(noBa ? { p_before_after: false } : {}),
   });
-  if (error) return { error: error.code === "PGRST202" ? (p.data.session > 1 ? "Session numbers need database update-0064. Ask the owner to run it, or save it as Session 1 for now." : "The owner needs to run update-0053 in Supabase first.") : "Could not save. Try again." };
+  if (error) return { error: error.code === "PGRST202" ? noBa ? "No before and after photo needs database update-0091. Ask the owner to run it, or add the photos for now." : (p.data.session > 1 ? "Session numbers need database update-0064. Ask the owner to run it, or save it as Session 1 for now." : "The owner needs to run update-0053 in Supabase first.") : "Could not save. Try again." };
   if (!data.ok && data.error === "POSSIBLE_DUPLICATE") {
     const at = new Date(data.existing.at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
     return { duplicate: `${data.existing.by} already logged this service for the same staff and amount today at ${at}. Is this a different client?`, at: Date.now() };
@@ -146,6 +153,14 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     const { data: pr, error: prErr } = await supabase.rpc("add_payment_proof", { p_log: data.id, p_photos: proofs });
     medsNote += prErr || !pr?.ok ? " The proof of payment didn't save: attach it again on the entry." : " Proof of payment attached.";
   }
+  // update-0091 (CHRIS Nov 27): logged from a booking. The waiver name (when it differs from the Facebook name) is saved on the
+  // booking and takes priority in all records; the entry is linked to the booking, which becomes Done.
+  if (p.data.booking) {
+    const { data: wv } = await supabase.rpc("set_booking_waiver", { p_id: p.data.booking, p_name: p.data.client });
+    const { data: ln, error: lnErr } = await supabase.rpc("link_booking_log", { p_booking: p.data.booking, p_log: data.id });
+    medsNote += lnErr || !ln?.ok || !wv?.ok ? " It didn't link to the booking: tap Done on Bookings." : " Linked to the booking (marked Done).";
+    revalidatePath("/bookings");
+  }
   revalidatePath("/services");
   revalidatePath("/me");
   const [{ data: svc }, { data: emp }] = await Promise.all([
@@ -167,8 +182,9 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
 }
 
 /** update-0087: what went wrong with a promo session, in plain words. */
-function promoError(d: { error: string; of?: number; session?: number; balance?: number; ends_on?: string }): string {
+function promoError(d: { error: string; of?: number; session?: number; balance?: number; ends_on?: string; due?: number; used?: number }): string {
   switch (d.error) {
+    case "PROMO_PAY_FIRST": return d.used ? `Sessions follow payments: this client has used the ${d.used} session${d.used === 1 ? "" : "s"} paid so far. Log at least ${centsToPhp(d.due ?? 0)} on the promo's payment line first.` : `Log the client's payment first (at least ${centsToPhp(d.due ?? 0)}) on the promo's payment line, choosing New client there. Then log the session.`;
     case "PROMO_USED_UP": return `This client has used all ${d.of} sessions of this item.`;
     case "PROMO_SESSION": return `This client is on session ${d.session} of ${d.of}. Pick that session.`;
     case "PROMO_PAY_LINE": return "Program sessions are already paid for, so they're ₱0. Log any payment on the promo's payment line.";

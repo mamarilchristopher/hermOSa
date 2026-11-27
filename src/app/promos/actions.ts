@@ -28,6 +28,9 @@ const Input = z.object({
   endsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   model: z.string().regex(/^M\d{2,3}$/).nullable(),
   source: z.enum(["MANUAL", "SUGGESTED"]),
+  // update-0091: payment options
+  pay: z.enum(["FULL", "INSTALLMENT"]).optional(),
+  maxPay: z.number().int().min(2).max(6).nullable().optional(),
 });
 export type PromoInput = z.infer<typeof Input>;
 
@@ -41,6 +44,12 @@ async function save(input: PromoInput) {
     p_valid_months: d.months, p_ends_on: d.endsOn, p_model: d.model, p_source: d.source,
   });
   if (error || !data?.ok) return { error: fail(error, data?.error) };
+  // update-0091: full payment or installments (up to maxPay monthly payments).
+  if (d.pay) {
+    const { data: pr, error: prErr } = await supabase.rpc("set_promo_payment", { p_id: data.id, p_options: d.pay, p_max: d.pay === "INSTALLMENT" ? d.maxPay ?? null : null });
+    if (prErr?.code === "PGRST202") { if (d.pay === "INSTALLMENT") return { error: "Installments need update-0091. Ask the owner to run it, or choose Full payment for now." }; }
+    else if (prErr || !pr?.ok) return { error: "Could not save the payment option. Try again." };
+  }
   return { supabase, id: data.id as string };
 }
 
