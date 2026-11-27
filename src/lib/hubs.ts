@@ -65,7 +65,7 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
     { key: "team", label: "Team", short: "Team", icon: "week", tabs: [
       { href: "/schedule", label: "Schedule" },
       { href: "/leave", label: "Leave", badge: n(c.leave) },
-      ...(approver ? [{ href: "/nte", label: "Late NTEs" }, { href: "/incidents", label: "Incident reports" }] : []),
+      ...(approver ? [{ href: "/nte/dashboard", label: "Tardiness" }, { href: "/nte", label: "Late NTEs" }, { href: "/incidents", label: "Incident reports" }] : []),
     ] },
     { key: "pay", label: "Pay", short: "Pay", icon: "coins", tabs: [
       ...(owner || gm ? [{ href: "/payroll", label: "Payroll" }] : []),

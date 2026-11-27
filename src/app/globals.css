@@ -2273,3 +2273,71 @@ td.cell-input .cell-pend { text-align: right; margin-top: 2px; }
 .glance-branch .delta { align-self: flex-start; font-size: 0.72rem; }
 @media (max-width: 700px) { .glance-head h2 { flex-basis: 100%; } }
 .glance-verdict { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* v0.99.4 (CHRIS Nov 28, option A): Tardiness dashboard — leaderboard rows with an on-time ring, minutes bar and a month heat strip. */
+.tdy-title { justify-content: space-between; }
+.tdy-title h1 { margin-bottom: 0; }
+.tdy-sub { font-size: 0.6em; font-weight: 700; }
+.tdy-watch { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.tdy-chip { display: inline-flex; gap: 6px; align-items: center; padding: 5px 12px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; text-decoration: none; border: 1px solid transparent; }
+.tdy-chip.due { background: var(--bad-bg); color: var(--bad); }
+.tdy-chip.near { background: var(--warn-bg); color: var(--warn); }
+.tdy-chip:hover { border-color: currentColor; }
+.tdy-board { padding: 8px 18px 14px; }
+.tdy-row { display: grid; grid-template-columns: 52px minmax(160px, 1.3fr) 108px minmax(130px, 1fr) minmax(170px, 1.4fr) 104px; gap: 14px; align-items: center;
+  padding: 10px 6px; border-bottom: 1px solid var(--line); color: inherit; text-decoration: none; border-radius: 10px; }
+a.tdy-row:hover { background: var(--pearl); }
+.tdy-headrow { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; color: var(--muted); padding-top: 10px; }
+.tdy-who { display: flex; flex-direction: column; min-width: 0; }
+.tdy-name { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.tdy-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tdy-lates strong { font-size: 1.05rem; }
+.tdy-ring { position: relative; width: 44px; height: 44px; display: inline-grid; place-items: center; }
+.tdy-ring svg { position: absolute; inset: 0; width: 44px; height: 44px; }
+.tdy-ring circle { fill: none; stroke-width: 4.5; }
+.tdy-ring .track { stroke: var(--line); }
+.tdy-ring.good .fill { stroke: var(--good); }
+.tdy-ring.mid .fill { stroke: var(--gold); }
+.tdy-ring.bad .fill { stroke: var(--bad); }
+.tdy-ring.none .fill { stroke: transparent; }
+.tdy-ring span.full { font-size: 0.6rem; letter-spacing: -0.02em; }
+.tdy-ring span { font-size: 0.7rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); }
+.tdy-bar { display: flex; flex-direction: column; gap: 4px; }
+.tdy-bar-num { font-size: 0.85rem; }
+.tdy-bar-track { position: relative; height: 8px; border-radius: 999px; background: var(--line); }
+.tdy-bar-track span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: var(--gold); }
+.tdy-bar-track span.over { background: var(--bad); }
+.tdy-bar-track b { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.55; border-radius: 1px; }
+.tdy-strip { display: grid; gap: 2px; }
+.tdy-strip i, .tdy-legend i { display: block; height: 18px; border-radius: 3px; background: transparent; }
+.tdy-strip i.off, .tdy-legend i.off { background: transparent; border: 1px dashed var(--line); }
+.tdy-strip i.future { background: var(--pearl); border: 1px solid var(--line); }
+.tdy-strip i.ok, .tdy-legend i.ok { background: var(--good); opacity: 0.35; }
+.tdy-strip i.absent, .tdy-legend i.absent { background: repeating-linear-gradient(135deg, var(--muted) 0 1.5px, transparent 1.5px 4px); opacity: 0.45; }
+.tdy-strip i.late, .tdy-legend i.late { background: var(--gold); }
+.tdy-strip i.late.big, .tdy-legend i.late.big { background: var(--bad); }
+.tdy-strip i.excused, .tdy-legend i.excused { background: var(--gold); opacity: 0.4; }
+.tdy-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0; }
+.tdy-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.tdy-legend i { width: 12px; height: 12px; }
+.tdy-st { justify-self: start; padding: 3px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; white-space: nowrap; }
+.tdy-st.due { background: var(--bad-bg); color: var(--bad); }
+.tdy-st.inir { background: var(--bad-bg); color: var(--bad); opacity: 0.8; }
+.tdy-st.near { background: var(--warn-bg); color: var(--warn); }
+.tdy-st.ok { background: var(--good-bg); color: var(--good); }
+@media (max-width: 860px) {
+  .tdy-board { padding: 4px 12px 12px; }
+  .tdy-headrow { display: none; }
+  .tdy-row { grid-template-columns: 44px 1fr auto; grid-template-areas: "ring who st" "ring lates bar" "strip strip strip"; gap: 6px 12px; padding: 12px 4px; }
+  .tdy-row > .tdy-ring { grid-area: ring; align-self: start; }
+  .tdy-row > .tdy-who { grid-area: who; }
+  .tdy-row > .tdy-st { grid-area: st; justify-self: end; }
+  .tdy-row > .tdy-lates { grid-area: lates; text-align: left; }
+  .tdy-row > .tdy-bar { grid-area: bar; min-width: 120px; }
+  .tdy-row > .tdy-strip { grid-area: strip; }
+  .tdy-strip i { height: 14px; }
+}
+.tdy-back { display: flex; gap: 16px; flex-wrap: wrap; }
+.tdy-links { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.tdy-links .button { margin: 0; }
+.tdy-lates .nowrap { white-space: nowrap; }

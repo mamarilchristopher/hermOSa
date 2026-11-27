@@ -20,7 +20,7 @@ export function HomeTardiness({ month, ntes, people }: { month: string; ntes: Nt
   const due = people.filter((r) => r.due);
   return (
     <div className="card">
-      <div className="card-head"><h2>Tardiness tracker, {month}</h2><Link className="small" href="/nte">All Late NTEs →</Link></div>
+      <div className="card-head"><h2>Tardiness tracker, {month}</h2><span className="tdy-links"><Link className="button small" href="/nte/dashboard">Dashboard</Link><Link className="button secondary small" href="/nte">All Late NTEs</Link></span></div>
       {due.length > 0 && (
         <ul className="plain-list" style={{ marginBottom: 10 }}>
           {due.map((r) => (
