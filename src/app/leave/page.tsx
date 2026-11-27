@@ -1,3 +1,4 @@
+import { AddPanel } from "@/components/Controls";
 import Link from "next/link";
 import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
@@ -74,10 +75,9 @@ export default async function LeavePage() {
         )}
 
         {me ? (
-          <div className="card">
-            <h2>File leave</h2>
+          <AddPanel title="File leave" hint="Vacation or sick leave, for you">
             <FileLeaveForm today={today} slFrom={addDays(today, -14)} />
-          </div>
+          </AddPanel>
         ) : (
           <div className="notice info">Your account isn&apos;t linked to an employee record yet, so you can&apos;t file leave. Ask an owner.</div>
         )}

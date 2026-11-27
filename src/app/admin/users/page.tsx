@@ -1,3 +1,4 @@
+import { AddPanel } from "@/components/Controls";
 import { ROLE_CHOICES } from "@/lib/staffLevels";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -152,10 +153,9 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           </>
         )}
         {others.length > 0 && (
-          <div className="card">
-            <h2 style={{ marginTop: 0 }}>Give someone an extra role</h2>
+          <AddPanel title="Give someone an extra role" hint="A role at one branch or at all branches">
             <GrantForm users={others} branches={branches.filter((b) => b.kind === "CLINIC")} />
-          </div>
+          </AddPanel>
         )}
       </main>
     </>

@@ -2113,4 +2113,8 @@ details.card:not(.add-panel)[open] > summary { margin-bottom: 12px; }
   .segmented[role="tablist"] { display: grid; grid-template-columns: 1fr 1fr; overflow: visible; width: 100%; border-radius: 14px; }
   .segmented[role="tablist"] a { white-space: normal; text-align: center; padding: 9px 8px; line-height: 1.25; display: flex; align-items: center; justify-content: center; }
   .segmented[role="tablist"] a:first-child:nth-last-child(odd) { grid-column: 1 / -1; }
+  /* The Service log's branch pick (v0.98.2): same 2-column grid, no branch cut off. */
+  .segmented.branch-choice { display: grid; grid-template-columns: 1fr 1fr; overflow: visible; width: 100%; border-radius: 14px; }
+  .segmented.branch-choice button { white-space: normal; text-align: center; padding: 9px 8px; line-height: 1.25; }
+  .segmented.branch-choice button:first-child:nth-last-child(odd) { grid-column: 1 / -1; }
 }
