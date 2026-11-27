@@ -24,6 +24,7 @@ export type Playbook = {
   updated: string; version?: string | number | null; proposed_note?: string | null; master_plan: string; catalog_sheet: string; month_total_pre_vat: number;
   december: { base_pre_vat: number; reserve_pre_vat: number; reserve_rule: string; daily_shape: string };
   rules: string[];
+  refresh_rule?: { principle: string; evidence: string[]; baseline: string; states: { state: string; test: string; action: string }[]; cadence: string[]; sales_and_foot_traffic: string[] } | null;
   lines: PlayLine[];
   radar: {
     note: string;
@@ -44,7 +45,7 @@ const isBranchLine = (l: PlayLine) => l.branch !== "ALL" && l.status !== "propos
 /** Plan per "BRANCH|SERVICE" for the advisor. */
 export const planMap = (pb: Playbook = PLAYBOOK) =>
   new Map(pb.lines.filter(isBranchLine).map((l) => [`${l.branch}|${l.service}`, {
-    budget: l.daily_budget_pre_vat, status: l.status, reviewDays: l.review_after_days,
+    budget: l.daily_budget_pre_vat, status: l.status, reviewDays: l.review_after_days, targetCpc: l.kpis?.target_cost_per_chat_vat ?? null,
     proposedChange: l.proposed_change ? { budget: l.proposed_change.daily_budget_pre_vat, why: l.proposed_change.why, status: l.proposed_change.status } : null,
   }]));
 export const playLine = (branch: string, service: string, pb: Playbook = PLAYBOOK) => pb.lines.find((l) => isBranchLine(l) && l.branch === branch && l.service === service) ?? null;

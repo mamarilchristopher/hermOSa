@@ -75,19 +75,6 @@ describe("budget moves", () => {
   });
 });
 
-describe("ad flags", () => {
-  it("turn off, winner and tiring", () => {
-    const rows = [
-      ...ad({ aid: "w", a: "DEMO winner", sp: [1000, 1000], m: [50, 50] }),
-      ...ad({ aid: "x", a: "DEMO dud", sp: [200, 200], m: [0, 0] }),
-      ...ad({ aid: "d", a: "DEMO dear", sp: [2000, 2000], m: [20, 20] }),
-      ...ad({ aid: "t", a: "DEMO tiring", sp: [1000, 1000], m: [16, 30] }),
-    ];
-    const ads = Object.fromEntries(run(rows, 100000).lines[0].ads.map((a) => [a.id, a.flag]));
-    expect(ads).toEqual({ w: "WINNER", x: "OFF", d: "OFF", t: "TIRING" });
-  });
-});
-
 describe("names and targeting", () => {
   it("sorts ads into Hiko, Gluta or other", () => {
     expect(serviceOfAd("03.11.25 | Drip | Non- Invasives | TOFU - FAIRVIEW", "Beauty and Luxury", "Fairview - Drip")).toBe("GLUTA");
@@ -148,32 +135,41 @@ describe("growth check (Nov 27): more spend on the same ads didn't bring more sa
   });
 });
 
-describe("refresh timing (CHRIS Nov 27): fatigue weighed against how the ad still performs", () => {
-  /** 28 days of one ad: [days 1-21 spend, chats], [last 7 days spend, chats] per day. */
-  function long(aid: string, early: [number, number], late: [number, number], start = 28) {
+describe("ad states (playbook refresh_rule, CHRIS Nov 27): judged by results, not age", () => {
+  /** 28 days of one ad: per-day [spend, chats] for days 1-14, 15-21 and the last 7. */
+  function long(aid: string, a: [number, number], b: [number, number], c: [number, number], ctr: [number, number] = [20, 20]) {
     const rows: FeedRow[] = [];
-    for (let i = 0; i < start; i++) {
-      const d = addDay(TODAY, -start + i), last = i >= start - 7;
-      const [sp, m] = last ? late : early;
-      rows.push({ d, page: QC, cid: "c1", c: "DEMO Hiko campaign", sid: "s1", s: "DEMO set", aid, a: `DEMO ${aid}`, sp, m, im: 1000, rc: 800, fq: 1.2, cl: 20, cb: 300000, sb: null, ss: "ACTIVE", as: "ACTIVE" });
+    for (let i = 0; i < 28; i++) {
+      const d = addDay(TODAY, -28 + i);
+      const [sp, m] = i < 14 ? a : i < 21 ? b : c;
+      rows.push({ d, page: QC, cid: "c1", c: "DEMO Hiko campaign", sid: "s1", s: "DEMO set", aid, a: `DEMO ${aid}`, sp, m, im: 1000, rc: 800, fq: 1.2,
+        cl: i < 21 ? ctr[0] : ctr[1], cb: 300000, sb: null, ss: "ACTIVE", as: "ACTIVE" });
     }
     return rows;
   }
-  const refresh = (rows: FeedRow[]) => Object.fromEntries(run(rows, 100000).lines[0].ads.map((a) => [a.id, a.refresh]));
+  // Target ₱35* a chat. ₱500/day for 18 chats = ₱31* a chat.
+  const plan = new Map([["QC_MAIN|HIKO", { budget: 3000, status: "keep", reviewDays: 7, targetCpc: 35 }]]);
+  const states = (rows: FeedRow[]) => Object.fromEntries(run(rows, 100000, plan).lines[0].ads.map((a) => [a.id, a.state]));
 
-  it("a long-running ad that still holds keeps its budget; slipping ads get watch or replace; new ads wait", () => {
-    const r = refresh([
-      ...long("hold", [500, 15], [500, 15]),          // same cost per chat for 4 weeks
-      ...long("slip", [500, 15], [500, 12]),          // +25%
-      ...long("worn", [500, 15], [500, 10]),          // +50%
-      ...long("new", [0, 0], [300, 8], 28),           // only spending this week
-    ]);
-    expect(r).toEqual({ hold: "EVERGREEN", slip: "WATCH", worn: "REPLACE", new: "NEW" });
+  it("winner, tiring, fatigued, loser, learning", () => {
+    expect(states([
+      ...long("win", [500, 18], [500, 18], [500, 18]),
+      ...long("tire", [500, 18], [500, 18], [500, 14], [30, 20]),   // +28% cost and click rate down a third
+      ...long("slip", [500, 18], [500, 14], [500, 14]),             // +28% but clicks fine: one sign only
+      ...long("fat", [500, 18], [500, 12], [500, 12]),              // +50% two weeks
+      ...long("lose", [500, 9], [500, 9], [500, 9]),                // ₱62* a chat from the start
+      ...long("new", [0, 0], [0, 0], [500, 12]),                    // 7 days: learning just ended, too soon
+    ])).toEqual({ win: "WINNER", tire: "TIRING", slip: "STEADY", fat: "FATIGUED", lose: "LOSER", new: "NEW" });
   });
 
-  it("the advice says why", () => {
-    const ads = run(long("hold", [500, 15], [500, 15]), 100000).lines[0].ads;
-    expect(ads[0].refreshWhy).toMatch(/Keep its budget; add new ads beside it/);
-    expect(ads[0].age).toBe(28);
+  it("age alone never makes an ad tiring", () => {
+    const [a] = run(long("old", [500, 18], [500, 18], [500, 18]), 100000, plan).lines[0].ads;
+    expect(a.age).toBe(28);
+    expect(a.state).toBe("WINNER");
+    expect(a.why).toMatch(/Keep it and its budget; never edit it/);
+  });
+
+  it("₱1,000* in 14 days and no chats is a loser", () => {
+    expect(states(long("dud", [0, 0], [100, 0], [100, 0]))).toEqual({ dud: "LOSER" });
   });
 });

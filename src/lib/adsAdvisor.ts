@@ -102,17 +102,20 @@ export function targetingText(t: Targeting): string {
   return parts.join(" · ");
 }
 
-export type AdFlag = "OFF" | "WINNER" | "TIRING" | null;
 /**
- * Refresh call per running ad (CHRIS Nov 27): weigh Meta's fatigue signs against how the ad still performs. An ad that
- * has run a long time and still holds its cost per chat keeps its budget; new ads are added beside it, not instead of it.
- *   NEW: under 14 days or under 20 chats in 4 weeks, too soon to judge. EVERGREEN: 21+ days, 80+ chats in 4 weeks, still at its own 4-week cost per chat.
- *   WATCH: slipping 15–30%: have a new version ready in 1–2 weeks. REPLACE: worse by 30%+: launch the new version now.
+ * Each running ad's state, from the playbook's refresh_rule (CHRIS Nov 27): judge an ad by its own results, not its age.
+ * Baseline = the ad's best 14-day cost per chat* after learning (its first 7 days and 50 chats are skipped).
+ *   WINNER: last 7 days within +20% of baseline and at or under the target. Keep it, never edit it.
+ *   TIRING: 2 signs: cost per chat 20%+ over baseline, and click rate 25%+ under its best week (frequency and quality
+ *           ranking are checked in Ads Manager). Add 1–2 new versions to the ad set; don't pause.
+ *   FATIGUED: 35%+ over baseline two weeks running. Pause, launch its remake, rest it 6–8 weeks.
+ *   LOSER: after 7 days and ₱3,000*, 50%+ over the target (or ₱1,000* and no chats). Pause; no remake.
+ *   NEW: still learning (under 7 days or 50 chats). STEADY: none of these.
  */
-export type Refresh = "NEW" | "EVERGREEN" | "WATCH" | "REPLACE" | null;
+export type AdState = "WINNER" | "TIRING" | "FATIGUED" | "LOSER" | "NEW" | "STEADY";
 export type AdView = {
-  id: string; name: string; adset: string; status: string; t14: Totals; t7: Totals; p7: Totals; t28: Totals; cpc14: number | null; flag: AdFlag; why: string;
-  age: number; agePlus: boolean; refresh: Refresh; refreshWhy: string;
+  id: string; name: string; adset: string; status: string; t14: Totals; t7: Totals; p7: Totals; t28: Totals; cpc14: number | null;
+  age: number; agePlus: boolean; state: AdState | null; why: string; baseline: number | null;
 };
 export type AdSetView = {
   id: string; name: string; campaign: string; status: string; t7: Totals; targeting: Targeting | null; text: string | null;
@@ -156,7 +159,7 @@ function budgets(rows: FeedRow[], idOf: (r: FeedRow) => string | null, valOf: (r
  * A branch line in the playbook. proposedChange = a controlled budget test the ads work proposes (e.g. Marikina Hiko +20%
  * for 3 weeks), shown as the move while it waits for CHRIS's OK.
  */
-export type PlanEntry = { budget: number; status: string; reviewDays: number; proposedChange?: { budget: number; why: string; status?: string } | null };
+export type PlanEntry = { budget: number; status: string; reviewDays: number; targetCpc?: number | null; proposedChange?: { budget: number; why: string; status?: string } | null };
 
 export type AdvisorInput = {
   feed: Feed;
@@ -202,6 +205,7 @@ export function advise(inp: AdvisorInput) {
   const acc = () => ({ t7: zero(), p7: zero(), t14: zero(), t28: zero() });
   const lines = new Map<string, Acc>();
   const ads = new Map<string, Acc & { key: string; first: string }>();
+  const daily = new Map<string, Map<string, { sp: number; m: number; im: number; cl: number }>>();
   const feedStart = rows.reduce((m, r) => (m === "" || r.d < m ? r.d : m), "");
   const sets = new Map<string, Acc & { key: string; name: string; campaign: string }>();
   const campSpend7 = new Map<string, Map<string, number>>(); // campaign → line → spend (to split a campaign budget)
@@ -210,6 +214,9 @@ export function advise(inp: AdvisorInput) {
     const L = lines.get(key) ?? acc(); lines.set(key, L);
     const A = ads.get(r.aid) ?? { ...acc(), key, first: "9999-12-31" }; ads.set(r.aid, A);
     if (n(r.sp) > 0 && r.d < A.first) A.first = r.d;
+    const dm = daily.get(r.aid) ?? new Map(); daily.set(r.aid, dm);
+    const dd = dm.get(r.d) ?? { sp: 0, m: 0, im: 0, cl: 0 };
+    dd.sp += n(r.sp); dd.m += n(r.m); dd.im += n(r.im); dd.cl += n(r.cl); dm.set(r.d, dd);
     const sid = r.sid ?? `${r.cid}-none`;
     const S = sets.get(sid) ?? { ...acc(), key, name: r.s ?? "", campaign: r.c ?? "" }; sets.set(sid, S);
     for (const X of [L, A, S]) {
@@ -299,39 +306,20 @@ export function advise(inp: AdvisorInput) {
         : `ROAS ${roas7.toFixed(1)}x this week: between ${CUT_BELOW}x and ${RAISE_AT}x, so hold.`;
     }
 
-    // Ads in this line.
+    // Ads in this line, judged by their own results (playbook refresh_rule), not their age.
     const lineCpc = perChat(L.t14);
+    const targetCpc = plan?.targetCpc ?? lineCpc ?? null;
     const adViews: AdView[] = [];
     for (const [aid, A] of ads) {
       if (A.key !== key) continue;
       const s = latestStatus.get(aid)!;
-      const cpc14 = perChat(A.t14), live = isLive(aid);
-      let flag: AdFlag = null, w = "";
-      if (live && A.t14.spend * 1.12 >= 1000 && A.t14.msgs === 0) { flag = "OFF"; w = `₱${Math.round(A.t14.spend * 1.12).toLocaleString("en-US")}* in 14 days and no chats.`; }
-      else if (live && cpc14 !== null && lineCpc !== null && A.t14.spend * 1.12 >= 1500 && cpc14 >= lineCpc * 1.6) { flag = "OFF"; w = `₱${cpc14.toFixed(0)}* a chat, ${(cpc14 / lineCpc).toFixed(1)}× this line's ₱${lineCpc.toFixed(0)}*.`; }
-      else if (A.t14.msgs >= 30 && cpc14 !== null && lineCpc !== null && cpc14 <= lineCpc * 0.8) { flag = "WINNER"; w = `₱${cpc14.toFixed(0)}* a chat on ${A.t14.msgs} chats, ${Math.round((1 - cpc14 / lineCpc) * 100)}% cheaper than this line. Make 2–3 new versions of it.`; }
-      // Refresh timing: this week against the ad's own 4 weeks (its staying power), not just against last week.
-      const age = A.first > end ? 0 : daysBetween(A.first, end) + 1, agePlus = A.first <= addDay(feedStart, 1);
-      let refresh: Refresh = null, rw = "";
-      if (live && flag !== "OFF") {
-        const c7 = perChat(A.t7), c28 = perChat(A.t28), r7 = ctr(A.t7), r28 = ctr(A.t28);
-        const slip = c7 !== null && c28 !== null && A.t7.msgs >= 15 ? c7 / c28 - 1 : null;
-        const ctrDrop = r7 !== null && r28 !== null && A.t7.impressions >= 5000 ? 1 - r7 / r28 : null;
-        if (age < 14 || A.t28.msgs < 20) { refresh = "NEW"; rw = `Running ${age} day${age === 1 ? "" : "s"}${A.t28.msgs < 20 ? ` with ${A.t28.msgs} chats` : ""}: judge it after 2 weeks and about 50 chats (Meta's learning takes the first week).`; }
-        else if ((slip !== null && slip > 0.3) || (ctrDrop !== null && ctrDrop > 0.3)) {
-          refresh = "REPLACE";
-          rw = `${slip !== null && slip > 0.3 ? `Cost per chat up ${Math.round(slip * 100)}% on its own 4-week average (₱${c28!.toFixed(0)}* → ₱${c7!.toFixed(0)}*)` : `Click rate down ${Math.round(ctrDrop! * 100)}% on its 4-week average`}. Launch a new version now; turn this one off once the new one is cheaper per chat after a week.`;
-          if (flag !== "WINNER") { flag = "TIRING"; w = rw; }
-        } else if ((slip !== null && slip > 0.15) || (ctrDrop !== null && ctrDrop > 0.15)) {
-          refresh = "WATCH";
-          rw = `Starting to slip (${slip !== null && slip > 0.15 ? `cost per chat +${Math.round(slip * 100)}%` : `click rate −${Math.round(ctrDrop! * 100)}%`} on its 4-week average). Keep its budget, and have a new version ready within 1–2 weeks.`;
-        } else if (age >= 21 && A.t28.msgs >= 80 && A.t7.msgs >= 15 && c7 !== null && (lineCpc === null || c7 <= lineCpc * 1.1)) {
-          refresh = "EVERGREEN";
-          rw = `Running ${age}${agePlus ? "+" : ""} days and ${c7 < c28! * 0.85 ? "getting cheaper" : "still holding"}: ₱${c7.toFixed(0)}* a chat this week, ₱${c28!.toFixed(0)}* over 4 weeks. Keep its budget; add new ads beside it instead of replacing it.`;
-        }
-      }
-      if (!live && A.t14.spend === 0 && flag !== "WINNER") continue;
-      adViews.push({ id: aid, name: s.name, adset: s.adset, status: live ? "ACTIVE" : s.as || s.ss || "OFF", t14: A.t14, t7: A.t7, p7: A.p7, t28: A.t28, cpc14, flag, why: w, age, agePlus, refresh, refreshWhy: rw });
+      const live = isLive(aid), cpc14 = perChat(A.t14);
+      const age = A.first > end ? 0 : daysBetween(A.first, end) + 1, agePlus = A.first <= addDay(feedStart, 7);
+      const j = judgeAd(daily.get(aid) ?? new Map(), A.first, end, agePlus, targetCpc);
+      let state: AdState | null = live ? j.state : null, why = live ? j.why : "";
+      if (live && A.t14.spend * 1.12 >= 1000 && A.t14.msgs === 0) { state = "LOSER"; why = `₱${Math.round(A.t14.spend * 1.12).toLocaleString("en-US")}* in 14 days and no chats. Pause it.`; }
+      if (!live && A.t14.spend === 0) continue;
+      adViews.push({ id: aid, name: s.name, adset: s.adset, status: live ? "ACTIVE" : s.as || s.ss || "OFF", t14: A.t14, t7: A.t7, p7: A.p7, t28: A.t28, cpc14, age, agePlus, state, why, baseline: j.baseline });
     }
     adViews.sort((a, b) => b.t14.spend - a.t14.spend);
 
@@ -355,6 +343,61 @@ export function advise(inp: AdvisorInput) {
   }
   out.sort((a, b) => BRANCH_ORDER.indexOf(a.branch) - BRANCH_ORDER.indexOf(b.branch) || b.share - a.share);
   return { lines: out, end, w7, lastDate: lastDate || null, staleDays: lastDate ? daysBetween(lastDate, today) : null };
+}
+
+type Day = { sp: number; m: number; im: number; cl: number };
+const sumDays = (dm: Map<string, Day>, a: string, b: string) => {
+  const t = { sp: 0, m: 0, im: 0, cl: 0 };
+  for (const [d, v] of dm) if (d >= a && d <= b) { t.sp += v.sp; t.m += v.m; t.im += v.im; t.cl += v.cl; }
+  return t;
+};
+const cpcOf = (t: Day, minChats = 1) => (t.m >= minChats ? (t.sp * 1.12) / t.m : null);
+
+/** One ad's state from its daily rows (see AdState). target = the ad set's target cost per chat*, if known. */
+export function judgeAd(dm: Map<string, Day>, first: string, end: string, olderThanFeed: boolean, target: number | null): { state: AdState; why: string; baseline: number | null } {
+  // Learning ends 7 days in and after 50 chats (ads that started before the feed are long past it).
+  let learnEnd = first;
+  if (!olderThanFeed) {
+    let chats = 0;
+    learnEnd = addDay(first, 6);
+    for (const d of [...dm.keys()].sort()) { chats += dm.get(d)!.m; if (chats >= 50) { if (d > learnEnd) learnEnd = d; break; } }
+    if (chats < 50) learnEnd = "9999-12-31";
+  }
+  const total = sumDays(dm, first, end);
+  const age = first > end ? 0 : daysBetween(first, end) + 1;
+  const c7 = cpcOf(sumDays(dm, addDay(end, -6), end), 10), cP7 = cpcOf(sumDays(dm, addDay(end, -13), addDay(end, -7)), 10);
+  const c14 = cpcOf(sumDays(dm, addDay(end, -13), end), 10);
+  const fmt = (v: number) => `₱${v.toFixed(0)}*`;
+  if (learnEnd >= end) {
+    if (age >= 7 && total.sp * 1.12 >= 3000 && target && c14 !== null && c14 >= target * 1.5)
+      return { state: "LOSER", why: `After ${age} days and ₱${Math.round(total.sp * 1.12).toLocaleString("en-US")}*: ${fmt(c14)} a chat, 50%+ over the ${fmt(target)} target. Pause it; no remake, learn from its hook.`, baseline: null };
+    return { state: "NEW", why: `Still learning (${age} day${age === 1 ? "" : "s"}, ${total.m} chats): judge it after 7 days and 50 chats.`, baseline: null };
+  }
+  // Baseline: best 14-day cost per chat after learning; with under 14 days since, the whole period after learning.
+  const start = addDay(learnEnd, 1) > first && !olderThanFeed ? addDay(learnEnd, 1) : first;
+  let baseline: number | null = null, peakCtr: number | null = null;
+  for (let e = addDay(start, 13); e <= end; e = addDay(e, 1)) {
+    const c = cpcOf(sumDays(dm, addDay(e, -13), e), 20);
+    if (c !== null && (baseline === null || c < baseline)) baseline = c;
+  }
+  if (baseline === null) baseline = cpcOf(sumDays(dm, start, end), 20);
+  for (let e = addDay(start, 6); e <= end; e = addDay(e, 1)) {
+    const w = sumDays(dm, addDay(e, -6), e);
+    if (w.im >= 5000 && (peakCtr === null || w.cl / w.im > peakCtr)) peakCtr = w.cl / w.im;
+  }
+  const last = sumDays(dm, addDay(end, -6), end);
+  const ctr7 = last.im >= 5000 ? last.cl / last.im : null;
+  if (baseline === null || c7 === null) return { state: "STEADY", why: "Too few chats this week to judge.", baseline };
+  const over = c7 / baseline - 1, run = `${age}${olderThanFeed ? "+" : ""} days`;
+  if (cP7 !== null && c7 > baseline * 1.35 && cP7 > baseline * 1.35)
+    return { state: "FATIGUED", why: `${fmt(c7)} a chat, ${Math.round(over * 100)}% over its best (${fmt(baseline)}) two weeks running. Pause it, launch its remake, and rest it 6–8 weeks.`, baseline };
+  if (target && c14 !== null && c14 >= target * 1.5 && baseline >= target * 1.5 && total.sp * 1.12 >= 3000)
+    return { state: "LOSER", why: `${fmt(c14)} a chat, 50%+ over the ${fmt(target)} target, and it was never under it. Pause it; no remake.`, baseline };
+  const signs = [c7 > baseline * 1.2 ? `cost per chat +${Math.round(over * 100)}% over its best` : "", ctr7 !== null && peakCtr !== null && ctr7 < peakCtr * 0.75 ? `click rate ${Math.round((1 - ctr7 / peakCtr) * 100)}% under its best week` : ""].filter(Boolean);
+  if (signs.length >= 2) return { state: "TIRING", why: `Tiring: ${signs.join(" and ")}. Don't pause yet: add 1–2 new versions to the ad set (new first 3 seconds, hook or person, same message).`, baseline };
+  if (c7 <= baseline * 1.2 && (!target || c7 <= target))
+    return { state: "WINNER", why: `${fmt(c7)} a chat this week vs its best ${fmt(baseline)} after ${run}. Keep it and its budget; never edit it (duplicate it to try a change).`, baseline };
+  return { state: "STEADY", why: `${fmt(c7)} a chat this week (best ${fmt(baseline)}${target ? `, target ${fmt(target)}` : ""})${signs.length ? `; ${signs[0]}` : ""}. Keep it while it holds and test new concepts beside it.`, baseline };
 }
 
 const peso = (p: number) => `₱${Math.round(p).toLocaleString("en-US")}`;
