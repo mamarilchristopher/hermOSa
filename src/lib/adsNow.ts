@@ -7,15 +7,15 @@
 import { BRANCH_ORDER, type LineView, type Targeting } from "./adsAdvisor";
 import { SERVICE_LABEL } from "./ads";
 
-export type Audience = { key: string; label: string; warn: boolean };
+export type Audience = { key: string; label: string; short: string; warn: boolean };
 /** Who an ad set reaches, in CHRIS's words. Advantage+ with women is only a suggestion, so men still see it. */
 export function audienceOf(t: Targeting | null): Audience {
-  if (!t) return { key: "unknown", label: "Audience unread", warn: false };
+  if (!t) return { key: "unknown", label: "Audience unread", short: "Unread", warn: false };
   const age = t.advantage && t.ageSuggest ? `${t.ageSuggest[0]}–${t.ageSuggest[1]}` : `${t.ageMin ?? 18}–${t.ageMax ?? 65}`;
-  if (t.genders === "men") return { key: `men|${age}`, label: `Men only · ${age}`, warn: false };
-  if (t.genders === "women" && !t.advantage) return { key: `women|${age}`, label: `Women only · ${age}`, warn: false };
-  if (t.genders === "women") return { key: `womenadv|${age}`, label: `Women, Advantage+ (men still see it) · ${age}`, warn: true };
-  return { key: `all|${age}`, label: `All genders · ${age}`, warn: true };
+  if (t.genders === "men") return { key: `men|${age}`, label: `Men only · ${age}`, short: "Men only", warn: false };
+  if (t.genders === "women" && !t.advantage) return { key: `women|${age}`, label: `Women only · ${age}`, short: "Women only", warn: false };
+  if (t.genders === "women") return { key: `womenadv|${age}`, label: `Women, Advantage+ (men still see it) · ${age}`, short: "Women + men", warn: true };
+  return { key: `all|${age}`, label: `All genders · ${age}`, short: "All genders", warn: true };
 }
 
 export type NowItem = {
