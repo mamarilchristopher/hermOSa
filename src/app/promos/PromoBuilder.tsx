@@ -7,7 +7,7 @@ import {
 import { modelSrc, modelsFor } from "@/lib/promoModels";
 import { drawPromo } from "@/lib/promoImage";
 import { PromoMockup } from "@/components/PromoMockup";
-import { COPY_FAIL, copyCanvas, fontsOf, saveCanvas } from "@/lib/canvasShare";
+import { COPY_FAIL, copyCanvas, fontsOf, photoFile, saveCanvas, savePhoto } from "@/lib/canvasShare";
 import { approvePromo, endPromo, savePromo, type PromoInput } from "./actions";
 
 export type Svc = { id: string; name: string; price: number; commission?: number | null; cost?: number | null };
@@ -38,6 +38,7 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
   const [pending, start] = useTransition();
   const builderRef = useRef<HTMLDivElement>(null);
   const canvases = useRef<{ story?: HTMLCanvasElement; feed?: HTMLCanvasElement }>({});
+  const files = useRef<{ story?: File; feed?: File }>({});
 
   const n = sessionsOf(d.items);
   const value = valueOf(d.items);
@@ -62,6 +63,7 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
 
   // Live images: redrawn a moment after every change.
   useEffect(() => {
+    files.current = {};
     if (!d.items.length) { setStory(null); setFeed(null); return; }
     let live = true;
     const t = setTimeout(async () => {
@@ -72,6 +74,10 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
       const [s, f] = await Promise.all([drawPromo("story", art, fonts), drawPromo("feed", art, fonts)]);
       if (!live) return;
       canvases.current = { story: s, feed: f };
+      // The saved photo files are made now, so tapping Save opens the phone's share sheet straight away.
+      const title = d.title || "Promo";
+      Promise.all([photoFile(s, fileName(title, "story")), photoFile(f, fileName(title, "feed"))])
+        .then(([story, feed]) => { if (live) files.current = { story, feed }; }).catch(() => null);
       setStory(s.toDataURL("image/jpeg", 0.85)); setFeed(f.toDataURL("image/jpeg", 0.85));
     }, 150);
     return () => { live = false; clearTimeout(t); };
@@ -126,6 +132,8 @@ export function PromoBuilder({ services, ideas, seasons, today, saved, serif, se
   }
   const fileName = (title: string, kind: "story" | "feed") => `${(title || "Promo").replace(/[^A-Za-z0-9]+/g, "-")}-${kind === "story" ? "Story" : "FB-post"}.png`;
   async function download(kind: "story" | "feed") {
+    const f = files.current[kind];
+    if (f) { await savePhoto(f); return; }
     const c = canvases.current[kind];
     if (c) await saveCanvas(Promise.resolve(c), fileName(d.title, kind));
   }

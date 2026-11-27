@@ -3,7 +3,7 @@
  * Brand (hard rules): official logo with the wordmark untouched, satin ivory with a gold band, never a brown background,
  * and never a "regular price": only the promo price, the session count and the price per session.
  */
-import { adName, adNameLong, BRANCH_LINE, mechanic, peso, sessionsOf, type PromoItem } from "./promoRules";
+import { adName, BRANCH_LINE, mechanic, peso, sessionsOf, type PromoItem } from "./promoRules";
 
 export type PromoArt = { title: string; tagline: string; items: PromoItem[]; price: number; months: number; endsOn?: string | null; photo: string };
 export type Fonts = { sans: string; serif: string };
@@ -72,8 +72,6 @@ function pill(g: CanvasRenderingContext2D, cx: number, y: number, text: string, 
 const untilText = (endsOn?: string | null) =>
   endsOn ? `Until ${new Date(`${endsOn}T00:00:00Z`).toLocaleDateString("en-PH", { month: "long", day: "numeric", timeZone: "UTC" })} only` : "Limited slots";
 
-const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
-
 function itemLines(items: PromoItem[]) {
   return items.map((i) => `${i.paid + i.free} × ${adName(i.name)}`);
 }
@@ -127,41 +125,41 @@ export async function drawPromo(kind: "story" | "feed", a: PromoArt, f: Fonts): 
     return c;
   }
 
-  // Feed: photo on the right, the offer on an ivory panel on the left, the gold band across both.
-  const PX = 500;
-  if (photo) cover(g, photo, PX, 0, W - PX, H, 0.5, 0.35);
-  const edge = g.createLinearGradient(PX, 0, PX + 140, 0);
-  edge.addColorStop(0, "rgba(251,248,244,1)"); edge.addColorStop(1, "rgba(251,248,244,0)");
-  g.fillStyle = edge; g.fillRect(PX - 1, 0, 141, H);
-  const M = 64, TW = 450;
-  if (logo) { const lw = 300; g.drawImage(logo, M, 64, lw, (logo.height / logo.width) * lw); }
-  let y = 64 + (logo ? (logo.height / logo.width) * 300 : 0) + 110;
-  g.textAlign = "left"; g.fillStyle = INK;
-  const ts = fitSize(g, (s) => R(700, s), a.title, TW, 3, 84, 50);
-  g.font = R(700, ts);
-  for (const l of wrap(g, a.title, TW)) { g.fillText(l, M, y); y += ts * 1.08; }
-  if (a.tagline) {
-    g.font = S(500, 30); g.fillStyle = INK2;
-    for (const l of wrap(g, a.tagline, TW - 20).slice(0, 2)) { g.fillText(l, M, y + 4); y += 40; }
-  }
-  y += 30;
-  goldBand(g, 0, y, PX + 160, 120);
+  // Feed (CHRIS Nov 27, "fix alignment"): the same centered layout as the story, sized for a 4:5 post.
+  // Laid out from the bottom up: footer, button, price, (program list), gold band, title; the photo gets the rest.
+  const ts = fitSize(g, (sz) => R(700, sz), a.title, W - 160, 2, 84, 52);
+  g.font = R(700, ts); const titleLines = wrap(g, a.title, W - 160);
+  g.font = S(500, 32); const tagLines = a.tagline ? wrap(g, a.tagline, W - 200).slice(0, 1) : [];
+  const all = single ? [] : itemLines(a.items);
+  const list = all.length > 3 ? [...all.slice(0, 2), `+ ${all.length - 2} more`] : all;
+  const priceBase = H - 236, priceTop = priceBase - 88;
+  const listTop = priceTop - 30 - list.length * 40;
+  const bandTop = (list.length ? listTop - 22 : priceTop - 40) - 112;
+  const textH = titleLines.length * ts * 1.08 + tagLines.length * 42;
+  const textTop = bandTop - 44 - textH;
+  const PH = Math.max(360, textTop - 40);
+  if (photo) cover(g, photo, 0, 0, W, PH, 0.5, PH < 560 ? 0.24 : 0.3); // short photo: keep the whole face in
+  const fade = g.createLinearGradient(0, PH - 200, 0, PH);
+  fade.addColorStop(0, "rgba(251,248,244,0)"); fade.addColorStop(1, "rgba(251,248,244,1)");
+  g.fillStyle = fade; g.fillRect(0, PH - 200, W, 202);
+  satin(g, 0, PH, W, H - PH);
+  if (logo) { const lw = 260, lh = (logo.height / logo.width) * lw; g.drawImage(logo, (W - lw) / 2, PH - lh + 24, lw, lh); }
+  g.textAlign = "center"; g.fillStyle = INK; g.font = R(700, ts);
+  let y = textTop + ts * 0.85;
+  for (const l of titleLines) { g.fillText(l, W / 2, y); y += ts * 1.08; }
+  g.font = S(500, 32); g.fillStyle = INK2;
+  for (const l of tagLines) { g.fillText(l, W / 2, y - ts * 0.1 + 8); y += 42; }
+  goldBand(g, 0, bandTop, W, 112);
   g.fillStyle = "#fff";
-  const band = single ? mechanic(a.items) : `${n} sessions`;
-  const bs = fitSize(g, (s) => S(800, s), band.toUpperCase(), PX + 60, 1, 64, 34);
-  g.font = S(800, bs); g.fillText(band.toUpperCase(), M, y + 60 + bs * 0.36);
-  y += 120 + 70;
-  g.fillStyle = INK2; g.font = S(600, 30);
-  const all = single ? [cap(adNameLong(a.items[0].name))] : itemLines(a.items);
-  const lines = all.length > 4 ? [...all.slice(0, 3), `+ ${all.length - 3} more`] : all;
-  for (const l of lines) { for (const w of wrap(g, l, TW - 20).slice(0, 2)) { g.fillText(w, M, y); y += 38; } }
-  y = Math.min(y + 100, H - 230);
-  g.fillStyle = INK; g.font = R(700, 112); g.fillText(peso(a.price), M, y);
-  g.font = S(600, 32); g.fillStyle = GOLD_DARK; g.fillText(per, M, y + 54);
-  g.font = S(500, 24); g.fillStyle = INK2;
-  g.fillText(untilText(a.endsOn), M, H - 120);
-  g.fillText(BRANCH_LINE, M, H - 82);
-  g.font = S(700, 26); g.fillStyle = INK; g.fillText("Message us to book", M, H - 44);
+  const band = single ? `${mechanic(a.items)} ${adName(a.items[0].name)}` : `${n} sessions · ${a.months} months`;
+  const bs = fitSize(g, (sz) => S(800, sz), band.toUpperCase(), W - 120, 1, 56, 32);
+  g.font = S(800, bs); g.fillText(band.toUpperCase(), W / 2, bandTop + 56 + bs * 0.36);
+  g.font = S(500, 30); g.fillStyle = INK2;
+  list.forEach((l, i) => g.fillText(l, W / 2, listTop + 30 + i * 40));
+  g.fillStyle = INK; g.font = R(700, 116); g.fillText(peso(a.price), W / 2, priceBase);
+  g.font = S(600, 32); g.fillStyle = GOLD_DARK; g.fillText(per, W / 2, priceBase + 50);
+  pill(g, W / 2, H - 148, "Message us to book", S(700, 30));
+  g.font = S(500, 24); g.fillStyle = INK2; g.fillText(`${untilText(a.endsOn)} · ${BRANCH_LINE}`, W / 2, H - 34);
   return c;
 }
 
