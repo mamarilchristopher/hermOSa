@@ -2118,3 +2118,14 @@ a.hb-row:hover strong { text-decoration: underline; }
   .adv-line header { flex-direction: column; }
 }
 @media (max-width: 900px) { .advisor .biz-kpis > :nth-child(3) { grid-column: auto; } }
+.adv-st { background: var(--pearl); color: var(--ink-2); margin-left: 4px; }
+.adv-st.proposed { background: var(--warn-bg); color: var(--warn); }
+.adv-st.start { background: var(--good-bg); color: var(--good); }
+.adv-verdict { font-weight: 700; }
+.adv-verdict.EXPAND { color: var(--good); }
+.adv-verdict.KEEP { color: var(--ink); }
+.adv-gaps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.adv-gaps li { padding: 10px 0; border-bottom: 1px solid var(--line); display: grid; gap: 3px; }
+.adv-gaps li:last-child { border-bottom: none; }
+.adv-gap-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+.adv-gaps .adv-verdict { min-width: 0; font-size: 0.84rem; }

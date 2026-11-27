@@ -15,8 +15,12 @@ export type PlayLine = {
   kpis: { target_cost_per_chat_vat: number; scale_if_weekly_real_roas_at_least: number; trim_if_real_roas_below_for_2_weeks: number };
 };
 export type Untapped = { service: string; why: string; evidence: string[]; setup: string; budget_day_pre_vat: number; creative_brief: string };
+export type ServiceGap = {
+  service: string; nov1_24_sales_php: number; new_clients: number; typical_ticket_php: number; ad_spend_share_last30d: string;
+  by_branch: string; break_even_close_rate_for_5x: string; assumed_cost_per_chat_vat: number | string; verdict: string;
+};
 export type Playbook = {
-  updated: string; master_plan: string; catalog_sheet: string; month_total_pre_vat: number;
+  updated: string; version?: string | number | null; proposed_note?: string | null; master_plan: string; catalog_sheet: string; month_total_pre_vat: number;
   december: { base_pre_vat: number; reserve_pre_vat: number; reserve_rule: string; daily_shape: string };
   rules: string[];
   lines: PlayLine[];
@@ -26,21 +30,27 @@ export type Playbook = {
     retargeting: { setup: string; audiences: string[]; budget_day_pre_vat: number; creative_plan: string; benchmarks: { metric: string; value: string; source: string }[] };
     trends: { title: string; detail: string; source: string }[];
     benchmarks: { campaign_type: string; metric: string; value: string; source: string }[];
+    service_gaps?: ServiceGap[] | null; service_gaps_note?: string | null;
   };
   videos: Record<string, { title: string; kind?: string | null; cpc?: string | number | null; running?: string | null; sec?: number | null }>;
 };
 
 export const PLAYBOOK = raw as unknown as Playbook;
 
-/** Plan per "BRANCH|SERVICE" for the advisor (branch lines only; the ALL lines are new ad sets). */
+/** A branch's running ad line (not an all-branch ad set, and not a new one still waiting for CHRIS's OK). */
+const isBranchLine = (l: PlayLine) => l.branch !== "ALL" && l.status !== "proposed";
+/** Plan per "BRANCH|SERVICE" for the advisor. */
 export const planMap = (pb: Playbook = PLAYBOOK) =>
-  new Map(pb.lines.filter((l) => l.branch !== "ALL").map((l) => [`${l.branch}|${l.service}`, { budget: l.daily_budget_pre_vat, status: l.status, reviewDays: l.review_after_days }]));
-export const playLine = (branch: string, service: string, pb: Playbook = PLAYBOOK) => pb.lines.find((l) => l.branch === branch && l.service === service) ?? null;
-export const newAdSets = (pb: Playbook = PLAYBOOK) => pb.lines.filter((l) => l.branch === "ALL");
-export const planPerDay = (pb: Playbook = PLAYBOOK) => pb.lines.reduce((s, l) => s + (l.daily_budget_pre_vat || 0), 0);
+  new Map(pb.lines.filter(isBranchLine).map((l) => [`${l.branch}|${l.service}`, { budget: l.daily_budget_pre_vat, status: l.status, reviewDays: l.review_after_days }]));
+export const playLine = (branch: string, service: string, pb: Playbook = PLAYBOOK) => pb.lines.find((l) => isBranchLine(l) && l.branch === branch && l.service === service) ?? null;
+/** All-branch ad sets and proposed new ones, proposed first. */
+export const newAdSets = (pb: Playbook = PLAYBOOK) => pb.lines.filter((l) => !isBranchLine(l)).sort((a, b) => Number(b.status === "proposed") - Number(a.status === "proposed"));
+/** Daily budget of the agreed plan (proposals not counted until CHRIS OKs them). */
+export const planPerDay = (pb: Playbook = PLAYBOOK) => pb.lines.filter((l) => l.status !== "proposed").reduce((s, l) => s + (l.daily_budget_pre_vat || 0), 0);
+export const proposedPerDay = (pb: Playbook = PLAYBOOK) => pb.lines.filter((l) => l.status === "proposed").reduce((s, l) => s + (l.daily_budget_pre_vat || 0), 0);
 
 const STATUS: Record<string, string> = {
-  keep: "Keep", keep_untouched: "Keep, don't touch", keep_and_refresh: "Keep, add fresh ads", rebuild: "Rebuild the ads", off: "Off", start: "Start",
+  keep: "Keep", keep_untouched: "Keep, don't touch", keep_and_refresh: "Keep, add fresh ads", rebuild: "Rebuild the ads", off: "Off", start: "Start", proposed: "Waiting for your OK", hold: "On hold",
 };
 export const statusLabel = (s: string) => STATUS[s] ?? s.replace(/_/g, " ");
 /** Source strings may hold several URLs split by " ; ". */

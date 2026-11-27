@@ -9,7 +9,7 @@ import { centsOfCell } from "@/lib/business";
 import type { StatusDay } from "@/lib/homeGlance";
 import { adServiceOf, NOV_SHARES, SERVICE_LABEL, type AdService } from "@/lib/ads";
 import { advise, fmtDay, LEARN_PER_WEEK, perChat, roleOf, type Feed, type LineView } from "@/lib/adsAdvisor";
-import { links, newAdSets, PLAYBOOK, planMap, planPerDay, playLine, statusLabel, type PlayLine } from "@/lib/adsPlaybook";
+import { links, newAdSets, PLAYBOOK, planMap, planPerDay, playLine, proposedPerDay, statusLabel, type PlayLine } from "@/lib/adsPlaybook";
 import { every } from "../../load";
 
 const MGMT = ["OWNER", "FINANCE", "AUDITOR", "MANAGER"];
@@ -137,16 +137,36 @@ export default async function AdAdvisor() {
         ))}
 
         <section className="card">
-          <h2>New ad sets to add <small>pre-VAT a day</small></h2>
+          <h2>New ad sets <small>pre-VAT a day{proposedPerDay() ? ` · ${peso(proposedPerDay())}/day waiting for your OK` : ""}</small></h2>
+          {pb.proposed_note && <p className="small muted">{pb.proposed_note.replace(/^Lines with status 'proposed'/, "New ad sets").replace(/CHRIS's OK/g, "your OK").replace(/the ALL_TEST/g, "the testing ad set's")}</p>}
           <div className="adv-new">
             {newAdSets().map((p) => (
               <details key={p.ad_set_name}>
-                <summary><b>{p.service_name}</b> · {peso(p.daily_budget_pre_vat)}/day <span className="muted">{p.ad_set_name}</span></summary>
+                <summary><b>{p.service_name}</b> · {p.daily_budget_pre_vat ? `${peso(p.daily_budget_pre_vat)}/day` : "₱0"} <span className={`pill adv-st ${p.status}`}>{statusLabel(p.status)}</span></summary>
                 <Setup p={p} />
               </details>
             ))}
           </div>
         </section>
+
+        {(pb.radar.service_gaps?.length ?? 0) > 0 && (
+          <section className="card">
+            <h2>Sales by service vs ad spend <small>Nov 1–24 Service log</small></h2>
+            <ul className="adv-gaps">
+              {pb.radar.service_gaps!.map((g) => (
+                <li key={g.service}>
+                  <div className="adv-gap-top"><b>{g.service}</b><span className={`adv-verdict ${g.verdict.split(":")[0]}`}>{g.verdict}</span></div>
+                  <div className="small">
+                    {peso(g.nov1_24_sales_php)} sales · {g.new_clients} new clients · ad spend {g.ad_spend_share_last30d}
+                    {g.break_even_close_rate_for_5x ? <> · 5x needs {g.break_even_close_rate_for_5x} of chats to buy{g.assumed_cost_per_chat_vat ? ` (₱${g.assumed_cost_per_chat_vat}* a chat, ₱${Number(g.typical_ticket_php).toLocaleString("en-US")} ticket)` : ""}</> : null}
+                  </div>
+                  <div className="small muted">{g.by_branch}</div>
+                </li>
+              ))}
+            </ul>
+            {pb.radar.service_gaps_note && <p className="small muted">{pb.radar.service_gaps_note}</p>}
+          </section>
+        )}
 
         <section className="card">
           <h2>Untapped services worth testing</h2>
