@@ -2663,3 +2663,13 @@ details.exp-edit[open] { flex-basis: 100%; }
   .exp-row-amt { grid-column: 3 / 4; grid-row: 1; }
   .exp-pick-branch { max-width: none; }
 }
+/* v0.99.9 Meta "Add locations in bulk" paste boxes (CHRIS Nov 28) */
+.adv-bulk { display: grid; gap: 8px; margin: 8px 0 4px; }
+.adv-bulk-box { border: 1px dashed var(--viz-gold); border-radius: 12px; padding: 8px 10px; background: var(--surface); min-width: 0; }
+.adv-bulk-box.ex { border-color: var(--line); }
+.adv-bulk-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.78rem; line-height: 1.35; }
+.adv-bulk-head > span { min-width: 0; }
+.adv-bulk-head .muted { display: block; font-size: 0.74rem; }
+.adv-bulk-box pre { margin: 6px 0 0; padding: 6px 8px; background: var(--viz-track); border-radius: 8px; font-size: 0.78rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); }
+.adv-bulk-box button.adv-ok { flex: none; min-height: 28px; padding: 2px 12px; }
+.adv-bulk-box button.adv-ok:not(.on) { background: transparent; color: var(--viz-deep); border: 1px solid var(--viz-gold); }
