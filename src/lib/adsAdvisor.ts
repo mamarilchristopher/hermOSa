@@ -16,7 +16,7 @@ export const PAGES: Record<string, string> = {
 };
 export const BRANCH_ORDER = ["QC_MAIN", "FAIRVIEW", "STA_MARIA", "MARIKINA"];
 /** Clinic pins, to catch an ad set aimed at another branch's area. */
-const CLINIC_PIN: Record<string, [number, number]> = {
+export const CLINIC_PIN: Record<string, [number, number]> = {
   QC_MAIN: [14.6393, 121.0566], FAIRVIEW: [14.7032, 121.0686], STA_MARIA: [14.8659, 120.9966], MARIKINA: [14.6587, 121.112],
 };
 export const RAISE_AT = 5;
@@ -30,6 +30,8 @@ export type FeedRow = {
   d: string; page: string; cid: string | null; c: string | null; sid: string | null; s: string | null; aid: string; a: string | null;
   sp: number | string | null; im: number | string | null; rc: number | string | null; fq: number | string | null; cl: number | string | null;
   m: number | string | null; sb: number | string | null; cb: number | string | null; ss: string | null; as: string | null;
+  /** Ad account id, once the reader returns it (Ads Manager links). */
+  act?: string | null;
 };
 export type Feed = { ok: boolean; from?: string; last_date: string | null; loaded_at: string | null; source: string | null; rows: FeedRow[]; targeting: Record<string, string> };
 
@@ -114,11 +116,11 @@ export function targetingText(t: Targeting): string {
  */
 export type AdState = "WINNER" | "TIRING" | "FATIGUED" | "LOSER" | "NEW" | "STEADY";
 export type AdView = {
-  id: string; name: string; adset: string; status: string; t14: Totals; t7: Totals; p7: Totals; t28: Totals; cpc14: number | null;
+  id: string; name: string; adset: string; sid: string; cid: string; status: string; t14: Totals; t7: Totals; p7: Totals; t28: Totals; cpc14: number | null;
   age: number; agePlus: boolean; state: AdState | null; why: string; baseline: number | null;
 };
 export type AdSetView = {
-  id: string; name: string; campaign: string; status: string; t7: Totals; targeting: Targeting | null; text: string | null;
+  id: string; name: string; campaign: string; cid: string; status: string; t7: Totals; p7: Totals; targeting: Targeting | null; text: string | null;
   mismatch: string | null; learnShort: boolean;
 };
 export type Action = "RAISE" | "TEST" | "CUT" | "KEEP" | "WAIT" | "OFF" | "START" | "NONE";
@@ -212,7 +214,7 @@ export function advise(inp: AdvisorInput) {
   const daily = new Map<string, Map<string, { sp: number; m: number; im: number; cl: number }>>();
   const lineDaily = new Map<string, Map<string, { sp: number; m: number }>>();
   const feedStart = rows.reduce((m, r) => (m === "" || r.d < m ? r.d : m), "");
-  const sets = new Map<string, Acc & { key: string; name: string; campaign: string }>();
+  const sets = new Map<string, Acc & { key: string; name: string; campaign: string; cid: string }>();
   const campSpend7 = new Map<string, Map<string, number>>(); // campaign → line → spend (to split a campaign budget)
   for (const r of rows) {
     const key = `${PAGES[r.page]}|${serviceOfAd(r.c, r.s, r.a)}`;
@@ -226,7 +228,7 @@ export function advise(inp: AdvisorInput) {
     const ld = lm.get(r.d) ?? { sp: 0, m: 0 };
     ld.sp += n(r.sp); ld.m += n(r.m); lm.set(r.d, ld);
     const sid = r.sid ?? `${r.cid}-none`;
-    const S = sets.get(sid) ?? { ...acc(), key, name: r.s ?? "", campaign: r.c ?? "" }; sets.set(sid, S);
+    const S = sets.get(sid) ?? { ...acc(), key, name: r.s ?? "", campaign: r.c ?? "", cid: r.cid ?? "" }; sets.set(sid, S);
     for (const X of [L, A, S]) {
       if (inR(r.d, w7, end)) add(X.t7, r);
       if (inR(r.d, p7a, p7b)) add(X.p7, r);
@@ -327,7 +329,7 @@ export function advise(inp: AdvisorInput) {
       let state: AdState | null = live ? j.state : null, why = live ? j.why : "";
       if (live && A.t14.spend * 1.12 >= 1000 && A.t14.msgs === 0) { state = "LOSER"; why = `₱${Math.round(A.t14.spend * 1.12).toLocaleString("en-US")}* in 14 days and no chats. Pause it.`; }
       if (!live && A.t14.spend === 0) continue;
-      adViews.push({ id: aid, name: s.name, adset: s.adset, status: live ? "ACTIVE" : s.as || s.ss || "OFF", t14: A.t14, t7: A.t7, p7: A.p7, t28: A.t28, cpc14, age, agePlus, state, why, baseline: j.baseline });
+      adViews.push({ id: aid, name: s.name, adset: s.adset, sid: s.sid, cid: s.cid, status: live ? "ACTIVE" : s.as || s.ss || "OFF", t14: A.t14, t7: A.t7, p7: A.p7, t28: A.t28, cpc14, age, agePlus, state, why, baseline: j.baseline });
     }
     adViews.sort((a, b) => b.t14.spend - a.t14.spend);
 
@@ -337,7 +339,7 @@ export function advise(inp: AdvisorInput) {
       if (S.key !== key || !liveSets.has(sid)) continue;
       const tg = parseTargeting(feed.targeting[sid]);
       const mismatch = tg?.nearest && tg.nearest !== branch ? tg.nearest : null;
-      setViews.push({ id: sid, name: S.name, campaign: S.campaign, status: "ACTIVE", t7: S.t7, targeting: tg, text: tg ? targetingText(tg) : null, mismatch, learnShort: S.t7.msgs < LEARN_PER_WEEK });
+      setViews.push({ id: sid, name: S.name, campaign: S.campaign, cid: S.cid, status: "ACTIVE", t7: S.t7, p7: S.p7, targeting: tg, text: tg ? targetingText(tg) : null, mismatch, learnShort: S.t7.msgs < LEARN_PER_WEEK });
     }
     setViews.sort((a, b) => b.t7.spend - a.t7.spend);
 

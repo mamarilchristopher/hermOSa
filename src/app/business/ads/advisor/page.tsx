@@ -15,6 +15,8 @@ import { links, newAdSets, PLAYBOOK, planMap, planPerDay, playLine, proposedPerD
 import { every } from "../../load";
 import PH from "@/data/phMarket.json";
 import { ApproveChip } from "./ApproveChip";
+import { adsManagerUrl, audit, CHECKS, type Finding, type Target } from "@/lib/adsAudit";
+import ACC from "@/data/adAccounts.json";
 
 const MGMT = ["OWNER", "FINANCE", "AUDITOR", "MANAGER"];
 const peso = (p: number) => `₱${Math.round(p).toLocaleString("en-US")}`;
@@ -107,36 +109,57 @@ export default async function AdAdvisor() {
   const ads = lines.flatMap((l) => l.ads.map((a) => ({ l, a })));
   const byState = (st: string) => ads.filter((x) => x.a.state === st);
   const losers = byState("LOSER"), fatigued = byState("FATIGUED"), tiring = byState("TIRING"), winners = byState("WINNER");
-  const mismatches = lines.flatMap((l) => l.adsets.filter((s) => s.mismatch).map((s) => ({ l, s })));
+  // Ad account per campaign, for Ads Manager links: the feed's own value, else the bundled map, else the id's suffix.
+  const actFeed = new Map(feed.rows.filter((r) => r.act && r.cid).map((r) => [r.cid!, String(r.act)]));
+  const accMap = ACC as { campaigns: Record<string, string>; suffix: Record<string, string> };
+  const actOf = (cid: string) => actFeed.get(cid) ?? accMap.campaigns[cid] ?? accMap.suffix[cid.slice(-4)] ?? null;
+  const go = (t: Target | null) => (!t ? null : t.kind === "page" ? { href: t.href, external: !!t.external } : { href: adsManagerUrl(t, actOf(t.cid)), external: true });
+  function budgetGo(l: LineView) {
+    const top = l.adsets[0];
+    if (!top) return { href: `https://adsmanager.facebook.com/adsmanager/manage/campaigns`, external: true };
+    return go(l.budgetSource === "campaign" ? { kind: "campaign", id: top.cid, cid: top.cid, view: "edit" } : { kind: "adset", id: top.id, cid: top.cid, view: "edit" });
+  }
+  const findings = audit({ feed, lines, end: res.end, sales, plan: (b, sv) => { const p = playLine(b, sv); return p ? { genders: p.audience.genders, ageMin: p.audience.age_min } : null; } });
+  const KIND: Record<string, string> = { pin: "Fix the area", overlap: "Branches overlap", age: "Audience", gender: "Audience", split: "Learning", setCost: "Ad sets", dupe: "Duplicate ad", zeroDay: "₱0-sales days", cpcJump: "Cost per chat", quality: "Chat quality", saturation: "Audience tired" };
   const moves: Move[] = [
-    ...mismatches.map(({ l, s }) => ({
-      id: `pin-${s.id}`, tone: "bad", tag: tag(l), kind: "Fix the area", title: `Move the map pin to ${short(l.branch)}`,
-      short: `"${s.name}" is aimed at the ${short(s.mismatch!)} area`, why: `The ad set's location pin is nearest ${nameOf[s.mismatch!] ?? s.mismatch}, so its chats go to the wrong clinic. Move the pin (and radius) to ${nameOf[l.branch]}. ${s.text ?? ""}`,
-      approve: `${tag(l)}: move ad set "${s.name}" pin to ${nameOf[l.branch]}`,
-    })),
+    ...groupFixes(findings.filter((f) => f.sev !== "info")).map((g) => {
+      const f = g[0];
+      if (g.length === 1) return { id: f.id, tone: f.sev, tag: f.tag, kind: KIND[f.check], title: f.title, short: f.short, why: f.why, approve: f.approve, action: f.action, go: go(f.target) };
+      const name = f.name;
+      return {
+        id: g.map((x) => x.id).join("+"), tone: g.some((x) => x.sev === "bad") ? "bad" : "warn", tag: f.tag, kind: `${g.length} fixes, one ad set`,
+        title: g.map((x) => x.title).join(" · "), short: name ? `"${name}"` : f.short, why: g.map((x) => x.why).join(" "),
+        approve: g.map((x) => x.approve).join("; "), action: "Fix settings", go: go(f.target),
+      };
+    }),
     ...lines.filter((l) => ["RAISE", "TEST", "CUT", "OFF", "START"].includes(l.action)).map((l) => ({
       id: `budget-${l.key}-${l.newBudget}`, tone: ["CUT", "OFF"].includes(l.action) ? "down" : "up", tag: tag(l),
       kind: l.action === "TEST" ? "Budget test" : l.action === "START" ? "Start" : l.action === "OFF" ? "Turn off" : l.action === "CUT" ? "Budget cut" : "Budget raise",
       title: l.action === "OFF" ? "Turn off" : `${peso(l.budget)} → ${peso(l.newBudget)}/day`,
       short: l.roas7 === null ? "No spend this week" : `ROAS ${xr(l.roas7)} this week · ${xr(l.roasP7)} last week`, why: l.why,
       approve: `${tag(l)}: ${l.headline}`, delta: l.budget > 0 ? l.newBudget / l.budget - 1 : null,
+      action: l.action === "START" ? "Open ad sets" : l.action === "OFF" ? "Turn off" : "Change budget",
+      go: budgetGo(l),
     })),
     ...losers.map(({ l, a }) => ({
       id: `pause-${a.id}`, tone: "bad", tag: tag(l), kind: "Pause ad", title: `Pause "${a.name}"`,
       short: `${a.cpc14 === null ? "No chats" : `₱${a.cpc14.toFixed(0)}* a chat`} · ${vat(a.t14.spend)} in 14 days`, why: a.why,
-      approve: `${tag(l)}: pause ad "${a.name}"`,
+      approve: `${tag(l)}: pause ad "${a.name}"`, action: "Pause ad", go: go({ kind: "ad", id: a.id, cid: a.cid, view: "list" }),
     })),
     ...fatigued.map(({ l, a }) => ({
       id: `remake-${a.id}`, tone: "bad", tag: tag(l), kind: "Pause + remake", title: `Remake "${a.name}"`,
       short: `₱${(a.cpc14 ?? 0).toFixed(0)}* a chat vs its best ₱${(a.baseline ?? 0).toFixed(0)}*`, why: a.why,
-      approve: `${tag(l)}: pause and remake ad "${a.name}"`,
+      approve: `${tag(l)}: pause and remake ad "${a.name}"`, action: "Open ad", go: go({ kind: "ad", id: a.id, cid: a.cid, view: "edit" }),
     })),
     ...tiring.map(({ l, a }) => ({
       id: `tiring-${a.id}`, tone: "warn", tag: tag(l), kind: "Add new versions", title: `Freshen "${a.name}"`,
       short: "Add 1–2 new versions; keep it running", why: a.why,
-      approve: `${tag(l)}: add 1–2 new versions next to ad "${a.name}"`,
+      approve: `${tag(l)}: add 1–2 new versions next to ad "${a.name}"`, action: "Add versions", go: go({ kind: "adset", id: a.sid, cid: a.cid, view: "ads" }),
     })),
   ];
+  const infos = findings.filter((f) => f.sev === "info");
+  const failed = new Map<string, number>();
+  for (const f of findings) failed.set(f.check, (failed.get(f.check) ?? 0) + 1);
   const holding = lines.filter((l) => l.action === "KEEP" || l.action === "WAIT").length;
   const nextReview = lines.map((l) => l.nextReview).filter((d) => d > today).sort()[0] ?? null;
   const learning = lines.flatMap((l) => l.adsets).filter((s) => s.learnShort).length;
@@ -206,7 +229,7 @@ export default async function AdAdvisor() {
           {winners.length > 0 && <span className="good">{winners.length} winning ad{winners.length === 1 ? "" : "s"}</span>}
           {losers.length + fatigued.length > 0 && <span className="bad">{losers.length + fatigued.length} to pause</span>}
           {tiring.length > 0 && <span className="warn">{tiring.length} tiring</span>}
-          {mismatches.length > 0 && <span className="bad">{mismatches.length} aimed at the wrong area</span>}
+          <span className={findings.some((f) => f.sev !== "info") ? "warn" : "good"}>{CHECKS.length} checks · {CHECKS.filter((c) => failed.has(c.key)).length} flagged</span>
           {learning > 0 && <span title={`Under ${LEARN_PER_WEEK} chats a week, Meta is still learning`}>{learning} ad set{learning === 1 ? "" : "s"} still learning</span>}
           <span>{holding} line{holding === 1 ? "" : "s"} holding budget</span>
           <span>Next review {nextReview ? fmtDay(nextReview) : "today"}</span>
@@ -215,7 +238,7 @@ export default async function AdAdvisor() {
         <section className="card adv-moves-card">
           <div className="adv-h">
             <h2>This week&apos;s moves <small>{moves.length ? `${moves.length} to OK` : "nothing to change"}</small></h2>
-            <span className="small muted">Approve copies your OK for the ads chat. Meta changes only after you OK the preview.</span>
+            <span className="small muted">Each button opens the exact ad or ad set in Ads Manager. Or tap Approve to have Claude do it after you OK a preview.</span>
           </div>
           {moves.length === 0 ? (
             <p className="adv-calm">Every line is holding. Leave budgets alone so Meta keeps learning; next review {nextReview ? fmtDay(nextReview) : "today"}.</p>
@@ -227,6 +250,7 @@ export default async function AdAdvisor() {
                   <div className="adv-move-title">{m.title}{m.delta !== undefined && m.delta !== null && Number.isFinite(m.delta) && <Chg c={m.delta} />}</div>
                   <div className="adv-move-short">{m.short}</div>
                   <div className="adv-move-foot">
+                    {m.go && <a className="adv-go" href={m.go.href} {...(m.go.external ? { target: "_blank", rel: "noreferrer" } : {})}>{m.action}{m.go.external ? " ↗" : " →"}</a>}
                     <ApproveChip id={m.id} text={m.approve} />
                     <details className="adv-why2"><summary>Why</summary><p>{m.why}</p></details>
                   </div>
@@ -234,6 +258,19 @@ export default async function AdAdvisor() {
               ))}
             </div>
           )}
+          <details className="adv-fold adv-checks">
+            <summary>What the advisor checked ({CHECKS.length} checks{infos.length ? `, ${infos.length} note${infos.length === 1 ? "" : "s"}` : ""})</summary>
+            <ul>
+              {CHECKS.map((c) => <li key={c.key} className={failed.has(c.key) ? "flag" : "ok"}><span>{failed.has(c.key) ? "!" : "✓"}</span>{c.label}{failed.has(c.key) ? <b> · {failed.get(c.key)} flagged</b> : null}</li>)}
+              <li className="ok"><span>✓</span>Each running ad judged against its own best 14 days (winner, tiring, fatigued, loser)</li>
+              <li className="ok"><span>✓</span>Budget moves follow ROAS from declared sales, at most once a week</li>
+            </ul>
+            {infos.length > 0 && (
+              <ul className="adv-notes">
+                {infos.map((f) => { const g = go(f.target); return <li key={f.id}><b>{f.tag}: {f.title}.</b> {f.why} {g && <a href={g.href} target="_blank" rel="noreferrer">{f.action} ↗</a>}</li>; })}
+              </ul>
+            )}
+          </details>
         </section>
 
         <div className="biz-row adv-charts">
@@ -258,7 +295,7 @@ export default async function AdAdvisor() {
                 <h3>Best ads now <small>copy their hook into new versions</small></h3>
                 <ol className="adv-best">
                   {[...winners].sort((x, y) => (x.a.cpc14 ?? 1e9) - (y.a.cpc14 ?? 1e9)).slice(0, 4).map(({ l, a }) => (
-                    <li key={a.id}><span><b>{a.name}</b><small>{tag(l)} · running {a.age}{a.agePlus ? "+" : ""} days</small></span><em>{a.cpc14 === null ? "–" : `₱${a.cpc14.toFixed(0)}*`}<small>a chat</small></em></li>
+                    <li key={a.id}><span><b>{go({ kind: "ad", id: a.id, cid: a.cid, view: "edit" }) ? <a href={go({ kind: "ad", id: a.id, cid: a.cid, view: "edit" })!.href} target="_blank" rel="noreferrer">{a.name}</a> : a.name}</b><small>{tag(l)} · running {a.age}{a.agePlus ? "+" : ""} days</small></span><em>{a.cpc14 === null ? "–" : `₱${a.cpc14.toFixed(0)}*`}<small>a chat</small></em></li>
                   ))}
                 </ol>
               </>
@@ -279,7 +316,7 @@ export default async function AdAdvisor() {
                 <span className="adv-c-spark">{l.days.some((d) => d.m > 0) && <GoldSpark values={l.days.map((d) => d.m)} id={`sp-${l.key.replace(/\W/g, "")}`} label={`${tag(l)} chats per day`} w={120} h={30} />}</span>
                 <span className={`pill adv-act ${ACTION_CLASS[l.action]}`}>{ACTION_LABEL[l.action]}</span>
               </summary>
-              <LineDetail l={l} branchName={nameOf[l.branch] ?? l.branch} play={playLine(l.branch, l.service)} today={today} />
+              <LineDetail l={l} branchName={nameOf[l.branch] ?? l.branch} play={playLine(l.branch, l.service)} today={today} link={(t) => go(t)?.href ?? null} />
             </details>
           )))}
         </section>
@@ -447,7 +484,21 @@ export default async function AdAdvisor() {
   );
 }
 
-type Move = { id: string; tone: string; tag: string; kind: string; title: string; short: string; why: string; approve: string; delta?: number | null };
+/** Setting fixes on the same ad set become one card (one trip into Ads Manager). */
+function groupFixes(fs: Finding[]) {
+  const SETTINGS = new Set(["pin", "overlap", "age", "gender"]);
+  const out: Finding[][] = [], bySet = new Map<string, Finding[]>();
+  for (const f of fs) {
+    if (SETTINGS.has(f.check) && f.target && f.target.kind === "adset") {
+      const g = bySet.get(f.target.id);
+      if (g) { g.push(f); continue; }
+      const ng = [f]; bySet.set(f.target.id, ng); out.push(ng);
+    } else out.push([f]);
+  }
+  return out;
+}
+
+type Move = { id: string; tone: string; tag: string; kind: string; title: string; short: string; why: string; approve: string; delta?: number | null; action: string; go: { href: string; external: boolean } | null };
 type PhMarket = {
   refs: { cpm: { label: string; median: number }; cpc: { label: string; median: number }; chat: { label: string; lo: number; hi: number } };
   ad_library: { note: string; searches: { label: string; url: string }[] };
@@ -477,7 +528,8 @@ function Sources({ s }: { s: string }) {
   return <>{links(s).map((x, i) => <span key={i}>{i ? " · " : ""}{x.href ? <a href={x.href} target="_blank" rel="noreferrer">{x.label}</a> : x.label}</span>)}</>;
 }
 
-function LineDetail({ l, branchName, play, today }: { l: LineView; branchName: string; play: PlayLine | null; today: string }) {
+function LineDetail({ l, branchName, play, today, link }: { l: LineView; branchName: string; play: PlayLine | null; today: string; link: (t: Target) => string | null }) {
+  const Open = ({ t, label = "Open" }: { t: Target; label?: string }) => { const h = link(t); return h ? <a className="adv-open" href={h} target="_blank" rel="noreferrer">{label} ↗</a> : null; };
   const pc = perChat(l.t7), pcp = perChat(l.p7);
   return (
     <div className="adv-detail">
@@ -495,7 +547,7 @@ function LineDetail({ l, branchName, play, today }: { l: LineView; branchName: s
 
       {l.adsets.map((s) => (
         <div key={s.id} className={`adv-set${s.mismatch ? " warn" : ""}`}>
-          <b>Ad set now:</b> {s.name} <span className="muted">({s.t7.msgs} chats this week{s.learnShort ? `, under ${LEARN_PER_WEEK}: still learning` : ""})</span>
+          <Open t={{ kind: "adset", id: s.id, cid: s.cid, view: "edit" }} /><b>Ad set now:</b> {s.name} <span className="muted">({s.t7.msgs} chats this week{s.learnShort ? `, under ${LEARN_PER_WEEK}: still learning` : ""})</span>
           {s.text && <div className="small">{s.text}</div>}
           {s.mismatch && <div className="small bad">Aimed at the wrong area: the pin is nearest the other branch. Move it to {branchName}.</div>}
         </div>
@@ -507,7 +559,7 @@ function LineDetail({ l, branchName, play, today }: { l: LineView; branchName: s
           <ul className="adv-ads">
             {l.ads.map((a) => (
               <li key={a.id}>
-                <div className="adv-ad-top"><b>{a.name}</b>{a.state ? <span className={`pill adv-flag ${a.state}`}>{STATE_LABEL[a.state]}</span> : null}</div>
+                <div className="adv-ad-top"><b>{a.name}</b><span className="adv-ad-r">{a.state ? <span className={`pill adv-flag ${a.state}`}>{STATE_LABEL[a.state]}</span> : null}<Open t={{ kind: "ad", id: a.id, cid: a.cid, view: "edit" }} /></span></div>
                 <div className="small adv-ad-facts">
                   {a.status === "ACTIVE" ? `running ${a.age}${a.agePlus ? "+" : ""} days` : a.status.toLowerCase().replace(/_/g, " ")} · {vat(a.t14.spend)} in 14 days · {a.t14.msgs.toLocaleString("en-US")} chats · {a.cpc14 === null ? "–" : `₱${a.cpc14.toFixed(0)}*`} a chat
                 </div>
