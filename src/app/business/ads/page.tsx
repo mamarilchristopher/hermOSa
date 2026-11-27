@@ -15,6 +15,12 @@ import {
   ROAS_FLOOR, roas, SERVICE_LABEL, SOURCE_LABEL, SOURCES, sourceOf, spendMonths, spent, spentK, summarize, summarizeSources, withVat, x,
   type AdService, type LogForSource, type Source, type SpendRow,
 } from "@/lib/ads";
+import { advise, type Feed } from "@/lib/adsAdvisor";
+import { planMap } from "@/lib/adsPlaybook";
+import { adsManagerUrl } from "@/lib/adsAudit";
+import { runningNow } from "@/lib/adsNow";
+import { RunningNow } from "./RunningNow";
+import ACC from "@/data/adAccounts.json";
 import { chunks, every } from "../load";
 import { saveSources, saveSpend } from "./actions";
 
@@ -37,10 +43,12 @@ export default async function Ads({ searchParams }: { searchParams: Promise<{ p?
 
   // daily_sales_status reads at most 800 days.
   const salesFrom = addDays(today, -790) > "2025-01-01" ? addDays(today, -790) : "2025-01-01";
-  const [{ data: spendData, error: spendErr }, { data: st }, { data: svcData }] = await Promise.all([
+  const [{ data: spendData, error: spendErr }, { data: st }, { data: svcData }, { data: feedData }] = await Promise.all([
     supabase.from("ad_spend_monthly").select("month, branch_id, service, spend_cents, messages, through").order("month"),
     supabase.rpc("daily_sales_status", { p_start: salesFrom, p_end: today }),
     supabase.from("services").select("id, name"),
+    // Running now (v0.100.3): the live ad sets from the ad feed's last two weeks.
+    supabase.rpc("ads_feed_rows", { p_from: addDays(today, -14) }),
   ]);
   if (spendErr) {
     return (<><TopBar access={access} /><main className="business"><div className="biz-head"><h1>Ads</h1></div>
@@ -130,6 +138,13 @@ export default async function Ads({ searchParams }: { searchParams: Promise<{ p?
   const best = [...bars].filter((b) => b.value !== null).sort((a, b) => (b.value ?? 0) - (a.value ?? 0))[0];
   const qp = (p: string) => `/business/ads?p=${encodeURIComponent(p)}`;
 
+  // Running now (CHRIS Nov 28): per branch, each live service + audience with its daily budget (before VAT).
+  const feed = feedData as Feed | null;
+  const now = feed?.ok && feed.rows.length ? runningNow(advise({ feed, today, sales: new Map(), shares: new Map(), plan: planMap() }).lines) : null;
+  const actFeed = new Map((feed?.rows ?? []).filter((r) => r.act && r.cid).map((r) => [r.cid!, String(r.act)]));
+  const accMap = ACC as { campaigns: Record<string, string>; suffix: Record<string, string> };
+  const setUrl = (id: string, cid: string) => adsManagerUrl({ kind: "adset", id, cid, view: "edit" }, actFeed.get(cid) ?? accMap.campaigns[cid] ?? accMap.suffix[cid.slice(-4)] ?? null);
+
   return (
     <>
       <TopBar access={access} />
@@ -138,6 +153,7 @@ export default async function Ads({ searchParams }: { searchParams: Promise<{ p?
         <nav className="ads-periods" aria-label="Period">
           {opts.map((o) => <Link key={o.key} href={qp(o.key)} className={o.key === period.key ? "on" : ""} aria-current={o.key === period.key ? "page" : undefined}>{o.label}</Link>)}
         </nav>
+        {now && <RunningNow now={now} lastDate={feed?.last_date ?? null} setUrl={setUrl} />}
         <Link href="/business/ads/advisor" className="card adv-link"><b>Ad advisor</b><span>This week&apos;s budget moves, ads to turn off or copy, ad set set-up, videos and market radar</span><span aria-hidden>→</span></Link>
         {sp.ok && <div className="notice ok">✓ {sp.ok}</div>}
         {sp.err && <div className="notice error">{sp.err}</div>}

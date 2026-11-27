@@ -2673,3 +2673,20 @@ details.exp-edit[open] { flex-basis: 100%; }
 .adv-bulk-box pre { margin: 6px 0 0; padding: 6px 8px; background: var(--viz-track); border-radius: 8px; font-size: 0.78rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); }
 .adv-bulk-box button.adv-ok { flex: none; min-height: 28px; padding: 2px 12px; }
 .adv-bulk-box button.adv-ok:not(.on) { background: transparent; color: var(--viz-deep); border: 1px solid var(--viz-gold); }
+
+/* v0.100.3 Business › Ads: Running now (live ad sets per branch, service + audience + daily budget) */
+.ads-now h2 { margin-bottom: 10px; }
+.ads-now-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ads-now-branch { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.ads-now-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.ads-now-head span { font-weight: 600; color: var(--gold); }
+.ads-now ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ads-now li { min-width: 0; }
+.ads-now-row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.ads-now-aud { color: var(--muted); font-size: 0.92em; }
+.ads-now li.warn .ads-now-aud { color: var(--warn); }
+.ads-now-bud { white-space: nowrap; font-size: 1.05em; }
+.ads-now li .small { overflow-wrap: anywhere; }
+.ads-now li a { color: inherit; text-decoration: underline; text-decoration-color: rgba(138, 109, 59, 0.4); }
+.ads-now-foot { margin-top: 10px; }
+@media (max-width: 720px) { .ads-now-grid { grid-template-columns: 1fr; } }

@@ -126,6 +126,8 @@ export type AdView = {
 export type AdSetView = {
   id: string; name: string; campaign: string; cid: string; status: string; t7: Totals; p7: Totals; targeting: Targeting | null; text: string | null;
   mismatch: string | null; learnShort: boolean;
+  /** Daily budget before VAT (pesos): the ad set's own, or its share of a campaign budget by last week's spend. */
+  budget?: number | null; budgetSource?: "adset" | "campaign" | "none";
 };
 export type Action = "RAISE" | "TEST" | "CUT" | "KEEP" | "WAIT" | "OFF" | "START" | "NONE";
 export type LineView = {
@@ -343,7 +345,16 @@ export function advise(inp: AdvisorInput) {
       if (S.key !== key || !liveSets.has(sid)) continue;
       const tg = parseTargeting(feed.targeting[sid]);
       const mismatch = tg?.nearest && tg.nearest !== branch ? tg.nearest : null;
-      setViews.push({ id: sid, name: S.name, campaign: S.campaign, cid: S.cid, status: "ACTIVE", t7: S.t7, p7: S.p7, targeting: tg, text: tg ? targetingText(tg) : null, mismatch, learnShort: S.t7.msgs < LEARN_PER_WEEK });
+      const own = setB.get(sid), camp = S.cid ? campB.get(S.cid) : undefined;
+      let budget: number | null = null, budgetSource: "adset" | "campaign" | "none" = "none";
+      if (own) { budget = own.value; budgetSource = "adset"; }
+      else if (camp) {
+        const peers = [...sets].filter(([id, X]) => X.cid === S.cid && liveSets.has(id) && !setB.get(id));
+        const tot = peers.reduce((a, [, X]) => a + X.t7.spend, 0);
+        budget = peers.length === 1 ? camp.value : tot > 0 ? (camp.value * S.t7.spend) / tot : camp.value / Math.max(1, peers.length);
+        budgetSource = "campaign";
+      }
+      setViews.push({ id: sid, name: S.name, campaign: S.campaign, cid: S.cid, status: "ACTIVE", t7: S.t7, p7: S.p7, targeting: tg, text: tg ? targetingText(tg) : null, mismatch, learnShort: S.t7.msgs < LEARN_PER_WEEK, budget, budgetSource });
     }
     setViews.sort((a, b) => b.t7.spend - a.t7.spend);
 
