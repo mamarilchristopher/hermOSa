@@ -17,8 +17,8 @@ import PH from "@/data/phMarket.json";
 import { ApproveChip } from "./ApproveChip";
 import { OpenOnHash } from "./OpenOnHash";
 import { TaskChip } from "./TaskChip";
-import { budgetSteps, bulkBlocks, pauseSteps, remakeSteps, settingsPlan, versionSteps, type BulkBlock, type SetRow } from "@/lib/adsSteps";
-import { BulkBox } from "./BulkBox";
+import { budgetSteps, locationPick, pauseSteps, remakeSteps, settingsPlan, versionSteps, type LocationPick, type SetRow } from "@/lib/adsSteps";
+import { AddressBox } from "./AddressBox";
 import { adsManagerUrl, audit, CHECKS, type Finding, type Target } from "@/lib/adsAudit";
 import ACC from "@/data/adAccounts.json";
 import { areaFor, areaStatus, openQuestions, sortAreas, TIER } from "@/lib/adsResearch";
@@ -132,13 +132,13 @@ export default async function AdAdvisor() {
     return go(l.budgetSource === "campaign" ? { kind: "campaign", id: top.cid, cid: top.cid, view: "edit" } : { kind: "adset", id: top.id, cid: top.cid, view: "edit" });
   }
   const findings = audit({ feed, lines, end: res.end, sales, marks, plan: (b, sv) => { const p = playLine(b, sv); return p ? { genders: p.audience.genders, ageMin: p.audience.age_min, ageMax: p.audience.age_max } : null; } });
-  const SETTINGS = new Set(["pin", "overlap", "age", "gender"]);
+  const SETTINGS = new Set(["pin", "overlap", "area", "age", "gender"]);
   const setOf = new Map(lines.flatMap((l) => l.adsets.map((s) => [s.id, { l, s }] as const)));
   const audiencePlan = (b: string, sv: string) => {
     const p = playLine(b, sv);
-    return p ? { ageMin: p.audience.age_min, ageMax: p.audience.age_max, genders: p.audience.genders, interests: p.audience.interests, include: p.geo.include, exclude: p.geo.exclude } : null;
+    return p ? { ageMin: p.audience.age_min, ageMax: p.audience.age_max, genders: p.audience.genders, interests: p.audience.interests } : null;
   };
-  const KIND: Record<string, string> = { pin: "Fix the area", overlap: "Branches overlap", age: "Audience", gender: "Audience", split: "Learning", setCost: "Ad sets", dupe: "Duplicate ad", zeroTag: "Data check", zeroDay: "Sales plan", cpcJump: "Cost per chat", quality: "Chat quality", saturation: "Audience tired" };
+  const KIND: Record<string, string> = { pin: "Fix the area", overlap: "Branches overlap", area: "Fix the area", age: "Audience", gender: "Audience", split: "Learning", setCost: "Ad sets", dupe: "Duplicate ad", zeroTag: "Data check", zeroDay: "Sales plan", cpcJump: "Cost per chat", quality: "Chat quality", saturation: "Audience tired" };
   const moves: Move[] = [
     ...groupFixes(findings.filter((f) => f.sev !== "info")).map((g) => {
       const f = g[0];
@@ -147,9 +147,9 @@ export default async function AdAdvisor() {
       const hit = SETTINGS.has(f.check) && f.target && f.target.kind === "adset" ? setOf.get(f.target.id) : undefined;
       const sp = hit ? settingsPlan({
         name: hit.s.name, branch: hit.l.branch, t: hit.s.targeting, plan: audiencePlan(hit.l.branch, hit.l.service), button: action,
-        overlapFix: g.find((x) => x.check === "overlap")?.radius ?? null, locationFlag: g.some((x) => x.check === "pin"),
+        overlapFix: g.find((x) => x.check === "overlap")?.radius ?? null, locationFlag: g.some((x) => x.check === "pin" || x.check === "area"),
       }) : null;
-      const extra = sp ? { rows: sp.rows, steps: sp.steps, bulk: sp.bulk } : { steps: f.steps };
+      const extra = sp ? { rows: sp.rows, steps: sp.steps, location: sp.location, branch: hit!.l.branch } : { steps: f.steps };
       if (g.length === 1) return { id: f.id, tone: f.sev, tag: f.tag, kind: KIND[f.check], title: f.title, short: f.short, why: f.why, approve: f.approve, action, go: go(f.target), ...extra };
       const name = f.name;
       return {
@@ -286,7 +286,7 @@ export default async function AdAdvisor() {
                       {m.rows.some((r) => !r.change) && <li className="ok"><b>Already right</b><span>{m.rows.filter((r) => !r.change).map((r) => r.field).join(", ")}</span></li>}
                     </ul>
                   )}
-                  {m.bulk && m.bulk.length > 0 && <BulkBox blocks={m.bulk} />}
+                  {m.location && <div className="adv-bulk"><AddressBox pick={m.location} label={`Hermosa ${SHORT[m.branch ?? ""] ?? ""} clinic`} /></div>}
                   <div className="adv-move-foot">
                     {m.go && <a className="adv-go" href={m.go.href} {...(m.go.external ? { target: "_blank", rel: "noreferrer" } : {})}>{m.action}{m.go.external ? " ↗" : " →"}</a>}
                     {m.steps && <TaskChip id={m.id} text={taskText(m)} />}
@@ -561,7 +561,7 @@ export default async function AdAdvisor() {
 
 /** Setting fixes on the same ad set become one card (one trip into Ads Manager). */
 function groupFixes(fs: Finding[]) {
-  const SETTINGS = new Set(["pin", "overlap", "age", "gender"]);
+  const SETTINGS = new Set(["pin", "overlap", "area", "age", "gender"]);
   const out: Finding[][] = [], bySet = new Map<string, Finding[]>();
   for (const f of fs) {
     if (SETTINGS.has(f.check) && f.target && f.target.kind === "adset") {
@@ -573,7 +573,7 @@ function groupFixes(fs: Finding[]) {
   return out;
 }
 
-type Move = { id: string; tone: string; tag: string; kind: string; title: string; short: string; why: string; approve: string; delta?: number | null; action: string; go: { href: string; external: boolean } | null; rows?: SetRow[]; steps?: string[]; bulk?: BulkBlock[] };
+type Move = { id: string; tone: string; tag: string; kind: string; title: string; short: string; why: string; approve: string; delta?: number | null; action: string; go: { href: string; external: boolean } | null; rows?: SetRow[]; steps?: string[]; location?: LocationPick | null; branch?: string };
 
 /** The task as text to send to whoever does it: link, values to set, numbered steps. */
 function taskText(m: Move) {
@@ -581,7 +581,7 @@ function taskText(m: Move) {
   const set = (m.rows ?? []).filter((r) => r.change).map((r) => `- ${r.field}: ${r.set}`);
   return [`Hermosa ads task · ${m.tag} · ${m.kind}`, m.title, m.short, href ? `Open: ${href}` : null, set.length ? `Set it to:\n${set.join("\n")}` : null,
     m.steps?.length ? `Steps:\n${m.steps.map((x, i) => `${i + 1}. ${x}`).join("\n")}` : null,
-    ...(m.bulk ?? []).map((b, i) => `Box ${i + 1} (${b.label}) · Location type: ${b.type} · Default radius: ${b.radius} mi${b.exclude ? " · then set to Exclude" : ""}\n${b.lines.join("\n")}`)].filter(Boolean).join("\n\n");
+    m.location ? `Location (paste in Search locations, then radius ${m.location.radius} mi):\n${m.location.address}` : null].filter(Boolean).join("\n\n");
 }
 type PhMarket = {
   refs: { cpm: { label: string; median: number }; cpc: { label: string; median: number }; chat: { label: string; lo: number; hi: number } };
@@ -680,7 +680,7 @@ function Setup({ p }: { p: PlayLine }) {
           {a.note && <div className="small muted">{a.note}</div>}
         </dd>
         <dt>Location</dt><dd>{p.geo.include.join("; ")}{p.geo.exclude.length > 0 && <><br /><span className="muted">Exclude: {p.geo.exclude.join("; ")}</span></>}
-          {p.branch !== "ALL" && <BulkBox blocks={bulkBlocks(p.branch, p.geo.include, p.geo.exclude)} />}</dd>
+          {p.branch !== "ALL" && <div className="adv-bulk"><AddressBox pick={locationPick(p.branch)} label={`Hermosa ${SHORT[p.branch] ?? p.branch} clinic`} /></div>}</dd>
         <dt>Placements</dt><dd>{p.placements}</dd>
       </dl>
       {p.creatives.length > 0 && (

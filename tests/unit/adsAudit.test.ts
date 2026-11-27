@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { addDay, advise, type FeedRow } from "../../src/lib/adsAdvisor";
 import { adsManagerUrl, audit, miles } from "../../src/lib/adsAudit";
+import { bestRadius } from "../../src/lib/adsSteps";
 
 const QC = "103117851723422", SMB = "112393681804031";
 const TODAY = "2026-12-15", END = addDay(TODAY, -1);
@@ -54,7 +55,14 @@ describe("ad checks", () => {
     expect(d).toBeGreaterThan(4);
     expect(d).toBeLessThan(5);
     expect(f.short).toContain("Fairview clinic");
-    expect(f.title).toBe(`Shrink the circle to ${Math.floor(d - 0.5)} mi`);
+    expect(f.title).toBe(`Shrink the circle to ${bestRadius("QC_MAIN")} mi`);
+  });
+
+  it("flags a town list instead of one clinic pin", () => {
+    const t = JSON.stringify({ age_min: 21, age_max: 54, genders: [2], geo_locations: { cities: [{ name: "DEMO town" }], places: [{ name: "DEMO pin", latitude: QC_PIN.lat, longitude: QC_PIN.lng, radius: 3, distance_unit: "mile" }] }, targeting_automation: { advantage_audience: 0 } });
+    const f = run(base(), { s1: t }).find((x) => x.check === "area")!;
+    expect(f.title).toBe(`Use the clinic pin + ${bestRadius("QC_MAIN")} mi`);
+    expect(run(base(), { s1: tg({ radius: 3 }) }).some((x) => x.check === "area")).toBe(false);
   });
 
   it("flags ages under 21", () => {

@@ -5,12 +5,14 @@
  */
 import { addDay, CLINIC_PIN, LEARN_PER_WEEK, PAGES, perChat, type AdSetView, type Feed, type LineView } from "./adsAdvisor";
 import { SERVICE_LABEL } from "./ads";
+import { bestRadius, CLINIC_SEARCH, locationOk } from "./adsSteps";
 
-export type CheckKey = "pin" | "overlap" | "age" | "gender" | "split" | "setCost" | "dupe" | "zeroTag" | "zeroDay" | "cpcJump" | "quality" | "saturation";
+export type CheckKey = "pin" | "overlap" | "area" | "age" | "gender" | "split" | "setCost" | "dupe" | "zeroTag" | "zeroDay" | "cpcJump" | "quality" | "saturation";
 /** Every check, in the order it is listed on the page. */
 export const CHECKS: { key: CheckKey; label: string }[] = [
   { key: "pin", label: "Each ad set's pin is in its own branch's area" },
   { key: "overlap", label: "Branch circles don't reach another clinic" },
+  { key: "area", label: "Each ad set is one pin on its clinic with the plan's radius (no town lists)" },
   { key: "age", label: "Ages 21+ and capped at the plan's top age" },
   { key: "gender", label: "Women only as a hard limit (men only in a separate test)" },
   { key: "split", label: "Ad sets get enough chats to leave learning" },
@@ -92,7 +94,7 @@ export function audit(inp: AuditInput): Finding[] {
         if (code === l.branch) continue;
         const d = miles([p.lat, p.lng], pin);
         if (d >= p.radius) continue;
-        const fix = Math.max(2, Math.floor(d - 0.5));
+        const best = bestRadius(l.branch), fix = best < d - 0.2 ? best : Math.max(1, Math.floor(d - 0.5));
         out.push({
           id: `overlap-${s.id}-${code}`, name: s.name, check: "overlap", sev: "warn", line: l.key, tag: tagOf(l), title: `Shrink the circle to ${fix} mi`,
           short: `Its ${p.radius}-mile circle covers the ${SHORT[code]} clinic (${d.toFixed(1)} mi away)`,
@@ -103,6 +105,23 @@ export function audit(inp: AuditInput): Finding[] {
         break;
       }
     }
+  }
+
+  // 2b. Location format (CHRIS Nov 28: "An address of the clinic + the best mile radius"): one pin on the branch's clinic,
+  //     no wider than the plan's radius. Town lists and extra places get flagged (Meta turns towns into 10–25 mi circles).
+  for (const { l, s } of sets) {
+    const t = s.targeting;
+    if (!t || s.mismatch || locationOk(l.branch, t)) continue;
+    if (out.some((f) => f.check === "overlap" && f.target && f.target.kind === "adset" && f.target.id === s.id)) continue;
+    const r = bestRadius(l.branch);
+    const now = [...t.places.map((x) => `${x.radius ?? "?"} mi around "${x.name}"`), ...t.cities].join(" + ") || "no location";
+    out.push({
+      id: `area-${s.id}`, name: s.name, check: "area", sev: "warn", line: l.key, tag: tagOf(l), title: `Use the clinic pin + ${r} mi`,
+      short: `"${s.name}" targets ${t.places.length + t.cities.length > 1 ? `${t.places.length + t.cities.length} places` : now}`,
+      why: `"${s.name}" targets ${now}. The rule is one location: the ${SHORT[l.branch]} clinic's address with a ${r}-mile radius, which stops short of the other clinics. Town lists and extra places spread the ads into other branches' areas (Meta also widens towns into 10–25 mile circles). In Locations, remove them and add only "${CLINIC_SEARCH[l.branch]}" at ${r} mi.`,
+      action: "Fix location", target: { kind: "adset", id: s.id, cid: s.cid, view: "edit" },
+      approve: `${tagOf(l)}: set ad set "${s.name}" location to the ${SHORT[l.branch]} clinic + ${r} mi`,
+    });
   }
 
   // 3–4. Ages under 21; not women-only as a hard limit (CHRIS Nov 28: about 90% of actual clients are women and ads

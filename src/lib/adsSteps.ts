@@ -3,7 +3,8 @@
  * with basic understanding of ads management"). Every move gets the exact values to type and numbered click-by-click
  * steps in Ads Manager, so a staff member can do it from the card or from the copied text.
  */
-import type { Targeting } from "./adsAdvisor";
+import { CLINIC_PIN, type Targeting } from "./adsAdvisor";
+import { PLAYBOOK, type Playbook } from "./adsPlaybook";
 
 const SHORT: Record<string, string> = { QC_MAIN: "QC Main", FAIRVIEW: "Fairview", STA_MARIA: "Sta. Maria", MARIKINA: "Marikina" };
 /** Public clinic addresses (CHRIS, Nov 23 2026), for dropping the map pin. */
@@ -13,86 +14,75 @@ export const CLINIC_ADDRESS: Record<string, string> = {
   STA_MARIA: "JSP Building, Kanto Caypombo, Sta. Maria, Bulacan",
   MARIKINA: "GT1 Bldg., B.G. Molina St., Parang, Marikina City",
 };
-/** Circle size when the playbook doesn't say. */
-const DEFAULT_RADIUS: Record<string, number> = { QC_MAIN: 4, FAIRVIEW: 5, STA_MARIA: 4, MARIKINA: 4 };
 const BRANCH_WORD: [RegExp, string][] = [[/qc main|main qc/i, "QC_MAIN"], [/fairview/i, "FAIRVIEW"], [/sta\.? maria|smb/i, "STA_MARIA"], [/marikina/i, "MARIKINA"]];
-const branchIn = (s: string) => BRANCH_WORD.find(([re]) => re.test(s))?.[1] ?? null;
+export const branchIn = (s: string) => BRANCH_WORD.find(([re]) => re.test(s))?.[1] ?? null;
 
-/** Meta's "Add locations in bulk" (CHRIS Nov 28, from Ads Manager): Location type + one Default radius for the whole
- *  paste, one location per line. Commas and semicolons split entries, so lines never contain them. Radii are the
- *  dropdown's values. */
-export const BULK_RADII = [1, 3, 5, 10, 15, 25];
-/** Pin addresses without commas, street first so Meta's matcher lands on the clinic. */
-export const CLINIC_BULK: Record<string, string> = {
-  QC_MAIN: "30 Matino Street Sikatuna Village Diliman Quezon City Philippines",
-  FAIRVIEW: "Regalado Avenue corner Coronet Street West Fairview Quezon City Philippines",
-  STA_MARIA: "Kanto Caypombo Santa Maria Bulacan Philippines",
-  MARIKINA: "B.G. Molina Street Parang Marikina City Philippines",
+/** What to type in Ads Manager's "Search locations" box for each clinic (street first, so Meta drops the pin on it). */
+export const CLINIC_SEARCH: Record<string, string> = {
+  QC_MAIN: "30 Matino Street, Sikatuna Village, Quezon City",
+  FAIRVIEW: "Regalado Avenue corner Coronet Street, West Fairview, Quezon City",
+  STA_MARIA: "Kanto Caypombo, Santa Maria, Bulacan",
+  MARIKINA: "B.G. Molina Street, Parang, Marikina City",
 };
-const PROVINCE: [RegExp, string][] = [
-  [/^(sta\.? maria|santa maria|bocaue|marilao|meycauayan|balagtas|pandi|norzagaray|angat|guiguinto|san jose del monte|obando|bulakan|malolos|plaridel)/i, "Bulacan"],
-  [/^(antipolo|cainta|san mateo|rodriguez|montalban|taytay)/i, "Rizal"],
-];
-/** "Sta. Maria" / "Rodriguez (Montalban)" / "San Jose del Monte, Bulacan" → "Santa Maria Bulacan Philippines". */
-export function bulkTown(raw: string) {
-  const name = raw.replace(/\s*\(.*?\)\s*/g, " ").split(",")[0].replace(/^sta\.?\s+/i, "Santa ").trim();
-  const prov = PROVINCE.find(([re]) => re.test(name))?.[1] ?? "Metro Manila";
-  return `${name} ${prov} Philippines`.replace(/[,;]/g, " ").replace(/\s+/g, " ");
+/** Location = ONE pin on the clinic + ONE radius (CHRIS Nov 28: "An address of the clinic + the best mile radius";
+ *  Meta's bulk add turned town names into 10–25 mi circles and stray places). Best radius: as wide as possible while
+ *  stopping at least half a mile short of every other Hermosa clinic, so branches don't serve each other's doorstep.
+ *  Sta. Maria has no clinic within 12 mi, so it is capped at 7 mi (the Bulacan towns it serves). */
+const RADIUS_CAP: Record<string, number> = { STA_MARIA: 7 };
+const toRad = (x: number) => (x * Math.PI) / 180;
+const milesBetween = (a: [number, number], b: [number, number]) => {
+  const dLat = toRad(b[0] - a[0]), dLng = toRad(b[1] - a[1]);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2;
+  return 3958.8 * 2 * Math.asin(Math.sqrt(h));
+};
+/** The radius the ads plan sets for a branch ("QC Main clinic address, 3.5 mi radius"); the plan is the one source. */
+export function planRadius(branch: string, pb: Playbook = PLAYBOOK): number | null {
+  for (const l of pb.lines) {
+    if (l.branch !== branch) continue;
+    for (const g of l.geo.include) { const m = g.match(/(\d+(?:\.\d+)?)\s*mi\b/i); if (m) return Number(m[1]); }
+  }
+  return null;
 }
-/** Largest dropdown radius that doesn't go past the target (so a circle never grows into another clinic). */
-export const bulkRadius = (miles: number) => [...BULK_RADII].reverse().find((r) => r <= miles) ?? 1;
-export type BulkBlock = { label: string; type: "Addresses"; radius: number; lines: string[]; exclude?: boolean };
-/** Paste-ready blocks for a branch: the clinic pin, the extra towns, and the clinics to exclude. */
-export function bulkBlocks(branch: string, include: string[], exclude: string[], pinMiles?: number | null): BulkBlock[] {
-  const inc = include.map((s) => ({ s, mi: s.match(/(\d+(?:\.\d+)?)\s*mi\b/i), b: branchIn(s) }));
-  const own = inc.find((x) => x.mi && (x.b === branch || x.b === null));
-  const towns = inc.filter((x) => !x.mi && !/each branch|see the branch/i.test(x.s)).map((x) => x.s);
-  const out: BulkBlock[] = [];
-  if (own || towns.length === 0) out.push({ label: `Hermosa ${SHORT[branch]} pin`, type: "Addresses", radius: bulkRadius(pinMiles ?? (own ? Number(own.mi![1]) : DEFAULT_RADIUS[branch] ?? 3)), lines: [CLINIC_BULK[branch]] });
-  if (towns.length) out.push({ label: "Towns", type: "Addresses", radius: 3, lines: towns.map(bulkTown) });
-  const ex = exclude.map((s) => ({ mi: Number(s.match(/(\d+(?:\.\d+)?)\s*mi\b/i)?.[1] ?? 2), b: branchIn(s) })).filter((x) => x.b && CLINIC_BULK[x.b]);
-  // Exclusions round UP to the dropdown (a bigger hole keeps us further from the other clinic).
-  const up = (mi: number) => BULK_RADII.find((r) => r >= mi) ?? 25;
-  for (const r of [...new Set(ex.map((x) => up(x.mi)))])
-    out.push({ label: "Exclude", type: "Addresses", radius: r, lines: ex.filter((x) => up(x.mi) === r).map((x) => CLINIC_BULK[x.b!]), exclude: true });
-  return out;
+/** Plan radius first (rounded down to a whole mile: Ads Manager's radius slider only takes whole miles); if the plan
+ *  has none, the widest whole mile that stops half a mile short of every other clinic. */
+export function bestRadius(branch: string): number {
+  const planned = planRadius(branch);
+  if (planned) return Math.max(1, Math.floor(planned));
+  return geoRadius(branch);
 }
+export function geoRadius(branch: string): number {
+  const me = CLINIC_PIN[branch];
+  if (!me) return 3;
+  const nearest = Math.min(...Object.entries(CLINIC_PIN).filter(([k]) => k !== branch).map(([, p]) => milesBetween(me, p)));
+  return Math.max(1, Math.min(RADIUS_CAP[branch] ?? 10, Math.floor(nearest - 0.5)));
+}
+/** Is this ad set's location already "one pin on its clinic, no wider than the best radius"? */
+export function locationOk(branch: string, t: Targeting | null) {
+  if (!t) return false;
+  return t.places.length === 1 && t.cities.length === 0 && t.nearest === branch && (t.places[0].radius ?? 99) <= bestRadius(branch);
+}
+export type LocationPick = { address: string; radius: number };
+export const locationPick = (branch: string, maxMiles?: number | null): LocationPick => ({
+  address: CLINIC_SEARCH[branch], radius: Math.min(bestRadius(branch), maxMiles ?? 99),
+});
 
-export type AudiencePlan = { ageMin: number; ageMax: number; genders: string; interests: string[]; include: string[]; exclude: string[] };
+export type AudiencePlan = { ageMin: number; ageMax: number; genders: string; interests: string[] };
 export type SetRow = { field: string; now: string; set: string; change: boolean };
-export type SettingsPlan = { rows: SetRow[]; steps: string[]; bulk: BulkBlock[] };
+export type SettingsPlan = { rows: SetRow[]; steps: string[]; location: LocationPick | null };
 
 const OPEN = (what: string, name: string, button: string) =>
   `Tap "${button} ↗" on this card. Ads Manager opens on ${what} "${name}" (log in with the Hermosa account if asked). Check the name at the top matches.`;
 const DONE = "Back in Hermosa OS, tap \"Done\" on this card so the owner knows it's finished.";
 
-function pinPlace(branch: string, miles: number) {
-  return { label: `Pin on Hermosa ${SHORT[branch]} (${CLINIC_ADDRESS[branch]}), ${miles} mi`, branch, miles };
-}
-
-/** What the ad set should look like, from the playbook line, and how to get it there. */
+/** What the ad set should look like (location from the clinic, audience from the playbook line) and how to get it there. */
 export function settingsPlan(o: {
   name: string; branch: string; t: Targeting | null; plan: AudiencePlan | null; overlapFix?: number | null; locationFlag?: boolean; button?: string;
 }): SettingsPlan {
   const { t, branch } = o;
-  const p: AudiencePlan = o.plan ?? { ageMin: 21, ageMax: 54, genders: "women", interests: [], include: [], exclude: [] };
-  // Location: a pin on our clinic with the playbook's circle, or the playbook's list of towns.
-  const inc = p.include.map((s) => ({ s, mi: s.match(/(\d+(?:\.\d+)?)\s*mi\b/i), b: branchIn(s) }));
-  const own = inc.find((x) => x.mi && (x.b === branch || x.b === null));
-  let radius = own ? Number(own.mi![1]) : DEFAULT_RADIUS[branch] ?? 4;
-  if (o.overlapFix) radius = Math.min(radius, o.overlapFix);
-  radius = bulkRadius(radius);
-  const towns = inc.filter((x) => !x.mi).map((x) => x.s.replace(/\s*\(.*?\)\s*$/, "").trim()).filter(Boolean);
-  const usePin = !!own || towns.length === 0;
-  const pin = pinPlace(branch, radius);
-  const bulk = bulkBlocks(branch, p.include, p.exclude, radius);
-  const setLoc = usePin ? [pin.label, ...towns].join(" + ") : towns.join(", ");
+  const p: AudiencePlan = o.plan ?? { ageMin: 21, ageMax: 54, genders: "women", interests: [] };
+  const loc = locationPick(branch, o.overlapFix);
   const nowLoc = t ? [...t.places.map((x) => `${x.radius ?? "?"} mi around "${x.name}"`), ...t.cities].join(" + ") || "Not set" : "Couldn't read";
-  const tooWide = !!t && t.places.some((x) => (x.radius ?? 0) > radius + 0.01);
-  const locChange = !!o.locationFlag || !!o.overlapFix || tooWide || (!!t && t.nearest !== null && t.nearest !== branch);
-  const excl = p.exclude.map((s) => ({ s, mi: Number(s.match(/(\d+(?:\.\d+)?)\s*mi\b/i)?.[1] ?? 2), b: branchIn(s) })).filter((x) => x.b);
-  const setExcl = excl.map((x) => `${x.mi} mi around Hermosa ${SHORT[x.b!]}`).join(", ");
-
+  const locChange = !!o.locationFlag || !!o.overlapFix || !locationOk(branch, t);
   const nowAge = !t ? "Couldn't read" : t.advantage
     ? `${t.ageMin ?? 18}+${t.ageSuggest ? ` (suggested ${t.ageSuggest[0]}–${t.ageSuggest[1]})` : ""}`
     : `${t.ageMin ?? 18}–${t.ageMax ?? 65}`;
@@ -102,8 +92,7 @@ export function settingsPlan(o: {
 
   const rows: SetRow[] = [
     { field: "Audience", now: !t ? "Couldn't read" : t.advantage ? "Advantage+ audience" : "Original audience", set: "Original audience options", change: !t || t.advantage },
-    { field: "Location", now: nowLoc, set: setLoc, change: locChange },
-    ...(setExcl ? [{ field: "Exclude", now: "–", set: setExcl, change: locChange }] : []),
+    { field: "Location", now: nowLoc, set: `Hermosa ${SHORT[branch]} clinic (${loc.address}) + ${loc.radius} mi`, change: locChange },
     { field: "Age", now: nowAge, set: `${p.ageMin}–${p.ageMax}`, change: ageChange },
     { field: "Gender", now: nowGender, set: "Women", change: genderChange },
   ];
@@ -112,10 +101,9 @@ export function settingsPlan(o: {
   steps.push("Scroll down to the Audience section.");
   if (!t || t.advantage) steps.push(`Click "Switch to original audience options" (under Advantage+ audience) and confirm. This makes age and gender hard limits.`);
   if (locChange) {
-    steps.push(`In Locations, remove every location now listed${t && nowLoc !== "Not set" ? ` (${nowLoc})` : ""} (the x next to each).`);
-    bulk.forEach((blk, i) => {
-      steps.push(`Click "Add locations in bulk". Set Location type to "${blk.type}" and Default radius to "${blk.radius} mi". Paste box ${i + 1} (${blk.label}, copied from this card), click "Match locations", check each match is in the right town, then add them.${blk.exclude ? " Then switch each of these to \"Exclude\" (the dropdown next to the location)." : ""}`);
-    });
+    steps.push(`In Locations, remove every location now listed${t && nowLoc !== "Not set" ? ` (${nowLoc})` : ""}: click the x next to each.`);
+    steps.push(`Click in "Search locations", paste the clinic address (Copy on this card): "${loc.address}". Pick the result that matches the clinic.`);
+    steps.push(`Click the small arrow next to the added location and set the radius to ${loc.radius} mi. That should be the only location.`);
   }
   if (ageChange) steps.push(`Set Age to ${p.ageMin} – ${p.ageMax}.`);
   if (genderChange) steps.push(`Set Gender to "Women".`);
@@ -123,7 +111,7 @@ export function settingsPlan(o: {
   steps.push("Don't change the budget, placements or ads.");
   steps.push(`Click "Publish" (bottom right). Meta restarts learning for a few days after an audience change; that's expected.`);
   steps.push(DONE);
-  return { rows, steps, bulk: locChange ? bulk : [] };
+  return { rows, steps, location: locChange ? loc : null };
 }
 
 /** Budget moves: the field to change, before VAT (what you type in Ads Manager). */
