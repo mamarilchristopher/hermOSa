@@ -13,6 +13,8 @@ const MORE: Record<string, string> = {
   NOTHING_TO_ISSUE: "There are no Late NTEs this month that aren't in an IR yet.",
   PROOF_REQUIRED: "Add a photo as proof first (a photo of the traffic, or a screenshot of your ride booking).",
   PHOTO_NOT_UPLOADED: "A photo didn't finish uploading. Remove it and add it again.",
+  PINGED_RECENTLY: "Already reminded in the last 10 minutes. Try again later.",
+  NO_APP_ACCOUNT: "This employee has no Hermosapp account yet, so they can't be reminded in the app.",
 };
 const text = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 const msg = (code: string | undefined) => (code && MORE[code]) || errorText(code);
@@ -69,4 +71,15 @@ export async function issueLateIr(_p: ActionState, fd: FormData): Promise<Action
   if (!data?.ok) return { error: msg(data?.error) };
   refresh();
   redirect(`/incidents/${data.id}?issued=1`);
+}
+
+/** Management: remind the employee to explain a Late NTE (notification + phone push). update-0094, CHRIS Nov 27. */
+export async function pingNte(_p: ActionState, fd: FormData): Promise<ActionState> {
+  const id = z.uuid().safeParse(fd.get("id"));
+  if (!id.success) return { error: "Refresh the page and try again." };
+  const { data, error } = await (await createClient()).rpc("ping_nte", { p_id: id.data });
+  if (error) return { error: error.code === "PGRST202" ? "Ping needs database update-0094. Ask the owner to run it." : "Could not send. Try again." };
+  if (!data?.ok) return { error: msg(data?.error) };
+  refresh();
+  return { ok: `Reminder sent${data.count > 1 ? ` (${data.count} times so far)` : ""}.`, at: Date.now() };
 }

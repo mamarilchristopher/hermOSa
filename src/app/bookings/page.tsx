@@ -3,7 +3,7 @@ import Link from "next/link";
 import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { isIsoDate, manilaToday } from "@/lib/dates";
-import { AddBookingForm, CopyForGc, NoteForm, StatusForm } from "./Forms";
+import { AddBookingForm, CancelReasonForm, CopyForGc, NoteForm, StatusForm } from "./Forms";
 import { LiveBookings } from "./LiveBookings";
 
 type Booking = {
@@ -63,6 +63,11 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
   // update-0091: bookings whose sale is already in the Service log (so nobody logs it twice).
   const { data: linked } = rows.length ? await supabase.from("service_logs").select("booking_id").in("booking_id", rows.map((r) => r.id)).neq("state", "REJECTED") : { data: [] };
   const sold = new Set(((linked ?? []) as { booking_id: string }[]).map((x) => x.booking_id));
+  // update-0094: the client's reason on Cancelled bookings (CHRIS Nov 27). Before the update runs this finds nothing.
+  const cancelledIds = rows.filter((r) => r.status === "CANCELLED").map((r) => r.id);
+  const { data: reasonRows, error: reasonErr } = cancelledIds.length ? await supabase.from("bookings").select("id, cancel_reason").in("id", cancelledIds) : { data: [], error: null };
+  const reasonOf = new Map(((reasonRows ?? []) as { id: string; cancel_reason: string | null }[]).map((x) => [x.id, x.cancel_reason]));
+  const reasonsLive = !reasonErr;
   const codeOf = new Map(clinics.map((b) => [b.id, b.code]));
   const canLog = (branchId: string) => can(access, [...LOG_ROLES], branchId);
   // Clinic hours end at 7 PM: after that (or for an earlier day) anyone still Booked, Confirmed or Arriving needs closing out.
@@ -93,7 +98,8 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
     ...list.flatMap((r) => {
       const line = `${r.contact ?? "----------"} ${r.client_name}${r.note ? ` (${r.note})` : ""}`;
       const st = moved(r) ? `RE-SCHED (${mdy(r.appointment_date)}${r.deposit_cents ? " w/ dp" : ""})` : GC_STATUS[r.status];
-      const extra = r.status_note && !moved(r) ? r.status_note.toUpperCase() : "";
+      const why = r.status === "CANCELLED" && !moved(r) ? reasonOf.get(r.id) : null;
+      const extra = [r.status_note && !moved(r) ? r.status_note.toUpperCase() : "", why ? `REASON: ${why.toUpperCase()}` : ""].filter(Boolean).join(" · ");
       return [line, ...(st ? [st] : []), ...(extra && extra !== st ? [extra] : [])];
     }),
     "",
@@ -179,6 +185,8 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
                   Logged {fmt(r.booked_on)}{r.csr_employee_id && name.get(r.csr_employee_id) ? ` by ${name.get(r.csr_employee_id)}` : r.csr_employee_id ? "" : " by owner / GM"}
                   {r.platform !== "FACEBOOK" && ` · ${r.platform.replace("_", "-").toLowerCase()}`}
                 </p>
+                {r.status === "CANCELLED" && !moved(r) && reasonOf.get(r.id) && <p className="small" style={{ margin: "0 0 6px" }}><strong>Client reason:</strong> {reasonOf.get(r.id)}</p>}
+                {r.status === "CANCELLED" && !moved(r) && reasonsLive && !reasonOf.get(r.id) && booker && <CancelReasonForm id={r.id} />}
                 {sold.has(r.id) && <p className="small" style={{ margin: "0 0 6px", color: "var(--good)" }}>✓ Sale logged in the Service log{canLog(r.branch_id) && <> · <Link href={`/services?branch=${codeOf.get(r.branch_id) ?? ""}&booking=${r.id}`}>Add another service</Link></>}</p>}
                 {!moved(r) && canMark(r.branch_id) && <><StatusForm id={r.id} status={r.status} booker={booker} today={today} /> <NoteForm id={r.id} note={r.status_note} /></>}
               </div>

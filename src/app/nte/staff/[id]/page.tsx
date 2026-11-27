@@ -8,7 +8,7 @@ import { monthLabel } from "@/lib/insights";
 import { dayLabel } from "@/lib/homeGlance";
 import { timeLabel } from "@/lib/schedule";
 import { firstName, irReason, IR_MINUTES_DEFAULT, IR_NTE_COUNT, nteCount, nteId, type NteList } from "@/lib/nte";
-import { IssueLateIrForm, NteDeadline, NteProofs, ReviewNteForm, VoidNteForm } from "../../Forms";
+import { IssueLateIrForm, NteDeadline, NteProofs, PingNteButton, ReviewNteForm, VoidNteForm } from "../../Forms";
 import { photoUrls } from "@/lib/photos";
 import { Uid } from "@/components/Uid";
 
@@ -36,6 +36,10 @@ export default async function StaffNtePage({ params, searchParams }: { params: P
   if (!list || !emp) notFound();
   const ntes = list.ntes.filter((n) => n.can_manage);
   const proofs = await photoUrls(supabase, ntes.flatMap((n) => n.proof_paths ?? []), "nte-proofs");
+  // Pings (update-0094): read straight from the table; before the update runs this simply finds nothing.
+  const open = ntes.filter((n) => n.state === "OPEN" && !n.ir_id).map((n) => n.id);
+  const { data: pingRows } = open.length ? await supabase.from("late_ntes").select("id, ping_count, last_ping_at").in("id", open) : { data: null };
+  const pings = new Map((pingRows ?? []).map((r: { id: string; ping_count: number; last_ping_at: string | null }) => [r.id, r]));
   if (list.ntes.length > 0 && ntes.length === 0) notFound();
   const counted = ntes.filter((n) => n.state !== "VOID" && n.state !== "ACCEPTED"); // accepted reasons don't count (update-0067)
   const notInIr = counted.filter((n) => !n.ir_id);
@@ -85,6 +89,7 @@ export default async function StaffNtePage({ params, searchParams }: { params: P
                     {n.review === "ACCEPTED" && n.review_note && <p className="small muted" style={{ margin: 0 }}>Note: {n.review_note}</p>}
                     {(n.state === "EXPLAINED" || n.state === "ACCEPTED") && !n.ir_id && <ReviewNteForm id={n.id} current={n.review ?? null} />}
                     {n.state === "OPEN" && !n.ir_id && <NteDeadline n={n} />}
+                    {n.state === "OPEN" && !n.ir_id && <PingNteButton id={n.id} name={first} count={pings.get(n.id)?.ping_count} last={pings.get(n.id)?.last_ping_at} />}
                     {n.state === "VOID" && <p className="small muted" style={{ margin: 0 }}>Doesn&apos;t count: {n.void_reason}</p>}
                   </div>
                   {n.state !== "VOID" && !n.ir_id && <VoidNteForm id={n.id} />}

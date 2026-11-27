@@ -811,6 +811,9 @@ button.online-chat.owner:hover { background: var(--brown); color: #fff; }
 .booking-actions { display: inline-flex; flex-direction: column; gap: 6px; }
 .booking-resched { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
 .booking-resched input { width: auto; flex: 1 1 140px; }
+.cancel-reason { background: var(--bad-bg); border-radius: 12px; padding: 8px 10px; margin-bottom: 6px; }
+.nte-ping { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+.nte-ping button { white-space: nowrap; }
 .time-example { display: block; width: 100%; max-width: 420px; height: auto; margin: 4px 0 8px; border-radius: 12px; border: 1px solid var(--line); }
 .price-edit { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .price-edit input, .price-edit select { width: auto; flex: 1 1 120px; }

@@ -44,12 +44,15 @@ export async function setStatus(_prev: BookingState, fd: FormData): Promise<Book
   const newDate = String(fd.get("new_date") ?? "");
   const note = String(fd.get("note") ?? "").trim();
   if (!id.success) return { error: "Refresh the page and try again." };
-  if (!["ARRIVING", "ARRIVED", "DONE", "NO_SHOW", "UNRESPONSIVE", "RESCHEDULED", "CONFIRMED", "CANCELLED", "BOOKED", "NOTE"].includes(status)) return { error: "Tap a status." };
+  if (!["ARRIVING", "ARRIVED", "DONE", "NO_SHOW", "UNRESPONSIVE", "RESCHEDULED", "CONFIRMED", "CANCELLED", "BOOKED", "NOTE", "CANCEL_REASON"].includes(status)) return { error: "Tap a status." };
+  // CHRIS Nov 27 (update-0094): every Cancelled booking needs the client's reason.
+  if ((status === "CANCELLED" || status === "CANCEL_REASON") && note.length < 3) return { error: "Write the client's reason for cancelling first." };
   if (status === "RESCHEDULED" && !isIsoDate(newDate)) return { error: "Choose the new date first." };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("set_booking_status", { p_id: id.data, p_status: status, p_new_date: status === "RESCHEDULED" ? newDate : null, p_note: note || null });
   if (error) return { error: missing(error.code) ? NEEDS_SQL : "Could not save. Try again." };
-  if (!data?.ok) return { error: data?.error === "BAD_REQUEST" && (status === "ARRIVING" || status === "NO_SHOW") ? NEEDS_0091 : errorText(data?.error) };
+  if (!data?.ok) return { error: data?.error === "BAD_REQUEST" && (status === "ARRIVING" || status === "NO_SHOW") ? NEEDS_0091
+    : data?.error === "BAD_REQUEST" && status === "CANCEL_REASON" ? "Adding a reason needs database update-0094. Ask the owner to run it." : errorText(data?.error) };
   revalidatePath("/bookings"); revalidatePath("/me");
   return { ok: "Saved." };
 }
@@ -65,6 +68,7 @@ export async function logFollowUp(_prev: BookingState, fd: FormData): Promise<Bo
   if (!["CALL", "FACEBOOK", "SMS", "OTHER"].includes(channel)) return { error: "Choose how you contacted them." };
   if (!["STILL_UNRESPONSIVE", "REBOOKED", "CANCELLED"].includes(outcome)) return { error: "Tap what happened." };
   if (outcome === "REBOOKED" && !isIsoDate(newDate)) return { error: "Choose the new visit date first." };
+  if (outcome === "CANCELLED" && note.length < 3) return { error: "Write the client's reason for cancelling in the note first." };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("log_booking_followup", { p_booking: id.data, p_channel: channel, p_outcome: outcome, p_new_date: outcome === "REBOOKED" ? newDate : null, p_note: note || null });
   if (error) return { error: missing(error.code) ? "The owner needs to run update-0081 in Supabase first." : "Could not save. Try again." };

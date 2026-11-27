@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useActionState, useEffect, useRef, useState, type MouseEvent } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { nteDeadline } from "@/lib/nte";
-import { explainNte, issueLateIr, reviewNte, voidNte, type ActionState } from "./actions";
+import { explainNte, issueLateIr, pingNte, reviewNte, voidNte, type ActionState } from "./actions";
 import { pick } from "@/lib/decision";
 
 function Msg({ s }: { s: ActionState }) {
@@ -128,6 +128,21 @@ function setNoteNow(form: HTMLFormElement | null, text: string) {
 }
 
 /** Management: cancel an NTE that was a mistake (wrong schedule, approved errand). */
+/** CHRIS Nov 27 (update-0094): remind the employee to explain. Sends a notification and a Hermosapp push. */
+export function PingNteButton({ id, name, count, last }: { id: string; name: string; count?: number; last?: string | null }) {
+  const [s, action, pending] = useActionState(pingNte, undefined);
+  const when = last ? new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(last)) : null;
+  return (
+    <form action={action} className="nte-ping">
+      <input type="hidden" name="id" value={id} />
+      <button className="small" disabled={pending} title={`Send ${name} a reminder to explain`}>🔔 {pending ? "Sending…" : `Ping ${name}`}</button>
+      {s?.ok ? <span className="small ok-text">{s.ok}</span>
+        : s?.error ? <span className="field-error">{s.error}</span>
+        : count ? <span className="small muted">Reminded {count === 1 ? "once" : `${count} times`}{when ? `, last ${when}` : ""}</span> : null}
+    </form>
+  );
+}
+
 export function VoidNteForm({ id }: { id: string }) {
   const [s, action, pending] = useActionState(voidNte, undefined);
   const [open, setOpen] = useState(false);

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { dayLabel } from "@/lib/homeGlance";
 import { firstName, nteCount, type Nte, type TrackerRow, nteId } from "@/lib/nte";
 import { Uid } from "@/components/Uid";
+import { PingNteButton } from "@/app/nte/Forms";
 
 /** Where a Late NTE stands, in CHRIS's words: Accepted reason / Rejected reason (with the reviewer's note). */
 function nteStatus(n: Nte): { label: string; tone: "good" | "bad" | "wait" | "muted" } {
@@ -48,6 +49,7 @@ export function HomeTardiness({ month, ntes, people }: { month: string; ntes: Nt
                       {n.explanation ? <>“{n.explanation.length > 140 ? `${n.explanation.slice(0, 140)}…` : n.explanation}”</> : <span className="muted">No reason yet</span>}
                       {n.review_note && <><br /><strong>Note:</strong> {n.review_note}</>}
                       {n.state === "VOID" && n.void_reason && <><br /><strong>Voided:</strong> {n.void_reason}</>}
+                      {n.state === "OPEN" && !n.ir_id && <PingNteButton id={n.id} name={firstName(n.name)} />}
                     </td>
                   </tr>
                 );
@@ -66,6 +68,7 @@ export function HomeTardiness({ month, ntes, people }: { month: string; ntes: Nt
                   {n.explanation && <span className="small">“{n.explanation.length > 140 ? `${n.explanation.slice(0, 140)}…` : n.explanation}”</span>}
                   {n.review_note && <span className="small"><strong>Note:</strong> {n.review_note}</span>}
                   {n.state === "VOID" && n.void_reason && <span className="small"><strong>Voided:</strong> {n.void_reason}</span>}
+                  {n.state === "OPEN" && !n.ir_id && <PingNteButton id={n.id} name={firstName(n.name)} />}
                 </li>
               );
             })}

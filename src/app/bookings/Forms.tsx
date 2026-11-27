@@ -49,6 +49,7 @@ export function AddBookingForm({ branches, today, min, max, services }: { branch
 export function StatusForm({ id, status, booker, today }: { id: string; status: string; booker: boolean; today: string }) {
   const [s, action, pending] = useActionState(setStatus, undefined);
   const [resched, setResched] = useState(false);
+  const [cancel, setCancel] = useState(false);
   const btn = (v: string, label: string) => (
     <button key={v} className={status === v ? "on" : ""} onClick={pick(v)} disabled={pending}>{label}</button>
   );
@@ -62,9 +63,17 @@ export function StatusForm({ id, status, booker, today }: { id: string; status: 
         {btn("DONE", "Done")}
         {btn("NO_SHOW", "Did not arrive")}
         {btn("UNRESPONSIVE", "Unresponsive")}
-        <button type="button" className={resched ? "on" : ""} onClick={() => setResched(!resched)}>Re-sched…</button>
-        {booker && btn("CANCELLED", "Cancelled")}
+        <button type="button" className={resched ? "on" : ""} onClick={() => { setResched(!resched); setCancel(false); }}>Re-sched…</button>
+        {/* CHRIS Nov 27 (update-0094): Cancelled always asks for the client's reason. */}
+        {booker && <button type="button" className={status === "CANCELLED" || cancel ? "on" : ""} disabled={pending || status === "CANCELLED"}
+          onClick={() => { setCancel(!cancel); setResched(false); }}>Cancelled…</button>}
       </div>
+      {cancel && (
+        <div className="booking-resched">
+          <input name="note" maxLength={300} required minLength={3} placeholder="Client's reason, e.g. no budget yet" autoFocus aria-label="Client's reason for cancelling" />
+          <button className="small danger" onClick={pick("CANCELLED")} disabled={pending}>Cancel booking</button>
+        </div>
+      )}
       {resched && (
         <div className="booking-resched">
           <input type="date" name="new_date" min={today} />
@@ -72,6 +81,22 @@ export function StatusForm({ id, status, booker, today }: { id: string; status: 
           <button className="small" onClick={pick("RESCHEDULED")} disabled={pending}>Move</button>
         </div>
       )}
+      {s?.error && <span className="small" style={{ color: "var(--bad)" }}>{s.error}</span>}
+    </form>
+  );
+}
+
+/** update-0094: a booking already marked Cancelled without the client's reason. */
+export function CancelReasonForm({ id }: { id: string }) {
+  const [s, action, pending] = useActionState(setStatus, undefined);
+  if (s?.ok) return null;
+  return (
+    <form action={action} className="booking-resched cancel-reason">
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="decision" value="CANCEL_REASON" />
+      <span className="small" style={{ color: "var(--bad)", fontWeight: 700 }}>Client reason needed</span>
+      <input name="note" maxLength={300} required minLength={3} placeholder="Why did the client cancel?" aria-label="Client's reason for cancelling" />
+      <button className="small" disabled={pending}>Save reason</button>
       {s?.error && <span className="small" style={{ color: "var(--bad)" }}>{s.error}</span>}
     </form>
   );
@@ -115,7 +140,7 @@ export function FollowUpForm({ id, today }: { id: string; today: string }) {
         <option value="SMS">Text</option>
         <option value="OTHER">Other</option>
       </select>
-      <input name="note" maxLength={300} placeholder="Note (optional), e.g. busy until Dec" />
+      <input name="note" maxLength={300} placeholder="Note (required if Cancelled: client's reason)" />
       <div className="status-pick">
         <button onClick={pick("STILL_UNRESPONSIVE")} disabled={pending}>Still unresponsive</button>
         <button type="button" className={rebook ? "on" : ""} onClick={() => setRebook(!rebook)}>Rebooked…</button>
