@@ -147,3 +147,33 @@ describe("growth check (Nov 27): more spend on the same ads didn't bring more sa
     expect(planMap().get("MARIKINA|HIKO")!.proposedChange?.budget).toBeGreaterThan(planMap().get("MARIKINA|HIKO")!.budget);
   });
 });
+
+describe("refresh timing (CHRIS Nov 27): fatigue weighed against how the ad still performs", () => {
+  /** 28 days of one ad: [days 1-21 spend, chats], [last 7 days spend, chats] per day. */
+  function long(aid: string, early: [number, number], late: [number, number], start = 28) {
+    const rows: FeedRow[] = [];
+    for (let i = 0; i < start; i++) {
+      const d = addDay(TODAY, -start + i), last = i >= start - 7;
+      const [sp, m] = last ? late : early;
+      rows.push({ d, page: QC, cid: "c1", c: "DEMO Hiko campaign", sid: "s1", s: "DEMO set", aid, a: `DEMO ${aid}`, sp, m, im: 1000, rc: 800, fq: 1.2, cl: 20, cb: 300000, sb: null, ss: "ACTIVE", as: "ACTIVE" });
+    }
+    return rows;
+  }
+  const refresh = (rows: FeedRow[]) => Object.fromEntries(run(rows, 100000).lines[0].ads.map((a) => [a.id, a.refresh]));
+
+  it("a long-running ad that still holds keeps its budget; slipping ads get watch or replace; new ads wait", () => {
+    const r = refresh([
+      ...long("hold", [500, 15], [500, 15]),          // same cost per chat for 4 weeks
+      ...long("slip", [500, 15], [500, 12]),          // +25%
+      ...long("worn", [500, 15], [500, 10]),          // +50%
+      ...long("new", [0, 0], [300, 8], 28),           // only spending this week
+    ]);
+    expect(r).toEqual({ hold: "EVERGREEN", slip: "WATCH", worn: "REPLACE", new: "NEW" });
+  });
+
+  it("the advice says why", () => {
+    const ads = run(long("hold", [500, 15], [500, 15]), 100000).lines[0].ads;
+    expect(ads[0].refreshWhy).toMatch(/Keep its budget; add new ads beside it/);
+    expect(ads[0].age).toBe(28);
+  });
+});
