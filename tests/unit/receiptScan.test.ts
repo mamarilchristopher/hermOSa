@@ -48,5 +48,6 @@ describe("receipt scan", () => {
     expect(t).toContain("c-elec: Electricity");
     expect(t).toContain("FAIRVIEW (Fairview)");
     expect(t).toContain("SALES_INVOICE");
+    expect(scanSystem(cats, [{ id: "b-q", code: "MARIKINA", name: "Marikina" }])).toContain("MARIKINA (Marikina): registered name HermosaCuatro");
   });
 });

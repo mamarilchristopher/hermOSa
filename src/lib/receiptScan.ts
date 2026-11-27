@@ -6,12 +6,12 @@ export type DocType = (typeof DOC_TYPES)[number];
 export const PAID_VIA = ["CASH", "BANK", "GCASH", "CARD", "OTHER"] as const;
 export type PaidVia = (typeof PAID_VIA)[number];
 
-/** Where each clinic is, so an address on a bill or receipt can point to the right branch. Area names only. */
+/** Each clinic's registered business name (CHRIS Nov 28) and area, so a name or address on a bill or receipt points to the right branch. */
 export const BRANCH_AREAS: Record<string, string> = {
-  QC_MAIN: "Quezon City along Mindanao Avenue (Bahay Toro, Project 8, Tandang Sora area). Any Quezon City address that is NOT Fairview/Novaliches.",
-  FAIRVIEW: "Fairview, Quezon City (Fairview, Novaliches, Commonwealth north area).",
-  STA_MARIA: "Santa Maria, Bulacan (also written Sta. Maria or SMB).",
-  MARIKINA: "Marikina City (e.g. Parang, Concepcion).",
+  QC_MAIN: "registered name HermosaUNO. Quezon City along Mindanao Avenue (Bahay Toro, Project 8, Tandang Sora area). Any Quezon City address that is NOT Fairview/Novaliches.",
+  FAIRVIEW: "registered name HermosaDOS. Fairview, Quezon City (Fairview, Novaliches, Commonwealth north area).",
+  STA_MARIA: "registered name HermosaTres. Santa Maria, Bulacan (also written Sta. Maria or SMB).",
+  MARIKINA: "registered name HermosaCuatro. Marikina City (e.g. Parang, Concepcion).",
 };
 
 /** The reader's raw answer (the shape the JSON schema asks for). */
@@ -51,7 +51,7 @@ export function scanSystem(cats: ScanCat[], branches: ScanBranch[]) {
     "- Small handwritten receipts (water refill delivery, LPG, laundry, repairs): one item with the total.",
     "- A chat screenshot that shows receipt photos: read the receipts in it as above.",
     "",
-    "Not expenses: a sales or service invoice or official receipt where Hermosa or HermosaCuatro is the SELLER (a client paying for a treatment or product). Use doc_type SALES_INVOICE and return no items.",
+    "Not expenses: a sales or service invoice or official receipt where Hermosa or one of the branch names below (HermosaUNO, HermosaDOS, HermosaTres, HermosaCuatro) is the SELLER (a client paying for a treatment or product). Use doc_type SALES_INVOICE and return no items.",
     "If no amount can be read at all, use doc_type NOT_A_RECEIPT and return no items.",
     "",
     "Dates: return YYYY-MM-DD. Philippine dates are usually month/day/year. A date written without a year is the most recent such date that is not after today. Never return a date after today.",
@@ -64,7 +64,7 @@ export function scanSystem(cats: ScanCat[], branches: ScanBranch[]) {
     ...cats.map((c) => `- ${c.id}: ${c.name}`),
     "Hints: drinking water deliveries and pantry groceries go to staff meals & pantry when that exists; Lalamove and rides go to transport & delivery; laundry to laundry & linens; aircon or plumbing repairs to repairs & maintenance; medical exams for staff (x-ray, health card) to HMO & insurance or miscellaneous.",
     "",
-    "Branch: decide which branch the expense belongs to from addresses on the document: the service address on a bill first, then a \"sold to\" or delivery address, then the store's own location when it is clearly near one branch. Use branch_code null when nothing points to one branch. Branches:",
+    "Branch: decide which branch the expense belongs to. Strongest sign: a branch's registered name (HermosaUNO, HermosaDOS, HermosaTres, HermosaCuatro, any spacing or capitals, e.g. \"Hermosa Cuatro\") as the customer, account name or \"sold to\". Next: the service address on a bill, then a \"sold to\" or delivery address, then the store's own location when it is clearly near one branch. Use branch_code null when nothing points to one branch. Branches:",
     ...branches.map((b) => `- ${b.code} (${b.name}): ${BRANCH_AREAS[b.code] ?? b.name}`),
     "branch_reason: a few words on what pointed to the branch (e.g. \"service address in Fairview\").",
     "",
