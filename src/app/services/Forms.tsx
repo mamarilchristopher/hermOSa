@@ -2,7 +2,7 @@
 import { pick } from "@/lib/decision";
 import { BACKJOB_REASONS } from "@/lib/backjobs";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { addService, approveMany, changeBranch, changeDate, renameClient, renumberMonth, decideLog, logService, toggleAfterDp, type ActionState } from "./actions";
+import { addService, approveMany, changeBranch, changeDate, fixPackageSession, renameClient, voidEntry, renumberMonth, decideLog, logService, toggleAfterDp, type ActionState } from "./actions";
 import { previewCommission, type CommissionType } from "@/lib/commission";
 import { centsToPhp } from "@/lib/csv";
 import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
@@ -383,6 +383,9 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
           </label>
         )}
         </div>
+        {kind === "NO_CHARGE" && svc?.sessions?.length ? (
+          <div className="span2 notice error small">A package session already paid for (or a free one) is <strong>Paid with ₱0</strong>, so the session commission is still paid. Choose <strong>Paid</strong> above and type 0.</div>
+        ) : null}
         {canDouble && (
           <label className="span2 double-dose">
             <input type="checkbox" name="double" value="1" checked={double} onChange={(e) => setDouble(e.target.checked)} />
@@ -659,6 +662,36 @@ export function ChangeDateForm({ id, date, max }: { id: string; date: string; ma
       <input type="hidden" name="id" value={id} />
       <input type="date" name="date" defaultValue={date} max={max} required aria-label="Correct date" />
       <button className="small" disabled={pending}>Save</button>
+      <button type="button" className="secondary small" onClick={() => setOpen(false)}>Cancel</button>
+      {s?.error && <span className="field-error">{s.error}</span>}
+    </form>
+  );
+}
+
+/** update-0095: a package session saved as "No charge" becomes Paid ₱0 with its session commission (owners / GM). */
+export function FixPackageForm({ id }: { id: string }) {
+  const [s, action, pending] = useActionState(fixPackageSession, undefined);
+  if (s?.ok) return <div className="small ok-text">{s.ok}</div>;
+  return (
+    <form action={action}>
+      <input type="hidden" name="id" value={id} />
+      <button className="small" disabled={pending}>Make it Paid ₱0 + commission</button>
+      {s?.error && <span className="field-error">{s.error}</span>}
+    </form>
+  );
+}
+
+/** update-0095: void a duplicate or wrong entry, even an approved one (owners / GM). */
+export function VoidEntryForm({ id }: { id: string }) {
+  const [s, action, pending] = useActionState(voidEntry, undefined);
+  const [open, setOpen] = useState(false);
+  if (s?.ok) return <div className="small ok-text">{s.ok}</div>;
+  if (!open) return <button type="button" className="link-button small" onClick={() => setOpen(true)}>Void entry</button>;
+  return (
+    <form action={action} className="change-date">
+      <input type="hidden" name="id" value={id} />
+      <input name="reason" required minLength={3} maxLength={300} placeholder="Why, e.g. duplicate of SL-2611-0401" aria-label="Why void this entry" autoFocus />
+      <button className="small danger" disabled={pending}>Void</button>
       <button type="button" className="secondary small" onClick={() => setOpen(false)}>Cancel</button>
       {s?.error && <span className="field-error">{s.error}</span>}
     </form>

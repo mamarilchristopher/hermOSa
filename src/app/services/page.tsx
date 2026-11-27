@@ -8,7 +8,7 @@ import { centsToPhp } from "@/lib/csv";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { addDays, sortBranches, WEEKDAYS, weekday } from "@/lib/insights";
 import { ROLE_TEXT, TYPE_TEXT } from "@/lib/commission";
-import { AfterDpForm, BatchApprove, BranchEntryForm, ChangeBranchForm, ChangeDateForm, DecideButtons, RenameClientForm, RenumberForm } from "./Forms";
+import { AfterDpForm, BatchApprove, BranchEntryForm, ChangeBranchForm, ChangeDateForm, DecideButtons, FixPackageForm, RenameClientForm, RenumberForm, VoidEntryForm } from "./Forms";
 import type { PackageLine } from "@/lib/packages";
 import { Uid } from "@/components/Uid";
 import { StaffFilter } from "./StaffFilter";
@@ -21,7 +21,7 @@ import type { PromoOptions } from "@/lib/promoTrack";
 
 type Log = {
   id: string; service_date: string; amount_paid_cents: number; commission_type: string; performer_id: string; assistant_id: string | null;
-  receipt_no: string | null; note: string | null; branch_id?: string; client_name?: string | null; price_note?: string | null; after_dp?: boolean; list_price_cents?: number | null; photo_folder?: string | null; share_ok?: boolean; photos_due?: boolean; session_no?: number; log_no?: string | null; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
+  receipt_no: string | null; note: string | null; service_id?: string; branch_id?: string; client_name?: string | null; price_note?: string | null; after_dp?: boolean; list_price_cents?: number | null; photo_folder?: string | null; share_ok?: boolean; photos_due?: boolean; session_no?: number; log_no?: string | null; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
   services: { name: string } | null;
 };
 const VISIT_TEXT: Record<string, string> = { BACKJOB: "Backjob (unpaid)", CHECKUP: "Check-up (unpaid)", NO_CHARGE: "No charge" };
@@ -313,6 +313,8 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                       )}
                       {l.state === "REJECTED" && l.decision_note && <div className="small muted">{l.decision_note}</div>}
                       {topMgmt && <ChangeDateForm id={l.id} date={l.service_date} max={today} />}
+                      {topMgmt && l.state !== "REJECTED" && l.visit_kind === "NO_CHARGE" && l.service_id && bundleIds.includes(l.service_id) && <FixPackageForm id={l.id} />}
+                      {topMgmt && l.state === "APPROVED" && <VoidEntryForm id={l.id} />}
                       {topMgmt && <ChangeBranchForm id={l.id} branch={l.branch_id ?? ""} branches={viewable.map((b) => ({ id: b.id, name: b.name }))} />}
                       {l.client_name && l.state !== "REJECTED" && (topMgmt || l.created_by === access.user_id || staff.some((x) => mine.has(x))) && <RenameClientForm id={l.id} name={l.client_name} all={topMgmt} />}
                       {topMgmt && l.state !== "REJECTED" && (l.after_dp || ((l.visit_kind ?? "PAID") === "PAID" && Number(l.amount_paid_cents) > 0 && Number(l.list_price_cents ?? 0) > Number(l.amount_paid_cents))) && (

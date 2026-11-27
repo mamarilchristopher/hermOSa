@@ -52,6 +52,8 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
   const { data: svcRow } = await supabase.from("services").select("*").eq("id", p.data.service).maybeSingle();
   const sessions = Array.isArray(svcRow?.session_prices) ? (svcRow.session_prices as (number | string)[]).map(Number) : null;
   const zeroOk = !!svcRow && !Number(svcRow.price_cents ?? 0) && svcRow.commission_cents != null; // bundle sessions, later doses
+  // Geraldine's list (Nov 27): package sessions already paid for were saved as "No charge", so no session commission.
+  if (sessions && p.data.kind === "NO_CHARGE") return { error: "A package session already paid for (or a free one) is logged as Paid with ₱0, so the session commission is paid. Choose Paid and type 0." };
   let cents = 0;
   if (paid) {
     try {
@@ -328,4 +330,28 @@ export async function changeBranch(_prev: ActionState, fd: FormData): Promise<Ac
   if (!data?.ok) return { error: data?.error === "ALREADY_PAID" ? "This entry's commission is already on a final payslip, so its branch can't change." : errorText(data?.error) };
   revalidatePath("/services"); revalidatePath("/me");
   return { ok: "Branch changed.", at: Date.now() };
+}
+
+/** update-0095: owners and the GM turn a package session saved as "No charge" into Paid ₱0 with its session commission. */
+export async function fixPackageSession(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const id = z.uuid().safeParse(fd.get("id"));
+  if (!id.success) return { error: "Refresh the page and try again." };
+  const { data, error } = await (await createClient()).rpc("fix_package_session", { p_log: id.data });
+  if (error) return { error: error.code === "PGRST202" ? "This needs database update-0095. Ask the owner to run it." : "Could not save. Try again." };
+  if (!data?.ok) return { error: data?.error === "ALREADY_PAID" ? "Already on a final payslip." : errorText(data?.error) };
+  revalidatePath("/services"); revalidatePath("/me");
+  return { ok: `Now Paid ₱0 · commission ${centsToPhp(Number(data.commission_cents ?? 0))}.`, at: Date.now() };
+}
+
+/** update-0095: owners and the GM void a duplicate or wrong entry (kept on record as Rejected, earns nothing). */
+export async function voidEntry(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const id = z.uuid().safeParse(fd.get("id"));
+  const reason = String(fd.get("reason") ?? "").trim();
+  if (!id.success) return { error: "Refresh the page and try again." };
+  if (reason.length < 3) return { error: "Say why, e.g. duplicate of SL-2611-0401." };
+  const { data, error } = await (await createClient()).rpc("void_service_entry", { p_log: id.data, p_reason: reason });
+  if (error) return { error: error.code === "PGRST202" ? "This needs database update-0095. Ask the owner to run it." : "Could not save. Try again." };
+  if (!data?.ok) return { error: data?.error === "ALREADY_PAID" ? "Already on a final payslip, so it can't be voided." : errorText(data?.error) };
+  revalidatePath("/services"); revalidatePath("/me");
+  return { ok: "Voided. It no longer counts.", at: Date.now() };
 }

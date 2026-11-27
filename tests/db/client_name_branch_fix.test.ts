@@ -80,3 +80,35 @@ describe("double dose", () => {
     expect(await db.rpc(staff, "aal1", "log_double_dose", [plain])).toMatchObject({ ok: false, error: "NOT_A_PACKAGE" });
   });
 });
+
+describe("fixing past package entries", () => {
+  it("a package session saved as No charge becomes Paid ₱0 with its commission; a duplicate is voided", async () => {
+    const lux = (await db.sql(`INSERT INTO public.services (organization_id, name, price_cents, commission_cents, session_prices, active, created_by)
+      SELECT organization_id, 'DEMO Lux 10+3', 0, 8000, array_fill(0::bigint, ARRAY[13]), true, $1 FROM public.branches LIMIT 1 RETURNING id`, [owner.appUserId])).rows[0].id as string;
+    const folder = randomUUID();
+    const pic = (k: string) => { const id = randomUUID(); return { kind: k, path: `${db.branches.FAIRVIEW}/${folder}/${k.toLowerCase()}-${id}.jpg`, thumb: null }; };
+    const nc = await db.rpc(staff, "aal1", "log_client_visit", [db.branches.FAIRVIEW, today(), lux, 0, "SOLO", ana, null, null,
+      "NO_CHARGE", true, "DEMO Package Client", null, folder, JSON.stringify(["WAIVER", "WAIVER", "BEFORE", "AFTER"].map(pic)), false, 10, true]);
+    expect(nc.ok).toBe(true);
+    await db.rpc(owner, "aal2", "approve_service_logs", [[nc.id]]);
+    expect((await db.rpc(staff, "aal1", "fix_package_session", [nc.id])).ok).toBe(false);
+    expect(await db.rpc(gm, "aal1", "fix_package_session", [nc.id])).toMatchObject({ ok: true, commission_cents: 8000 });
+    const row = (await db.sql(`SELECT visit_kind, commission_type, state, (SELECT sum(amount_cents)::int FROM public.commission_lines WHERE service_log_id = l.id) com
+      FROM public.service_logs l WHERE id = $1`, [nc.id])).rows[0];
+    expect(row).toEqual({ visit_kind: "PAID", commission_type: "SOLO", state: "APPROVED", com: 8000 });
+    expect(await db.rpc(gm, "aal1", "fix_package_session", [nc.id])).toMatchObject({ ok: false, error: "NOT_NO_CHARGE" });
+    const plain = await visit("DEMO Plain");
+    expect(await db.rpc(gm, "aal1", "fix_package_session", [plain])).toMatchObject({ ok: false, error: "NOT_NO_CHARGE" });
+
+    await db.rpc(owner, "aal2", "approve_service_logs", [[plain]]);
+    expect((await db.rpc(staff, "aal1", "void_service_entry", [plain, "DEMO duplicate"])).ok).toBe(false);
+    expect(await db.rpc(owner, "aal2", "void_service_entry", [plain, "x"])).toMatchObject({ ok: false, error: "REASON_REQUIRED" });
+    expect((await db.rpc(owner, "aal2", "void_service_entry", [plain, "Duplicate of another entry"])).ok).toBe(true);
+    expect((await db.sql("SELECT state, decision_note FROM public.service_logs WHERE id = $1", [plain])).rows[0]).toEqual({ state: "REJECTED", decision_note: "Duplicate of another entry" });
+    // The SQL Editor fix (no signed-in user) uses the private versions.
+    const nc2 = await db.rpc(staff, "aal1", "log_client_visit", [db.branches.FAIRVIEW, today(), lux, 0, "SOLO", ana, null, null,
+      "NO_CHARGE", true, "DEMO Package Client 2", null, folder, "[]", false, 11, true]);
+    await db.sql("SELECT private.fix_package_session($1)", [nc2.id]);
+    expect((await db.sql("SELECT visit_kind FROM public.service_logs WHERE id = $1", [nc2.id])).rows[0].visit_kind).toBe("PAID");
+  });
+});
