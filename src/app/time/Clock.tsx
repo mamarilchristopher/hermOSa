@@ -137,10 +137,17 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status, manag
     <div className="card clock-card">
       <Now />
       <div className="clock-status muted">{status}</div>
+      {/* update-0097 (CHRIS Nov 27): staff rotate, so they say where they're assigned today (default = home branch).
+          The Service log uses this branch for today's staff lists. */}
       {!isIn && branches.length > 1 && (
-        <select value={branch} onChange={(e) => setBranch(e.target.value)} aria-label="Branch">
-          {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
+        <div className="field clock-branch">
+          <span className="field-label">Branch assigned today</span>
+          <div className="segmented choice" role="radiogroup" aria-label="Branch assigned today">
+            {branches.map((b) => (
+              <button type="button" key={b.id} role="radio" aria-checked={branch === b.id} className={branch === b.id ? "on" : ""} onClick={() => setBranch(b.id)}>{b.name}</button>
+            ))}
+          </div>
+        </div>
       )}
       <input ref={file} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onPhoto(e.target.files?.[0])} />
       <button className={`clock-btn ${isIn ? "out" : ""}`} disabled={!!busy || !branch} onClick={() => file.current?.click()}>

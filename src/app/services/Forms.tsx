@@ -11,7 +11,7 @@ import { promoItemLabel, promoOf, promoServiceIds, type PromoOptions } from "@/l
 import { payStatus, planDues, sessionsUnlocked } from "@/lib/promoPay";
 import { packageRecord, type PackageLine } from "@/lib/packages";
 
-type Opt = { id: string; name: string; eligible?: boolean; here?: boolean; price?: number | null; commission?: number | null; sessions?: number[] | null };
+type Opt = { id: string; name: string; eligible?: boolean; here?: boolean; at?: string[]; atHere?: boolean; price?: number | null; commission?: number | null; sessions?: number[] | null };
 
 /**
  * A bundle session's label in the Session No. list: "1", "2", … "11 · free".
@@ -80,7 +80,8 @@ export function BranchEntryForm({ branches, start, employees, ...rest }: Omit<Pa
   const [picked, setB] = useState(start);
   // One branch to log for: always that one (the state can be stale after switching from All branches).
   const b = branches.length === 1 ? branches[0].id : branches.some((x) => x.id === picked) ? picked : "";
-  const people = employees.map(({ branch, ...e }) => ({ ...e, here: branch === b }));
+  // update-0097: where each person timed in today (empty = not yet); home branch only matters for other days.
+  const people = employees.map(({ branch, ...e }) => ({ ...e, here: branch === b, atHere: !!e.at?.includes(b) }));
   return (
     <>
       {branches.length > 1 && (
@@ -245,15 +246,34 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   // update-0054: owners and the GM may save without photos; the lead and assist are then asked to add them.
   const missing = photosOptional ? null : missingPhotos;
   const needsPartner = paid && !!person && person.eligible !== false;
+  // update-0097 (CHRIS Nov 27): staff rotate, so for today the lists follow where people timed in. Timed in here first;
+  // not timed in yet next; timed in at another branch only for owners and the GM (staff can't pick them).
+  const isToday = day === (today ?? date);
+  const groups = (skip?: string) => {
+    const list = employees.filter((e) => e.id !== skip);
+    if (!isToday) return { top: list.filter((e) => e.here), mid: list.filter((e) => !e.here), midLabel: "Other branches", away: [] as Opt[] };
+    const timed = (e: Opt) => (e.at?.length ?? 0) > 0;
+    return {
+      top: list.filter((e) => e.atHere),
+      mid: list.filter((e) => !timed(e)).sort((a, b) => Number(!!b.here) - Number(!!a.here)),
+      midLabel: "Not timed in yet",
+      away: photosOptional ? list.filter((e) => timed(e) && !e.atHere) : [],
+    };
+  };
+  const opts = (skip?: string) => {
+    const g = groups(skip);
+    return (
+      <>
+        {g.top.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+        {g.mid.length > 0 && <optgroup label={g.midLabel}>{g.mid.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</optgroup>}
+        {g.away.length > 0 && <optgroup label="Timed in at another branch">{g.away.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</optgroup>}
+      </>
+    );
+  };
   const people = (
     <>
       <option value="">Choose…</option>
-      {employees.filter((e) => e.here).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-      {employees.some((e) => !e.here) && (
-        <optgroup label="Other branches">
-          {employees.filter((e) => !e.here).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-        </optgroup>
-      )}
+      {opts()}
     </>
   );
   return (
@@ -553,10 +573,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
           <label><span>Assisted by <span className="muted">(optional)</span></span>
               <select name="partner" value={partner} onChange={(e) => setPartner(e.target.value)}>
                 <option value="">None</option>
-                {employees.filter((e) => e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-                {employees.some((e) => !e.here && e.id !== who) && (
-                  <optgroup label="Other branches">{employees.filter((e) => !e.here && e.id !== who).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</optgroup>
-                )}
+                {opts(who)}
               </select>
           </label>
         )}

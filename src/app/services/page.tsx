@@ -27,6 +27,8 @@ type Log = {
 const VISIT_TEXT: Record<string, string> = { BACKJOB: "Backjob (unpaid)", CHECKUP: "Check-up (unpaid)", NO_CHARGE: "No charge" };
 type Line = { service_log_id: string; employee_id: string; role: string; amount_cents: number };
 
+const topMgmtFor = (access: Parameters<typeof can>[0]) => can(access, ["OWNER"], null) || can(access, ["MANAGER"], null);
+
 export default async function ServiceLog({ searchParams }: { searchParams: Promise<{ date?: string; branch?: string; entry?: string; days?: string; staff?: string; booking?: string }> }) {
   const { supabase, access, branches } = await requireAccess();
   const sp = await searchParams;
@@ -36,6 +38,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   // else today's schedule, else their home branch (records only). Staff open on that branch; management on All branches.
   const staffOnly = !can(access, ["OWNER", "FINANCE", "MANAGER", "AUDITOR", "HR"], null) && !access.grants.some((g) => g.role === "MANAGER");
   const { data: meRow } = await supabase.from("employees").select("id, branch_id").eq("app_user_id", access.user_id).eq("active", true).order("created_at").limit(1).maybeSingle();
+  // update-0097: everyone's time-in branches today (before update-0097 the function is missing: no limits).
+  const { data: atToday } = await supabase.rpc("staff_branches_today");
+  const timedIn = (atToday && typeof atToday === "object" ? atToday : {}) as Record<string, string[]>;
   const [{ data: inAt }, { data: shiftAt }] = meRow ? await Promise.all([
     supabase.from("time_punches").select("branch_id").eq("employee_id", meRow.id).eq("work_date", manilaToday()).eq("kind", "IN").order("punched_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("shifts").select("branch_id").eq("employee_id", meRow.id).eq("work_date", manilaToday()).eq("state", "PUBLISHED").maybeSingle(),
@@ -48,7 +53,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const scopeIds = scope.map((b) => b.id);
   const bName = Object.fromEntries(branches.map((b) => [b.id, b.name]));
   const LOG_ROLES = ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN"] as const;
-  const logBranches = scope.filter((b) => can(access, [...LOG_ROLES], b.id));
+  // update-0097 (CHRIS Nov 27): staff log today's services only at the branch(es) they timed in at. Owners and the GM anywhere.
+  const myAt = meRow ? timedIn[meRow.id] ?? [] : [];
+  const logBranches = scope.filter((b) => can(access, [...LOG_ROLES], b.id) && (topMgmtFor(access) || myAt.length === 0 || myAt.includes(b.id)));
   const approverFor = (id: string | undefined) => !!id && can(access, ["OWNER", "MANAGER"], id);
   const today = manilaToday();
   const date = isIsoDate(sp.date) && sp.date <= today ? sp.date : today;
@@ -129,7 +136,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   // CHRIS Nov 26: the General Manager doesn't perform services, so she isn't in the Lead / Assisted by lists.
   const clinicIds = new Set(branches.filter((b) => b.kind === "CLINIC").map((b) => b.id));
   // CHRIS Nov 26: only clinic staff in these lists (no CSRs / WFH staff).
-  const employees = (emps ?? []).filter((e) => !/general\s*manager/i.test(e.position ?? "") && !/\bcsr\b/i.test(e.position ?? "") && clinicIds.has(e.branch_id)).map((e) => ({ id: e.id, name: e.full_name, eligible: e.commission_eligible, branch: e.branch_id as string }));
+  const employees = (emps ?? []).filter((e) => !/general\s*manager/i.test(e.position ?? "") && !/\bcsr\b/i.test(e.position ?? "") && clinicIds.has(e.branch_id)).map((e) => ({ id: e.id, name: e.full_name, eligible: e.commission_eligible, branch: e.branch_id as string, at: timedIn[e.id] ?? [] }));
   // Staff who aren't on commission never see commission choices (management still does, to log for others).
   const myEmp = (emps ?? []).find((e) => e.app_user_id === access.user_id);
   const noCommission = !!myEmp && !myEmp.commission_eligible && !access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));

@@ -106,6 +106,7 @@ export const ERROR_TEXT: Record<string, string> = {
   MALFORMED_CSV: "The file isn't a valid CSV.",
   UNCLOSED_CSV_QUOTE: "The file isn't a valid CSV (a quote is never closed).",
   UNKNOWN_BRANCH: "Unknown branch.",
+  WRONG_BRANCH_TODAY: "Today this person timed in at another branch. Log it at the branch where they timed in, or ask the GM.",
   CANCEL_REASON_REQUIRED: "Write the client's reason for cancelling first.",
   BOOKING_DATE: "Check the date: bookings can be up to 30 days back or a year ahead, and a re-sched needs a new day from today on.",
   NOT_AUTHENTICATED: "Please sign in again.",

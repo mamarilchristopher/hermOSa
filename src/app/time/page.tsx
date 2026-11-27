@@ -40,7 +40,11 @@ export default async function TimePage() {
   const mine = (punches ?? []) as Punch[];
   const isIn = mine.at(-1)?.kind === "IN";
   const firstIn = mine.find((p) => p.kind === "IN");
-  const defaultBranch = isIn ? mine.at(-1)!.branch_id : shift?.branch_id ?? me?.branch_id ?? clinics[0]?.id ?? "";
+  // update-0097 (CHRIS Nov 27): time in asks "Branch assigned today", one of the 4 clinics, default = home branch.
+  // WFH is offered only to staff whose home is WFH (CSRs).
+  const defaultBranch = isIn ? mine.at(-1)!.branch_id : me?.branch_id ?? shift?.branch_id ?? clinics[0]?.id ?? "";
+  const homeWfh = !!short.find((b) => b.id === me?.branch_id)?.wfh;
+  const pickable = short.filter((b) => !b.wfh || homeWfh);
   const start = shift?.start_time?.slice(0, 5);
   const status = !me ? "" : isIn ? `You're in since ${clock(mine.filter((p) => p.kind === "IN").at(-1)!.punched_at)}.`
     : firstIn ? "You're timed out." : shift?.is_off ? "You're on a day off today." : start ? `Today: ${branchShort(clinics.find((b) => b.id === shift?.branch_id)?.name ?? "")}, ${timeLabel(start)} – ${timeLabel(shift?.end_time)}.`
@@ -76,7 +80,7 @@ export default async function TimePage() {
         <p className="muted small">Time in when you arrive and time out when you leave by taking a photo of the clinic clock. No more posting it in the group chat.</p>
 
         {me ? (
-          <TimeClock userId={access.user_id} isIn={isIn} branches={short} defaultBranch={defaultBranch} status={status} managerShot={canApprove(access, null)} />
+          <TimeClock userId={access.user_id} isIn={isIn} branches={pickable} defaultBranch={defaultBranch} status={status} managerShot={canApprove(access, null)} />
         ) : (
           <div className="notice info">Your login isn&apos;t linked to an employee record yet, so you can&apos;t time in. Ask the owner to link it on the Employees page.</div>
         )}

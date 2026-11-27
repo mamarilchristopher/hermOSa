@@ -2050,3 +2050,12 @@ a.hb-row:hover strong { text-decoration: underline; }
   .ads-src { grid-template-columns: minmax(0, 1fr); }
   .ads-table th, .ads-table td { padding: 6px 5px; }
 }
+
+/* update-0097: "Branch assigned today" on the time clock. PC: one row; phone: 2 x 2. */
+.clock-branch { display: grid; gap: 6px; justify-items: center; }
+.clock-branch .segmented.choice { justify-self: center; }
+@media (max-width: 560px) {
+  .clock-branch, .clock-branch .segmented.choice { width: 100%; }
+  .clock-branch .segmented.choice { display: grid; grid-template-columns: 1fr 1fr; border-radius: 16px; }
+  .clock-branch .segmented.choice button { white-space: nowrap; padding: 10px 8px; }
+}

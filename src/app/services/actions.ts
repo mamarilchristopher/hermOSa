@@ -123,6 +123,7 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     ...(p.data.session > 1 || noBa ? { p_session: p.data.session } : {}),
     ...(noBa ? { p_before_after: false } : {}),
   });
+  if (error?.message?.includes("WRONG_BRANCH_TODAY")) return { error: errorText("WRONG_BRANCH_TODAY") };
   if (error) return { error: error.code === "PGRST202" ? noBa ? "No before and after photo needs database update-0091. Ask the owner to run it, or add the photos for now." : (p.data.session > 1 ? "Session numbers need database update-0064. Ask the owner to run it, or save it as Session 1 for now." : "The owner needs to run update-0053 in Supabase first.") : "Could not save. Try again." };
   if (!data.ok && data.error === "POSSIBLE_DUPLICATE") {
     const at = new Date(data.existing.at).toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });

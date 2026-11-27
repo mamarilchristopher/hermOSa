@@ -36,7 +36,9 @@ async function punch(d: z.infer<typeof Punch>): Promise<PunchState> {
   if (!data?.ok) return { error: errorText(data?.error) };
   try { revalidatePath("/time"); revalidatePath("/me"); } catch (e) { console.error("revalidate", e); }
   const at = new Date(data.at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" });
-  return { ok: `${p.data.kind === "IN" ? "Timed in" : "Timed out"} at ${at}.`, at: Date.now(), far: data.distance_m ?? null };
+  // update-0097: at a clinic, the phone's location beats the branch picked (CHRIS Nov 27).
+  const where = data.moved && data.branch_name ? ` Your location shows ${data.branch_name}, so that's your branch today.` : "";
+  return { ok: `${p.data.kind === "IN" ? "Timed in" : "Timed out"} at ${at}.${where}`, at: Date.now(), far: data.distance_m ?? null };
 }
 
 const Loc = z.object({ branch: z.uuid(), lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) });
