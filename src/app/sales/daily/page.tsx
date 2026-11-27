@@ -8,11 +8,13 @@ import { addDays, addMonths, monthEnd, monthLabel, sortBranches } from "@/lib/in
 import { DecideForm } from "./Forms";
 import { MonthGrid, type GridCell } from "./MonthGrid";
 import { highlightKeys } from "@/lib/noticeLink";
+import { withApprovedSales } from "@/lib/approvedSales";
+import { SERVICE_LOG_FROM, type StatusDay } from "@/lib/homeGlance";
 
 type Status = {
   ok: boolean; error?: string; second_signoff: boolean;
   branches: { id: string; code: string; name: string; can_enter: boolean; self_publish: boolean; can_approve: boolean }[];
-  days: [string, string, number | null, string | null, boolean, number | null][];
+  days: StatusDay[];
   corrections: { id: string; branch_id: string; date: string; old_cents: number; new_cents: number; reason: string; requested_by: string; mine: boolean }[];
 };
 
@@ -40,8 +42,9 @@ export default async function DailySales({ searchParams }: { searchParams: Promi
   const dates: string[] = [];
   for (let d = start; d <= end; d = addDays(d, 1)) dates.push(d);
   const cells: Record<string, GridCell> = {};
-  for (const [b, d, rec, mark, staged, service] of st.days ?? []) {
-    cells[`${b}|${d}`] = [rec === null ? null : Number(rec), mark, staged, service === null ? null : Number(service), false];
+  // v0.99.3 (CHRIS Nov 28): from Nov 25 the service log figure is the APPROVED total, so late sign-offs fill the right day.
+  for (const [b, d, rec, mark, staged, service, pend] of st.ok ? await withApprovedSales(supabase, st.days ?? [], end) : []) {
+    cells[`${b}|${d}`] = [rec === null ? null : Number(rec), mark, staged, service === null ? null : Number(service), false, pend ? Number(pend) : null, d >= SERVICE_LOG_FROM];
   }
   for (const c of st.corrections ?? []) {
     const k = `${c.branch_id}|${c.date}`;
@@ -51,7 +54,7 @@ export default async function DailySales({ searchParams }: { searchParams: Promi
   const anyEnter = branches.some((b) => b.can_enter);
   const gaps = dates.filter((d) => d < today).reduce((n, d) => n + branches.filter((b) => {
     const c = cells[`${b.id}|${d}`];
-    return !c || (c[0] === null && !c[1] && !c[2]);
+    return !c || (c[0] === null && !c[1] && !c[2] && !(c[6] && (c[3] ?? 0) > 0));
   }).length, 0);
 
   return (
@@ -59,7 +62,7 @@ export default async function DailySales({ searchParams }: { searchParams: Promi
       <TopBar access={access} />
       <main className="wide">
         <h1>Daily sales</h1>
-        <p className="muted small">Type each branch&apos;s total for the day, like the Sales Source Tracker. Press Save (or Enter) to keep them. Amounts are declared sales (cash and online).</p>
+        <p className="muted small">From Nov 25 each day fills itself from the branch&apos;s approved Service log entries (sales signed off later still land on their service date). Type a total only to override a day. Amounts are declared sales (cash and online).</p>
 
         <div className="periods card">
           <div className="segmented">
@@ -75,7 +78,7 @@ export default async function DailySales({ searchParams }: { searchParams: Promi
           <>
             {gaps > 0 && <p className="small">{gaps} branch-day{gaps === 1 ? "" : "s"} this month with nothing entered (highlighted). Use the ▾ in a cell to mark it Zero sales or Closed.</p>}
             <MonthGrid dates={dates} branches={branches.map((b) => ({ id: b.id, name: b.name, can_enter: b.can_enter }))} cells={cells} today={today} changed={changed} highlight={highlightKeys(sp.hl, branches, ym)} />
-            <p className="small muted">▾ in an empty cell: Zero sales, Closed or Enter sales (typing 0 also means zero sales). • the total differs from that day&apos;s service log (hover to see it). ✎ a change is waiting for sign-off. ↺ changed before. Every save notifies the other management members, and changing a saved day needs a second person to confirm.
+            <p className="small muted">▾ in an empty cell: Zero sales, Closed or Enter sales (typing 0 also means zero sales). Gold amounts come from approved Service log entries; +₱ = logged but still waiting for sign-off. • a typed total differs from that day&apos;s approved service log (hover to see it). ✎ a change is waiting for sign-off. ↺ changed before. Every save notifies the other management members, and changing a saved day needs a second person to confirm.
               {st.second_signoff ? " Entries wait for a second person on Imports before they count." : " While second sign-off is off, entries by owners and the general manager count right away."}</p>
 
             {st.corrections.length > 0 && (

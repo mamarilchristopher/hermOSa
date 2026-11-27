@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { centsToPhp } from "@/lib/csv";
-import { monthLabel } from "@/lib/insights";
-import { dayLabel, type DayCell, type Glance } from "@/lib/homeGlance";
+import { addDays, monthLabel } from "@/lib/insights";
+import { dayLabel, type DayCell, type DayView, type Glance } from "@/lib/homeGlance";
 import type { DutyRow } from "@/components/OnDuty";
 import { OnDutyFaces, type DutyFace } from "@/components/OnDutyFaces";
 
@@ -24,6 +24,12 @@ function Cell({ c }: { c: DayCell }) {
   }
 }
 
+/** How a finished day went, as one short chip (CHRIS Nov 28: dashboards, not sentences). */
+function verdict(v: DayView): { text: string; tone: string } | null {
+  if (v.vsAvg === null) return null;
+  return v.vsAvg >= 0.1 ? { text: "Strong day", tone: "up" } : v.vsAvg <= -0.1 ? { text: "Slow day", tone: "down" } : { text: "Average day", tone: "neu" };
+}
+
 /** What needs doing, each with an Open button to the page where it's done. Red dot = urgent. */
 export function TodoCard({ todos }: { todos: Todo[] }) {
   return (
@@ -43,33 +49,49 @@ export function TodoCard({ todos }: { todos: Todo[] }) {
 }
 
 /** Home for owners, finance and managers: what needs doing, yesterday per branch, and how the month is going. */
-export function ManagerHome({ g, duty, faces = {}, branches, me, bookings, tardiness }: { me?: string; bookings?: ReactNode; tardiness?: ReactNode; g: Glance; duty: DutyRow[] | null; faces?: Record<string, DutyFace>; branches: { id: string; name: string; code?: string }[] }) {
+export function ManagerHome({ g, view, duty, faces = {}, branches, me, bookings, tardiness }: { me?: string; bookings?: ReactNode; tardiness?: ReactNode; g: Glance; view: DayView; duty: DutyRow[] | null; faces?: Record<string, DutyFace>; branches: { id: string; name: string; code?: string }[] }) {
   const ym = g.today.slice(0, 7);
   const hm = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" });
-  const entered = g.branches.filter((b) => b.todayCell.kind !== "empty").length;
   // CHRIS (Nov 26): "Not entered yet" boxes show only during clinic hours to 11:59 PM, never 12:00 AM to 9:59 AM.
   const open = hm >= "10:00";
-  const shown = g.branches.filter((b) => open || b.todayCell.kind !== "empty");
+  const shown = view.branches.filter((b) => !view.isToday || open || b.cell.kind !== "empty" || b.pending > 0);
   return (
     <>
-      {/* CHRIS (Nov 25): today's sales logged so far is the top view for management. */}
-      <div className="card">
-        <div className="card-head">
-          <h2>Today so far, {dayLabel(g.today)}</h2>
-          <Link className="small" href="/sales/daily">Daily Sales →</Link>
+      {/* CHRIS (Nov 25): today's sales logged so far is the top view for management.
+          CHRIS (Nov 28): ‹ › switch the day; a finished day says how it went. */}
+      <div className="card glance-today">
+        <div className="card-head glance-head">
+          <h2>{view.isToday ? "Today so far" : view.date === addDays(view.today, -1) ? "Yesterday" : "Sales"}, {dayLabel(view.date)}</h2>
+          <div className="glance-nav">
+            {view.prev ? <Link className="button secondary small" href={`/me?day=${view.prev}`} scroll={false} aria-label="Previous day">‹</Link>
+              : <span className="button secondary small is-off" aria-hidden>‹</span>}
+            {view.next ? <Link className="button secondary small" href={view.next === view.today ? "/me" : `/me?day=${view.next}`} scroll={false} aria-label="Next day">›</Link>
+              : <span className="button secondary small is-off" aria-hidden>›</span>}
+            {!view.isToday && <Link className="button secondary small" href="/me" scroll={false}>Today</Link>}
+            <Link className="small" href={`/sales/daily?month=${view.date.slice(0, 7)}`}>Daily Sales →</Link>
+          </div>
         </div>
-        <div className="glance-total"><strong>{php(g.todaySoFar)}</strong><span className="muted small">{open ? `${entered} of ${g.branches.length} branches with sales so far` : "Clinics open at 10 AM"}</span></div>
+        <div className="glance-total"><strong>{php(view.total)}</strong>
+          {view.isToday
+            ? <span className="muted small">{open ? `${view.withSales} of ${view.branches.length} branches with sales so far` : "Clinics open at 10 AM"}</span>
+            : <span className="glance-verdict">{verdict(view) && <span className={`chg ${verdict(view)!.tone}`}>{verdict(view)!.text}</span>}
+                <Delta v={view.vsAvg} title="vs this month's daily average" />{view.vsAvg !== null && <span className="muted small">vs month avg</span>}
+                {view.branches.filter((b) => b.cell.kind === "empty").length > 0 && <span className="chg warn">{view.branches.filter((b) => b.cell.kind === "empty").length} not entered</span>}</span>}
+        </div>
+        {view.pending > 0 && <p className="small muted glance-pending"><span className="chg warn">+{php(view.pending)} waiting sign-off</span></p>}
         {shown.length > 0 && <div className="glance-branches">
           {shown.map((b) => {
             const inner = (<>
               <span className="small muted">{b.name}</span>
-              <strong>{b.todayCell.kind === "empty" ? <span className="muted">Nothing logged yet</span> : <Cell c={b.todayCell} />}</strong>
+              <strong>{b.cell.kind === "empty" ? <span className="muted">{b.pending > 0 ? "Waiting for sign-off" : view.isToday ? "Nothing logged yet" : "Not entered"}</span> : <Cell c={b.cell} />}</strong>
+              {!view.isToday && <Delta v={b.vsAvg} title="vs this branch's daily average this month" />}
+              {b.pending > 0 && <span className="small muted">+{php(b.pending)} waiting sign-off</span>}
             </>);
             // CHRIS Nov 26: a branch with sales opens that branch's Service log for the day.
             const code = branches.find((x) => x.id === b.id)?.code;
-            return b.todayCell.kind !== "empty" && code
-              ? <Link key={b.id} href={`/services?date=${g.today}&branch=${code}`} className="glance-branch glance-link">{inner}</Link>
-              : <div key={b.id} className={`glance-branch ${b.todayCell.kind === "empty" ? "missing" : ""}`}>{inner}</div>;
+            return (b.cell.kind !== "empty" || b.pending > 0) && code
+              ? <Link key={b.id} href={`/services?date=${view.date}&branch=${code}`} className="glance-branch glance-link">{inner}</Link>
+              : <div key={b.id} className={`glance-branch ${b.cell.kind === "empty" && !b.pending ? "missing" : ""}`}>{inner}</div>;
           })}
         </div>}
       </div>

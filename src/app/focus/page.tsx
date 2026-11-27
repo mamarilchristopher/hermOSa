@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { manilaToday } from "@/lib/dates";
+import { withApprovedSales } from "@/lib/approvedSales";
 import { computeGlance, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
 import { addDays, addMonths, monthStart, sortBranches } from "@/lib/insights";
 import { companyDays, dayContext, monthEndOf, promoPicks, weekdayAverages } from "@/lib/business";
@@ -49,7 +50,7 @@ export default async function MyDay() {
 
   const s = (st ?? { ok: false }) as DailyStatus;
   const sb = sortBranches(s.branches ?? []);
-  const days = s.days ?? [];
+  const days = await withApprovedSales(supabase, s.days ?? [], today);
   const g = computeGlance(today, sb, days);
   const byDay = companyDays(days, sb.map((b) => b.id));
   const wk = weekdayAverages(byDay, today, 12);

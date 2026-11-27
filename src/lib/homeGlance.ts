@@ -3,8 +3,9 @@
 // Zero sales days count as ₱0; Closed and empty days are left out of averages (same rule as the Daily Sales grid).
 import { addDays, addMonths, daysBetween, monthEnd, monthStart, weekday } from "./insights";
 
-/** [branch, date, recorded cents, mark CLOSED|NO_SALES, staged, service log cents] as daily_sales_status returns it. */
-export type StatusDay = [string, string, number | null, string | null, boolean, number | null];
+/** [branch, date, recorded cents, mark CLOSED|NO_SALES, staged, service log cents, (optional) cents still waiting sign-off]
+ *  as daily_sales_status returns it; from Nov 25 withApprovedSales() makes index 5 the APPROVED Service log total. */
+export type StatusDay = [string, string, number | null, string | null, boolean, number | null, (number | null)?];
 export type GlanceBranch = { id: string; name: string };
 
 export type DayCell =
@@ -22,6 +23,8 @@ export type BranchGlance = {
   today: number | null;
   /** Today's cell as entered so far (sales, zero, closed, waiting or empty). */
   todayCell: DayCell;
+  /** Today's Service log entries still waiting for sign-off (not in the figures yet). */
+  todayPending: number;
   mtd: number;
   /** Same days last month (1st to the same day number). */
   lastSame: number;
@@ -57,8 +60,10 @@ export function cellOf(rec: StatusDay | undefined): DayCell {
   const [, date, cents, mark, staged, service] = rec;
   // CHRIS Nov 26 (v0.81.2): the Daily Sales tab is the correct figure, so Home shows exactly what it shows.
   // The service log only fills a day nobody has typed or marked yet (shown as "Sales Logged").
+  // CHRIS Nov 28 (v0.99.3): an untyped day takes its approved Service log total, even if it was marked Zero sales or Closed
+  // (sales declared late after an outage); a typed figure still wins.
   if (cents !== null) return { kind: "sales", cents: Number(cents) };
-  if (!mark && service !== null && service !== undefined && Number(service) > 0 && date >= SERVICE_LOG_FROM) return { kind: "sales", cents: Number(service), log: true };
+  if (service !== null && service !== undefined && Number(service) > 0 && date >= SERVICE_LOG_FROM) return { kind: "sales", cents: Number(service), log: true };
   if (mark === "NO_SALES") return { kind: "zero" };
   if (mark === "CLOSED") return { kind: "closed" };
   if (staged) return { kind: "waiting" };
@@ -97,7 +102,7 @@ export function computeGlance(today: string, branches: GlanceBranch[], days: Sta
     return {
       id: b.id, name: b.name, yesterday: y,
       vsAvg: yv !== null && before ? pct(yv, before) : null,
-      today: t.kind === "sales" ? t.cents : null, todayCell: t,
+      today: t.kind === "sales" ? t.cents : null, todayCell: t, todayPending: Number(at.get(`${b.id}|${today}`)?.[6] ?? 0),
       mtd, lastSame, change: pct(mtd, lastSame), avg: counted ? Math.round(mtd / counted) : null,
       emptyDays,
     };
@@ -128,3 +133,40 @@ export const dayLabel = (d: string) => `${WD[weekday(d)]}, ${MO[Number(d.slice(5
 
 /** Payroll cutoffs are twice a month: the 1st to the 15th, and the 16th to the month's end. Returns the current cutoff's last day. */
 export const cutoffEnd = (today: string) => (Number(today.slice(8, 10)) <= 15 ? `${today.slice(0, 7)}-15` : monthEnd(today));
+
+/** One day of the "Today so far" card (CHRIS Nov 28: ‹ › to look at any day, and say how a finished day went). */
+export type DayView = {
+  date: string; today: string; isToday: boolean;
+  total: number; withSales: number; pending: number;
+  /** A finished day vs the sum of each branch's daily average this month (days before it). */
+  vsAvg: number | null;
+  prev: string | null; next: string | null;
+  branches: { id: string; name: string; cell: DayCell; pending: number; vsAvg: number | null }[];
+};
+
+export function computeDay(view: string, today: string, branches: GlanceBranch[], days: StatusDay[]): DayView {
+  const first = glanceFetchStart(today);
+  const date = view >= first && view <= today ? view : today;
+  const at = new Map(days.map((d) => [`${d[0]}|${d[1]}`, d]));
+  const mStart = monthStart(date);
+  let avgTotal = 0, avgOk = true;
+  const list = branches.map((b) => {
+    let s = 0, n = 0;
+    for (let d = mStart; d < date; d = addDays(d, 1)) { const v = centsOf(cellOf(at.get(`${b.id}|${d}`))); if (v !== null) { s += v; n += 1; } }
+    const avg = n ? s / n : null;
+    if (avg === null) avgOk = false; else avgTotal += avg;
+    const cell = cellOf(at.get(`${b.id}|${date}`));
+    const v = centsOf(cell);
+    return { id: b.id, name: b.name, cell, pending: Number(at.get(`${b.id}|${date}`)?.[6] ?? 0),
+      vsAvg: date < today && v !== null && avg ? pct(v, avg) : null };
+  });
+  const total = list.reduce((s, b) => s + (centsOf(b.cell) ?? 0), 0);
+  return {
+    date, today, isToday: date === today, total,
+    withSales: list.filter((b) => b.cell.kind === "sales").length,
+    pending: list.reduce((s, b) => s + b.pending, 0),
+    vsAvg: date < today && avgOk && avgTotal > 0 ? pct(total, avgTotal) : null,
+    prev: date > first ? addDays(date, -1) : null, next: date < today ? addDays(date, 1) : null,
+    branches: list,
+  };
+}

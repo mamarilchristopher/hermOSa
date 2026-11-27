@@ -7,6 +7,7 @@ import { manilaToday } from "@/lib/dates";
 import { addDays } from "@/lib/insights";
 import { centsOfCell } from "@/lib/business";
 import type { StatusDay } from "@/lib/homeGlance";
+import { withApprovedSales } from "@/lib/approvedSales";
 import { adServiceOf, NOV_SHARES, SERVICE_LABEL, type AdService } from "@/lib/ads";
 import { advise, fmtDay, LEARN_PER_WEEK, perChat, roleOf, type Feed, type LineView } from "@/lib/adsAdvisor";
 import { links, newAdSets, PLAYBOOK, planMap, planPerDay, playLine, proposedPerDay, statusLabel, type PlayLine } from "@/lib/adsPlaybook";
@@ -42,7 +43,7 @@ export default async function AdAdvisor() {
 
   // Declared sales per branch per day, and each branch's Hiko/Gluta share from the last 4 weeks of the Service log.
   const sales = new Map<string, Map<string, number>>();
-  for (const r of ((st as { days?: StatusDay[] } | null)?.days ?? [])) {
+  for (const r of await withApprovedSales(supabase, (st as { days?: StatusDay[] } | null)?.days ?? [], today)) {
     const v = centsOfCell(r), code = codeOf[r[0]];
     if (v === null || !code) continue;
     const m = sales.get(code) ?? new Map<string, number>();

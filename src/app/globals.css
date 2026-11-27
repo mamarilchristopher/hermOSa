@@ -2258,3 +2258,18 @@ details.entry-more[open] { flex-basis: 100%; margin-left: 0; }
   .entry-paid { font-size: 1.05rem; }
 }
 .entry-actions .details-btn { margin: 0; }
+
+/* v0.99.3 (CHRIS Nov 28): Daily sales cells filled from approved Service log entries, and entries still waiting sign-off. */
+.cell-auto { color: var(--gold); font-weight: 700; }
+.cell-pend { display: block; font-size: 0.68rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
+td.cell-input .cell-pend { text-align: right; margin-top: 2px; }
+/* Home "Today so far" with ‹ › day arrows. */
+.glance-head { flex-wrap: wrap; gap: 8px 12px; }
+.glance-nav { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.glance-nav .button.small { min-width: 34px; }
+.glance-nav > a.small:not(.button) { margin-left: 6px; }
+.glance-total .delta { margin-right: 6px; }
+.glance-pending { margin: 6px 0 0; }
+.glance-branch .delta { align-self: flex-start; font-size: 0.72rem; }
+@media (max-width: 700px) { .glance-head h2 { flex-basis: 100%; } }
+.glance-verdict { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
