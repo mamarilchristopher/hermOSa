@@ -13,7 +13,8 @@ import { DeleteFolder } from "./DeleteFolder";
 
 type Photo = { id: string; kind: "WAIVER" | "BEFORE" | "AFTER"; path: string; thumb: string | null };
 type Visit = { id: string; date: string; client: string; service: string | null; branch_id: string; branch: string | null; lead: string | null;
-  assist: string | null; type: string; kind: string; share_ok: boolean; state: string; photos: Photo[] };
+  assist: string | null; type: string; kind: string; share_ok: boolean; state: string; photos: Photo[];
+  old?: (Photo & { why: "REPLACED" | "REMOVED"; at: string })[] }; // update-0093: replaced / removed photos
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const shiftMonth = (m: string, by: number) => {
@@ -40,7 +41,7 @@ export async function PhotoFolders({ social, searchParams }: { social: boolean; 
   const visits = q ? all.filter((v) => `${v.client} ${v.service ?? ""}`.toLowerCase().includes(q)) : all;
 
   // Signed links: the small preview for the grid, the untouched original to open, and a download copy.
-  const files = visits.flatMap((v) => v.photos.flatMap((p) => [p.path, p.thumb].filter((x): x is string => !!x)));
+  const files = visits.flatMap((v) => [...v.photos, ...(v.old ?? [])].flatMap((p) => [p.path, p.thumb].filter((x): x is string => !!x)));
   const originals = visits.flatMap((v) => v.photos.map((p) => p.path));
   const sign = async (paths: string[], download: boolean) => {
     const out: Record<string, string> = {};
@@ -145,6 +146,26 @@ export async function PhotoFolders({ social, searchParams }: { social: boolean; 
                             </ul>
                           </div>
                         ))}
+                        {/* update-0093 (CHRIS Nov 27): photos replaced or removed by an approved edit stay here, in "Old". */}
+                        {!social && (v.old?.length ?? 0) > 0 && (
+                          <details className="folder-group folder-old">
+                            <summary><span className="field-label">📁 Old ({v.old!.length})</span></summary>
+                            <ul className="plain-list folder-photos">
+                              {v.old!.map((p) => {
+                                const src = p.thumb ? view[p.thumb] : /\.hei[cf]$/i.test(p.path) ? undefined : view[p.path];
+                                const on = new Date(p.at).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" });
+                                return (
+                                  <li key={p.id}>
+                                    <a href={view[p.path]} target="_blank" rel="noreferrer" className="folder-photo">
+                                      {src ? <img src={src} alt={`Old ${KIND_TEXT[p.kind]} photo of ${v.client}`} loading="lazy" /> : <span className="folder-nothumb">Open photo</span>}
+                                    </a>
+                                    <span className="small"><span className="muted">{KIND_TEXT[p.kind]} · {p.why === "REPLACED" ? "replaced" : "removed"} {on}</span></span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </details>
+                        )}
                         {canShare && (
                           <div className="folder-foot">
                             <ShareToggle id={v.id} on={v.share_ok} />

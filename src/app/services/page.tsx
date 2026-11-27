@@ -14,6 +14,7 @@ import { StaffFilter } from "./StaffFilter";
 import { DeclaredCheck, diffText } from "./DeclaredCheck";
 import { CHECK_FROM, CHECK_TO, checkBranches, inCheckWindow, type StatusDay } from "@/lib/declaredCheck";
 import { AddPhotosLater } from "./PhotoSlots";
+import { EditPhotos } from "./EditPhotos";
 import { AttachProof } from "./PaymentProof";
 import type { PromoOptions } from "@/lib/promoTrack";
 
@@ -94,6 +95,8 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const list = all.filter((l) => l.service_date === date); // the chosen day, for the cards on top
   // update-0054 (CHRIS Nov 26): only staff timed in today add entries; owners and the GM always can.
   const { data: onDuty } = canLog && !topMgmt ? await supabase.rpc("can_log_services_now") : { data: true };
+  // update-0093: photo changes waiting for the owners / the GM (errors before the update = none).
+  const { data: photoWaiting } = topMgmt ? await supabase.rpc("photo_changes_pending") : { data: 0 };
   // update-0087: promo items and the clients with sessions left (errors before the update mean no promo tracking yet).
   const { data: promoData } = canLog ? await supabase.rpc("promo_log_options") : { data: null };
   const promoOpts = (promoData as (PromoOptions & { ok: boolean }) | null)?.ok ? (promoData as PromoOptions) : null;
@@ -173,6 +176,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
           <div className="card stat"><div className="label">Sign-off</div><div className="value">{pendingCount === 0 ? (list.length ? "All signed" : "–") : `${pendingCount} waiting`}</div><div className="note">{approver ? "Approve entries below, one by one or together" : "Your manager signs these off"}</div></div>
         </div>
 
+        {Number(photoWaiting) > 0 && (
+          <div className="notice"><strong>{Number(photoWaiting)} photo change{Number(photoWaiting) === 1 ? "" : "s"}</strong> waiting for your approval. <Link href="/services/photo-changes">Review photo changes</Link></div>
+        )}
         {checks.length > 0 && <DeclaredCheck checks={checks} names={checkNames} current={branch?.id ?? ""} open={inCheckWindow(date)} day={inCheckWindow(date) ? date : CHECK_TO} link={link} />}
 
         {canLog && (
@@ -258,7 +264,11 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                         {payCheck.get(l.id) && <span className={`pill ${payCheck.get(l.id) === "RECEIVED" ? "PUBLISHED" : payCheck.get(l.id) === "NOT_RECEIVED" ? "REVERSED" : "STAGED"}`} style={{ marginLeft: 6 }}>
                           {payCheck.get(l.id) === "RECEIVED" ? "Payment received" : payCheck.get(l.id) === "NOT_RECEIVED" ? "Not received" : "To confirm"}</span>}</div> : null}
                       {l.state !== "REJECTED" && <AttachProof log={l.id} branch={l.branch_id ?? branch?.id ?? ""} have={proofCount.get(l.id) ?? 0} />}
-                      {l.photo_folder && l.client_name && <div className="small"><Link href={`/clinic/archive?month=${l.service_date.slice(0, 7)}#${l.id}`}>Photos</Link>{l.share_ok ? <span className="muted"> · sharing OK</span> : null}</div>}</td>
+                      {l.photo_folder && l.client_name && <div className="small"><Link href={`/clinic/archive?month=${l.service_date.slice(0, 7)}#${l.id}`}>Photos</Link>{l.share_ok ? <span className="muted"> · sharing OK</span> : null}</div>}
+                      {/* update-0093 (CHRIS Nov 27): add, remove or replace photos on a past entry; saved after an owner's or the GM's approval. */}
+                      {l.state !== "REJECTED" && !l.photos_due && (topMgmt || l.created_by === access.user_id || staff.some((x) => mine.has(x))) && (
+                        <EditPhotos log={l.id} branch={l.branch_id ?? branch?.id ?? ""} approver={can(access, ["OWNER"], null) || can(access, ["MANAGER"], null)} />
+                      )}</td>
                     <td className="num">{centsToPhp(l.amount_paid_cents)}</td>
                     <td>{l.visit_kind && l.visit_kind !== "PAID"
                       ? <span className="tag">{VISIT_TEXT[l.visit_kind] ?? l.visit_kind}</span>

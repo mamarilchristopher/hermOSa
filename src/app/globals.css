@@ -1522,6 +1522,8 @@ button.chat-with:hover .avatar { box-shadow: 0 0 0 3px var(--gold-soft); }
 /* v0.80.1: add-on button stays a pill; All branches split and branch tags */
 .entry-grid .addons { grid-column: 1 / -1; align-content: start; }
 .addons > button { align-self: start; }
+.addon-row > .addon-note { grid-column: 1 / -1; } /* update-0093: reason for a different price */
+@media (max-width: 560px) { .more-services .addon-row { grid-template-columns: minmax(0, 1fr) auto; } .more-services .addon-row > label:first-child { grid-column: 1 / -1; } }
 .branch-split { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 0.85rem; }
 .tag.branch-tag { margin-right: 6px; margin-bottom: 4px; }
 /* update-0081: live Bookings board and Sales follow-ups */
@@ -1957,3 +1959,31 @@ a.hb-row:hover strong { text-decoration: underline; }
 .nte-recent-row > .uid { font-weight: 700; }
 @media (max-width: 640px) { .nte-recent-row { grid-template-columns: 1fr auto; } .nte-recent-row > .uid { grid-column: 1 / -1; justify-self: start; } }
 .nte-list li.focused { outline: 2px solid var(--gold); outline-offset: 4px; border-radius: 10px; background: rgba(201, 162, 74, 0.12); }
+
+/* update-0093: edit photos on a past entry; photo change approvals; "Old" photos in the client folder */
+.edit-photos { display: grid; gap: 10px; margin-top: 8px; justify-items: stretch; min-width: 0; }
+.edit-photos > * { min-width: 0; }
+.edit-photos .field input { width: 100%; box-sizing: border-box; }
+.edit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; margin: 0; max-width: 680px; width: 100%; }
+.edit-grid > li { padding: 0; border: 0; }
+.edit-grid li { display: grid; gap: 6px; align-content: start; }
+.edit-grid li.gone .edit-thumb { opacity: .35; outline: 2px solid var(--bad); }
+.edit-grid li.swapped .edit-thumb { outline: 2px solid var(--good); }
+.edit-thumb { padding: 0; border: 1px solid var(--line); background: var(--pearl); border-radius: 12px; overflow: hidden; aspect-ratio: 3 / 4; width: 100%; cursor: zoom-in; display: flex; align-items: center; justify-content: center; }
+.edit-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.edit-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.edit-actions .button, .edit-actions button { padding: 4px 10px; }
+.photo-edit-wait { display: grid; gap: 8px; justify-items: start; }
+.photo-change { display: grid; gap: 10px; }
+.photo-change-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.change-list { display: grid; gap: 12px; margin: 0; }
+.change-list > li { display: grid; gap: 4px; padding: 0; border: 0; }
+.change-pair { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; width: 100%; }
+.change-pair figure { margin: 0; display: grid; gap: 4px; width: 150px; max-width: calc(50% - 6px); align-content: start; }
+.change-pic { display: block; aspect-ratio: 3 / 4; border-radius: 12px; overflow: hidden; }
+.change-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-decision { display: grid; gap: 8px; }
+.photo-decision input { max-width: 420px; width: 100%; }
+.folder-old > summary { cursor: pointer; list-style: none; }
+.folder-old > summary::-webkit-details-marker { display: none; }
+.folder-old .folder-photo { opacity: .8; }

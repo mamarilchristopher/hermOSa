@@ -63,6 +63,11 @@ export async function loadTodos(supabase: SupabaseClient, access: Access, today:
   if (swapAsks) todos.unshift({ text: `${swapAsks === 1 ? "A coworker asked" : `${swapAsks} coworkers asked`} to swap schedules with you. Accept or decline`, href: "/schedule", urgent: true });
   if (!leaveErr && leaveWaiting) todos.unshift({ text: `${plural(leaveWaiting, "leave request is", "leave requests are")} waiting for your approval`, href: "/leave" });
   for (const l of (myLeave ?? []) as { kind: string; start_date: string }[]) todos.push({ text: `Your ${l.kind} from ${l.start_date} was not approved. See the note`, href: "/leave" });
+  // update-0093 (CHRIS Nov 27): Service log photo changes wait for the owners / the GM.
+  if (ownerLevel) {
+    const { data: photoWaiting, error: pcErr } = await supabase.rpc("photo_changes_pending");
+    if (!pcErr && Number(photoWaiting) > 0) todos.unshift({ text: `${plural(Number(photoWaiting), "Service log photo change is", "Service log photo changes are")} waiting for your approval`, href: "/services/photo-changes", urgent: true });
+  }
   // Bookings (update-0040): CSRs confirm tomorrow's visits; branch staff see today's online bookings.
   const csr = access.grants.some((g) => g.role === "CSR");
   const branchStaff = access.grants.some((g) => ["MANAGER", "CLINICIAN", "CASHIER"].includes(g.role) && g.branch_id !== null);

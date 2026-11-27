@@ -97,6 +97,8 @@ export function BranchEntryForm({ branches, start, employees, ...rest }: Omit<Pa
 /** Add-ons (CHRIS Nov 26, update-0080): extras sold with a service, e.g. L-Carnitine with a Lux Queen drip. */
 export type AddonOpt = { id: string; name: string; price: number | null };
 type AddonRow = { service: string; amount: string };
+/** update-0093 (CHRIS Nov 27): another service the same client had in this visit, with the usual commission rules. */
+type MoreRow = { service: string; amount: string; note: string };
 
 /** update-0091 (CHRIS Nov 27): the booking this sale is logged from (tapped on Bookings), so the visit isn't recorded twice. */
 export type FromBooking = { id: string; fbName: string; waiverName: string | null; serviceId: string | null };
@@ -124,6 +126,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const [session, setSession] = useState("1");
   const [med, setMed] = useState("");
   const [extras, setExtras] = useState<AddonRow[]>([]);
+  const [more, setMore] = useState<MoreRow[]>([]);
   const [afterDp, setAfterDp] = useState(false); // update-0085: balance paid after a down payment
   // update-0087: the client's promo for a promo item ("" = not picked, "new" = starts the promo with this visit).
   const [promoClient, setPromoClient] = useState("");
@@ -142,7 +145,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       setAmount("");
       setKind("PAID");
       setWho("");
-      setService(""); setPartner(""); setClient(booking ? (sameName ? booking.fbName : client) : ""); setPriceNote(""); setShare(false); setNote(""); setSession("1"); setMed(""); setExtras([]); setAfterDp(false); setPromoClient(""); setContact(""); setPayPlan("1"); setHasBa(true);
+      setService(""); setPartner(""); setClient(booking ? (sameName ? booking.fbName : client) : ""); setPriceNote(""); setShare(false); setNote(""); setSession("1"); setMed(""); setExtras([]); setMore([]); setAfterDp(false); setPromoClient(""); setContact(""); setPayPlan("1"); setHasBa(true);
       photos.reset();
       proofs.reset();
     }
@@ -203,6 +206,15 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
     const c = previewCommission(toCents(x.amount), effType, null, null);
     return { lead: acc.lead + (leadEmp?.eligible === false ? 0 : c.lead), assist: acc.assist + (assistEmp?.eligible === false ? 0 : c.assist), solo: acc.solo + (person?.eligible === false ? 0 : c.solo) };
   }, { lead: 0, assist: 0, solo: 0 });
+  // update-0093: more services of the same visit, each with its own set commission or 5% (a discount earns 5% of what was paid).
+  const moreChoices = services.filter((s) => (s.price ?? 0) > 0 && !s.sessions?.length);
+  const moreRows = paid ? more.filter((x) => x.service) : [];
+  for (const x of moreRows) {
+    const s = moreChoices.find((o) => o.id === x.service);
+    const c = previewCommission(toCents(x.amount), effType, s?.commission ?? null, s?.price ?? null);
+    extra.lead += leadEmp?.eligible === false ? 0 : c.lead; extra.assist += assistEmp?.eligible === false ? 0 : c.assist; extra.solo += person?.eligible === false ? 0 : c.solo;
+  }
+  const moreJson = JSON.stringify(moreRows.map((x) => ({ service: x.service, amount: x.amount.trim(), note: x.note.trim() })));
   const mainTotal = shown.lead + shown.assist + shown.solo;
   const extraTotal = extra.lead + extra.assist + extra.solo;
   const p = { ...raw, lead: raw.lead + extra.lead, assist: raw.assist + extra.assist, total: mainTotal + extraTotal };
@@ -242,6 +254,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       <input type="hidden" name="photos" value={photos.json} />
       <input type="hidden" name="proofs" value={proofs.json} />
       <input type="hidden" name="addons" value={addonsJson} />
+      <input type="hidden" name="more" value={moreJson} />
       {needsPhotos && !hasBa && <input type="hidden" name="no_ba" value="1" />}
       <div className="field">
         <span className="field-label">Did the client pay?</span>
@@ -433,6 +446,39 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
               </div>
             ))}
             <button type="button" className="secondary small" onClick={() => setExtras([...extras, { service: addons.length === 1 ? addons[0].id : "", amount: addons.length === 1 && addons[0].price ? String(addons[0].price / 100) : "" }])}>+ Add-on{extras.length ? " (another)" : ""}</button>
+          </div>
+        )}
+        {paid && (
+          <div className="span2 addons more-services">
+            {more.map((x, i) => {
+              const s = moreChoices.find((o) => o.id === x.service);
+              const differs = !!s && x.amount.trim() !== "" && toCents(x.amount) !== (s.price ?? 0);
+              const set = (p: Partial<MoreRow>) => setMore(more.map((y, j) => (j === i ? { ...y, ...p } : y)));
+              return (
+                <div className="addon-row" key={i}>
+                  <label><span>Another service</span>
+                    <select value={x.service} aria-label="Another service" onChange={(e) => {
+                      const o = moreChoices.find((m) => m.id === e.target.value);
+                      set({ service: e.target.value, amount: o?.price ? String(o.price / 100) : "", note: "" });
+                    }}>
+                      <option value="" disabled>Choose a service…</option>
+                      {moreChoices.map((o) => <option key={o.id} value={o.id}>{o.name} {centsToPhp(o.price ?? 0)}</option>)}
+                    </select>
+                  </label>
+                  <label>Amount paid (₱)
+                    <input inputMode="decimal" placeholder="e.g. 1500" value={x.amount} required={!!x.service} onChange={(e) => set({ amount: e.target.value })} />
+                  </label>
+                  <button type="button" className="secondary small addon-remove" aria-label="Remove service" onClick={() => setMore(more.filter((_, j) => j !== i))}>✕</button>
+                  {differs && (
+                    <label className="addon-note"><span>Reason for the different price <span className="muted">(list price {centsToPhp(s!.price ?? 0)})</span></span>
+                      <input required minLength={3} maxLength={300} placeholder="e.g. 10% promo, loyalty discount" value={x.note} onChange={(e) => set({ note: e.target.value })} />
+                    </label>
+                  )}
+                </div>
+              );
+            })}
+            <button type="button" className="secondary small" onClick={() => setMore([...more, { service: "", amount: "", note: "" }])}>+ Another service{more.length ? " (one more)" : ""}</button>
+            {more.length === 0 && <span className="small muted">Same client, more than one service? Add each one here: one entry, same photos, each with its own commission.</span>}
           </div>
         )}
         {dpPossible && (

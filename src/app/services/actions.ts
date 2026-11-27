@@ -30,6 +30,7 @@ const Log = z.object({
   session: z.coerce.number().int().min(1).max(15).default(1),
   meds: z.union([z.uuid(), z.string().regex(/^free:[0-9a-f-]{36}$/), z.literal("")]).optional(),
   addons: z.string().max(2000).optional(),
+  more: z.string().max(4000).optional(),
   promo_client: z.union([z.uuid(), z.literal("new"), z.literal("")]).optional(),
   promo_contact: z.string().trim().max(40).optional(),
   promo_payments: z.coerce.number().int().min(1).max(6).optional(),
@@ -39,7 +40,7 @@ const Log = z.object({
 const Photos = z.array(z.object({ kind: z.enum(["WAIVER", "BEFORE", "AFTER"]), path: z.string().max(300), thumb: z.string().max(300).nullable() })).max(20);
 
 export async function logService(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session", "meds", "proofs", "addons", "promo_client", "promo_contact", "promo_payments", "no_ba", "booking"].map((k) => [k, fd.get(k) ?? undefined])));
+  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session", "meds", "proofs", "addons", "more", "promo_client", "promo_contact", "promo_payments", "no_ba", "booking"].map((k) => [k, fd.get(k) ?? undefined])));
   if (!p.success) return { error: "Fill in the client's name, the service, the amount paid and who did it." };
   let photos;
   try { photos = Photos.parse(JSON.parse(p.data.photos || "[]")); } catch { return { error: "The photos didn't attach. Remove them and add them again." }; }
@@ -71,6 +72,15 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
         .map((a) => ({ service: a.service, cents: phpToCents(a.amount.replace(/[,₱\s]/g, "")) }));
     } catch { return { error: "Enter what the client paid for each add-on, e.g. 500." }; }
     if (addons.some((a) => !(a.cents > 0))) return { error: "Enter what the client paid for each add-on, e.g. 500." };
+  }
+  // update-0093 (CHRIS Nov 27): more services of the same visit, each its own line with the usual commission rules.
+  let more: { service: string; cents: number; note: string }[] = [];
+  if (paid && p.data.more) {
+    try {
+      more = z.array(z.object({ service: z.uuid(), amount: z.string().max(20), note: z.string().max(300) })).max(8).parse(JSON.parse(p.data.more))
+        .map((a) => ({ service: a.service, cents: phpToCents(a.amount.replace(/[,₱\s]/g, "")), note: a.note.trim() }));
+    } catch { return { error: "Enter what the client paid for each extra service, e.g. 1500." }; }
+    if (more.some((a) => !(a.cents > 0))) return { error: "Enter what the client paid for each extra service, e.g. 1500." };
   }
   // update-0087: a promo item needs the client's promo (or "new" to start it); price 0 / no price = bundles, promo items.
   const mayBePromo = !!svcRow && !Number(svcRow.price_cents ?? 0);
@@ -132,6 +142,15 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
       : ` An add-on didn't save${ad?.error ? ` (${errorText(ad.error)})` : ""}: log it again as its own entry.`;
   }
   if (addonsOk) medsNote += addonsOk === 1 ? " Add-on added." : ` ${addonsOk} add-ons added.`;
+  let moreOk = 0;
+  for (const a of more) {
+    const { data: ex, error: exErr } = await supabase.rpc("log_extra_service", { p_log: data.id, p_service: a.service, p_amount_cents: a.cents, p_price_note: a.note || null });
+    if (!exErr && ex?.ok) { moreOk++; continue; }
+    medsNote += exErr?.code === "PGRST202" ? " More services need database update-0093: ask the owner to run it, then log the other service as its own entry."
+      : ex?.error === "PRICE_NOTE_REQUIRED" ? " A service with a different price didn't save: log it again with the reason."
+      : ` A service didn't save${ex?.error ? ` (${errorText(ex.error)})` : ""}: log it again as its own entry.`;
+  }
+  if (moreOk) medsNote += moreOk === 1 ? " 1 more service added." : ` ${moreOk} more services added.`;
   // update-0088 (CHRIS Nov 27): tag the backjob (what needed fixing, first treatment and who did it) for tracking.
   if (p.data.kind === "BACKJOB") {
     const staff = String(fd.get("bj_staff") ?? "");
