@@ -1,6 +1,6 @@
 {
  "_note": "Synced from the ads thread playbook (adset-playbook.json + radar.json). Budgets pre-VAT. Live numbers come from the daily feed.",
- "updated": "2026-11-27",
+ "updated": "2026-11-28",
  "master_plan": "https://claude.ai/artifact/Sf3SGgnZBBm9rQuqtJJH9r",
  "catalog_sheet": "https://docs.google.com/spreadsheets/d/1uJy4S4bM96H0zmS3EzWlAgCfHz8-yvMHi0doaQEitlM/edit",
  "month_total_pre_vat": 320000,
@@ -63,7 +63,10 @@
   "No before/after, no regular-price text, no lightening claims, no needle close-ups in the first 3 seconds.",
   "Every create, edit or budget increase needs CHRIS's OK on a preview.",
   "When a branch's sales hold after a budget cut, move the freed money into a NEW offer or audience test (another tier, service or branch gap), not back into the same ad set.",
-  "Refresh by performance, not age (see refresh_rule): keep winners as long as their cost per chat and bookings hold; add new versions when an ad starts tiring; pause only when fatigued for 2 weeks."
+  "Refresh by performance, not age (see refresh_rule): keep winners as long as their cost per chat and bookings hold; add new versions when an ad starts tiring; pause only when fatigued for 2 weeks.",
+  "Geo: a branch's radius must not reach another Hermosa clinic (QC Main to Fairview is 4.5 mi, Marikina to QC Main is 3.9 mi). Use pins and radii that stop short, or exclude the other branch's area.",
+  "Age: every ad set starts at 21+, never 18.",
+  "One ad runs in one ad set only. Duplicates ('- Copy') compete with each other in the same auction."
  ],
  "lines": [
   {
@@ -818,7 +821,7 @@
   }
  ],
  "proposed_note": "Lines with status 'proposed' (Ultra Max ₱1,000, Botox family ₱600, NovoForm ₱300 per day) wait on CHRIS's OK. They take the ALL_TEST ₱495/day. Total ₱11,940/day, about ₱363k a month pre-VAT, still under the 2026 average of ~₱367k pre-VAT (₱411k*).",
- "version": "1.3",
+ "version": "1.4",
  "radar": {
   "note": "Outside sources are mostly US agency or vendor blogs. Treat their numbers as directional. Our own ad log and the Hermosa OS sales numbers win.",
   "untapped": [
