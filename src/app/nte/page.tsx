@@ -46,7 +46,10 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
     <>
       <TopBar access={access} />
       <main>
-        <h1>Late NTEs</h1>
+        <div className="title-row tdy-title">
+          <h1>Late NTEs</h1>
+          {manager && <Link className="button small" href={`/nte/dashboard${ym === thisMonth ? "" : `?month=${ym}`}`}>Tardiness dashboard →</Link>}
+        </div>
         <p className="muted small">A Late NTE (Notice to Explain) is made automatically when someone times in more than {list.grace} minutes after their shift starts.
           {manager ? ` An IR is suggested at 3 Late NTEs in a month, or sooner once someone is more than ${list.ir_minutes ?? 60} minutes late in total. Open a person to see their NTEs and issue an IR.` : " Write your explanation for each one."}</p>
 
@@ -57,7 +60,7 @@ export default async function NtePage({ searchParams }: { searchParams: Promise<
 
         {manager && (
           <div className="card">
-            <h2>Tardiness tracker, {monthLabel(ym)}</h2>
+            <div className="card-head"><h2>Tardiness tracker, {monthLabel(ym)}</h2><Link className="small" href={`/nte/dashboard${ym === thisMonth ? "" : `?month=${ym}`}`}>Dashboard →</Link></div>
             {rows.length === 0 ? <p className="muted" style={{ margin: 0 }}>No Late NTEs this month.</p> : (
               <ul className="plain-list">
                 {rows.map((r) => (

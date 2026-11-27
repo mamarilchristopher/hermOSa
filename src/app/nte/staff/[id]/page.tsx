@@ -54,7 +54,7 @@ export default async function StaffNtePage({ params, searchParams }: { params: P
     <>
       <TopBar access={access} />
       <main>
-        <p><Link href={`/nte?month=${ym}`} className="small">← Tardiness tracker</Link></p>
+        <p className="small tdy-back"><Link href={`/nte/dashboard?month=${ym}`}>← Tardiness dashboard</Link><Link href={`/nte?month=${ym}`}>All Late NTEs</Link></p>
         <h1>{emp.full_name} <Uid v={emp.uid} /></h1>
         <p className="muted small">{emp.position ?? "Staff"} · Late NTEs, {monthLabel(ym)}</p>
 
