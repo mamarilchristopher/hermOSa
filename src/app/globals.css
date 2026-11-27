@@ -2688,3 +2688,13 @@ details.exp-edit[open] { flex-basis: 100%; }
 .ads-now-bud { white-space: nowrap; }
 @media (max-width: 1100px) { .ads-now-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .ads-now-grid { grid-template-columns: 1fr; } }
+
+/* v0.100.5 Ad advisor: each audience fix weighed with the ad set's own numbers (fix / test a copy / keep) */
+.adv-move.info { border-top-color: var(--gold-line); }
+.adv-trade { margin: 8px 0 4px; padding: 8px 10px; border-radius: 10px; background: var(--pearl); font-size: 0.86rem; line-height: 1.4; }
+.adv-trade > b { display: inline; }
+.adv-trade ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px; }
+.adv-trade li { display: grid; grid-template-columns: 14px 1fr; gap: 4px; font-weight: 400; }
+.adv-trade li > span { font-weight: 800; }
+.adv-trade li.gain > span { color: var(--good); }
+.adv-trade li.cost > span { color: var(--bad); }

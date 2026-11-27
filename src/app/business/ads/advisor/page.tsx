@@ -17,8 +17,9 @@ import PH from "@/data/phMarket.json";
 import { ApproveChip } from "./ApproveChip";
 import { OpenOnHash } from "./OpenOnHash";
 import { TaskChip } from "./TaskChip";
-import { budgetSteps, locationPick, pauseSteps, remakeSteps, settingsPlan, versionSteps, type LocationPick, type SetRow } from "@/lib/adsSteps";
+import { budgetSteps, locationPick, pauseSteps, remakeSteps, settingsPlan, versionSteps, type LocationPick, type SetRow, type Trade } from "@/lib/adsSteps";
 import { AddressBox } from "./AddressBox";
+import { AUDIENCE_DATA } from "@/lib/adsWeigh";
 import { adsManagerUrl, audit, CHECKS, type Finding, type Target } from "@/lib/adsAudit";
 import ACC from "@/data/adAccounts.json";
 import { areaFor, areaStatus, openQuestions, sortAreas, TIER } from "@/lib/adsResearch";
@@ -146,10 +147,25 @@ export default async function AdAdvisor() {
       // Setting fixes: the whole target set-up from the playbook, and the clicks to get there (v0.99.8, delegable).
       const hit = SETTINGS.has(f.check) && f.target && f.target.kind === "adset" ? setOf.get(f.target.id) : undefined;
       const sp = hit ? settingsPlan({
-        name: hit.s.name, branch: hit.l.branch, service: hit.l.service, t: hit.s.targeting, plan: audiencePlan(hit.l.branch, hit.l.service), button: action,
+        id: hit.s.id, name: hit.s.name, branch: hit.l.branch, service: hit.l.service, t: hit.s.targeting, today,
+        volume: { msgs7: hit.s.t7.msgs, spend7: hit.s.t7.spend, budget: hit.s.budget ?? null, budgetSource: hit.s.budgetSource }, plan: audiencePlan(hit.l.branch, hit.l.service), button: action,
         overlapFix: g.find((x) => x.check === "overlap")?.radius ?? null, locationFlag: g.some((x) => x.check === "pin" || x.check === "area"),
       }) : null;
-      const extra = sp ? { rows: sp.rows, steps: sp.steps, location: sp.location, branch: hit!.l.branch } : { steps: f.steps };
+      const extra = sp ? { rows: sp.rows, steps: sp.steps, location: sp.location, branch: hit!.l.branch, how: sp.how, trade: sp.trade,
+        weighed: sp.weighing ? `Meta numbers ${fmtDay(AUDIENCE_DATA.from)}–${fmtDay(AUDIENCE_DATA.to)}` : undefined } : { steps: f.steps };
+      // When the numbers say keep the audience, the audience titles give way (the location one, if any, stays).
+      if (sp?.method === "hold") {
+        const rest = g.filter((x) => x.check !== "age" && x.check !== "gender").map((x) => x.title);
+        const title = [...rest, "Keep its audience for now"].join(" · ");
+        return { id: g.map((x) => x.id).join("+"), tone: rest.length ? "warn" : "info", tag: f.tag, kind: "Rule vs data", title, short: f.name ? `"${f.name}"` : f.short,
+          why: g.map((x) => x.why).join(" "), approve: g.map((x) => x.approve).join("; "), action, go: go(f.target), ...extra };
+      }
+      // A close call: the audience fix is tested on a copy first.
+      if (sp?.method === "copy") {
+        const title = g.map((x) => (x.check === "gender" || x.check === "age" ? `Test: ${x.title.charAt(0).toLowerCase()}${x.title.slice(1)}` : x.title)).join(" · ");
+        return { id: g.map((x) => x.id).join("+"), tone: "warn", tag: f.tag, kind: "Test first", title, short: f.name ? `"${f.name}"` : f.short,
+          why: g.map((x) => x.why).join(" "), approve: g.map((x) => x.approve).join("; "), action, go: go(f.target), ...extra };
+      }
       if (g.length === 1) return { id: f.id, tone: f.sev, tag: f.tag, kind: KIND[f.check], title: f.title, short: f.short, why: f.why, approve: f.approve, action, go: go(f.target), ...extra };
       const name = f.name;
       return {
@@ -286,6 +302,13 @@ export default async function AdAdvisor() {
                       {m.rows.some((r) => !r.change) && <li className="ok"><b>Already right</b><span>{m.rows.filter((r) => !r.change).map((r) => r.field).join(", ")}</span></li>}
                     </ul>
                   )}
+                  {m.how && (
+                    <div className="adv-trade">
+                      <b>{m.how}</b>
+                      {m.weighed && <span className="small muted"> · {m.weighed}</span>}
+                      {m.trade && m.trade.length > 0 && <ul>{m.trade.map((x) => <li key={x.text} className={x.tone}><span aria-hidden>{x.tone === "gain" ? "+" : "−"}</span>{x.text}</li>)}</ul>}
+                    </div>
+                  )}
                   {m.location && <Addresses pick={m.location} branch={m.branch ?? ""} />}
                   <div className="adv-move-foot">
                     {m.go && <a className="adv-go" href={m.go.href} {...(m.go.external ? { target: "_blank", rel: "noreferrer" } : {})}>{m.action}{m.go.external ? " ↗" : " →"}</a>}
@@ -306,6 +329,7 @@ export default async function AdAdvisor() {
               {CHECKS.map((c) => <li key={c.key} className={failed.has(c.key) ? "flag" : "ok"}><span>{failed.has(c.key) ? "!" : "✓"}</span>{c.label}{failed.has(c.key) ? <b> · {failed.get(c.key)} flagged</b> : null}</li>)}
               <li className="ok"><span>✓</span>Each running ad judged against its own best 14 days (winner, tiring, fatigued, loser)</li>
               <li className="ok"><span>✓</span>Budget moves follow ROAS from declared sales, at most once a week</li>
+              <li className="ok"><span>✓</span>Each audience fix is weighed with the ad set&apos;s own gender and age numbers (value per peso, Meta re-learning): fix, test a copy, or keep</li>
             </ul>
             {infos.length > 0 && (
               <ul className="adv-notes">
@@ -573,13 +597,14 @@ function groupFixes(fs: Finding[]) {
   return out;
 }
 
-type Move = { id: string; tone: string; tag: string; kind: string; title: string; short: string; why: string; approve: string; delta?: number | null; action: string; go: { href: string; external: boolean } | null; rows?: SetRow[]; steps?: string[]; location?: LocationPick | null; branch?: string };
+type Move = { id: string; tone: string; tag: string; kind: string; title: string; short: string; why: string; approve: string; delta?: number | null; action: string; go: { href: string; external: boolean } | null; rows?: SetRow[]; steps?: string[]; location?: LocationPick | null; branch?: string; how?: string; trade?: Trade[]; weighed?: string };
 
 /** The task as text to send to whoever does it: link, values to set, numbered steps. */
 function taskText(m: Move) {
   const href = m.go ? (m.go.href.startsWith("/") ? `https://hermosaos.com${m.go.href}` : m.go.href) : null;
   const set = (m.rows ?? []).filter((r) => r.change).map((r) => `- ${r.field}: ${r.set}`);
-  return [`Hermosa ads task · ${m.tag} · ${m.kind}`, m.title, m.short, href ? `Open: ${href}` : null, set.length ? `Set it to:\n${set.join("\n")}` : null,
+  const weighed = m.how ? [m.how, ...(m.trade ?? []).map((x) => `${x.tone === "gain" ? "+" : "-"} ${x.text}`)].join("\n") : null;
+  return [`Hermosa ads task · ${m.tag} · ${m.kind}`, m.title, m.short, weighed, href ? `Open: ${href}` : null, set.length ? `Set it to:\n${set.join("\n")}` : null,
     m.steps?.length ? `Steps:\n${m.steps.map((x, i) => `${i + 1}. ${x}`).join("\n")}` : null,
     m.location ? [`Location (paste in Search locations, then radius ${m.location.radius} mi):\n${m.location.address}`,
       ...m.location.also.map((x) => `Also add (paste in Search locations, then radius ${x.radius} mi):\n${x.address}`),

@@ -3,8 +3,9 @@
  * with basic understanding of ads management"). Every move gets the exact values to type and numbered click-by-click
  * steps in Ads Manager, so a staff member can do it from the card or from the copied text.
  */
-import { CLINIC_PIN, type Targeting } from "./adsAdvisor";
+import { addDay, CLINIC_PIN, fmtDay, type Targeting } from "./adsAdvisor";
 import { PLAYBOOK, type Playbook } from "./adsPlaybook";
+import { weigh, type Weighing } from "./adsWeigh";
 
 const SHORT: Record<string, string> = { QC_MAIN: "QC Main", FAIRVIEW: "Fairview", STA_MARIA: "Sta. Maria", MARIKINA: "Marikina" };
 /** Public clinic addresses (CHRIS, Nov 23 2026), for dropping the map pin. */
@@ -115,7 +116,14 @@ export const locationText = (branch: string, loc: LocationPick) =>
 
 export type AudiencePlan = { ageMin: number; ageMax: number; genders: string; interests: string[] };
 export type SetRow = { field: string; now: string; set: string; change: boolean };
-export type SettingsPlan = { rows: SetRow[]; steps: string[]; location: LocationPick | null };
+/** A trade-off of the fix: what it costs (Meta re-learning, narrower reach) or gains, from the ad set's own numbers. */
+export type Trade = { tone: "gain" | "cost"; text: string };
+/** "edit" = change the ad set in place; "copy" = close call, test a fixed copy first; "hold" = the data says keep the
+ *  current audience, so the rule gives way for now. */
+export type SettingsPlan = { rows: SetRow[]; steps: string[]; location: LocationPick | null; method: "copy" | "edit" | "hold"; how: string; trade: Trade[]; weighing: Weighing | null };
+/** Last week's volume of the ad set. Spend and budget pre-VAT pesos. */
+export type Volume = { msgs7: number; spend7: number; budget: number | null; budgetSource?: "adset" | "campaign" | "none" };
+const pesoT = (p: number) => `₱${Math.round(p).toLocaleString("en-US")}`;
 
 const OPEN = (what: string, name: string, button: string) =>
   `Tap "${button} ↗" on this card. Ads Manager opens on ${what} "${name}" (log in with the Hermosa account if asked). Check the name at the top matches.`;
@@ -124,6 +132,8 @@ const DONE = "Back in Hermosa OS, tap \"Done\" on this card so the owner knows i
 /** What the ad set should look like (location from the clinic, audience from the playbook line) and how to get it there. */
 export function settingsPlan(o: {
   name: string; branch: string; service?: string | null; t: Targeting | null; plan: AudiencePlan | null; overlapFix?: number | null; locationFlag?: boolean; button?: string;
+  /** The ad set's id (for its gender/age numbers) and last week's chats and spend. */
+  id?: string; volume?: Volume | null; today?: string;
 }): SettingsPlan {
   const { t, branch } = o;
   const p: AudiencePlan = o.plan ?? { ageMin: 21, ageMax: 54, genders: "women", interests: [] };
@@ -145,25 +155,78 @@ export function settingsPlan(o: {
     { field: "Gender", now: nowGender, set: "Women", change: genderChange },
   ];
 
-  const steps: string[] = [OPEN("ad set", o.name, o.button ?? "Fix settings")];
-  steps.push("Scroll down to the Audience section.");
-  if (!t || t.advantage) steps.push(`Click "Switch to original audience options" (under Advantage+ audience) and confirm. This makes age and gender hard limits.`);
-  if (locChange) {
-    steps.push(`In Locations, remove every location now listed${t && nowLoc !== "Not set" ? ` (${nowLoc})` : ""}: click the x next to each.`);
-    steps.push(`Click in "Search locations", paste the clinic address (Copy on this card): "${loc.address}". Pick the result that matches the clinic.`);
-    steps.push(`Click the small arrow next to the added location and set the radius to ${loc.radius} mi.${loc.also.length ? "" : " That should be the only included location."}`);
-    for (const x of loc.also)
-      steps.push(`Also add the ${SHORT[x.branch]} clinic: paste "${x.address}" in "Search locations", pick the matching result and set its radius to ${x.radius} mi.`);
-    for (const x of loc.exclude)
-      steps.push(`Leave out the ${SHORT[x.branch]} clinic's area (its own ads cover it): click "Include" next to the search box and change it to "Exclude", paste "${x.address}", pick the matching result and set its radius to ${x.radius} mi.`);
+  // Weigh the rule against the ad set's own numbers (CHRIS Nov 28: "weighing which rule should prevail").
+  const v = o.volume ?? null;
+  const wz = (genderChange || ageChange) && o.id ? weigh(o.id, { women: true, ageMin: p.ageMin, ageMax: p.ageMax, chatsPerDay: v ? v.msgs7 / 7 : null }) : null;
+  const method: "copy" | "edit" | "hold" = wz?.verdict === "test" ? "copy" : wz?.verdict === "hold" ? "hold" : "edit";
+  const vat = (x: number) => x * 1.12;
+  const pct = (x: number) => `${Math.round(Math.abs(x) * 100)}%`;
+  const days = (d: number | null) => (d === null ? "a few days" : d <= 1 ? "about a day" : d >= 14 ? "2+ weeks" : `about ${Math.round(d)} days`);
+  const weekly = wz && v ? vat(v.spend7) * Math.abs(wz.gain) : null;
+  let how: string;
+  if (!wz) how = (genderChange || ageChange) ? "Fix it (your rule). No gender/age numbers for this ad set yet, so it isn't weighed." : "Fix it (location plan).";
+  else if (method === "edit") how = `Fix it: each peso buys about ${pct(wz.gain)} more (${pesoT(vat(wz.now))}* → ${pesoT(vat(wz.after))}* per chat, a man's chat counted as a third${weekly ? `, about ${pesoT(weekly)}* a week` : ""}). Meta re-learns in ${days(wz.learnDays)}.`;
+  else if (method === "copy") how = `Close call (${wz.gain >= 0 ? "+" : "−"}${pct(wz.gain)}): test a fixed copy next to it for 7 days, then keep the better one.`;
+  else how = `Keep its audience for now: here the current mix is better value by ${pct(wz.gain)} (${pesoT(vat(wz.now))}* vs ${pesoT(vat(wz.after))}* per chat, a man's chat counted as a third). Re-weighed every 4 weeks.`;
+  const trade: Trade[] = [];
+  if (wz && genderChange && wz.men.share >= 0.03)
+    trade.push({ tone: "gain", text: `Men got ${pct(wz.men.share)} of its money (${pesoT(vat(wz.men.spend))}* in 4 weeks)${wz.men.cpc ? ` at ${pesoT(vat(wz.men.cpc))}* a chat` : ""}, but a man who chats books about a third as often.` });
+  if (wz && ageChange && wz.older.share >= 0.03 && wz.older.cpc && wz.kept.cpc)
+    trade.push(wz.older.cpc > wz.kept.cpc
+      ? { tone: "gain", text: `Women ${wz.older.from}+ got ${pct(wz.older.share)} at ${pesoT(vat(wz.older.cpc))}* a chat vs ${pesoT(vat(wz.kept.cpc))}* for ${wz.kept.label}.` }
+      : { tone: "cost", text: `Women ${wz.older.from}+ chat cheaper here (${pesoT(vat(wz.older.cpc))}* vs ${pesoT(vat(wz.kept.cpc))}*); whether they book is unknown.` });
+  if (wz && method !== "hold") {
+    trade.push({ tone: "cost", text: "Narrower audience: allowing 10% for pricier reach." });
+    trade.push(method === "copy"
+      ? { tone: "gain", text: "The original keeps running while the copy learns, so chats don't dip." }
+      : { tone: "cost", text: `Meta re-learns: ${days(wz.learnDays)} at ${Math.round(v ? v.msgs7 / 7 : wz.chats / 28)} chats a day.` });
   }
-  if (ageChange) steps.push(`Set Age to ${p.ageMin} – ${p.ageMax}.`);
-  if (genderChange) steps.push(`Set Gender to "Women".`);
-  if (t && t.interests.length === 0 && p.interests.length) steps.push(`Optional: in Detailed targeting, add ${p.interests.slice(0, 4).map((x) => `"${x}"`).join(", ")}.`);
-  steps.push("Don't change the budget, placements or ads.");
-  steps.push(`Click "Publish" (bottom right). Meta restarts learning for a few days after an audience change; that's expected.`);
+  if (locChange && t && t.places.length === 1 && t.cities.length === 0 && (t.places[0].radius ?? 0) < loc.radius - 1)
+    trade.push({ tone: "gain", text: `Reaches clients who travel for this service (up to ${loc.radius} mi) instead of only the clinic's neighborhood.` });
+  else if (locChange)
+    trade.push({ tone: "gain", text: "Stops paying for people closer to another Hermosa clinic or in towns the plan doesn't serve." });
+  // A hold keeps the audience as it is; only the location (if flagged) still changes.
+  const doGender = genderChange && method !== "hold", doAge = ageChange && method !== "hold", doAdv = (!t || t.advantage) && method !== "hold";
+  if (method === "hold") for (const r of rows) if ((r.field === "Age" && ageChange) || (r.field === "Gender" && genderChange) || (r.field === "Audience" && r.change)) r.set = "Keep as is (data)";
+
+  const fixes: string[] = [];
+  if (doAdv) fixes.push(`Click "Switch to original audience options" (under Advantage+ audience) and confirm. This makes age and gender hard limits.`);
+  if (locChange) {
+    fixes.push(`In Locations, remove every location now listed${t && nowLoc !== "Not set" ? ` (${nowLoc})` : ""}: click the x next to each.`);
+    fixes.push(`Click in "Search locations", paste the clinic address (Copy on this card): "${loc.address}". Pick the result that matches the clinic.`);
+    fixes.push(`Click the small arrow next to the added location and set the radius to ${loc.radius} mi.${loc.also.length ? "" : " That should be the only included location."}`);
+    for (const x of loc.also)
+      fixes.push(`Also add the ${SHORT[x.branch]} clinic: paste "${x.address}" in "Search locations", pick the matching result and set its radius to ${x.radius} mi.`);
+    for (const x of loc.exclude)
+      fixes.push(`Leave out the ${SHORT[x.branch]} clinic's area (its own ads cover it): click "Include" next to the search box and change it to "Exclude", paste "${x.address}", pick the matching result and set its radius to ${x.radius} mi.`);
+  }
+  if (doAge) fixes.push(`Set Age to ${p.ageMin} – ${p.ageMax}.`);
+  if (doGender) fixes.push(`Set Gender to "Women".`);
+  if (t && t.interests.length === 0 && p.interests.length) fixes.push(`Optional: in Detailed targeting, add ${p.interests.slice(0, 4).map((x) => `"${x}"`).join(", ")}.`);
+
+  const steps: string[] = [OPEN("ad set", o.name, o.button ?? "Fix settings")];
+  if (method === "hold" && fixes.length === 0) {
+    steps.push("Leave this ad set as it is. The advisor re-weighs it with fresh numbers every 4 weeks.");
+  } else if (method !== "copy") {
+    steps.push("Scroll down to the Audience section.", ...fixes, "Don't change the budget, placements or ads.");
+    steps.push(`Click "Publish" (bottom right). Meta re-learns for ${wz ? days(wz.learnDays) : "a few days"} after the change; that's expected.`);
+  } else {
+    const half = v?.budget ? Math.round(v.budget / 2 / 10) * 10 : null;
+    const check = o.today ? fmtDay(addDay(o.today, 7)) : "7 days from now";
+    const cpc = v && v.msgs7 > 0 ? vat(v.spend7) / v.msgs7 : null;
+    steps.push(`Go to the Ad sets tab, tick "${o.name}", click "Duplicate", choose the same campaign and click "Duplicate". Rename the copy "${o.name} - fixed". Leave the original On.`);
+    steps.push(`In the copy, scroll down to the Audience section.`, ...fixes.map((x) => `In the copy: ${x.charAt(0).toLowerCase()}${x.slice(1)}`));
+    if (v?.budgetSource === "adset" && v.budget && half)
+      steps.push(`Budget, so the total stays ${pesoT(v.budget)}/day: set the copy's Daily budget to ${pesoT(half)}, then lower the original's from ${pesoT(v.budget)} to ${pesoT(v.budget - half)}. Type the numbers as is; Meta adds VAT.`);
+    else steps.push("The copy shares the campaign's budget. Don't change the budget.");
+    steps.push(`Click "Publish" (bottom right). The copy starts in learning; that's expected.`);
+    // The copy reaches only the kept women, so each of its chats is worth a full woman-equivalent chat: it wins when its
+    // cost per chat is at or under the original's cost per woman-equivalent chat.
+    const bar = wz ? vat(wz.now) : cpc ? cpc * 1.3 : null;
+    steps.push(`On ${check}, compare the two in Ads Manager. If the copy's cost per result is ${bar ? `${pesoT(bar)}* or less` : "no more than 30% above the original's"}, turn the original Off${v?.budgetSource === "adset" && v.budget ? ` and set the copy to ${pesoT(v.budget)}` : ""}. If not, leave both on and tell the owner.`);
+  }
   steps.push(DONE);
-  return { rows, steps, location: locChange ? loc : null };
+  return { rows, steps, location: locChange ? loc : null, method, how, trade, weighing: wz };
 }
 
 /** Budget moves: the field to change, before VAT (what you type in Ads Manager). */
