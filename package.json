@@ -19,6 +19,7 @@
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.14.0",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.118.0",
     "fflate": "0.8.3",

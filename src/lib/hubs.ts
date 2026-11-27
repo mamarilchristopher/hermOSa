@@ -34,7 +34,9 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
     { key: "chat", label: "Chat", short: "Chat", icon: "chat", tabs: [{ href: "/chat", label: "Chat", badge: n(c.chat) }] },
     // CHRIS Nov 27 (v0.89.1): its own Business hub: the Business page, the Dashboard and the promo generator.
     { key: "business", label: "Business", short: "Business", icon: "briefcase", tabs: [
-      ...(management ? [{ href: "/business", label: "Business" }, { href: "/business/ads", label: "Ads" }, { href: "/business/ads/advisor", label: "Ad advisor" }, { href: "/", label: "Dashboard" }] : []),
+      ...(management ? [{ href: "/business", label: "Business" }, { href: "/business/ads", label: "Ads" }, { href: "/business/ads/advisor", label: "Ad advisor" }, { href: "/business/expenses", label: "Expenses" }, { href: "/", label: "Dashboard" }] : []),
+      // update-0100 (CHRIS Nov 28): Finance and Auditors see Expenses too.
+      ...(!management && has(["FINANCE", "AUDITOR"]) ? [{ href: "/business/expenses", label: "Expenses" }] : []),
       // update-0086 (CHRIS Nov 27): promo ideas every Monday, and the builder. Owners and the GM.
       ...(owner || gm ? [{ href: "/promos", label: "Promos" }, { href: "/promos/post", label: "Promo posts" }] : []),
     ] },
