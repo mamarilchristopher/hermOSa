@@ -123,7 +123,10 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const noCommission = !!myEmp && !myEmp.commission_eligible && !access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
 
   const paid = list.filter((l) => l.state !== "REJECTED").reduce((s, l) => s + Number(l.amount_paid_cents), 0);
-  const commission = lines.filter((x) => list.find((l) => l.id === x.service_log_id)?.state !== "REJECTED").reduce((s, x) => s + Number(x.amount_cents), 0);
+  // v0.92.1 fix: only the chosen day's entries. Lines are loaded for every day shown (7+ days), and a line whose
+  // entry wasn't on the chosen day used to count too, so the card showed the whole week's commission.
+  const dayIds = new Set(list.filter((l) => l.state !== "REJECTED").map((l) => l.id));
+  const commission = lines.filter((x) => dayIds.has(x.service_log_id)).reduce((s, x) => s + Number(x.amount_cents), 0);
   const pendingCount = list.filter((l) => l.state === "PENDING").length;
   const pendingMine = all.filter((l) => l.state === "PENDING" && approverFor(l.branch_id));
   const pendingAll = pendingMine.length;
