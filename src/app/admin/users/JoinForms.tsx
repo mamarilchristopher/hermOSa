@@ -5,9 +5,9 @@ import { approveJoin, createInvite, moveLogin } from "./actions";
 export const LEVEL_TEXT: Record<string, string> = {
   OWNER: "Owner (everything, needs 2-step sign-in)",
   GM: "General Manager (all branches, signs off commissions)",
-  SENIOR_CMA: "Senior CMA (own branch, on commission)",
-  CMA: "CMA (own branch, on commission)",
-  TRAINEE: "Trainee (own branch, no commission by default)",
+  SENIOR_CMA: "Senior CMA (home branch, works at any branch, on commission)",
+  CMA: "CMA (home branch, works at any branch, on commission)",
+  TRAINEE: "Trainee (home branch, works at any branch, no commission by default)",
   CSR: "CSR (online bookings, all branches, WFH, basic pay only)",
   MANAGER: "Branch manager (one branch)",
   CASHIER: "Front desk / cashier (one branch)",

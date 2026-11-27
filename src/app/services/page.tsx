@@ -30,8 +30,17 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const viewable = branchesFor(access, branches, ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"]);
   if (viewable.length === 0) redirect("/");
+  // update-0092 (CHRIS Nov 27): staff work at any branch. Where they are today = the branch they timed in at,
+  // else today's schedule, else their home branch (records only). Staff open on that branch; management on All branches.
+  const staffOnly = !can(access, ["OWNER", "FINANCE", "MANAGER", "AUDITOR", "HR"], null) && !access.grants.some((g) => g.role === "MANAGER");
+  const { data: meRow } = await supabase.from("employees").select("id, branch_id").eq("app_user_id", access.user_id).eq("active", true).order("created_at").limit(1).maybeSingle();
+  const [{ data: inAt }, { data: shiftAt }] = meRow ? await Promise.all([
+    supabase.from("time_punches").select("branch_id").eq("employee_id", meRow.id).eq("work_date", manilaToday()).eq("kind", "IN").order("punched_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("shifts").select("branch_id").eq("employee_id", meRow.id).eq("work_date", manilaToday()).eq("state", "PUBLISHED").maybeSingle(),
+  ]) : [{ data: null }, { data: null }];
+  const workingAt = [inAt?.branch_id, shiftAt?.branch_id, meRow?.branch_id].find((id) => id && viewable.some((b) => b.id === id)) as string | undefined;
   // CHRIS Nov 26 (v0.80.1): "All branches" is the default for anyone who sees more than one branch.
-  const picked = viewable.find((b) => b.code === sp.branch);
+  const picked = viewable.find((b) => b.code === sp.branch) ?? (sp.branch === undefined && staffOnly ? viewable.find((b) => b.id === workingAt) : undefined);
   const branch = picked ?? (viewable.length > 1 ? null : viewable[0]);
   const scope = branch ? [branch] : viewable;
   const scopeIds = scope.map((b) => b.id);
@@ -180,7 +189,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 Logging the sale for <strong>{bk.waiver_name ?? bk.client_name}</strong>{bk.waiver_name ? <span className="muted"> (FB: {bk.client_name})</span> : null}, booked for {bk.services} at {bName[bk.branch_id] ?? "the branch"}. Saving links it to the booking, so it&apos;s not recorded twice. <Link href={`/bookings?d=${bk.appointment_date}&focus=${bk.id}`}>Back to Bookings</Link>
               </div>
             )}
-            <BranchEntryForm key={`${here}-${fromBooking?.id ?? ""}`} booking={fromBooking} branches={(fromBooking ? logBranches.filter((b) => b.id === bk!.branch_id) : logBranches).map((b) => ({ id: b.id, name: b.name }))} start={fromBooking ? bk!.branch_id : logBranches.find((b) => b.id === myEmp?.branch_id)?.id ?? (logBranches.length === 1 ? logBranches[0].id : "")} date={date} today={today} meds={(services ?? []).filter((s) => s.is_meds).map((s) => ({ id: s.id, name: s.name, price: Number(s.price_cents ?? 0) }))} services={sortServices((services ?? []).filter((s) => !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null, sessions: Array.isArray(s.session_prices) ? (s.session_prices as (number | string)[]).map(Number) : null }))} promos={promoOpts} addons={sortServices((services ?? []).filter((s) => s.is_addon && !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
+            <BranchEntryForm key={`${here}-${fromBooking?.id ?? ""}`} booking={fromBooking} branches={(fromBooking ? logBranches.filter((b) => b.id === bk!.branch_id) : logBranches).map((b) => ({ id: b.id, name: b.name }))} start={fromBooking ? bk!.branch_id : logBranches.find((b) => b.id === workingAt)?.id ?? (logBranches.length === 1 ? logBranches[0].id : "")} date={date} today={today} meds={(services ?? []).filter((s) => s.is_meds).map((s) => ({ id: s.id, name: s.name, price: Number(s.price_cents ?? 0) }))} services={sortServices((services ?? []).filter((s) => !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null, sessions: Array.isArray(s.session_prices) ? (s.session_prices as (number | string)[]).map(Number) : null }))} promos={promoOpts} addons={sortServices((services ?? []).filter((s) => s.is_addon && !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
             </>
             )}
             {isManager && <p className="small" style={{ marginTop: 12 }}><Link href="/services/prices">Price list and commissions</Link> (add a service, set its price and commission)</p>}

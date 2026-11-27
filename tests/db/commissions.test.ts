@@ -65,7 +65,8 @@ describe("logging services", () => {
   it("lead needs an assistant, not the same person; staff can't log for another branch; no future dates", async () => {
     expect((await db.rpc(fvStaff, "aal1", "log_service", [db.branches.FAIRVIEW, daysAgo(0), svc, 1000, "LEAD", ana, null, null, null])).error).toBe("ASSISTANT_REQUIRED");
     expect((await db.rpc(fvStaff, "aal1", "log_service", [db.branches.FAIRVIEW, daysAgo(0), svc, 1000, "LEAD", ana, ana, null, null])).error).toBe("SAME_PERSON");
-    expect((await db.rpc(mkStaff, "aal1", "log_service", [db.branches.FAIRVIEW, daysAgo(0), svc, 1000, "SOLO", ana, null, null, null])).error).toBe("FORBIDDEN");
+    // update-0092: staff aren't locked to their home branch (a Marikina CMA working at Fairview logs there).
+    expect((await db.rpc(mkStaff, "aal1", "log_service", [db.branches.FAIRVIEW, daysAgo(0), svc, 1000, "SOLO", ana, null, null, null])).ok).toBe(true);
     expect((await db.rpc(fvStaff, "aal1", "log_service", [db.branches.FAIRVIEW, "2999-01-01", svc, 1000, "SOLO", ana, null, null, null])).error).toBe("INVALID_DATE");
   });
 });
@@ -94,13 +95,13 @@ describe("sign-off and visibility", () => {
     expect((await db.rpc(fvManager, "aal1", "decide_service_log", [own.id, true, null])).error).toBe("SELF_APPROVAL_DENIED");
   });
 
-  it("staff see only their own commission amounts; managers see the branch's; other branches see nothing", async () => {
+  it("staff see only their own commission amounts; managers see the branch's; other branches see no commission", async () => {
     const mine = await db.as(fvStaff, "aal1", "SELECT DISTINCT employee_id FROM public.commission_lines");
     expect(mine.rows.map((r) => r.employee_id)).toEqual([ana]);
     const mgr = await db.as(fvManager, "aal1", "SELECT count(DISTINCT employee_id)::int AS n FROM public.commission_lines");
     expect(mgr.rows[0].n).toBeGreaterThan(1);
-    const other = await db.as(mkStaff, "aal1", "SELECT count(*)::int AS n FROM public.service_logs");
-    expect(other.rows[0].n).toBe(0);
+    // update-0092: staff of another branch see the entries (they may work there), but never others' commission.
+    expect((await db.as(mkStaff, "aal1", "SELECT count(*)::int AS n FROM public.commission_lines WHERE employee_id = $1", [ana])).rows[0].n).toBe(0);
   });
 
   it("a cashier or clinician can't add employees; HR (with MFA) can", async () => {

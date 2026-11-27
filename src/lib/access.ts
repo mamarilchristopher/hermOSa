@@ -49,9 +49,13 @@ export function can(a: Access, roles: Role[], branchId: string | null): boolean 
     (g) =>
       roles.includes(g.role) &&
       effective(a, g.role) &&
-      (g.branch_id === null || (branchId !== null && g.branch_id === branchId)),
+      (g.branch_id === null || (branchId !== null && (g.branch_id === branchId || ANY_BRANCH.includes(g.role)))),
   );
 }
+
+/** update-0092 (CHRIS Nov 27): staff move between branches, so a branch CLINICIAN grant (CMAs, Senior CMAs, Trainees) works at every
+ *  clinic (the home branch stays on their records). The database (private.has_role) applies the same rule. */
+const ANY_BRANCH: Role[] = ["CLINICIAN"];
 
 /** The General Manager: a company-wide MANAGER grant (Geraldine). Since update-0028 the GM gives every owner-level approval. */
 export const isGM = (a: Access) => can(a, ["MANAGER"], null);

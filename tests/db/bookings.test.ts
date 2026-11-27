@@ -47,7 +47,8 @@ describe("bookings", () => {
 
   it("branch staff mark Arrived / Done / Re-sched; only bookers cancel", async () => {
     expect((await db.rpc(fvCma, "aal1", "set_booking_status", [id, "ARRIVED", null, null])).ok).toBe(true);
-    expect((await db.rpc(mkCma, "aal1", "set_booking_status", [id, "DONE", null, null])).error).toBe("NOT_FOUND");
+    // update-0092: staff aren't locked to their home branch, so a Marikina CMA working at Fairview can mark it too.
+    expect((await db.rpc(mkCma, "aal1", "set_booking_status", [id, "ARRIVED", null, null])).ok).toBe(true);
     expect((await db.rpc(fvCma, "aal1", "set_booking_status", [id, "CANCELLED", null, null])).ok).toBe(false);
     expect((await db.rpc(fvCma, "aal1", "set_booking_status", [id, "DONE", null, "DEMO Hiko done"])).ok).toBe(true);
     const mk = (await db.sql("SELECT id FROM public.bookings WHERE branch_id = $1", [MK])).rows[0].id;
@@ -62,11 +63,12 @@ describe("bookings", () => {
 });
 
 describe("update-0071: everyone sees bookings; moves are remembered", () => {
-  it("staff of another branch can read (not mark) a branch's bookings", async () => {
+  it("staff of another branch can read and (update-0092) mark a branch's bookings", async () => {
     const r = await book(csr, "aal1", { client: "DEMO Seen" });
     const seen = await db.as(mkCma, "aal1", "SELECT count(*)::int n FROM public.bookings WHERE id = $1", [r.id]);
     expect(seen.rows[0].n).toBe(1);
-    expect((await db.rpc(mkCma, "aal1", "set_booking_status", [r.id, "ARRIVED", null, null])).ok).toBe(false);
+    expect((await db.rpc(mkCma, "aal1", "set_booking_status", [r.id, "ARRIVED", null, null])).ok).toBe(true);
+    expect((await db.rpc(mkCma, "aal1", "set_booking_status", [r.id, "CANCELLED", null, null])).ok).toBe(false);
   });
   it("a booking moved twice still lists both days it left", async () => {
     const r = await book(csr, "aal1", { client: "DEMO Moved" });

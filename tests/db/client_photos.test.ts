@@ -69,19 +69,21 @@ describe("log_client_visit", () => {
     const sneaky = photos(folder, FULL);
     sneaky[1].path = `${db.branches.FAIRVIEW}/${folder}/../x-${randomUUID()}.jpg`;
     expect((await visit(staff, { folder, list: sneaky })).error).toBe("BAD_REQUEST");
+    // update-0092: staff aren't locked to their home branch: QC Main staff working at Fairview log it there.
     expect((await db.rpc(qcStaff, "aal1", "log_client_visit", [db.branches.FAIRVIEW, today(), svc, 899900, "SOLO", ana, null, null, "PAID", true,
-      "DEMO Client", null, folder, JSON.stringify(photos(folder, FULL)), false])).ok).toBe(false);
+      "DEMO Client", null, folder, JSON.stringify(photos(folder, FULL)), false])).ok).toBe(true);
   });
 
   it("client archive: every employee can view it (update-0057)", async () => {
     const month = today();
+    // 3: the update-0092 visit QC Main staff logged at Fairview is in the archive too.
     const mine = await db.rpc(staff, "aal1", "client_photo_folders", [month, null, false]);
-    expect(mine.length).toBe(2);
+    expect(mine.length).toBe(3);
     expect(mine[0].photos.length).toBe(4);
-    expect((await db.rpc(gm, "aal1", "client_photo_folders", [month, null, false])).length).toBe(2);
-    expect((await db.rpc(owner, "aal2", "client_photo_folders", [month, db.branches.FAIRVIEW, false])).length).toBe(2);
-    expect((await db.rpc(qcStaff, "aal1", "client_photo_folders", [month, null, false])).length).toBe(2);
-    expect((await db.rpc(csr, "aal1", "client_photo_folders", [month, null, false])).length).toBe(2);
+    expect((await db.rpc(gm, "aal1", "client_photo_folders", [month, null, false])).length).toBe(3);
+    expect((await db.rpc(owner, "aal2", "client_photo_folders", [month, db.branches.FAIRVIEW, false])).length).toBe(3);
+    expect((await db.rpc(qcStaff, "aal1", "client_photo_folders", [month, null, false])).length).toBe(3);
+    expect((await db.rpc(csr, "aal1", "client_photo_folders", [month, null, false])).length).toBe(3);
   });
 
   it("social media: only visits the client allowed, never waivers, for every employee", async () => {
