@@ -18,9 +18,49 @@ const DEFAULT_RADIUS: Record<string, number> = { QC_MAIN: 4, FAIRVIEW: 5, STA_MA
 const BRANCH_WORD: [RegExp, string][] = [[/qc main|main qc/i, "QC_MAIN"], [/fairview/i, "FAIRVIEW"], [/sta\.? maria|smb/i, "STA_MARIA"], [/marikina/i, "MARIKINA"]];
 const branchIn = (s: string) => BRANCH_WORD.find(([re]) => re.test(s))?.[1] ?? null;
 
+/** Meta's "Add locations in bulk" (CHRIS Nov 28, from Ads Manager): Location type + one Default radius for the whole
+ *  paste, one location per line. Commas and semicolons split entries, so lines never contain them. Radii are the
+ *  dropdown's values. */
+export const BULK_RADII = [1, 3, 5, 10, 15, 25];
+/** Pin addresses without commas, street first so Meta's matcher lands on the clinic. */
+export const CLINIC_BULK: Record<string, string> = {
+  QC_MAIN: "30 Matino Street Sikatuna Village Diliman Quezon City Philippines",
+  FAIRVIEW: "Regalado Avenue corner Coronet Street West Fairview Quezon City Philippines",
+  STA_MARIA: "Kanto Caypombo Santa Maria Bulacan Philippines",
+  MARIKINA: "B.G. Molina Street Parang Marikina City Philippines",
+};
+const PROVINCE: [RegExp, string][] = [
+  [/^(sta\.? maria|santa maria|bocaue|marilao|meycauayan|balagtas|pandi|norzagaray|angat|guiguinto|san jose del monte|obando|bulakan|malolos|plaridel)/i, "Bulacan"],
+  [/^(antipolo|cainta|san mateo|rodriguez|montalban|taytay)/i, "Rizal"],
+];
+/** "Sta. Maria" / "Rodriguez (Montalban)" / "San Jose del Monte, Bulacan" → "Santa Maria Bulacan Philippines". */
+export function bulkTown(raw: string) {
+  const name = raw.replace(/\s*\(.*?\)\s*/g, " ").split(",")[0].replace(/^sta\.?\s+/i, "Santa ").trim();
+  const prov = PROVINCE.find(([re]) => re.test(name))?.[1] ?? "Metro Manila";
+  return `${name} ${prov} Philippines`.replace(/[,;]/g, " ").replace(/\s+/g, " ");
+}
+/** Largest dropdown radius that doesn't go past the target (so a circle never grows into another clinic). */
+export const bulkRadius = (miles: number) => [...BULK_RADII].reverse().find((r) => r <= miles) ?? 1;
+export type BulkBlock = { label: string; type: "Addresses"; radius: number; lines: string[]; exclude?: boolean };
+/** Paste-ready blocks for a branch: the clinic pin, the extra towns, and the clinics to exclude. */
+export function bulkBlocks(branch: string, include: string[], exclude: string[], pinMiles?: number | null): BulkBlock[] {
+  const inc = include.map((s) => ({ s, mi: s.match(/(\d+(?:\.\d+)?)\s*mi\b/i), b: branchIn(s) }));
+  const own = inc.find((x) => x.mi && (x.b === branch || x.b === null));
+  const towns = inc.filter((x) => !x.mi && !/each branch|see the branch/i.test(x.s)).map((x) => x.s);
+  const out: BulkBlock[] = [];
+  if (own || towns.length === 0) out.push({ label: `Hermosa ${SHORT[branch]} pin`, type: "Addresses", radius: bulkRadius(pinMiles ?? (own ? Number(own.mi![1]) : DEFAULT_RADIUS[branch] ?? 3)), lines: [CLINIC_BULK[branch]] });
+  if (towns.length) out.push({ label: "Towns", type: "Addresses", radius: 3, lines: towns.map(bulkTown) });
+  const ex = exclude.map((s) => ({ mi: Number(s.match(/(\d+(?:\.\d+)?)\s*mi\b/i)?.[1] ?? 2), b: branchIn(s) })).filter((x) => x.b && CLINIC_BULK[x.b]);
+  // Exclusions round UP to the dropdown (a bigger hole keeps us further from the other clinic).
+  const up = (mi: number) => BULK_RADII.find((r) => r >= mi) ?? 25;
+  for (const r of [...new Set(ex.map((x) => up(x.mi)))])
+    out.push({ label: "Exclude", type: "Addresses", radius: r, lines: ex.filter((x) => up(x.mi) === r).map((x) => CLINIC_BULK[x.b!]), exclude: true });
+  return out;
+}
+
 export type AudiencePlan = { ageMin: number; ageMax: number; genders: string; interests: string[]; include: string[]; exclude: string[] };
 export type SetRow = { field: string; now: string; set: string; change: boolean };
-export type SettingsPlan = { rows: SetRow[]; steps: string[] };
+export type SettingsPlan = { rows: SetRow[]; steps: string[]; bulk: BulkBlock[] };
 
 const OPEN = (what: string, name: string, button: string) =>
   `Tap "${button} ↗" on this card. Ads Manager opens on ${what} "${name}" (log in with the Hermosa account if asked). Check the name at the top matches.`;
@@ -41,9 +81,11 @@ export function settingsPlan(o: {
   const own = inc.find((x) => x.mi && (x.b === branch || x.b === null));
   let radius = own ? Number(own.mi![1]) : DEFAULT_RADIUS[branch] ?? 4;
   if (o.overlapFix) radius = Math.min(radius, o.overlapFix);
+  radius = bulkRadius(radius);
   const towns = inc.filter((x) => !x.mi).map((x) => x.s.replace(/\s*\(.*?\)\s*$/, "").trim()).filter(Boolean);
   const usePin = !!own || towns.length === 0;
   const pin = pinPlace(branch, radius);
+  const bulk = bulkBlocks(branch, p.include, p.exclude, radius);
   const setLoc = usePin ? [pin.label, ...towns].join(" + ") : towns.join(", ");
   const nowLoc = t ? [...t.places.map((x) => `${x.radius ?? "?"} mi around "${x.name}"`), ...t.cities].join(" + ") || "Not set" : "Couldn't read";
   const tooWide = !!t && t.places.some((x) => (x.radius ?? 0) > radius + 0.01);
@@ -70,14 +112,10 @@ export function settingsPlan(o: {
   steps.push("Scroll down to the Audience section.");
   if (!t || t.advantage) steps.push(`Click "Switch to original audience options" (under Advantage+ audience) and confirm. This makes age and gender hard limits.`);
   if (locChange) {
-    steps.push(`In Locations, click "Edit" and remove every location now listed${t && nowLoc !== "Not set" ? ` (${nowLoc})` : ""}.`);
-    if (usePin) {
-      steps.push(`Click "Drop Pin" and type "${CLINIC_ADDRESS[branch]}" in the search box (or drag the pin onto the Hermosa ${SHORT[branch]} clinic). Set the circle to ${radius} mi.`);
-      if (towns.length) steps.push(`Also type and add: ${towns.join(", ")}. Pick the Philippine one each time.`);
-    } else {
-      steps.push(`Type and add each of these, picking the one in ${branch === "STA_MARIA" ? "Bulacan" : "Metro Manila"}: ${towns.join(", ")}.`);
-    }
-    for (const x of excl) steps.push(`Switch the dropdown from "Include" to "Exclude", drop a pin on "${CLINIC_ADDRESS[x.b!]}" (Hermosa ${SHORT[x.b!]}) and set it to ${x.mi} mi.`);
+    steps.push(`In Locations, remove every location now listed${t && nowLoc !== "Not set" ? ` (${nowLoc})` : ""} (the x next to each).`);
+    bulk.forEach((blk, i) => {
+      steps.push(`Click "Add locations in bulk". Set Location type to "${blk.type}" and Default radius to "${blk.radius} mi". Paste box ${i + 1} (${blk.label}, copied from this card), click "Match locations", check each match is in the right town, then add them.${blk.exclude ? " Then switch each of these to \"Exclude\" (the dropdown next to the location)." : ""}`);
+    });
   }
   if (ageChange) steps.push(`Set Age to ${p.ageMin} – ${p.ageMax}.`);
   if (genderChange) steps.push(`Set Gender to "Women".`);
@@ -85,7 +123,7 @@ export function settingsPlan(o: {
   steps.push("Don't change the budget, placements or ads.");
   steps.push(`Click "Publish" (bottom right). Meta restarts learning for a few days after an audience change; that's expected.`);
   steps.push(DONE);
-  return { rows, steps };
+  return { rows, steps, bulk: locChange ? bulk : [] };
 }
 
 /** Budget moves: the field to change, before VAT (what you type in Ads Manager). */

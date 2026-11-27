@@ -17,7 +17,8 @@ import PH from "@/data/phMarket.json";
 import { ApproveChip } from "./ApproveChip";
 import { OpenOnHash } from "./OpenOnHash";
 import { TaskChip } from "./TaskChip";
-import { budgetSteps, pauseSteps, remakeSteps, settingsPlan, versionSteps, type SetRow } from "@/lib/adsSteps";
+import { budgetSteps, bulkBlocks, pauseSteps, remakeSteps, settingsPlan, versionSteps, type BulkBlock, type SetRow } from "@/lib/adsSteps";
+import { BulkBox } from "./BulkBox";
 import { adsManagerUrl, audit, CHECKS, type Finding, type Target } from "@/lib/adsAudit";
 import ACC from "@/data/adAccounts.json";
 import { areaFor, areaStatus, openQuestions, sortAreas, TIER } from "@/lib/adsResearch";
@@ -148,7 +149,7 @@ export default async function AdAdvisor() {
         name: hit.s.name, branch: hit.l.branch, t: hit.s.targeting, plan: audiencePlan(hit.l.branch, hit.l.service), button: action,
         overlapFix: g.find((x) => x.check === "overlap")?.radius ?? null, locationFlag: g.some((x) => x.check === "pin"),
       }) : null;
-      const extra = sp ? { rows: sp.rows, steps: sp.steps } : { steps: f.steps };
+      const extra = sp ? { rows: sp.rows, steps: sp.steps, bulk: sp.bulk } : { steps: f.steps };
       if (g.length === 1) return { id: f.id, tone: f.sev, tag: f.tag, kind: KIND[f.check], title: f.title, short: f.short, why: f.why, approve: f.approve, action, go: go(f.target), ...extra };
       const name = f.name;
       return {
@@ -285,6 +286,7 @@ export default async function AdAdvisor() {
                       {m.rows.some((r) => !r.change) && <li className="ok"><b>Already right</b><span>{m.rows.filter((r) => !r.change).map((r) => r.field).join(", ")}</span></li>}
                     </ul>
                   )}
+                  {m.bulk && m.bulk.length > 0 && <BulkBox blocks={m.bulk} />}
                   <div className="adv-move-foot">
                     {m.go && <a className="adv-go" href={m.go.href} {...(m.go.external ? { target: "_blank", rel: "noreferrer" } : {})}>{m.action}{m.go.external ? " ↗" : " →"}</a>}
                     {m.steps && <TaskChip id={m.id} text={taskText(m)} />}
@@ -571,14 +573,15 @@ function groupFixes(fs: Finding[]) {
   return out;
 }
 
-type Move = { id: string; tone: string; tag: string; kind: string; title: string; short: string; why: string; approve: string; delta?: number | null; action: string; go: { href: string; external: boolean } | null; rows?: SetRow[]; steps?: string[] };
+type Move = { id: string; tone: string; tag: string; kind: string; title: string; short: string; why: string; approve: string; delta?: number | null; action: string; go: { href: string; external: boolean } | null; rows?: SetRow[]; steps?: string[]; bulk?: BulkBlock[] };
 
 /** The task as text to send to whoever does it: link, values to set, numbered steps. */
 function taskText(m: Move) {
   const href = m.go ? (m.go.href.startsWith("/") ? `https://hermosaos.com${m.go.href}` : m.go.href) : null;
   const set = (m.rows ?? []).filter((r) => r.change).map((r) => `- ${r.field}: ${r.set}`);
   return [`Hermosa ads task · ${m.tag} · ${m.kind}`, m.title, m.short, href ? `Open: ${href}` : null, set.length ? `Set it to:\n${set.join("\n")}` : null,
-    m.steps?.length ? `Steps:\n${m.steps.map((x, i) => `${i + 1}. ${x}`).join("\n")}` : null].filter(Boolean).join("\n\n");
+    m.steps?.length ? `Steps:\n${m.steps.map((x, i) => `${i + 1}. ${x}`).join("\n")}` : null,
+    ...(m.bulk ?? []).map((b, i) => `Box ${i + 1} (${b.label}) · Location type: ${b.type} · Default radius: ${b.radius} mi${b.exclude ? " · then set to Exclude" : ""}\n${b.lines.join("\n")}`)].filter(Boolean).join("\n\n");
 }
 type PhMarket = {
   refs: { cpm: { label: string; median: number }; cpc: { label: string; median: number }; chat: { label: string; lo: number; hi: number } };
@@ -676,7 +679,8 @@ function Setup({ p }: { p: PlayLine }) {
           {a.behaviors.length > 0 && <> · behaviours: {a.behaviors.join(", ")}</>}
           {a.note && <div className="small muted">{a.note}</div>}
         </dd>
-        <dt>Location</dt><dd>{p.geo.include.join("; ")}{p.geo.exclude.length > 0 && <><br /><span className="muted">Exclude: {p.geo.exclude.join("; ")}</span></>}</dd>
+        <dt>Location</dt><dd>{p.geo.include.join("; ")}{p.geo.exclude.length > 0 && <><br /><span className="muted">Exclude: {p.geo.exclude.join("; ")}</span></>}
+          {p.branch !== "ALL" && <BulkBox blocks={bulkBlocks(p.branch, p.geo.include, p.geo.exclude)} />}</dd>
         <dt>Placements</dt><dd>{p.placements}</dd>
       </dl>
       {p.creatives.length > 0 && (
