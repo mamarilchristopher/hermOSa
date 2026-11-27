@@ -2,7 +2,7 @@
 import { pick } from "@/lib/decision";
 import { BACKJOB_REASONS } from "@/lib/backjobs";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { addService, approveMany, changeDate, renumberMonth, decideLog, logService, toggleAfterDp, type ActionState } from "./actions";
+import { addService, approveMany, changeBranch, changeDate, renameClient, renumberMonth, decideLog, logService, toggleAfterDp, type ActionState } from "./actions";
 import { previewCommission, type CommissionType } from "@/lib/commission";
 import { centsToPhp } from "@/lib/csv";
 import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
@@ -645,6 +645,41 @@ export function ChangeDateForm({ id, date, max }: { id: string; date: string; ma
     <form action={action} className="change-date">
       <input type="hidden" name="id" value={id} />
       <input type="date" name="date" defaultValue={date} max={max} required aria-label="Correct date" />
+      <button className="small" disabled={pending}>Save</button>
+      <button type="button" className="secondary small" onClick={() => setOpen(false)}>Cancel</button>
+      {s?.error && <span className="field-error">{s.error}</span>}
+    </form>
+  );
+}
+
+/** update-0095 (Geraldine's list): fix a misspelled client name. Management may fix every entry with that name at once. */
+export function RenameClientForm({ id, name, all }: { id: string; name: string; all: boolean }) {
+  const [s, action, pending] = useActionState(renameClient, undefined);
+  const [open, setOpen] = useState(false);
+  if (s?.ok) return <div className="small ok-text">{s.ok}</div>;
+  if (!open) return <button type="button" className="link-button small" onClick={() => setOpen(true)}>Fix name</button>;
+  return (
+    <form action={action} className="change-date">
+      <input type="hidden" name="id" value={id} />
+      <input name="name" defaultValue={name} required minLength={2} maxLength={120} aria-label="Correct client name" autoFocus />
+      {all && <label className="small" style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" name="all" value="1" defaultChecked style={{ width: "auto" }} /> All entries named &ldquo;{name}&rdquo;</label>}
+      <button className="small" disabled={pending}>Save</button>
+      <button type="button" className="secondary small" onClick={() => setOpen(false)}>Cancel</button>
+      {s?.error && <span className="field-error">{s.error}</span>}
+    </form>
+  );
+}
+
+/** update-0095: owners and the GM move an entry to the branch where it was really done. */
+export function ChangeBranchForm({ id, branch, branches }: { id: string; branch: string; branches: { id: string; name: string }[] }) {
+  const [s, action, pending] = useActionState(changeBranch, undefined);
+  const [open, setOpen] = useState(false);
+  if (s?.ok) return <div className="small ok-text">{s.ok}</div>;
+  if (!open) return <button type="button" className="link-button small" onClick={() => setOpen(true)}>Change branch</button>;
+  return (
+    <form action={action} className="change-date">
+      <input type="hidden" name="id" value={id} />
+      <select name="branch" defaultValue={branch} aria-label="Correct branch">{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
       <button className="small" disabled={pending}>Save</button>
       <button type="button" className="secondary small" onClick={() => setOpen(false)}>Cancel</button>
       {s?.error && <span className="field-error">{s.error}</span>}

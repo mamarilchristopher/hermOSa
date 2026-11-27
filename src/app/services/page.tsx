@@ -8,7 +8,7 @@ import { centsToPhp } from "@/lib/csv";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { addDays, sortBranches, WEEKDAYS, weekday } from "@/lib/insights";
 import { ROLE_TEXT, TYPE_TEXT } from "@/lib/commission";
-import { AfterDpForm, BatchApprove, BranchEntryForm, ChangeDateForm, DecideButtons, RenumberForm } from "./Forms";
+import { AfterDpForm, BatchApprove, BranchEntryForm, ChangeBranchForm, ChangeDateForm, DecideButtons, RenameClientForm, RenumberForm } from "./Forms";
 import type { PackageLine } from "@/lib/packages";
 import { Uid } from "@/components/Uid";
 import { StaffFilter } from "./StaffFilter";
@@ -162,7 +162,11 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
       <main>
         <h1>Service Log</h1>
         <p className="muted small">{noCommission ? "Every service done today and who did it. A manager signs off each entry." : "Every service done today, who did it and the commission. A manager signs off each entry."}</p>
-        {bundleIds.length > 0 && <p className="small" style={{ marginTop: -4 }}><Link href="/services/packages">📦 Package clients: each client&apos;s sessions so far</Link></p>}
+        <form action="/services/clients" className="row-buttons log-search" style={{ marginTop: -4 }}>
+          <input name="q" minLength={2} required placeholder="🔍 Search a client (all dates)" aria-label="Search a client" />
+          <button className="secondary small">Search</button>
+          {bundleIds.length > 0 && <Link className="small" href="/services/packages">📦 Package clients</Link>}
+        </form>
 
         <div className="periods card">
           <div className="segmented" aria-label="Branch">
@@ -309,6 +313,8 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                       )}
                       {l.state === "REJECTED" && l.decision_note && <div className="small muted">{l.decision_note}</div>}
                       {topMgmt && <ChangeDateForm id={l.id} date={l.service_date} max={today} />}
+                      {topMgmt && <ChangeBranchForm id={l.id} branch={l.branch_id ?? ""} branches={viewable.map((b) => ({ id: b.id, name: b.name }))} />}
+                      {l.client_name && l.state !== "REJECTED" && (topMgmt || l.created_by === access.user_id || staff.some((x) => mine.has(x))) && <RenameClientForm id={l.id} name={l.client_name} all={topMgmt} />}
                       {topMgmt && l.state !== "REJECTED" && (l.after_dp || ((l.visit_kind ?? "PAID") === "PAID" && Number(l.amount_paid_cents) > 0 && Number(l.list_price_cents ?? 0) > Number(l.amount_paid_cents))) && (
                         <AfterDpForm id={l.id} on={!!l.after_dp} />
                       )}

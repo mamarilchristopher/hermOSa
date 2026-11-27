@@ -295,3 +295,28 @@ export async function renumberMonth(_prev: ActionState, fd: FormData): Promise<A
   revalidatePath("/services");
   return { ok: `${data.entries} entries re-numbered in order.`, at: Date.now() };
 }
+
+/** update-0095 (Geraldine's list, Nov 27): fix a misspelled client name on one entry, or (management) on all of that client's entries. */
+export async function renameClient(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const id = z.uuid().safeParse(fd.get("id"));
+  const name = String(fd.get("name") ?? "").trim().replace(/\s+/g, " ");
+  if (!id.success) return { error: "Refresh the page and try again." };
+  if (name.length < 2 || name.length > 120) return { error: "Type the client's full name." };
+  const { data, error } = await (await createClient()).rpc("rename_service_client", { p_log: id.data, p_name: name, p_all: fd.get("all") === "1" });
+  if (error) return { error: error.code === "PGRST202" ? "Fixing names needs database update-0095. Ask the owner to run it." : "Could not save. Try again." };
+  if (!data?.ok) return { error: errorText(data?.error) };
+  revalidatePath("/services"); revalidatePath("/services/clients"); revalidatePath("/services/packages");
+  return { ok: data.changed > 1 ? `Fixed on ${data.changed} entries.` : "Name fixed.", at: Date.now() };
+}
+
+/** update-0095: owners and the GM move an entry to the right branch (its photos follow; commission unchanged). */
+export async function changeBranch(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const id = z.uuid().safeParse(fd.get("id"));
+  const branch = z.uuid().safeParse(fd.get("branch"));
+  if (!id.success || !branch.success) return { error: "Pick the correct branch." };
+  const { data, error } = await (await createClient()).rpc("change_service_branch", { p_log: id.data, p_branch: branch.data });
+  if (error) return { error: error.code === "PGRST202" ? "Changing branches needs database update-0095. Ask the owner to run it." : "Could not save. Try again." };
+  if (!data?.ok) return { error: data?.error === "ALREADY_PAID" ? "This entry's commission is already on a final payslip, so its branch can't change." : errorText(data?.error) };
+  revalidatePath("/services"); revalidatePath("/me");
+  return { ok: "Branch changed.", at: Date.now() };
+}

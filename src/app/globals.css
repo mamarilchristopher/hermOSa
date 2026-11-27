@@ -2002,3 +2002,10 @@ a.hb-row:hover strong { text-decoration: underline; }
   .pkg-table td[data-l]::before { content: attr(data-l); display: block; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .pkg-table td:first-child { grid-column: 1 / -1; }
 }
+
+/* Geraldine's list (Nov 27): client search on the Service log. */
+.log-search { align-items: center; margin-bottom: 12px; }
+.log-search input { flex: 1 1 220px; width: auto; max-width: 420px; }
+.client-hits li { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.client-hits li:last-child { border-bottom: 0; }
+.client-hit-end { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
