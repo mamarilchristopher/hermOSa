@@ -148,6 +148,87 @@
    "next": "Watch December sales against the ₱550k target.",
    "links": {},
    "report": "https://claude.ai/artifact/Sf3SGgnZBBm9rQuqtJJH9r"
+  },
+  {
+   "id": "service-gaps",
+   "title": "Sales gaps and expansion by service and branch",
+   "question": "Which services sell well with little or no ad money behind them, and where would extra budget pay back?",
+   "asked": "2026-11-27",
+   "asked_by": "CHRIS",
+   "status": "done",
+   "headline": "Ultra Max (₱348.5k), the Botox family (₱151k) and NovoForm (₱31k) sold in Nov 1-24 with no ads behind them. Three tests take ₱1,900/day before VAT out of the old test budget.",
+   "findings": [
+    {
+     "tier": 1,
+     "text": "Ultra Max: 25 clients and ₱348,500 in Nov 1-24, which is 27% of Hiko clients and 37% of Hiko money, yet no ad ever led with it. It only needs 1.8% of chats to buy for 5x ROAS.",
+     "source": "Hermosa service log Nov 1-24 (playbook/service-gaps-nov2026.csv)"
+    },
+    {
+     "tier": 1,
+     "text": "Botox family (Jawtox, Botox, Barbie arms, Sweatox): ₱151,000 from 28 clients with 0% of ad spend. Fairview and Marikina sold ₱0 of Jawtox.",
+     "source": "Hermosa service log Nov 1-24"
+    },
+    {
+     "tier": 1,
+     "text": "NovoForm: ₱31,000 from 4 clients (Fairview ₱25.5k). Its old static ads got chats at ₱17-29*, the cheapest of any service.",
+     "source": "Hermosa service log + ad log"
+    },
+    {
+     "tier": 1,
+     "text": "Hiko Deluxe/Pro gets about 90% of spend. QC Main halved its spend in November and sales held, so more money in the same Hiko ads is not where growth is.",
+     "source": "Hermosa Meta by page + declared sales"
+    },
+    {
+     "tier": 1,
+     "text": "Week to week, extra spend returned only 0.5-1.8x (correlation -0.2 to 0.2). QC sales per chat fell from ₱370 (Apr) to ₱155 (Aug-Sep), so chat quality and closing are the limit, not chat volume.",
+     "source": "Hermosa Meta by page + declared sales, 45 weeks of 2026 (playbook/branch-month-2026.csv)"
+    },
+    {
+     "tier": 1,
+     "text": "Marikina has the best return per peso (6.7x) and is the only branch where spend shows a hint of paying back 2 weeks later.",
+     "source": "Hermosa Meta by page + declared sales"
+    }
+   ],
+   "recommendation": "With your OK: 1) Ultra Max ad set at QC Main, ₱1,000/day before VAT. 2) Botox family across all 4 branches, ₱600/day. 3) NovoForm at Fairview + QC, ₱300/day. These are funded from the old test budget, so the total stays about ₱363k a month before VAT. 4) Marikina Hiko +20% for 3 weeks as a controlled test. Every ad set is women only.",
+   "next": "Waiting for your OK on the 3 tests and the Marikina raise (Sales: Manage Meta ads thread). Each change goes to you as a preview first.",
+   "links": {
+    "playbook_lines": [
+     "QC_HIKO-ULTRAMAX_QC6MI_ADV_27-50_F_AUTO",
+     "ALL_BOTOX_4PINS_ADV_23-45_F_AUTO",
+     "FV_NOVOFORM_FV5MI+QC6MI_ADV_25-55_F_AUTO"
+    ]
+   },
+   "report": "/mnt/project-files/meta-ads/playbook/service-gaps-nov2026.csv"
+  },
+  {
+   "id": "refresh-timing",
+   "title": "When to refresh or turn off an ad",
+   "question": "How long should an ad run before it's refreshed, weighing Meta's fatigue against the ad's own results?",
+   "asked": "2026-11-27",
+   "asked_by": "CHRIS",
+   "status": "done",
+   "headline": "Judge an ad by its own results, not its age. Long-runners that still hold their cost per chat and bookings keep their budget.",
+   "findings": [
+    {
+     "tier": 1,
+     "text": "'failed hiko' has run 13 months (₱585k* lifetime) and still got ₱30.6* per chat in the last 30 days, at frequency 1.98.",
+     "source": "Hermosa Meta via Windsor"
+    },
+    {
+     "tier": 1,
+     "text": "'Drip 082124' has run 27 months and got ₱27.1* per chat in the last 30 days.",
+     "source": "Hermosa Meta via Windsor"
+    },
+    {
+     "tier": 0,
+     "text": "Meta groups lookalike ads as one creative (Andromeda), so new concepts need to be truly different, not small edits.",
+     "source": "Meta platform rule"
+    }
+   ],
+   "recommendation": "Weekly check per ad. Winner: if last 7 days cost per chat within +20% of its baseline AND at or under the ad set target, with bookings per chat holding, then keep running and keep its budget. Never edit it (an edit restarts learning); to try a change, duplicate it as a new ad. Tiring: if 2 of these in the last 7 days: cost per chat +20-35% over baseline, 7-day frequency above 2.5 (retargeting: above 5), CTR or hook rate (3-sec views / impressions) down 25%+ from its peak, quality ranking drops a level, then do not pause yet. Add 1-2 new versions to the same ad set (new first 3 seconds, new hook or new person, same core message) so Meta can shift spend. Fatigued: if cost per chat more than 35% over baseline for 2 weeks in a row, OR bookings per chat down 30%+ for 2 weeks, then pause it and launch its remake. Rest it 6-8 weeks, then it can come back as a new ad. Loser: if after 7 days and ₱3,000* spend: cost per chat 50%+ over the ad set target, or 0 bookings from its chats, then pause. It was never a winner, so no remake; learn from its hook.",
+   "next": "Built into the advisor's weekly moves.",
+   "links": {},
+   "report": "/mnt/project-files/meta-ads/playbook/adset-playbook.json (refresh_rule)"
   }
  ]
 }

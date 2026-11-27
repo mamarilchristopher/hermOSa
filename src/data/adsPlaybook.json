@@ -823,7 +823,7 @@
   }
  ],
  "proposed_note": "Lines with status 'proposed' (Ultra Max ₱1,000, Botox family ₱600, NovoForm ₱300 per day) wait on CHRIS's OK. They take the ALL_TEST ₱495/day. Total ₱11,940/day, about ₱363k a month pre-VAT, still under the 2026 average of ~₱367k pre-VAT (₱411k*).",
- "version": "1.6",
+ "version": "1.7",
  "radar": {
   "note": "Outside sources are mostly US agency or vendor blogs. Treat their numbers as directional. Our own ad log and the Hermosa OS sales numbers win.",
   "untapped": [
@@ -872,14 +872,17 @@
    },
    {
     "service": "Men-only test (Hiko for men, jawtox)",
-    "why": "CHRIS is open to a men-only test if the market is there. Regular ad sets stay women only (junk chats from men seeing women models). Our clients are about 90% women, so men are a small but possibly untapped group. Deep research on PH male aesthetics is under way.",
+    "why": "Own data, Nov 2024 to Nov 2026: men took 25.4% of spend (₱2,664,422*) and 24.2% of chats but are about 10% of clients, so a man who chats is about 0.34x as likely to book. No ad was ever made for men. They saw women-led ads, which brought the junk chats. A men-only test with male-led ads checks if there is real demand.",
     "evidence": [
-     "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)"
+     "Hermosa Meta accounts via Windsor, gender breakdown",
+     "CHRIS Nov 28 (clients about 90% women)",
+     "https://claude.ai/artifact/Wc51DtfoxjBAj5rQpknB2D"
     ],
-    "setup": "Separate men-only TEST ad set (gender Men, hard limit, 21+), male-led creative only (male client or male model in the first 2 seconds), QC Main first. Judge by bookings per chat, not cost per chat. Small test budget, 2 weeks.",
-    "budget_day_pre_vat": 0,
+    "setup": "Only after the women-only leak fix. One QC Main men-only ad set in its own campaign: original audience, gender Men, 21-54, ₱600/day before VAT for 21 days (₱12,600). Two male-led Taglish ads: Jawtox, and Hiko for men at ₱8,999/₱13,999. No before/after, no women in the ads. Front desk tags chats MEN-TEST.",
+    "budget_day_pre_vat": 600,
     "creative_brief": "V055 'Ang ganda and pogi mo' re-cut to 15s with the male client in the first 2 seconds.",
-    "status": "research"
+    "status": "proposed",
+    "kpis": "Win = men's bookings per chat at least 0.7x the women's at QC Main, plus 5+ paid treatments. Below 0.4x = stop for good."
    }
   ],
   "retargeting": {
