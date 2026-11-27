@@ -19,6 +19,9 @@ beforeAll(async () => {
   beaE = (await db.rpc(owner, "aal2", "save_employee", [null, FV, "DEMO Bea", "CMA", true, bea.appUserId, true])).id;
   await db.sql("UPDATE public.organizations SET late_grace_minutes = 15");
   svc = (await db.rpc(lead, "aal1", "add_service", ["DEMO Facial"])).id;
+  // update-0084 skips attendance before the in-app time clock started (live: 2026-11-25). These cases use
+  // Sep/Oct 2026 days, so the test organization's clock "started" earlier, as it would for a new clinic.
+  await db.sql(`UPDATE public.organizations SET payroll_rules = coalesce(payroll_rules, '{}'::jsonb) || '{"attendance_from": "2026-01-01"}'`);
 }, 60_000);
 afterAll(async () => db?.close());
 
