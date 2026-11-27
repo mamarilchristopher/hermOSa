@@ -75,6 +75,7 @@ export default async function AdAdvisor() {
   const offAds = lines.flatMap((l) => l.ads.filter((a) => a.flag === "OFF"));
   const winners = lines.flatMap((l) => l.ads.filter((a) => a.flag === "WINNER"));
   const tiring = lines.flatMap((l) => l.ads.filter((a) => a.flag === "TIRING"));
+  const evergreen = lines.flatMap((l) => l.ads.filter((a) => a.refresh === "EVERGREEN"));
   const mismatches = lines.flatMap((l) => l.adsets.filter((s) => s.mismatch).map((s) => ({ l, s })));
   const stale = res.staleDays !== null && res.staleDays >= 2;
   const loaded = feed.loaded_at ? new Date(feed.loaded_at).toLocaleString("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null;
@@ -109,7 +110,7 @@ export default async function AdAdvisor() {
           <div className="card biz-kpi">
             <div className="label">Ads</div>
             <div className="value">{offAds.length} <small className="muted">off</small> · {winners.length} <small className="muted">win</small></div>
-            <div className="sub muted">{tiring.length ? `${tiring.length} tiring` : "none tiring"}</div>
+            <div className="sub muted">{tiring.length ? `${tiring.length} to replace` : "none to replace"} · {evergreen.length} still holding</div>
           </div>
           <div className="card biz-kpi">
             <div className="label">Next review</div>
@@ -118,12 +119,13 @@ export default async function AdAdvisor() {
           </div>
         </div>
 
-        {(offAds.length > 0 || winners.length > 0 || mismatches.length > 0) && (
+        {(offAds.length > 0 || winners.length > 0 || mismatches.length > 0 || tiring.length > 0) && (
           <div className="card adv-todo">
             <h2>Do first</h2>
             <ul>
               {mismatches.map(({ l, s }) => <li key={s.id} className="bad"><b>{nameOf[l.branch]} {SERVICE_LABEL[l.service]}:</b> ad set &quot;{s.name}&quot; is aimed at the {nameOf[s.mismatch!] ?? s.mismatch} area, not {nameOf[l.branch]}. Move its pin to {nameOf[l.branch]}.</li>)}
               {offAds.map((a) => <li key={a.id} className="bad"><b>Turn off &quot;{a.name}&quot;</b> ({a.adset}): {a.why}</li>)}
+              {tiring.map((a) => <li key={`t-${a.id}`} className="bad"><b>New version of &quot;{a.name}&quot;</b>: {a.refreshWhy || a.why}</li>)}
               {winners.map((a) => <li key={a.id} className="good"><b>Winner &quot;{a.name}&quot;</b>{a.status !== "ACTIVE" ? " (paused: consider turning it back on)" : ""}: {a.why}</li>)}
             </ul>
           </div>
@@ -245,7 +247,9 @@ export default async function AdAdvisor() {
           <ul className="adv-list small">
             {pb.rules.map((r) => <li key={r}>{r}</li>)}
             <li>ROAS here = the line&apos;s share of the branch&apos;s declared sales ({fromLog === 4 ? "shares from the last 4 weeks of the Service log" : "November 2026 Service log shares where the last 4 weeks are thin"}) ÷ ad spend with VAT, week by week.</li>
-            <li>Turn off: ₱1,000* in 14 days with no chats, or 1.6× the line&apos;s cost per chat. Winner: 30+ chats at 20%+ cheaper than the line. Tiring: cost per chat up 30%+ or clicks down 30%+ on the week before.</li>
+            <li>Turn off: ₱1,000* in 14 days with no chats, or 1.6× the line&apos;s cost per chat. Winner: 30+ chats at 20%+ cheaper than the line.</li>
+            <li>Refresh timing weighs Meta&apos;s fatigue against how the ad still performs: each ad&apos;s last 7 days are compared with its own 4-week average. Still holding (21+ days, 80+ chats in 4 weeks, cost per chat steady and no worse than the line): keep its budget and add new ads beside it. Watch (15–30% worse): have a new version ready in 1–2 weeks. Replace (30%+ worse, or clicks down 30%+): launch the new version now and turn the old one off once the new one is cheaper. Too new: under 2 weeks or under 20 chats.</li>
+            <li>Sales come first: sales per chat shows what a chat is worth in sales, because more chats haven&apos;t meant more sales in 2026.</li>
             <li>An ad set needs about {LEARN_PER_WEEK} chats a week to leave Meta&apos;s learning phase.</li>
             <li>December: {pb.december.daily_shape} {pb.december.reserve_rule}</li>
           </ul>
@@ -278,6 +282,7 @@ function LineCard({ l, rank, branchName, play, today }: { l: LineView; rank: num
           <span><small>Per chat</small>{pc === null ? "–" : `₱${pc.toFixed(0)}*`}</span>
           <span><small>ROAS</small>{xr(l.roas7)} <em className="muted">prev {xr(l.roasP7)}</em></span>
           <span><small>Sales 7 days</small>{compact(l.sales7)}</span>
+          <span title="This line's share of the branch's sales ÷ its chats: what a chat is worth in sales"><small>Sales per chat</small>{l.salesPerChat === null ? "–" : `₱${Math.round(l.salesPerChat).toLocaleString("en-US")}`}</span>
         </div>
       ) : null}
 
@@ -299,22 +304,22 @@ function LineCard({ l, rank, branchName, play, today }: { l: LineView; rank: num
       {l.ads.length > 0 && (
         <details>
           <summary>Ads ({l.ads.filter((a) => a.status === "ACTIVE").length} running)</summary>
-          <div className="table-wrap">
-            <table className="ads-table">
-              <thead><tr><th>Ad</th><th>14 days*</th><th>Chats</th><th>Per chat*</th><th /></tr></thead>
-              <tbody>
-                {l.ads.map((a) => (
-                  <tr key={a.id} title={a.why || a.adset}>
-                    <td className="adv-ad">{a.name}{a.status !== "ACTIVE" && <span className="muted"> · {a.status.toLowerCase().replace(/_/g, " ")}</span>}</td>
-                    <td>{vat(a.t14.spend)}</td>
-                    <td>{a.t14.msgs}</td>
-                    <td>{a.cpc14 === null ? "–" : `₱${a.cpc14.toFixed(0)}*`}</td>
-                    <td>{a.flag && <span className={`pill adv-flag ${a.flag}`}>{a.flag === "OFF" ? "Turn off" : a.flag === "WINNER" ? "Winner" : "Tiring"}</span>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ul className="adv-ads">
+            {l.ads.map((a) => {
+              const note = a.flag === "OFF" || a.flag === "WINNER" ? a.why : a.refreshWhy;
+              const pill = a.flag ? <span className={`pill adv-flag ${a.flag}`}>{a.flag === "OFF" ? "Turn off" : a.flag === "WINNER" ? "Winner" : "Replace"}</span>
+                : a.refresh && a.refresh !== "REPLACE" ? <span className={`pill adv-flag ${a.refresh}`}>{a.refresh === "EVERGREEN" ? "Still holding" : a.refresh === "WATCH" ? "Watch" : "Too new"}</span> : null;
+              return (
+                <li key={a.id}>
+                  <div className="adv-ad-top"><b>{a.name}</b>{pill}</div>
+                  <div className="small adv-ad-facts">
+                    {a.status === "ACTIVE" ? `running ${a.age}${a.agePlus ? "+" : ""} days` : a.status.toLowerCase().replace(/_/g, " ")} · {vat(a.t14.spend)} in 14 days · {a.t14.msgs.toLocaleString("en-US")} chats · {a.cpc14 === null ? "–" : `₱${a.cpc14.toFixed(0)}*`} a chat
+                  </div>
+                  {note && <div className="small muted">{note}</div>}
+                </li>
+              );
+            })}
+          </ul>
         </details>
       )}
       <p className="small muted adv-next">Next review: {l.nextReview > today ? fmtDay(l.nextReview) : "today"}{l.lastChange ? ` · budget last changed ${fmtDay(l.lastChange)}` : ""}</p>
