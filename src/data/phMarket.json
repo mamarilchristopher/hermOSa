@@ -1,0 +1,17 @@
+{
+  "_note": "Philippine yardsticks for the live 'Us vs PH' tile (figures from the playbook radar's tier 3 sources, before VAT). Competitor rows come from the playbook radar (tier 2).",
+  "refs": {
+    "cpm": { "label": "PH median about ₱87", "median": 87 },
+    "cpc": { "label": "PH about ₱4.70", "median": 4.7 },
+    "chat": { "label": "PH ₱15–₱50", "lo": 15, "hi": 50 }
+  },
+  "ad_library": {
+    "note": "Meta's Ad Library can't be read from the cloud, so open these searches to see competitors' live ads. An ad that has run for months is usually a winner.",
+    "searches": [
+      { "label": "Hiko nose", "url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=PH&q=hiko%20nose&search_type=keyword_unordered&media_type=all" },
+      { "label": "Thread lift", "url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=PH&q=thread%20lift&search_type=keyword_unordered&media_type=all" },
+      { "label": "Gluta drip", "url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=PH&q=gluta%20drip&search_type=keyword_unordered&media_type=all" },
+      { "label": "Botox", "url": "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=PH&q=botox&search_type=keyword_unordered&media_type=all" }
+    ]
+  }
+}
