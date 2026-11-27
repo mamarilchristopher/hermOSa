@@ -6,10 +6,10 @@ import { adsManagerUrl, audit, miles } from "../../src/lib/adsAudit";
 const QC = "103117851723422", SMB = "112393681804031";
 const TODAY = "2026-12-15", END = addDay(TODAY, -1);
 const QC_PIN = { lat: 14.6393, lng: 121.0566 }, SMB_PIN = { lat: 14.8659, lng: 120.9966 };
-const tg = (o: { pin?: { lat: number; lng: number }; radius?: number; ageMin?: number; genders?: number[] }) => JSON.stringify({
-  age_min: o.ageMin ?? 21, age_max: 65, ...(o.genders ? { genders: o.genders } : {}),
+const tg = (o: { pin?: { lat: number; lng: number }; radius?: number; ageMin?: number; genders?: number[]; advantage?: boolean }) => JSON.stringify({
+  age_min: o.ageMin ?? 21, age_max: 65, genders: o.genders ?? [2],
   geo_locations: { places: [{ name: "DEMO pin", latitude: (o.pin ?? QC_PIN).lat, longitude: (o.pin ?? QC_PIN).lng, radius: o.radius ?? 3, distance_unit: "mile" }] },
-  targeting_automation: { advantage_audience: 1 },
+  targeting_automation: { advantage_audience: o.advantage ? 1 : 0 },
 });
 /** 21 days of one ad in one ad set; spend and chats per day: [last 7, the 7 before, the 7 before that]. */
 function ad(o: { page?: string; sid: string; aid: string; a: string; sp: number[]; m: number[]; im?: number[]; cl?: number[]; fq?: number[]; cid?: string }) {
@@ -56,10 +56,16 @@ describe("ad checks", () => {
     expect(f.title).toBe(`Shrink the circle to ${Math.floor(d - 0.5)} mi`);
   });
 
-  it("flags ages under 21, and never flags women-only (CHRIS's call)", () => {
-    const f = run(base(), { s1: tg({ ageMin: 18, genders: [2] }) }, { plan: { genders: "all", ageMin: 21 } });
-    expect(f.find((x) => x.check === "age")!.title).toBe("Raise the minimum age to 21");
+  it("flags ages under 21", () => {
+    const f = run(base(), { s1: tg({ ageMin: 18 }) });
     expect(f.map((x) => x.check)).toEqual(["age"]);
+    expect(f[0].title).toBe("Raise the minimum age to 21");
+  });
+
+  it("flags anything that isn't women only as a hard limit (CHRIS Nov 28)", () => {
+    expect(run(base(), { s1: tg({ genders: [1, 2] }) }).find((x) => x.check === "gender")!.short).toBe('"DEMO set s1" shows to all genders');
+    expect(run(base(), { s1: tg({ advantage: true }) }).find((x) => x.check === "gender")!.short).toBe('"DEMO set s1" uses Advantage+ audience, so men still see it');
+    expect(run(base(), { s1: tg({}) }).some((x) => x.check === "gender")).toBe(false);
   });
 
   it("flags ad sets split too thin to leave learning", () => {

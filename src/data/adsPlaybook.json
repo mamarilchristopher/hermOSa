@@ -66,19 +66,20 @@
   "Refresh by performance, not age (see refresh_rule): keep winners as long as their cost per chat and bookings hold; add new versions when an ad starts tiring; pause only when fatigued for 2 weeks.",
   "Geo: a branch's radius must not reach another Hermosa clinic (QC Main to Fairview is 4.5 mi, Marikina to QC Main is 3.9 mi). Use pins and radii that stop short, or exclude the other branch's area.",
   "Age: every ad set starts at 21+, never 18.",
-  "One ad runs in one ad set only. Duplicates ('- Copy') compete with each other in the same auction."
+  "One ad runs in one ad set only. Duplicates ('- Copy') compete with each other in the same auction.",
+  "Gender: every regular ad set is women only, as a hard limit (original audience controls, not an Advantage+ suggestion). About 90% of actual clients are women, and men seeing women-model ads bring junk chats (CHRIS, Nov 28). Exception: dedicated men-only TEST ad sets with male-led creative are allowed when research shows an untapped market (CHRIS: 'i'd happily test a Hiko for men'). Never mix genders in one ad set."
  ],
  "lines": [
   {
    "branch": "QC_MAIN",
    "service": "HIKO",
-   "ad_set_name": "QC_HIKO_4MI-XFVMK_BROAD_21-54_ALL_AUTO",
+   "ad_set_name": "QC_HIKO_4MI-XFVMK_BROAD_21-54_F_AUTO",
    "status": "keep_and_refresh",
    "audience": {
-    "mode": "advantage_plus",
+    "mode": "original_audience_women",
     "age_min": 21,
     "age_max": 54,
-    "genders": "all",
+    "genders": "women",
     "interests": [
      "Beauty",
      "Cosmetics",
@@ -90,7 +91,7 @@
     "behaviors": [
      "Engaged shoppers"
     ],
-    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+    "note": "CHRIS rule (Nov 28): women only, as a HARD limit. Advantage+ audience can only 'suggest' gender, so use original audience controls: gender Women, age 21+, location as set, Advantage+ audience off. Interests stay off (broad)."
    },
    "creatives": [
     {
@@ -126,7 +127,7 @@
      "why": "Bakit Trending: ₱40.9* per chat, and still running"
     }
    ],
-   "rationale": "Hiko drives ~64% of sales. QC Main Hiko returned 4.1x in 2026. In November, spend was halved while sales held, so the old budget was over-spending. Keep this ad set out of learning and rotate in 8-12 different concepts. All-genders ad sets got chats at ₱32.6* vs ₱47.9* for women-only (last 30 days), so keep all genders.",
+   "rationale": "Hiko drives ~64% of sales. QC Main Hiko returned 4.1x in 2026. In November, spend was halved while sales held, so the old budget was over-spending. Keep this ad set out of learning and rotate in 8-12 different concepts. Women only (CHRIS, Nov 28): about 90% of actual clients are women, and showing ads to men brings creepy, junk chats. All-genders chats looked cheaper (₱32.6* vs ₱47.9*) but CHRIS reports many were junk from men, so cost per chat flattered them; judge by bookings per chat.",
    "review_after_days": 7,
    "daily_budget_pre_vat": 3125,
    "service_name": "Hiko nose lift",
@@ -153,7 +154,7 @@
    "ad_set_name": "QC_DRIP (off)",
    "status": "off",
    "audience": {
-    "mode": "advantage_plus",
+    "mode": "original_audience_women",
     "age_min": 21,
     "age_max": 45,
     "genders": "women",
@@ -165,7 +166,7 @@
      "Online shopping"
     ],
     "behaviors": [],
-    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+    "note": "CHRIS rule (Nov 28): women only, as a HARD limit. Advantage+ audience can only 'suggest' gender, so use original audience controls: gender Women, age 21+, location as set, Advantage+ audience off. Interests stay off (broad)."
    },
    "creatives": [],
    "rationale": "QC Gluta returned only 1.2x in 2026. Leave it off and test new drip creative in ALL_TEST first. Bring it back only if a test ad reaches 4x real ROAS.",
@@ -192,13 +193,13 @@
   {
    "branch": "FAIRVIEW",
    "service": "HIKO",
-   "ad_set_name": "FV_HIKO_5MI+SJDM-XQC_BROAD_21-54_ALL_AUTO",
+   "ad_set_name": "FV_HIKO_5MI+SJDM-XQC_BROAD_21-54_F_AUTO",
    "status": "rebuild",
    "audience": {
-    "mode": "advantage_plus",
+    "mode": "original_audience_women",
     "age_min": 21,
     "age_max": 54,
-    "genders": "all",
+    "genders": "women",
     "interests": [
      "Beauty",
      "Cosmetics",
@@ -210,7 +211,7 @@
     "behaviors": [
      "Engaged shoppers"
     ],
-    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+    "note": "CHRIS rule (Nov 28): women only, as a HARD limit. Advantage+ audience can only 'suggest' gender, so use original audience controls: gender Women, age 21+, location as set, Advantage+ audience off. Interests stay off (broad)."
    },
    "creatives": [
     {
@@ -261,7 +262,7 @@
    "ad_set_name": "FV_DRIP_5MI+SJDM-XQC_BROAD_21-45_F_AUTO",
    "status": "keep",
    "audience": {
-    "mode": "advantage_plus",
+    "mode": "original_audience_women",
     "age_min": 21,
     "age_max": 45,
     "genders": "women",
@@ -273,7 +274,7 @@
      "Online shopping"
     ],
     "behaviors": [],
-    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+    "note": "CHRIS rule (Nov 28): women only, as a HARD limit. Advantage+ audience can only 'suggest' gender, so use original audience controls: gender Women, age 21+, location as set, Advantage+ audience off. Interests stay off (broad)."
    },
    "creatives": [
     {
@@ -317,13 +318,13 @@
   {
    "branch": "STA_MARIA",
    "service": "HIKO",
-   "ad_set_name": "SM_HIKO_BULACAN8_BROAD_21-54_ALL_AUTO",
+   "ad_set_name": "SM_HIKO_BULACAN8_BROAD_21-54_F_AUTO",
    "status": "rebuild",
    "audience": {
-    "mode": "advantage_plus",
+    "mode": "original_audience_women",
     "age_min": 21,
     "age_max": 54,
-    "genders": "all",
+    "genders": "women",
     "interests": [
      "Beauty",
      "Cosmetics",
@@ -335,7 +336,7 @@
     "behaviors": [
      "Engaged shoppers"
     ],
-    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+    "note": "CHRIS rule (Nov 28): women only, as a HARD limit. Advantage+ audience can only 'suggest' gender, so use original audience controls: gender Women, age 21+, location as set, Advantage+ audience off. Interests stay off (broad)."
    },
    "creatives": [
     {
@@ -355,7 +356,7 @@
      "why": "2-year results"
     }
    ],
-   "rationale": "SMB Hiko returned 3.0x. The current live ad set runs from the Main page on the QC pin (+4 mi, women only) at ₱44.2* per chat. Move it to the Bulacan towns and all genders.",
+   "rationale": "SMB Hiko returned 3.0x. The current live ad set runs from the Main page on the QC pin (+4 mi, women only) at ₱44.2* per chat. Move it to the Bulacan towns, keeping women only.",
    "review_after_days": 7,
    "daily_budget_pre_vat": 1150,
    "service_name": "Hiko nose lift",
@@ -387,7 +388,7 @@
    "ad_set_name": "SM_DRIP_BULACAN8_BROAD_21-45_F_AUTO",
    "status": "keep_untouched",
    "audience": {
-    "mode": "advantage_plus",
+    "mode": "original_audience_women",
     "age_min": 21,
     "age_max": 45,
     "genders": "women",
@@ -399,7 +400,7 @@
      "Online shopping"
     ],
     "behaviors": [],
-    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+    "note": "CHRIS rule (Nov 28): women only, as a HARD limit. Advantage+ audience can only 'suggest' gender, so use original audience controls: gender Women, age 21+, location as set, Advantage+ audience off. Interests stay off (broad)."
    },
    "creatives": [
     {
@@ -438,13 +439,13 @@
   {
    "branch": "MARIKINA",
    "service": "HIKO",
-   "ad_set_name": "MK_HIKO_4MI+RIZAL-XQC_BROAD_21-54_ALL_AUTO",
+   "ad_set_name": "MK_HIKO_4MI+RIZAL-XQC_BROAD_21-54_F_AUTO",
    "status": "keep_untouched",
    "audience": {
-    "mode": "advantage_plus",
+    "mode": "original_audience_women",
     "age_min": 21,
     "age_max": 54,
-    "genders": "all",
+    "genders": "women",
     "interests": [
      "Beauty",
      "Cosmetics",
@@ -454,7 +455,7 @@
      "Online shopping (Shopee, Lazada)"
     ],
     "behaviors": [],
-    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+    "note": "CHRIS rule (Nov 28): women only, as a HARD limit. Advantage+ audience can only 'suggest' gender, so use original audience controls: gender Women, age 21+, location as set, Advantage+ audience off. Interests stay off (broad)."
    },
    "creatives": [
     {
@@ -504,7 +505,7 @@
    "ad_set_name": "MK_DRIP_4MI+RIZAL-XQC_BROAD_21-45_F_AUTO",
    "status": "start",
    "audience": {
-    "mode": "advantage_plus",
+    "mode": "original_audience_women",
     "age_min": 21,
     "age_max": 45,
     "genders": "women",
@@ -516,7 +517,7 @@
      "Online shopping"
     ],
     "behaviors": [],
-    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+    "note": "CHRIS rule (Nov 28): women only, as a HARD limit. Advantage+ audience can only 'suggest' gender, so use original audience controls: gender Women, age 21+, location as set, Advantage+ audience off. Interests stay off (broad)."
    },
    "creatives": [
     {
@@ -559,13 +560,13 @@
    "branch": "ALL",
    "service": "OTHER",
    "service_name": "Retargeting (4 pages)",
-   "ad_set_name": "<BR>_RTG_MSG90+VV30_ALL_21-60_ALL_AUTO",
+   "ad_set_name": "<BR>_RTG_MSG90+VV30_ALL_21-60_F_AUTO",
    "status": "start",
    "audience": {
     "mode": "custom_audiences",
     "age_min": 21,
     "age_max": 60,
-    "genders": "all",
+    "genders": "women",
     "interests": [],
     "behaviors": [],
     "custom": [
@@ -575,7 +576,8 @@
     ],
     "exclude": [
      "Customer list of clients from the last 30 days (only with CHRIS's OK)"
-    ]
+    ],
+    "note": "Women only (CHRIS rule Nov 28)."
    },
    "creatives": [
     {
@@ -620,13 +622,13 @@
    "branch": "ALL",
    "service": "OTHER",
    "service_name": "Testing",
-   "ad_set_name": "ALL_TEST_<CONCEPT>_QC4MI_BROAD_21-54_ALL_AUTO",
+   "ad_set_name": "ALL_TEST_<CONCEPT>_QC4MI_BROAD_21-54_F_AUTO",
    "status": "hold",
    "audience": {
-    "mode": "advantage_plus",
+    "mode": "original_audience_women",
     "age_min": 21,
     "age_max": 54,
-    "genders": "all",
+    "genders": "women",
     "interests": [
      "Beauty",
      "Cosmetics",
@@ -636,7 +638,7 @@
      "Online shopping (Shopee, Lazada)"
     ],
     "behaviors": [],
-    "note": "Age minimum and location are hard limits. Age max, gender and interests are only suggestions under Advantage+ audience."
+    "note": "CHRIS rule (Nov 28): women only, as a HARD limit. Advantage+ audience can only 'suggest' gender, so use original audience controls: gender Women, age 21+, location as set, Advantage+ audience off. Interests stay off (broad)."
    },
    "creatives": [
     {
@@ -667,16 +669,16 @@
    "branch": "QC_MAIN",
    "service": "HIKO",
    "service_name": "Ultra Max Hiko ₱13,999 (premium tier)",
-   "ad_set_name": "QC_HIKO-ULTRAMAX_QC6MI_ADV_27-50_ALL_AUTO",
+   "ad_set_name": "QC_HIKO-ULTRAMAX_QC6MI_ADV_27-50_F_AUTO",
    "status": "proposed",
    "daily_budget_pre_vat": 1000,
    "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
    "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
    "audience": {
-    "mode": "advantage_plus",
+    "mode": "original_audience_women",
     "age_min": 25,
     "age_max": 50,
-    "genders": "all",
+    "genders": "women",
     "interests": [
      "Luxury goods",
      "Frequent international travelers",
@@ -685,7 +687,7 @@
      "Engaged shoppers"
     ],
     "behaviors": [],
-    "note": "Income targeting does not exist in the Philippines. Interests are only suggestions under Advantage+. The premium offer and creative do the real filtering (Andromeda matches the ad to people like the ones who respond). Past 'Luxury' interest ad sets cost ₱48-64* per chat vs ₱34-48* for Broad, while still selling the ₱8,999 offer, so the interest alone did not help."
+    "note": "CHRIS rule (Nov 28): women only, as a HARD limit. Advantage+ audience can only 'suggest' gender, so use original audience controls: gender Women, age 21+, location as set, Advantage+ audience off. Interests stay off (broad). Income targeting does not exist in the Philippines. Interests are not used. The premium offer and creative do the real filtering (Andromeda matches the ad to people like the ones who respond). Past 'Luxury' interest ad sets cost ₱48-64* per chat vs ₱34-48* for Broad, while still selling the ₱8,999 offer, so the interest alone did not help."
    },
    "geo": {
     "include": [
@@ -725,23 +727,23 @@
    "branch": "ALL",
    "service": "OTHER",
    "service_name": "Botox family: Jawtox, Barbie Arms, Botox per unit",
-   "ad_set_name": "ALL_BOTOX_4PINS_ADV_23-45_ALL_AUTO",
+   "ad_set_name": "ALL_BOTOX_4PINS_ADV_23-45_F_AUTO",
    "status": "proposed",
    "daily_budget_pre_vat": 600,
    "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
    "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
    "audience": {
-    "mode": "advantage_plus",
+    "mode": "original_audience_women",
     "age_min": 21,
     "age_max": 45,
-    "genders": "all",
+    "genders": "women",
     "interests": [
      "Beauty",
      "Fitness and wellness",
      "Fashion"
     ],
     "behaviors": [],
-    "note": "Suggestions only."
+    "note": "CHRIS rule (Nov 28): women only, as a HARD limit. Advantage+ audience can only 'suggest' gender, so use original audience controls: gender Women, age 21+, location as set, Advantage+ audience off. Interests stay off (broad)."
    },
    "geo": {
     "include": [
@@ -778,23 +780,23 @@
    "branch": "FAIRVIEW",
    "service": "OTHER",
    "service_name": "NovoForm (doctor-guided)",
-   "ad_set_name": "FV_NOVOFORM_FV5MI+QC6MI_ADV_25-55_ALL_AUTO",
+   "ad_set_name": "FV_NOVOFORM_FV5MI+QC6MI_ADV_25-55_F_AUTO",
    "status": "proposed",
    "daily_budget_pre_vat": 300,
    "objective": "Engagement > Messages (Messenger), campaign ALL_MIX_AON_MSG, ad set budget",
    "placements": "Advantage+ placements (Reels, Stories, Feed on FB and IG). Every ad needs a 9:16 version plus a 4:5 Feed version.",
    "audience": {
-    "mode": "advantage_plus",
+    "mode": "original_audience_women",
     "age_min": 25,
     "age_max": 55,
-    "genders": "all",
+    "genders": "women",
     "interests": [
      "Health and wellness",
      "Weight management",
      "Fitness"
     ],
     "behaviors": [],
-    "note": "Suggestions only. Wellness framing: no scale photos, no kilos claims, no before/after."
+    "note": "CHRIS rule (Nov 28): women only, as a HARD limit. Advantage+ audience can only 'suggest' gender, so use original audience controls: gender Women, age 21+, location as set, Advantage+ audience off. Interests stay off (broad). Wellness framing: no scale photos, no kilos claims, no before/after."
    },
    "geo": {
     "include": [
@@ -821,7 +823,7 @@
   }
  ],
  "proposed_note": "Lines with status 'proposed' (Ultra Max ₱1,000, Botox family ₱600, NovoForm ₱300 per day) wait on CHRIS's OK. They take the ALL_TEST ₱495/day. Total ₱11,940/day, about ₱363k a month pre-VAT, still under the 2026 average of ~₱367k pre-VAT (₱411k*).",
- "version": "1.4",
+ "version": "1.6",
  "radar": {
   "note": "Outside sources are mostly US agency or vendor blogs. Treat their numbers as directional. Our own ad log and the Hermosa OS sales numbers win.",
   "untapped": [
@@ -832,7 +834,7 @@
      "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)",
      "Hermosa service log Nov 1-24 (playbook/service-gaps-nov2026.csv)"
     ],
-    "setup": "ALL_TEST ad set for 2 weeks. QC 4 mi + Fairview 5 mi, Advantage+, age 25-55 hard minimum 21. Doctor-guided, wellness framing only: no scale photos, no before/after, no weight or kilos claims, no 'lose X kg'.",
+    "setup": "ALL_TEST ad set for 2 weeks. QC 4 mi + Fairview 5 mi, original audience (Advantage+ audience off), women only (hard limit), age 25-55, minimum 21. Doctor-guided, wellness framing only: no scale photos, no before/after, no weight or kilos claims, no 'lose X kg'.",
     "budget_day_pre_vat": 300,
     "creative_brief": "Doctor talking head (15s): 'Safe ba ang GLP-1? Dito, doctor-guided ka from day 1.' Then the consult is free, then Send message. Reuse V057 with the scale shots removed."
    },
@@ -843,7 +845,7 @@
      "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)",
      "Hermosa service log Nov 1-24 (playbook/service-gaps-nov2026.csv)"
     ],
-    "setup": "QC + Marikina, women 21-45 suggestion, Advantage+. Run it in ALL_TEST first.",
+    "setup": "QC + Marikina, women only (hard limit), age 21-45, original audience (Advantage+ audience off). Run it in ALL_TEST first.",
     "budget_day_pre_vat": 300,
     "creative_brief": "Re-cut V035 to 20s. Remove the before/after overlay and the syringe close-ups in the first 10s. Hook: 'Sleeveless season na. Ready na ba arms mo?' Current price only."
    },
@@ -854,7 +856,7 @@
      "https://www.thetrndsph.com/2026/03/non-surgical-skin-tightening.html",
      "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)"
     ],
-    "setup": "ALL_TEST, QC + Marikina, all genders 30-55 suggestion.",
+    "setup": "ALL_TEST, QC + Marikina, women only (hard limit), age 30-55.",
     "budget_day_pre_vat": 250,
     "creative_brief": "Real client testimonial video (no B/A): 'Mukhang pagod lagi? Lifted look in 1 session, walang downtime.' Show the Ultra V Lift price as the current price."
    },
@@ -864,19 +866,20 @@
     "evidence": [
      "https://www.soiclinic.com/blog/most-googled-beauty-treatments-philippines-2026"
     ],
-    "setup": "Each branch's own area, women 18-35 suggestion (hard minimum 21), Advantage+. Start with SMB and Marikina, where drips already convert.",
+    "setup": "Each branch's own area, women only (hard limit), age 21-35, original audience (Advantage+ audience off). Start with SMB and Marikina, where drips already convert.",
     "budget_day_pre_vat": 250,
     "creative_brief": "ASMR-style treatment clip (V020 facial raw) with the hook 'Glass skin without filter?'. Glow only: no whitening or lightening words, and no acne before/after."
    },
    {
-    "service": "Men (Hiko 'pogi', jawtox)",
-    "why": "All-genders Hiko ad sets get chats ~30% cheaper than women-only (₱32.6* vs ₱47.9*). This is our own ad data; no PH source yet measures male demand.",
+    "service": "Men-only test (Hiko for men, jawtox)",
+    "why": "CHRIS is open to a men-only test if the market is there. Regular ad sets stay women only (junk chats from men seeing women models). Our clients are about 90% women, so men are a small but possibly untapped group. Deep research on PH male aesthetics is under way.",
     "evidence": [
      "Hermosa ad log (331 creatives, Nov 2024 - Nov 2026)"
     ],
-    "setup": "Keep Hiko ad sets all-genders. Add 1-2 male-led creatives per ad set instead of a separate ad set.",
+    "setup": "Separate men-only TEST ad set (gender Men, hard limit, 21+), male-led creative only (male client or male model in the first 2 seconds), QC Main first. Judge by bookings per chat, not cost per chat. Small test budget, 2 weeks.",
     "budget_day_pre_vat": 0,
-    "creative_brief": "V055 'Ang ganda and pogi mo' re-cut to 15s with the male client in the first 2 seconds."
+    "creative_brief": "V055 'Ang ganda and pogi mo' re-cut to 15s with the male client in the first 2 seconds.",
+    "status": "research"
    }
   ],
   "retargeting": {
@@ -910,7 +913,7 @@
    },
    {
     "title": "Advantage+ audience is the default; detailed targeting shrank (Meta platform rule, applies in PH)",
-    "detail": "Interest exclusions were removed on Mar 31, 2025. Interests were merged into broad clusters from Jun 2025. Campaigns using deprecated targeting stopped delivering after Jan 15, 2026. Interests are now suggestions only. Location and minimum age stay hard limits.",
+    "detail": "Interest exclusions were removed on Mar 31, 2025. Interests were merged into broad clusters from Jun 2025. Campaigns using deprecated targeting stopped delivering after Jan 15, 2026. Interests are now suggestions only. Location and minimum age stay hard limits. Our exception: gender is a hard women-only limit (CHRIS, Nov 28), which needs original audience controls because Advantage+ audience treats gender as a suggestion only.",
     "source": "https://lafactory.com/meta-broad-vs-detailed-targeting/"
    },
    {

@@ -15,7 +15,7 @@ export type PlayLine = {
   proposed_change?: { daily_budget_pre_vat: number; why: string; status?: string } | null;
   kpis: { target_cost_per_chat_vat: number; scale_if_weekly_real_roas_at_least: number; trim_if_real_roas_below_for_2_weeks: number };
 };
-export type Untapped = { service: string; why: string; evidence: string[]; setup: string; budget_day_pre_vat: number; creative_brief: string };
+export type Untapped = { service: string; why: string; evidence: string[]; setup: string; budget_day_pre_vat: number; creative_brief: string; status?: string | null };
 export type ServiceGap = {
   service: string; nov1_24_sales_php: number; new_clients: number; typical_ticket_php: number; ad_spend_share_last30d: string;
   by_branch: string; break_even_close_rate_for_5x: string; assumed_cost_per_chat_vat: number | string; verdict: string;
@@ -57,7 +57,7 @@ export const planPerDay = (pb: Playbook = PLAYBOOK) => pb.lines.filter((l) => l.
 export const proposedPerDay = (pb: Playbook = PLAYBOOK) => pb.lines.filter((l) => l.status === "proposed").reduce((s, l) => s + (l.daily_budget_pre_vat || 0), 0);
 
 const STATUS: Record<string, string> = {
-  keep: "Keep", keep_untouched: "Keep, don't touch", keep_and_refresh: "Keep, add fresh ads", rebuild: "Rebuild the ads", off: "Off", start: "Start", proposed: "Waiting for your OK", hold: "On hold",
+  keep: "Keep", keep_untouched: "Keep, don't touch", keep_and_refresh: "Keep, add fresh ads", rebuild: "Rebuild the ads", off: "Off", start: "Start", proposed: "Waiting for your OK", hold: "On hold", research: "Being researched",
 };
 export const statusLabel = (s: string) => STATUS[s] ?? s.replace(/_/g, " ");
 /** Source strings may hold several URLs split by " ; ", each optionally followed by a note ("https://x.ph/a (PH agency)"). */

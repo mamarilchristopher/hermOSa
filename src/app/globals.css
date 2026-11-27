@@ -2522,3 +2522,4 @@ a.adv-open:hover { background: var(--viz-track); }
 .adv-checks li.flag > b { white-space: nowrap; }
 .adv-detail .adv-nums span.adv-wk { display: flex; }
 @media (max-width: 700px) { .adv-detail .adv-nums { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; } }
+.adv-st.research { background: var(--viz-track); color: var(--viz-deep); }

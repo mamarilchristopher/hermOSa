@@ -6,12 +6,13 @@
 import { addDay, CLINIC_PIN, LEARN_PER_WEEK, PAGES, perChat, type AdSetView, type Feed, type LineView } from "./adsAdvisor";
 import { SERVICE_LABEL } from "./ads";
 
-export type CheckKey = "pin" | "overlap" | "age" | "split" | "setCost" | "dupe" | "zeroDay" | "cpcJump" | "quality" | "saturation";
+export type CheckKey = "pin" | "overlap" | "age" | "gender" | "split" | "setCost" | "dupe" | "zeroDay" | "cpcJump" | "quality" | "saturation";
 /** Every check, in the order it is listed on the page. */
 export const CHECKS: { key: CheckKey; label: string }[] = [
   { key: "pin", label: "Each ad set's pin is in its own branch's area" },
   { key: "overlap", label: "Branch circles don't reach another clinic" },
   { key: "age", label: "Ages 21+ (house rule)" },
+  { key: "gender", label: "Women only as a hard limit (men only in a separate test)" },
   { key: "split", label: "Ad sets get enough chats to leave learning" },
   { key: "setCost", label: "Ad sets in a line cost about the same per chat" },
   { key: "dupe", label: "No ad runs in two ad sets of the same line" },
@@ -96,8 +97,8 @@ export function audit(inp: AuditInput): Finding[] {
     }
   }
 
-  // 3. Ages under 21. (Gender is not checked: women-only is CHRIS's call, Nov 28 — clients are about 90% women and
-  //    ads open to men bring junk chats.)
+  // 3–4. Ages under 21; not women-only as a hard limit (CHRIS Nov 28: about 90% of actual clients are women and ads
+  //      open to men bring junk chats). With Advantage+ audience on, gender is only a suggestion, so men still see it.
   for (const { l, s } of sets) {
     const t = s.targeting;
     if (!t) continue;
@@ -110,6 +111,17 @@ export function audit(inp: AuditInput): Finding[] {
         why: `The house rule is 21+ for aesthetic ads (Meta's own floor for cosmetic procedures is 18). Under-21s rarely book and some need a parent's OK. In the ad set's Audience, set the minimum age to ${minAge}${t.advantage ? " (with Advantage+ audience, the minimum age is a hard limit; the age range is only a suggestion)" : ""}.`,
         action: "Fix ages", target: { kind: "adset", id: s.id, cid: s.cid, view: "edit" },
         approve: `${tagOf(l)}: set ad set "${s.name}" minimum age to ${minAge}`,
+      });
+    }
+    // A separate men-only TEST ad set with male-led creative is allowed (playbook v1.6); mixed gender never is.
+    if (t.genders === "all" || t.advantage) {
+      const open = t.genders === "all";
+      out.push({
+        id: `gender-${s.id}`, name: s.name, check: "gender", sev: "warn", line: l.key, tag: tagOf(l), title: "Make it women only",
+        short: open ? `"${s.name}" shows to all genders` : `"${s.name}" uses Advantage+ audience, so men still see it`,
+        why: `${open ? "This ad set shows to men and women." : "With Advantage+ audience on, Meta treats gender only as a suggestion, so the ads still reach the other gender."} Your rule: regular ad sets are women only as a hard limit (about 90% of actual clients are women; men bring junk chats); men are reached only by a separate men-only test ad set. In the ad set's Audience, switch to original audience options and set gender to Women. Changing the audience restarts learning, so do it together with any other fixes to this ad set.`,
+        action: "Fix audience", target: { kind: "adset", id: s.id, cid: s.cid, view: "edit" },
+        approve: `${tagOf(l)}: set ad set "${s.name}" to women only (original audience)`,
       });
     }
   }

@@ -120,7 +120,7 @@ export default async function AdAdvisor() {
     return go(l.budgetSource === "campaign" ? { kind: "campaign", id: top.cid, cid: top.cid, view: "edit" } : { kind: "adset", id: top.id, cid: top.cid, view: "edit" });
   }
   const findings = audit({ feed, lines, end: res.end, sales, plan: (b, sv) => { const p = playLine(b, sv); return p ? { genders: p.audience.genders, ageMin: p.audience.age_min } : null; } });
-  const KIND: Record<string, string> = { pin: "Fix the area", overlap: "Branches overlap", age: "Audience", split: "Learning", setCost: "Ad sets", dupe: "Duplicate ad", zeroDay: "₱0-sales days", cpcJump: "Cost per chat", quality: "Chat quality", saturation: "Audience tired" };
+  const KIND: Record<string, string> = { pin: "Fix the area", overlap: "Branches overlap", age: "Audience", gender: "Audience", split: "Learning", setCost: "Ad sets", dupe: "Duplicate ad", zeroDay: "₱0-sales days", cpcJump: "Cost per chat", quality: "Chat quality", saturation: "Audience tired" };
   const moves: Move[] = [
     ...groupFixes(findings.filter((f) => f.sev !== "info")).map((g) => {
       const f = g[0];
@@ -264,7 +264,6 @@ export default async function AdAdvisor() {
               {CHECKS.map((c) => <li key={c.key} className={failed.has(c.key) ? "flag" : "ok"}><span>{failed.has(c.key) ? "!" : "✓"}</span>{c.label}{failed.has(c.key) ? <b> · {failed.get(c.key)} flagged</b> : null}</li>)}
               <li className="ok"><span>✓</span>Each running ad judged against its own best 14 days (winner, tiring, fatigued, loser)</li>
               <li className="ok"><span>✓</span>Budget moves follow ROAS from declared sales, at most once a week</li>
-              <li className="ok"><span>✓</span>Women-only audiences are fine: your call (about 90% of clients are women; ads open to men bring junk chats)</li>
             </ul>
             {infos.length > 0 && (
               <ul className="adv-notes">
@@ -402,6 +401,7 @@ export default async function AdAdvisor() {
                   <span className="label">Untapped service</span>
                   <span className="adv-opp-title">{u.service}</span>
                   <span className="adv-big">{u.budget_day_pre_vat ? `test ${peso(u.budget_day_pre_vat)}/day` : "no extra budget"}</span>
+                  {u.status && <span className={`pill adv-st ${u.status}`}>{statusLabel(u.status)}</span>}
                 </summary>
                 <p className="small">{u.why}</p>
                 <p className="small"><b>Set-up:</b> {u.setup}</p>
@@ -487,7 +487,7 @@ export default async function AdAdvisor() {
 
 /** Setting fixes on the same ad set become one card (one trip into Ads Manager). */
 function groupFixes(fs: Finding[]) {
-  const SETTINGS = new Set(["pin", "overlap", "age"]);
+  const SETTINGS = new Set(["pin", "overlap", "age", "gender"]);
   const out: Finding[][] = [], bySet = new Map<string, Finding[]>();
   for (const f of fs) {
     if (SETTINGS.has(f.check) && f.target && f.target.kind === "adset") {
@@ -591,7 +591,7 @@ function Setup({ p }: { p: PlayLine }) {
         <dt>Goal</dt><dd>{p.objective}</dd>
         <dt>Audience</dt>
         <dd>
-          {a.mode === "advantage_plus" ? "Advantage+ audience" : a.mode === "custom_audiences" ? "Custom audiences (no Advantage+ expansion)" : "Detailed targeting"} · ages {a.age_min}–{a.age_max} · {a.genders === "all" ? "all genders" : a.genders}
+          {a.mode === "advantage_plus" ? "Advantage+ audience" : a.mode === "original_audience_women" ? "Original audience, women only (hard limit)" : a.mode === "custom_audiences" ? "Custom audiences (no Advantage+ expansion)" : "Detailed targeting"} · ages {a.age_min}–{a.age_max} · {a.genders === "all" ? "all genders" : a.genders}
           {a.interests.length > 0 && <> · suggestions: {a.interests.join(", ")}</>}
           {a.behaviors.length > 0 && <> · behaviours: {a.behaviors.join(", ")}</>}
           {a.note && <div className="small muted">{a.note}</div>}
