@@ -41,6 +41,16 @@ export async function loadTodos(supabase: SupabaseClient, access: Access, today:
     const timeTodo = await timeIn(emp.id);
     if (timeTodo) todos.unshift(timeTodo);
   }
+  // CHRIS Nov 27 (update-0094): Cancelled bookings without the client's reason go on the To do of the CSR who booked
+  // them and of whoever marked them Cancelled. Before update-0094 the column doesn't exist and this finds nothing.
+  {
+    const or = [`status_by.eq.${userId}`, ...(emp ? [`csr_employee_id.eq.${emp.id}`] : [])].join(",");
+    const { data: noReason } = await supabase.from("bookings").select("id, client_name, appointment_date")
+      .eq("status", "CANCELLED").is("cancel_reason", null).or(or).order("appointment_date", { ascending: false }).limit(20);
+    for (const b of (noReason ?? []) as { id: string; client_name: string; appointment_date: string }[]) {
+      todos.push({ text: `Add the client's reason: ${b.client_name}'s booking (${dayLabel(b.appointment_date)}) was cancelled without one`, href: `/bookings?d=${b.appointment_date}&focus=${b.id}#bk-${b.id}`, urgent: true });
+    }
+  }
   if (missing.length && !isOwner) {
     todos.push({ text: `Your employee details need ${missing.length <= 3 ? missing.map((f) => f.label.replace(/\s*\(.*\)/, "")).join(", ") : `${missing.length} more items`}. Please add them`, href: "/me/details" });
   }

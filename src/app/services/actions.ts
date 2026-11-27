@@ -59,10 +59,10 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
       return { error: "Enter the amount paid, e.g. 2500 or 2500.50" };
     }
     if (cents < 0 || (cents === 0 && !zeroOk)) return { error: "Enter the amount paid. If the client didn't pay, choose Backjob, Check-up or No charge." };
-    // A bundle session paid differently from its schedule needs a reason, like a different list price.
-    const due = sessions?.[p.data.session - 1];
-    if (sessions && due === undefined) return { error: `This bundle has ${sessions.length} sessions. Pick a session from 1 to ${sessions.length}.` };
-    if (due !== undefined && cents !== due && (p.data.price_note ?? "").length < 3) return { error: "Write why this session's amount is different from the bundle's schedule." };
+    // CHRIS Nov 27: bundle sessions have no preset amount (clients pay differently per promo); staff type what was paid
+    // and management approves it with the entry, as always. Only the session number is checked.
+    if (sessions && p.data.session > sessions.length) return { error: `This bundle has ${sessions.length} sessions. Pick a session from 1 to ${sessions.length}.` };
+    if (sessions && (p.data.amount ?? "").trim() === "") return { error: "Type what the client paid for this session (0 if nothing)." };
   }
   // CHRIS Nov 26 (update-0080): add-ons, each its own line of this visit at 5% commission. Checked before anything is saved.
   let addons: { service: string; cents: number }[] = [];

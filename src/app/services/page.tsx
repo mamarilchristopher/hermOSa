@@ -9,6 +9,7 @@ import { isIsoDate, manilaToday } from "@/lib/dates";
 import { addDays, sortBranches, WEEKDAYS, weekday } from "@/lib/insights";
 import { ROLE_TEXT, TYPE_TEXT } from "@/lib/commission";
 import { AfterDpForm, BatchApprove, BranchEntryForm, ChangeDateForm, DecideButtons, RenumberForm } from "./Forms";
+import type { PackageLine } from "@/lib/packages";
 import { Uid } from "@/components/Uid";
 import { StaffFilter } from "./StaffFilter";
 import { DeclaredCheck, diffText } from "./DeclaredCheck";
@@ -100,6 +101,14 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   // update-0087: promo items and the clients with sessions left (errors before the update mean no promo tracking yet).
   const { data: promoData } = canLog ? await supabase.rpc("promo_log_options") : { data: null };
   const promoOpts = (promoData as (PromoOptions & { ok: boolean }) | null)?.ok ? (promoData as PromoOptions) : null;
+  // CHRIS Nov 27: clients' package records (bundle sessions already logged), so the form suggests the next session.
+  const bundleIds = (services ?? []).filter((s) => Array.isArray(s.session_prices) && s.session_prices.length).map((s) => s.id as string);
+  const { data: pkgRows } = canLog && bundleIds.length
+    ? await supabase.from("service_logs").select("client_name, service_id, session_no, service_date, amount_paid_cents, branch_id")
+      .in("service_id", bundleIds).neq("state", "REJECTED").not("client_name", "is", null).order("service_date", { ascending: false }).limit(5000)
+    : { data: [] };
+  const packages: PackageLine[] = ((pkgRows ?? []) as { client_name: string; service_id: string; session_no: number | null; service_date: string; amount_paid_cents: number; branch_id: string | null }[])
+    .map((r) => ({ client: r.client_name, service: r.service_id, session: r.session_no ?? 1, date: r.service_date, amount: Number(r.amount_paid_cents), branch: r.branch_id }));
   const { data: lineRows } = all.length
     ? await supabase.from("commission_lines").select("service_log_id, employee_id, role, amount_cents").in("service_log_id", all.map((l) => l.id))
     : { data: [] as Line[] };
@@ -153,6 +162,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
       <main>
         <h1>Service Log</h1>
         <p className="muted small">{noCommission ? "Every service done today and who did it. A manager signs off each entry." : "Every service done today, who did it and the commission. A manager signs off each entry."}</p>
+        {bundleIds.length > 0 && <p className="small" style={{ marginTop: -4 }}><Link href="/services/packages">📦 Package clients: each client&apos;s sessions so far</Link></p>}
 
         <div className="periods card">
           <div className="segmented" aria-label="Branch">
@@ -198,7 +208,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 Logging the sale for <strong>{bk.waiver_name ?? bk.client_name}</strong>{bk.waiver_name ? <span className="muted"> (FB: {bk.client_name})</span> : null}, booked for {bk.services} at {bName[bk.branch_id] ?? "the branch"}. Saving links it to the booking, so it&apos;s not recorded twice. <Link href={`/bookings?d=${bk.appointment_date}&focus=${bk.id}`}>Back to Bookings</Link>
               </div>
             )}
-            <BranchEntryForm key={`${here}-${fromBooking?.id ?? ""}`} booking={fromBooking} branches={(fromBooking ? logBranches.filter((b) => b.id === bk!.branch_id) : logBranches).map((b) => ({ id: b.id, name: b.name }))} start={fromBooking ? bk!.branch_id : logBranches.find((b) => b.id === workingAt)?.id ?? (logBranches.length === 1 ? logBranches[0].id : "")} date={date} today={today} meds={(services ?? []).filter((s) => s.is_meds).map((s) => ({ id: s.id, name: s.name, price: Number(s.price_cents ?? 0) }))} services={sortServices((services ?? []).filter((s) => !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null, sessions: Array.isArray(s.session_prices) ? (s.session_prices as (number | string)[]).map(Number) : null }))} promos={promoOpts} addons={sortServices((services ?? []).filter((s) => s.is_addon && !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
+            <BranchEntryForm key={`${here}-${fromBooking?.id ?? ""}`} booking={fromBooking} branches={(fromBooking ? logBranches.filter((b) => b.id === bk!.branch_id) : logBranches).map((b) => ({ id: b.id, name: b.name }))} start={fromBooking ? bk!.branch_id : logBranches.find((b) => b.id === workingAt)?.id ?? (logBranches.length === 1 ? logBranches[0].id : "")} date={date} today={today} meds={(services ?? []).filter((s) => s.is_meds).map((s) => ({ id: s.id, name: s.name, price: Number(s.price_cents ?? 0) }))} services={sortServices((services ?? []).filter((s) => !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null, sessions: Array.isArray(s.session_prices) ? (s.session_prices as (number | string)[]).map(Number) : null }))} promos={promoOpts} packages={packages} addons={sortServices((services ?? []).filter((s) => s.is_addon && !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
             </>
             )}
             {isManager && <p className="small" style={{ marginTop: 12 }}><Link href="/services/prices">Price list and commissions</Link> (add a service, set its price and commission)</p>}

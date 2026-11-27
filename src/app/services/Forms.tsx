@@ -9,15 +9,20 @@ import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
 import { ProofGroup, useProofSlots } from "./PaymentProof";
 import { promoItemLabel, promoOf, promoServiceIds, type PromoOptions } from "@/lib/promoTrack";
 import { payStatus, planDues, sessionsUnlocked } from "@/lib/promoPay";
+import { packageRecord, type PackageLine } from "@/lib/packages";
 
 type Opt = { id: string; name: string; eligible?: boolean; here?: boolean; price?: number | null; commission?: number | null; sessions?: number[] | null };
 
-/** A bundle session's label in the Session No. list: "1 · ₱6,800", "8 · paid already", "11 · free". */
+/**
+ * A bundle session's label in the Session No. list: "1", "2", … "11 · free".
+ * CHRIS Nov 27: no preset prices per session (clients pay differently depending on the promo they availed),
+ * so the list only says which sessions are the free ones; staff type what the client paid.
+ */
 function sessionLabel(i: number, list: number[], name: string): string {
   const free = Number(/\+(\d+)/.exec(name)?.[1] ?? 0);
-  const c = list[i];
-  return `${i + 1} · ${c > 0 ? centsToPhp(c) : i >= list.length - free ? "free" : "paid already"}`;
+  return `${i + 1}${free && i >= list.length - free ? " · free" : ""}`;
 }
+
 
 
 const KINDS = [
@@ -103,7 +108,7 @@ type MoreRow = { service: string; amount: string; note: string };
 /** update-0091 (CHRIS Nov 27): the booking this sale is logged from (tapped on Bookings), so the visit isn't recorded twice. */
 export type FromBooking = { id: string; fbName: string; waiverName: string | null; serviceId: string | null };
 
-export function EntryForm({ branch, date, today, services, employees, noCommission = false, photosOptional = false, meds = [], addons = [], promos = null, booking = null }: { branch: string; date: string; today?: string; services: Opt[]; employees: Opt[]; noCommission?: boolean; photosOptional?: boolean; meds?: MedsOpt[]; addons?: AddonOpt[]; promos?: PromoOptions | null; booking?: FromBooking | null }) {
+export function EntryForm({ branch, date, today, services, employees, noCommission = false, photosOptional = false, meds = [], addons = [], promos = null, booking = null, packages = [] }: { branch: string; date: string; today?: string; services: Opt[]; employees: Opt[]; noCommission?: boolean; photosOptional?: boolean; meds?: MedsOpt[]; addons?: AddonOpt[]; promos?: PromoOptions | null; booking?: FromBooking | null; packages?: PackageLine[] }) {
   // CHRIS Nov 26: owners and the GM pick the service date (default today) to batch-log older days; it stays set between saves.
   const [day, setDay] = useState(today ?? date);
   const [state, action, pending] = useActionState(logService, undefined);
@@ -220,8 +225,10 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const p = { ...raw, lead: raw.lead + extra.lead, assist: raw.assist + extra.assist, total: mainTotal + extraTotal };
   shown.lead += extra.lead; shown.assist += extra.assist; shown.solo += extra.solo;
   const addonsJson = JSON.stringify(extraRows.map((x) => ({ service: x.service, amount: x.amount.trim() })));
-  // A bundle session's amount comes from its schedule (update-0068); anything else from the list price.
-  const scheduled = svc?.sessions?.length ? svc.sessions[Number(session) - 1] ?? null : null;
+  // CHRIS Nov 27: bundle sessions have no preset amount; anything else starts from the list price.
+  const scheduled: number | null = null;
+  const pkg = svc?.sessions?.length && !pm ? packageRecord(packages, client, svc.id) : null;
+  const pkgRepeat = pkg && pkg.done.includes(Number(session)) ? pkg.lines.find((l) => l.session === Number(session)) : null;
   const listPrice = scheduled ?? svc?.price ?? null;
   const priceDiffers = paid && listPrice != null && (scheduled != null ? amount.trim() !== "" && cents !== scheduled : listPrice > 0 && cents > 0 && cents !== listPrice);
   const needsPhotos = kind === "PAID" || kind === "BACKJOB";
@@ -322,12 +329,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
           </label>
         ) : (
         <label className="session-field">Session No.
-          <select name="session" value={session} onChange={(e) => {
-            setSession(e.target.value);
-            // Bundles (update-0068): each session has its own amount (₱0 once it's paid for, and the free ones).
-            const c = svc?.sessions?.[Number(e.target.value) - 1];
-            if (c != null) setAmount(String(c / 100));
-          }} aria-label="Session number">
+          <select name="session" value={session} onChange={(e) => setSession(e.target.value)} aria-label="Session number">
             {svc?.sessions?.length
               ? svc.sessions.map((_, i) => <option key={i + 1} value={i + 1}>{sessionLabel(i, svc.sessions!, svc.name)}</option>)
               : Array.from({ length: 15 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
@@ -347,11 +349,12 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
               else { setAmount(nm.pay ? "" : nm.part && next?.sessions?.length ? "" : "0"); }
               return;
             }
-            // A bundle: keep the session if it exists in the bundle, else session 1, and fill in that session's amount.
+            // A bundle: the client's next session if they already have a package record, else session 1.
+            // CHRIS Nov 27: the amount is left empty: staff type what this client paid (it varies by promo).
             if (next?.sessions?.length) {
-              const n = Number(session) <= next.sessions.length ? Number(session) : 1;
-              setSession(String(n));
-              setAmount(String(next.sessions[n - 1] / 100));
+              const rec = packageRecord(packages, client, next.id);
+              setSession(String(rec ? Math.min(next.sessions.length, rec.last + 1) : Number(session) <= next.sessions.length ? Number(session) : 1));
+              setAmount("");
               return;
             }
             // Fill in the list price (it can still be changed, e.g. for a discount).
@@ -369,10 +372,24 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
         </label>
         {paid && (
           <label>Amount paid (₱)
-            <input name="amount" inputMode="decimal" placeholder="e.g. 2500" required value={amount} readOnly={!!pm?.part && !!pm.promo.pay_service_id} onChange={(e) => setAmount(e.target.value)} />
+            <input name="amount" inputMode="decimal" placeholder={svc?.sessions?.length && !pm ? "What the client paid (0 if none)" : "e.g. 2500"} required value={amount} readOnly={!!pm?.part && !!pm.promo.pay_service_id} onChange={(e) => setAmount(e.target.value)} />
           </label>
         )}
         </div>
+        {svc?.sessions?.length && !pm ? (
+          <div className="span2 pkg-record small">
+            {pkg ? (
+              <>
+                <strong>{client.trim()}&apos;s {svc.name}:</strong> started in Hermosapp at session {pkg.start} ({new Date(`${pkg.startDate}T00:00:00+08:00`).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" })}).
+                Sessions logged: {pkg.done.join(", ")} · paid so far {centsToPhp(pkg.paid)}.
+                {pkg.last < svc.sessions.length ? <> Next: <strong>session {pkg.last + 1}</strong> of {svc.sessions.length}.</> : <> All {svc.sessions.length} sessions are logged.</>}
+                {pkgRepeat && <span style={{ color: "var(--bad)", display: "block" }}>Session {session} is already logged for this client ({new Date(`${pkgRepeat.date}T00:00:00+08:00`).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" })}). Check the session number.</span>}
+              </>
+            ) : client.trim().length >= 2
+              ? <>No sessions of {svc.name} logged yet for {client.trim()}. The session you pick now starts their record (e.g. pick 2 if they did session 1 before Hermosapp).</>
+              : <>Type the client&apos;s name to see their sessions of this package.</>}
+          </div>
+        ) : null}
         {pm && (
           <div className="span2 promo-pick">
             <input type="hidden" name="promo_client" value={promoClient} />
