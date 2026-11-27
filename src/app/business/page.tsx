@@ -7,6 +7,7 @@ import { BarRows, Chg, compact, DayColumns, Donut, GoldArea, GoldBars, GoldSpark
 import { CountUp } from "@/components/CountUp";
 import { PromoMockup } from "@/components/PromoMockup";
 import { manilaToday } from "@/lib/dates";
+import { withApprovedSales } from "@/lib/approvedSales";
 import { computeGlance, dayLabel, type StatusDay } from "@/lib/homeGlance";
 import { addDays, addMonths, monthLabel, monthStart, sortBranches, WEEKDAYS } from "@/lib/insights";
 import { centsToPhp } from "@/lib/csv";
@@ -55,7 +56,7 @@ export default async function Business() {
     return (<><TopBar access={access} /><main><h1>Business</h1><div className="notice error">Sales figures couldn&apos;t load. Try again in a moment.</div></main></>);
   }
   const sb = sortBranches(s.branches ?? []);
-  const days = s.days ?? [];
+  const days = await withApprovedSales(supabase, s.days ?? [], today);
   const g = computeGlance(today, sb, days);
   const byDay = companyDays(days, sb.map((b) => b.id));
   const weeks = weeklyTotals(byDay, today, 12);

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Access } from "./access";
 import type { Ir } from "./incidents";
+import { withApprovedSales } from "./approvedSales";
 import { computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } from "./homeGlance";
 import { addDays, sortBranches } from "./insights";
 import { missingRequired, type Details } from "./employeeDetails";
@@ -142,7 +143,7 @@ export async function loadTodos(supabase: SupabaseClient, access: Access, today:
     const todos: Todo[] = [];
     const s = (st ?? { ok: false }) as DailyStatus;
     if (s.ok) {
-      const g = computeGlance(today, sortBranches(s.branches ?? []), s.days ?? []);
+      const g = computeGlance(today, sortBranches(s.branches ?? []), await withApprovedSales(supabase, s.days ?? [], today));
       if (g.yesterdayMissing.length) todos.push({ text: `Yesterday's sales not entered yet: ${g.yesterdayMissing.join(", ")}`, href: "/sales/daily", urgent: true });
       const olderEmpty = g.emptyDays - g.yesterdayMissing.length;
       if (olderEmpty > 0) todos.push({ text: `${plural(olderEmpty, "earlier day", "earlier days")} this month with nothing entered (enter the total or mark Zero sales / Closed)`, href: "/sales/missing" });

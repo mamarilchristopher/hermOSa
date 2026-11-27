@@ -7,8 +7,11 @@ import { saveGrid } from "./actions";
 import { ShareDay } from "./ShareDay";
 
 export type GridBranch = { id: string; name: string; can_enter: boolean };
-/** [recorded cents | null, mark | null, waiting sign-off, service log cents | null, correction pending] */
-export type GridCell = [number | null, string | null, boolean, number | null, boolean];
+/** [recorded cents | null, mark | null, waiting sign-off, approved service log cents | null, correction pending,
+ *   service log cents still waiting sign-off | null, auto-fill from the service log applies (Nov 25 on)] */
+export type GridCell = [number | null, string | null, boolean, number | null, boolean, (number | null)?, boolean?];
+/** CHRIS Nov 28 (v0.99.3): an untyped day shows its approved Service log total (even over a Zero sales / Closed mark). */
+const autoOf = (c: GridCell | undefined): number | null => (c && c[0] === null && c[6] && (c[3] ?? 0) > 0 ? c[3] : null);
 
 const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const label = (d: string) => `${WD[new Date(`${d}T00:00:00Z`).getUTCDay()]} ${Number(d.slice(8))}`;
@@ -79,7 +82,8 @@ export function MonthGrid({ dates, branches, cells, today, changed = [], highlig
     if (t?.trim() && typedMark(t)) return { cents: 0, draft: true };
     const c = t?.trim() ? readMoney(t) : null;
     if (c !== null && !Number.isNaN(c) && c > 0) return { cents: c, draft: true };
-    return { cents: cells[key(b, d)]?.[0] ?? 0, draft: false };
+    const c0 = cells[key(b, d)];
+    return { cents: c0?.[0] ?? autoOf(c0) ?? 0, draft: false };
   };
   let running = 0;
   const rows = dates.map((d) => {
@@ -136,7 +140,7 @@ export function MonthGrid({ dates, branches, cells, today, changed = [], highlig
         <label className="check-inline"><input type="checkbox" checked={editing} onChange={(e) => setEditing(e.target.checked)} /> Change recorded days</label>
         {msg && <span className={msg.ok ? "saved-tick" : "field-error"}>{msg.text}</span>}
         <ShareDay dates={dates} branches={branches} today={today}
-          cellOf={(b, d) => { const c = cells[key(b, d)]; return c ? { cents: c[0], mark: c[1], staged: c[2] } : undefined; }} />
+          cellOf={(b, d) => { const c = cells[key(b, d)]; return c ? { cents: c[0] ?? autoOf(c), mark: autoOf(c) !== null ? null : c[1], staged: c[2] } : undefined; }} />
       </div>
       <div className="table-wrap">
         <table className="tracker">
@@ -151,8 +155,10 @@ export function MonthGrid({ dates, branches, cells, today, changed = [], highlig
                   const k = key(b.id, d);
                   const c = cells[k];
                   const rec = c?.[0] ?? null, mark = c?.[1] ?? null, staged = c?.[2] ?? false, service = c?.[3] ?? null, fixing = c?.[4] ?? false;
+                  const auto = autoOf(c), pend = c?.[5] ?? null;
                   const flag = rec !== null && service !== null && rec !== service;
-                  const canType = b.can_enter && !mark && !staged && !fixing && (rec === null || editing);
+                  const canType = b.can_enter && !mark && !staged && !fixing && ((rec === null && auto === null) || editing);
+                  const pendNote = pend ? <span className="cell-pend" title="Logged in the Service log, waiting for sign-off">+{php(pend)} waiting</span> : null;
                   if (canType && rec === null && marks[k]) {
                     return (
                       <td key={k} data-cell={k} className={`num cell-input ${hl.has(k) ? "hl" : ""}`}>
@@ -167,7 +173,7 @@ export function MonthGrid({ dates, branches, cells, today, changed = [], highlig
                     return (
                       <td key={k} data-cell={k} className={`num cell-input ${parsed.bad.has(k) ? "bad" : ""} ${rec !== null ? "editing" : ""} ${hl.has(k) ? "hl" : ""}`}>
                         <span className="cell-entry">
-                          <input inputMode="decimal" aria-label={`${b.name} ${d}`} placeholder={rec !== null ? php(rec) : ""}
+                          <input inputMode="decimal" aria-label={`${b.name} ${d}`} placeholder={rec !== null ? php(rec) : auto !== null ? php(auto) : ""}
                             value={typed[k] ?? ""} onChange={(e) => setTyped((t) => ({ ...t, [k]: e.target.value }))}
                             onBlur={(e) => {
                               const tm = rec === null ? typedMark(e.target.value) : null;
@@ -196,13 +202,15 @@ export function MonthGrid({ dates, branches, cells, today, changed = [], highlig
                             </select>
                           )}
                         </span>
+                        {pendNote}
                       </td>
                     );
                   }
                   return (
-                    <td key={k} data-cell={k} className={`num ${rec === null && !mark && !staged && d < today ? "gap" : ""} ${hl.has(k) ? "hl" : ""}`}
-                      title={flag ? `Service log: ${php(service!)}` : fixing ? "Correction waiting for sign-off" : undefined}>
-                      {rec !== null ? php(rec) : mark ? <span className="cell-mark">{mark === "CLOSED" ? "Closed" : "Zero sales"}</span> : staged ? "Waiting" : "–"}
+                    <td key={k} data-cell={k} className={`num ${rec === null && auto === null && !mark && !staged && d < today ? "gap" : ""} ${hl.has(k) ? "hl" : ""}`}
+                      title={flag ? `Approved service log: ${php(service!)}` : auto !== null ? `From approved Service log entries${mark ? ` (was marked ${mark === "CLOSED" ? "Closed" : "Zero sales"})` : ""}` : fixing ? "Correction waiting for sign-off" : undefined}>
+                      {rec !== null ? php(rec) : auto !== null ? <span className="cell-auto">{php(auto)}</span> : mark ? <span className="cell-mark">{mark === "CLOSED" ? "Closed" : "Zero sales"}</span> : staged ? "Waiting" : "–"}
+                      {pendNote}
                       {flag && <span className="flag" aria-label="differs from the service log"> •</span>}
                       {fixing && <span className="flag"> ✎</span>}
                       {changedSet.has(k) && !fixing && <span className="changed-mark" title="Changed before"> ↺</span>}

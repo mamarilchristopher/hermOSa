@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeGlance, dayLabel, type StatusDay } from "../../src/lib/homeGlance";
+import { cellOf, computeDay, computeGlance, dayLabel, type StatusDay } from "../../src/lib/homeGlance";
 
 const A = { id: "a", name: "QC Main" }, B = { id: "b", name: "Fairview" };
 const d = (b: string, date: string, cents: number | null, mark: string | null = null, staged = false): StatusDay => [b, date, cents, mark, staged, null];
@@ -73,5 +73,32 @@ describe("service log as the source from Nov 25", () => {
     expect(g.branches[0].mtd).toBe(300_00);
     expect(g.branches[1].todayCell).toEqual({ kind: "sales", cents: 90_00 });
     expect(g.todaySoFar).toBe(210_00);
+  });
+});
+
+describe("v0.99.3: approved Service log fills days, ‹ › day view (CHRIS Nov 28)", () => {
+  it("an untyped day takes the approved log total, even over a Zero sales mark; typed still wins", () => {
+    expect(cellOf(["b", "2026-11-28", null, "NO_SALES", false, 950000])).toEqual({ kind: "sales", cents: 950000, log: true });
+    expect(cellOf(["b", "2026-11-28", 500000, null, false, 950000])).toEqual({ kind: "sales", cents: 500000 });
+    expect(cellOf(["b", "2026-11-28", null, "CLOSED", false, null])).toEqual({ kind: "closed" });
+    expect(cellOf(["b", "2026-11-20", null, null, false, 950000])).toEqual({ kind: "empty" });
+  });
+  it("computeDay: yesterday vs the month's daily average, pending kept apart, arrows stop at today", () => {
+    const br = [{ id: "a", name: "A" }, { id: "b", name: "B" }];
+    const days: StatusDay[] = [
+      ["a", "2026-11-25", null, null, false, 1000000], ["b", "2026-11-25", null, null, false, 1000000],
+      ["a", "2026-11-26", null, null, false, 1000000], ["b", "2026-11-26", null, null, false, 1000000],
+      ["a", "2026-11-27", null, null, false, 1500000], ["b", "2026-11-27", null, "NO_SALES", false, 900000, 200000],
+    ];
+    const today = "2026-11-28";
+    const y = computeDay("2026-11-27", today, br, days);
+    expect(y.isToday).toBe(false);
+    expect(y.total).toBe(2400000);
+    expect(y.pending).toBe(200000);
+    expect(y.next).toBe(today);
+    expect(y.vsAvg).toBeCloseTo(0.2); // ₱24,000 vs the two branches' Nov 25–26 averages (₱10,000 each)
+    const t = computeDay("2026-12-05", today, br, days);
+    expect(t.date).toBe(today);
+    expect(t.next).toBeNull();
   });
 });

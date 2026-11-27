@@ -14,7 +14,8 @@ import type { Ir } from "@/lib/incidents";
 import { branchShort, timeLabel } from "@/lib/schedule";
 import { loadFaces } from "@/lib/dutyFaces";
 import { noticeButton, noticeHref } from "@/lib/noticeLink";
-import { computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
+import { withApprovedSales } from "@/lib/approvedSales";
+import { computeDay, computeGlance, cutoffEnd, dayLabel, glanceFetchStart, type StatusDay } from "@/lib/homeGlance";
 import { addDays, sortBranches } from "@/lib/insights";
 import { missingRequired, type Details } from "@/lib/employeeDetails";
 import { tracker, type NteList, nteId } from "@/lib/nte";
@@ -27,7 +28,7 @@ type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: s
   corrections?: { id: string; mine: boolean }[] };
 
 /** The management Home: today's and yesterday's sales, the month, and who's on duty. To-dos live in the bell (src/lib/todos.ts). */
-async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>>["supabase"], today: string) {
+async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>>["supabase"], today: string, viewDay: string) {
   const [{ data: st }, { data: dutyData }, bookings] = await Promise.all([
     supabase.rpc("daily_sales_status", { p_start: glanceFetchStart(today), p_end: today }),
     supabase.rpc("on_duty", { p_date: today }), // errors (before update-0022) mean no On Duty card
@@ -35,10 +36,13 @@ async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>
   ]);
   const s = (st ?? { ok: false }) as DailyStatus;
   if (!s.ok) return null;
-  const g = computeGlance(today, sortBranches(s.branches ?? []), s.days ?? []);
+  const days = await withApprovedSales(supabase, s.days ?? [], today);
+  const sb = sortBranches(s.branches ?? []);
+  const g = computeGlance(today, sb, days);
+  const view = computeDay(/^\d{4}-\d{2}-\d{2}$/.test(viewDay) ? viewDay : today, today, sb, days);
   const duty = Array.isArray(dutyData) ? (dutyData as DutyRow[]) : null;
   const faces = duty?.length ? await loadFaces(supabase, duty) : {};
-  return { g, duty, faces, bookings };
+  return { g, view, duty, faces, bookings };
 }
 
 type Notice = { id: string; kind?: string; title: string; body: string | null; link: string | null; created_at: string; read_at: string | null };
@@ -52,7 +56,8 @@ const ROLE_LABEL: Record<string, string> = {
 type Line = { role: string; amount_cents: number; service_logs: { service_date: string; state: string; photos_due?: boolean; services: { name: string } | null } };
 
 /** Staff Home: your own details and, for commission staff, this month's running commission (covered until tapped). */
-export default async function Me() {
+export default async function Me({ searchParams }: { searchParams: Promise<{ day?: string }> }) {
+  const viewDay = (await searchParams).day ?? "";
   const { supabase, access, branches } = await requireAccess();
   const today = manilaToday();
   const start = monthStart(today), ym = today.slice(0, 7);
@@ -90,7 +95,7 @@ export default async function Me() {
   const first = (emp?.full_name || access.display_name).trim().split(/\s+/)[0];
   const management = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "AUDITOR"].includes(g.role));
   const logger = access.grants.some((g) => ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"].includes(g.role));
-  const home = management ? await managementHome(supabase, today) : null;
+  const home = management ? await managementHome(supabase, today, viewDay) : null;
   // CHRIS Nov 26: every employee's Home has the live Bookings board (management gets it inside ManagerHome).
   const staffBookings = management ? null : await loadHomeBookings(supabase, today, can(access, ["CSR", "OWNER", "MANAGER"], null));
   // Late NTEs waiting for my explanation (shown as boxes at the top), and the owner/GM tardiness tracker.
@@ -169,7 +174,7 @@ export default async function Me() {
         )}
         {staffBookings && <HomeBookings rows={staffBookings.rows} who={staffBookings.who} toFollow={staffBookings.toFollow}
           branches={sortBranches(branches.filter((b) => b.kind === "CLINIC")).map((b) => ({ id: b.id, name: branchShort(b.name), code: b.code }))} />}
-        {home && <ManagerHome me={access.user_id} g={home.g} duty={home.duty} faces={home.faces} branches={homeBranches}
+        {home && <ManagerHome me={access.user_id} g={home.g} view={home.view} duty={home.duty} faces={home.faces} branches={homeBranches}
           bookings={home.bookings && <HomeBookings rows={home.bookings.rows} who={home.bookings.who} toFollow={home.bookings.toFollow} branches={home.g.branches.map((x) => homeBranches.find((b) => b.id === x.id) ?? { id: x.id, name: x.name })} />}
           tardiness={ownerLevel && trackData != null && <HomeTardiness month={monthLabel(today.slice(0, 7))} ntes={(trackData as NteList).ntes} people={tardy} />} />}
         {emp?.commission_eligible && (

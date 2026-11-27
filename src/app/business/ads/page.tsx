@@ -9,6 +9,7 @@ import { manilaToday } from "@/lib/dates";
 import { addDays, monthEnd } from "@/lib/insights";
 import { centsOfCell } from "@/lib/business";
 import type { StatusDay } from "@/lib/homeGlance";
+import { withApprovedSales } from "@/lib/approvedSales";
 import {
   AD_SERVICES, adRoas, adServiceOf, CREATIVES, monthName, NOV_SHARES, perMessage, periodOptions, PLAN, PLAN_DECEMBER, PLAN_TESTING,
   ROAS_FLOOR, roas, SERVICE_LABEL, SOURCE_LABEL, SOURCES, sourceOf, spendMonths, spent, spentK, summarize, summarizeSources, withVat, x,
@@ -55,7 +56,7 @@ export default async function Ads({ searchParams }: { searchParams: Promise<{ p?
 
   // Declared sales per branch per month (the Daily Sales figure, the service log only where nothing was typed).
   const sales = new Map<string, Map<string, number>>();
-  for (const r of ((st as { ok?: boolean; days?: StatusDay[] } | null)?.days ?? [])) {
+  for (const r of await withApprovedSales(supabase, (st as { days?: StatusDay[] } | null)?.days ?? [], today)) {
     const v = centsOfCell(r);
     if (v === null) continue;
     const m = sales.get(r[0]) ?? new Map<string, number>();
