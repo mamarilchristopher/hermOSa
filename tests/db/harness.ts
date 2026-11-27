@@ -29,6 +29,9 @@ export class TestDb {
     const url = new URL(ADMIN_URL);
     url.pathname = `/${name}`;
     const pool = new pg.Pool({ connectionString: url.toString(), max: 4 });
+    // DROP DATABASE ... WITH (FORCE) at close() can end a pooled connection before pool.end() has closed it;
+    // without a listener that "terminating connection" error is unhandled and fails the whole run (CI, Nov 27).
+    pool.on("error", () => {});
     const db = new TestDb(name, pool, admin);
     await db.sql(readFileSync(join(root, "tests/db/supabase-shim.sql"), "utf8"));
     const migDir = join(root, "supabase/migrations");
