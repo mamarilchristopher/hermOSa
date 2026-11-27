@@ -88,7 +88,7 @@ export function audit(inp: AuditInput): Finding[] {
         out.push({
           id: `overlap-${s.id}-${code}`, name: s.name, check: "overlap", sev: "warn", line: l.key, tag: tagOf(l), title: `Shrink the circle to ${fix} mi`,
           short: `Its ${p.radius}-mile circle covers the ${SHORT[code]} clinic (${d.toFixed(1)} mi away)`,
-          why: `"${s.name}" reaches ${p.radius} miles around ${p.name}; the ${SHORT[code]} clinic is ${d.toFixed(1)} miles away, so ${SHORT[l.branch]} and ${SHORT[code]} ads bid against each other for the same people and ${SHORT[l.branch]} pays for chats that live nearer ${SHORT[code]}. Set the radius to about ${fix} miles so it stops short of ${SHORT[code]}, or keep it and exclude a 2-mile circle around the ${SHORT[code]} clinic.`,
+          why: `"${s.name}" reaches ${p.radius} miles around ${p.name}; the ${SHORT[code]} clinic is ${d.toFixed(1)} miles away, so people near ${SHORT[code]} get ${SHORT[l.branch]} ads and chat with the farther clinic. Where our ad sets reach the same people, Meta enters only one of them in each auction and holds the others back (auction overlap), which slows their learning. Set the radius to about ${fix} miles so it stops short of ${SHORT[code]}, or keep it and exclude a 2-mile circle around the ${SHORT[code]} clinic.`,
           action: "Fix radius", target: { kind: "adset", id: s.id, cid: s.cid, view: "edit" },
           approve: `${tagOf(l)}: set ad set "${s.name}" radius to ${fix} mi`,
         });
@@ -163,7 +163,7 @@ export function audit(inp: AuditInput): Finding[] {
       out.push({
         id: `dupe-${worse.id}`, check: "dupe", sev: "info", line: l.key, tag: tagOf(l), title: `Pause the weaker copy of "${worse.name}"`,
         short: `Runs in ${setsOf.size} ad sets of the same line`,
-        why: `The same ad runs in ${setsOf.size} ad sets aimed at the same people, so it bids against itself. Keep the copy at ₱${(ranked[0].cpc14 ?? 0).toFixed(0)}* a chat and pause the one at ₱${(worse.cpc14 ?? 0).toFixed(0)}*.`,
+        why: `The same ad runs in ${setsOf.size} ad sets aimed at the same people. Meta lets only one of our ad sets into each auction for a person, so the copies hold each other back and split the chats each needs to finish learning. Keep the copy at ₱${(ranked[0].cpc14 ?? 0).toFixed(0)}* a chat and pause the one at ₱${(worse.cpc14 ?? 0).toFixed(0)}*.`,
         action: "Open ad", target: { kind: "ad", id: worse.id, cid: worse.cid, view: "list" },
         approve: `${tagOf(l)}: pause the copy of ad "${worse.name}" in ad set "${worse.adset}"`,
       });
