@@ -56,10 +56,10 @@ describe("ad checks", () => {
     expect(f.title).toBe(`Shrink the circle to ${Math.floor(d - 0.5)} mi`);
   });
 
-  it("flags ages under 21, and women-only when the plan says all genders (as a note)", () => {
+  it("flags ages under 21, and never flags women-only (CHRIS's call)", () => {
     const f = run(base(), { s1: tg({ ageMin: 18, genders: [2] }) }, { plan: { genders: "all", ageMin: 21 } });
     expect(f.find((x) => x.check === "age")!.title).toBe("Raise the minimum age to 21");
-    expect(f.find((x) => x.check === "gender")!.sev).toBe("info");
+    expect(f.map((x) => x.check)).toEqual(["age"]);
   });
 
   it("flags ad sets split too thin to leave learning", () => {

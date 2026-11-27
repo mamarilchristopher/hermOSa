@@ -6,13 +6,12 @@
 import { addDay, CLINIC_PIN, LEARN_PER_WEEK, PAGES, perChat, type AdSetView, type Feed, type LineView } from "./adsAdvisor";
 import { SERVICE_LABEL } from "./ads";
 
-export type CheckKey = "pin" | "overlap" | "age" | "gender" | "split" | "setCost" | "dupe" | "zeroDay" | "cpcJump" | "quality" | "saturation";
+export type CheckKey = "pin" | "overlap" | "age" | "split" | "setCost" | "dupe" | "zeroDay" | "cpcJump" | "quality" | "saturation";
 /** Every check, in the order it is listed on the page. */
 export const CHECKS: { key: CheckKey; label: string }[] = [
   { key: "pin", label: "Each ad set's pin is in its own branch's area" },
   { key: "overlap", label: "Branch circles don't reach another clinic" },
   { key: "age", label: "Ages 21+ (house rule)" },
-  { key: "gender", label: "Gender matches the plan" },
   { key: "split", label: "Ad sets get enough chats to leave learning" },
   { key: "setCost", label: "Ad sets in a line cost about the same per chat" },
   { key: "dupe", label: "No ad runs in two ad sets of the same line" },
@@ -97,7 +96,8 @@ export function audit(inp: AuditInput): Finding[] {
     }
   }
 
-  // 3–4. Ages under 21; gender not what the plan says.
+  // 3. Ages under 21. (Gender is not checked: women-only is CHRIS's call, Nov 28 — clients are about 90% women and
+  //    ads open to men bring junk chats.)
   for (const { l, s } of sets) {
     const t = s.targeting;
     if (!t) continue;
@@ -110,15 +110,6 @@ export function audit(inp: AuditInput): Finding[] {
         why: `The house rule is 21+ for aesthetic ads (Meta's own floor for cosmetic procedures is 18). Under-21s rarely book and some need a parent's OK. In the ad set's Audience, set the minimum age to ${minAge}${t.advantage ? " (with Advantage+ audience, the minimum age is a hard limit; the age range is only a suggestion)" : ""}.`,
         action: "Fix ages", target: { kind: "adset", id: s.id, cid: s.cid, view: "edit" },
         approve: `${tagOf(l)}: set ad set "${s.name}" minimum age to ${minAge}`,
-      });
-    }
-    if (plan && plan.genders === "all" && t.genders !== "all") {
-      out.push({
-        id: `gender-${s.id}`, name: s.name, check: "gender", sev: "info", line: l.key, tag: tagOf(l), title: `Open it to all genders`,
-        short: `"${s.name}" shows only to ${t.genders}; the plan says all`,
-        why: `The playbook audience for ${tagOf(l)} is all genders (men book Hiko and jaw treatments too). Keep it ${t.genders}-only only if it is a deliberate test.`,
-        action: "Fix audience", target: { kind: "adset", id: s.id, cid: s.cid, view: "edit" },
-        approve: `${tagOf(l)}: set ad set "${s.name}" to all genders`,
       });
     }
   }

@@ -120,7 +120,7 @@ export default async function AdAdvisor() {
     return go(l.budgetSource === "campaign" ? { kind: "campaign", id: top.cid, cid: top.cid, view: "edit" } : { kind: "adset", id: top.id, cid: top.cid, view: "edit" });
   }
   const findings = audit({ feed, lines, end: res.end, sales, plan: (b, sv) => { const p = playLine(b, sv); return p ? { genders: p.audience.genders, ageMin: p.audience.age_min } : null; } });
-  const KIND: Record<string, string> = { pin: "Fix the area", overlap: "Branches overlap", age: "Audience", gender: "Audience", split: "Learning", setCost: "Ad sets", dupe: "Duplicate ad", zeroDay: "₱0-sales days", cpcJump: "Cost per chat", quality: "Chat quality", saturation: "Audience tired" };
+  const KIND: Record<string, string> = { pin: "Fix the area", overlap: "Branches overlap", age: "Audience", split: "Learning", setCost: "Ad sets", dupe: "Duplicate ad", zeroDay: "₱0-sales days", cpcJump: "Cost per chat", quality: "Chat quality", saturation: "Audience tired" };
   const moves: Move[] = [
     ...groupFixes(findings.filter((f) => f.sev !== "info")).map((g) => {
       const f = g[0];
@@ -264,6 +264,7 @@ export default async function AdAdvisor() {
               {CHECKS.map((c) => <li key={c.key} className={failed.has(c.key) ? "flag" : "ok"}><span>{failed.has(c.key) ? "!" : "✓"}</span>{c.label}{failed.has(c.key) ? <b> · {failed.get(c.key)} flagged</b> : null}</li>)}
               <li className="ok"><span>✓</span>Each running ad judged against its own best 14 days (winner, tiring, fatigued, loser)</li>
               <li className="ok"><span>✓</span>Budget moves follow ROAS from declared sales, at most once a week</li>
+              <li className="ok"><span>✓</span>Women-only audiences are fine: your call (about 90% of clients are women; ads open to men bring junk chats)</li>
             </ul>
             {infos.length > 0 && (
               <ul className="adv-notes">
@@ -486,7 +487,7 @@ export default async function AdAdvisor() {
 
 /** Setting fixes on the same ad set become one card (one trip into Ads Manager). */
 function groupFixes(fs: Finding[]) {
-  const SETTINGS = new Set(["pin", "overlap", "age", "gender"]);
+  const SETTINGS = new Set(["pin", "overlap", "age"]);
   const out: Finding[][] = [], bySet = new Map<string, Finding[]>();
   for (const f of fs) {
     if (SETTINGS.has(f.check) && f.target && f.target.kind === "adset") {
