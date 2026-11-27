@@ -87,7 +87,7 @@ export function BranchEntryForm({ branches, start, employees, ...rest }: Omit<Pa
       {branches.length > 1 && (
         <div className="field">
           <span className="field-label">Branch</span>
-          <div className="segmented choice" role="radiogroup" aria-label="Branch">
+          <div className="segmented choice branch-choice" role="radiogroup" aria-label="Branch">
             {branches.map((x) => (
               <button type="button" key={x.id} role="radio" aria-checked={b === x.id} className={b === x.id ? "on" : ""} onClick={() => setB(x.id)}>{x.name.replace(/ \(.*\)$/, "")}</button>
             ))}

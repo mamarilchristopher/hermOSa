@@ -8,6 +8,7 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45); --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -14px rgba(0, 0, 0, 0.75);
   --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.45), 0 16px 32px -16px rgba(0, 0, 0, 0.85);
   --chart-fill: #d9b56b; --chart-fill-soft: #3c3f46;
+  --btn-bg: #ececef; --btn-hover: #ffffff; --btn-fg: #16171a; --on-accent: #16171a;
   color-scheme: dark;
 }
 [data-mode="dark"] body { background: var(--pearl); }
@@ -21,7 +22,6 @@
 [data-mode="dark"] .mobile-bar { background: rgba(23, 24, 27, 0.94); }
 [data-mode="dark"] .online-strip { background: rgba(23, 24, 27, 0.92); border-bottom-color: rgba(255, 255, 255, 0.08); }
 [data-mode="dark"] .tab-nav { background: rgba(23, 24, 27, 0.97); }
-[data-mode="dark"] button, [data-mode="dark"] .button { background: #ececef; border-color: #ececef; color: #16171a; }
 [data-mode="dark"] button.secondary, [data-mode="dark"] .button.secondary { background: var(--surface); color: var(--brown-dark); border-color: var(--line-strong); }
 [data-mode="dark"] .icon-btn, [data-mode="dark"] .tab-nav button.tab-more { background: transparent; border-color: transparent; color: var(--muted); }
 [data-mode="dark"] .icon-btn:hover { background: var(--cream); color: var(--ink); }
@@ -95,3 +95,7 @@
 [data-mode="dark"] .hb-branch { background: #34353c; color: #f1f1f3; border-bottom-color: #c9a24a; }
 [data-mode="dark"] .hb-branch:hover { background: #3d3e46; color: #fff; }
 [data-mode="dark"] .hb-branch-name { color: #e3c27f; }
+/* v0.99.2 (CHRIS Nov 28): badges on red and tags inside your own (light) chat bubble stay readable. */
+[data-mode="dark"] .nav-badge, [data-mode="dark"] .tab-badge, [data-mode="dark"] .dock-count { color: #16171a; }
+[data-mode="dark"] .chat-msg.mine .chat-tag { color: var(--on-accent); background: rgba(0, 0, 0, 0.1); }
+[data-mode="dark"] table.tracker td.cell-input input { background: #16171a; color: var(--ink); }

@@ -1,3 +1,4 @@
+import { AddPanel } from "@/components/Controls";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, requireAccess } from "@/lib/access";
@@ -88,11 +89,10 @@ export default async function PayslipPage({ params }: { params: Promise<{ id: st
         )}
 
         {editable && (
-          <div className="card">
-            <h2>Add a line</h2>
-            <p className="muted small">Overtime, holiday pay not on the schedule, bonuses, cash advances, SSS or Pag-IBIG loans, personal loans. Write the installment in the label, like &quot;(2nd deduction)&quot;.</p>
+          <AddPanel title="Add a line" hint="Overtime, bonus, cash advance, loan">
+            <p className="muted small" style={{ marginTop: 0 }}>Overtime, holiday pay not on the schedule, bonuses, cash advances, SSS or Pag-IBIG loans, personal loans. Write the installment in the label, like &quot;(2nd deduction)&quot;.</p>
             <AdjustmentForm run={p.run_id} employee={p.employee_id} />
-          </div>
+          </AddPanel>
         )}
       </main>
     </>

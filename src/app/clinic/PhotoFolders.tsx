@@ -1,5 +1,6 @@
 // Client photo folders (update-0053), shared by the Client archive and Social media tabs. Server component.
 import Link from "next/link";
+import { ControlBar, PeriodNav, Tabs } from "@/components/Controls";
 import { redirect } from "next/navigation";
 import { requireAccess, can } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
@@ -58,6 +59,7 @@ export async function PhotoFolders({ social, searchParams }: { social: boolean; 
   const branchOrder = [...new Set(visits.map((v) => v.branch_id))].sort((a, b) => rank(a) - rank(b));
   const base = social ? "/clinic/social" : "/clinic/archive";
   const link = (m: string) => `${base}?month=${m}${branch ? `&branch=${branch}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
+  const monthLink = (m: string, b: string | null) => `${base}?month=${m}${b ? `&branch=${b}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
   const canShare = owner || gm;
   const label = `${MONTHS[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
 
@@ -72,27 +74,18 @@ export async function PhotoFolders({ social, searchParams }: { social: boolean; 
             : "Every client's waiver and before/after photos from the service log, by month and day. Each photo is tagged with the client, service, branch, date and staff; Download saves it with that tag at the bottom. Tap a photo to open the untagged full-quality original."}
         </p>
 
-        <div className="card">
-          <div className="sched-nav">
-            <Link className="nav-arrow" href={link(shiftMonth(month, -1))} aria-label="Previous month">‹</Link>
-            <div className="week-title"><strong>{label}</strong>
-              <span className="small muted">{month === thisMonth ? "This month" : <Link href={link(thisMonth)}>Go to this month</Link>}</span></div>
-            {month < thisMonth ? <Link className="nav-arrow" href={link(shiftMonth(month, 1))} aria-label="Next month">›</Link> : <span className="nav-arrow" aria-hidden />}
-          </div>
-          <form className="field-grid" method="get" style={{ marginTop: 12 }}>
-            <input type="hidden" name="month" value={month} />
-            {clinics.length > 1 && (
-              <label className="field half">Branch
-                <select name="branch" defaultValue={branch ?? ""}>
-                  <option value="">All branches</option>
-                  {clinics.map((b) => <option key={b.id} value={b.id}>{branchShort(b.name)}</option>)}
-                </select></label>
-            )}
-            <label className="field half">Client or service
-              <input name="q" defaultValue={sp.q ?? ""} placeholder="Search names" maxLength={60} /></label>
-            <div className="field row-buttons"><button className="small" type="submit">Show</button></div>
-          </form>
-        </div>
+        {/* v0.98.1: branch tabs + month nav in one bar (the Service log pattern); search under it. */}
+        <ControlBar>
+          <Tabs tabs={[{ href: monthLink(month, null), label: "All branches", on: !branch }, ...clinics.map((b) => ({ href: monthLink(month, b.id), label: b.name, on: branch === b.id }))]} />
+          <PeriodNav prev={link(shiftMonth(month, -1))} next={month < thisMonth ? link(shiftMonth(month, 1)) : null} label={label}
+            reset={month === thisMonth ? null : { href: link(thisMonth), label: "This month" }} prevLabel="Previous month" nextLabel="Next month" />
+        </ControlBar>
+        <form className="row-buttons log-search" method="get">
+          <input type="hidden" name="month" value={month} />
+          {branch && <input type="hidden" name="branch" value={branch} />}
+          <input name="q" defaultValue={sp.q ?? ""} placeholder="🔍 Search a client or service" aria-label="Client or service" maxLength={60} />
+          <button className="secondary small" type="submit">Search</button>
+        </form>
 
         {error ? <div className="notice error">{error.code === "PGRST202" ? "The owner needs to run update-0053 in Supabase first." : "Could not load the photos. Try again."}</div>
           : visits.length === 0 ? <p className="muted">{social ? "No shared client photos" : "No client photos"} in {label}{q ? " for that search" : ""}.</p> : (

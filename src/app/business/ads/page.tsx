@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AddPanel } from "@/components/Controls";
 import { redirect } from "next/navigation";
 import { can, requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
@@ -309,8 +310,7 @@ export default async function Ads({ searchParams }: { searchParams: Promise<{ p?
         </div>
 
         {ownerGm && (
-          <details className="card biz-more" id="spend">
-            <summary>Add or correct monthly ad spend</summary>
+          <AddPanel id="spend" title="Add or correct monthly ad spend" hint="Owners and the GM">
             <form action={saveSpend} className="ads-tag">
               <input type="hidden" name="period" value={period.key} />
               <label>
@@ -320,7 +320,7 @@ export default async function Ads({ searchParams }: { searchParams: Promise<{ p?
               <p className="small muted">Saving a month, branch and service again replaces it. Claude can pull these from Meta each month.</p>
               <button type="submit">Save ad spend</button>
             </form>
-          </details>
+          </AddPanel>
         )}
 
         <p className="small muted ads-foot">* = amount spent with 12% VAT. Recommended budgets are before VAT. Full analysis: <a href="https://claude.ai/artifact/NBhJKh5fqUpE7SG6pVQsTD" target="_blank" rel="noreferrer">Meta ads ROAS check</a>.</p>

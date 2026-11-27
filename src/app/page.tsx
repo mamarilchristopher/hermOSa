@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Tabs } from "@/components/Controls";
 import { redirect } from "next/navigation";
 import { requireAccess, errorText } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
@@ -80,18 +81,17 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     <>
       <TopBar access={access} />
       <main>
-        {focus && allBranches.length > 1 && (
-          <nav className="crumbs" aria-label="Branches">
-            <Link className="back" href={`/?p=${period.key}&start=${period.start}&end=${period.end}`}>← All Branches</Link>
-            {allBranches.filter((b) => b.id !== focus.id).map((b) => (
-              <Link key={b.id} href={`/?p=${period.key}&start=${period.start}&end=${period.end}&branch=${b.code}`}>{b.name}</Link>
-            ))}
-          </nav>
-        )}
         <h1>{whole ? "Sales: All Branches" : `Sales: ${daily.branches[0].name}`}</h1>
         <p className="muted small">
           {period.label} · {throughText} (Manila, today not counted until it's recorded) · published imports only
         </p>
+        {/* v0.98.1: branch choice as tabs, the Service log pattern (was a row of small links). */}
+        {allBranches.length > 1 && (
+          <div className="branch-tabs-row">
+            <Tabs tabs={[{ href: `/?p=${period.key}&start=${period.start}&end=${period.end}`, label: "All branches", on: !focus },
+              ...allBranches.map((b) => ({ href: `/?p=${period.key}&start=${period.start}&end=${period.end}&branch=${b.code}`, label: b.name, on: focus?.id === b.id }))]} />
+          </div>
+        )}
         {header}
         {(pending ?? 0) > 0 && (
           <div className="notice info">

@@ -1,6 +1,7 @@
 // Proof of payment (update-0075, CHRIS Nov 26): its own folder, by service date, then client name.
 // Owners and the GM see every proof; staff see the entries they logged, did, assisted on or attached a proof to.
 import Link from "next/link";
+import { ControlBar, PeriodNav, Tabs } from "@/components/Controls";
 import { redirect } from "next/navigation";
 import { requireAccess, can } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
@@ -45,6 +46,7 @@ export default async function PaymentProofs({ searchParams }: { searchParams: Pr
   }
   const days = [...new Set(folders.map((f) => f.date))];
   const link = (m: string) => `/clinic/payments?month=${m}${branch ? `&branch=${branch}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
+  const monthLink = (m: string, b: string | null) => `/clinic/payments?month=${m}${b ? `&branch=${b}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
   const label = `${MONTHS[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
 
   return (
@@ -56,27 +58,18 @@ export default async function PaymentProofs({ searchParams }: { searchParams: Pr
           Payment screenshots and receipts attached to service log entries, by service date, then client name. Tap a proof to open it.
           {mgmt ? "" : " You see the entries you logged, did, assisted on or attached a proof to."}
         </p>
-        <div className="card">
-          <div className="sched-nav">
-            <Link className="nav-arrow" href={link(shiftMonth(month, -1))} aria-label="Previous month">‹</Link>
-            <div className="week-title"><strong>{label}</strong>
-              <span className="small muted">{month === thisMonth ? "This month" : <Link href={link(thisMonth)}>Go to this month</Link>}</span></div>
-            {month < thisMonth ? <Link className="nav-arrow" href={link(shiftMonth(month, 1))} aria-label="Next month">›</Link> : <span className="nav-arrow" aria-hidden />}
-          </div>
-          <form className="field-grid" method="get" style={{ marginTop: 12 }}>
-            <input type="hidden" name="month" value={month} />
-            {clinics.length > 1 && (
-              <label className="field half">Branch
-                <select name="branch" defaultValue={branch ?? ""}>
-                  <option value="">All branches</option>
-                  {clinics.map((b) => <option key={b.id} value={b.id}>{branchShort(b.name)}</option>)}
-                </select></label>
-            )}
-            <label className="field half">Client or service
-              <input name="q" defaultValue={sp.q ?? ""} placeholder="Search names" maxLength={60} /></label>
-            <div className="field row-buttons"><button className="small" type="submit">Show</button></div>
-          </form>
-        </div>
+        {/* v0.98.1: branch tabs + month nav in one bar (the Service log pattern); search under it. */}
+        <ControlBar>
+          <Tabs tabs={[{ href: monthLink(month, null), label: "All branches", on: !branch }, ...clinics.map((b) => ({ href: monthLink(month, b.id), label: b.name, on: branch === b.id }))]} />
+          <PeriodNav prev={link(shiftMonth(month, -1))} next={month < thisMonth ? link(shiftMonth(month, 1)) : null} label={label}
+            reset={month === thisMonth ? null : { href: link(thisMonth), label: "This month" }} prevLabel="Previous month" nextLabel="Next month" />
+        </ControlBar>
+        <form className="row-buttons log-search" method="get">
+          <input type="hidden" name="month" value={month} />
+          {branch && <input type="hidden" name="branch" value={branch} />}
+          <input name="q" defaultValue={sp.q ?? ""} placeholder="🔍 Search a client or service" aria-label="Client or service" maxLength={60} />
+          <button className="secondary small" type="submit">Search</button>
+        </form>
 
         {error ? <div className="notice error">{error.code === "PGRST202" ? "The owner needs to run update-0075 in Supabase first." : "Could not load the proofs. Try again."}</div>
           : folders.length === 0 ? <p className="muted">No proof of payment in {label}{q ? " for that search" : ""}. Attach one from an entry in the Service log.</p> : (
