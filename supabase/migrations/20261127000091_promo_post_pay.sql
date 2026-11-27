@@ -6,7 +6,10 @@
 --     FB feed + Story on all 4 pages; then reminder, "last 3 days" and "last day" Stories), and once the launch is
 --     posted the app announces it in the All staff chat (photo + details, @all) from the owner who approved it.
 --   * The posts can be published by the app straight to the 4 Facebook pages (after the one-time Meta connection), or
---     posted by the CSRs from Clinic › Promo posts with a "Posted on all 4 pages" button.
+--     posted by the CSRs from Promo posts with a "Posted on all 4 pages" button.
+--   * Bookings: Arriving and Did not arrive statuses; a sale logged from the booking's name is linked to it (marks it
+--     Done); the waiver name, when different from the Facebook name, is used in all records.
+--   * Service log: "Service has before and after photo?" (unticked = only the signed waiver is needed).
 -- CHECK FIRST (changes nothing):
 -- select case when exists (select 1 from pg_proc where proname = 'promo_post_done') then 'ALREADY RUN: tick the box on your To-Do' else 'NOT RUN YET: run the rest of this file' end as result;
 
@@ -671,3 +674,5 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.log_client_visit(uuid, date, uuid, bigint, text, uuid, uuid, text, text, boolean, text, text, uuid, jsonb, boolean, integer, boolean) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.log_client_visit(uuid, date, uuid, bigint, text, uuid, uuid, text, text, boolean, text, text, uuid, jsonb, boolean, integer, boolean) TO authenticated;
+
+SELECT 'update-0091 is installed' AS result;
