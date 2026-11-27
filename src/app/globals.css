@@ -2203,3 +2203,6 @@ details.card:not(.add-panel)[open] > summary { margin-bottom: 12px; }
 .adv-ad-top { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; font-size: 0.88rem; overflow-wrap: anywhere; }
 .adv-ad-top .pill { flex: none; }
 .adv-ad-facts { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.adv-flag.FATIGUED, .adv-flag.LOSER { background: var(--bad-bg); color: var(--bad); }
+.adv-flag.STEADY { background: var(--pearl); color: var(--ink-2); }
+.adv-todo li.warn b { color: var(--warn); }
