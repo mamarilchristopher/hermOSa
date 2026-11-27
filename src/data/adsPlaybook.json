@@ -442,6 +442,11 @@
     "target_cost_per_chat_vat": 35,
     "scale_if_weekly_real_roas_at_least": 5.0,
     "trim_if_real_roas_below_for_2_weeks": 3.5
+   },
+   "proposed_change": {
+    "daily_budget_pre_vat": 1975,
+    "why": "Best ROAS per peso (6.8x) and a 2-week payback hint; 3-week controlled +20% test while other branches stay flat.",
+    "status": "proposed"
    }
   },
   {
@@ -767,7 +772,7 @@
   }
  ],
  "proposed_note": "Lines with status 'proposed' (Ultra Max ₱1,000, Botox family ₱600, NovoForm ₱300 per day) wait on CHRIS's OK. They take the ALL_TEST ₱495/day. Total ₱11,940/day, about ₱363k a month pre-VAT, still under the 2026 average of ~₱367k pre-VAT (₱411k*).",
- "version": "1.1",
+ "version": "1.2",
  "radar": {
   "note": "Outside sources are mostly US agency or vendor blogs. Treat their numbers as directional. Our own ad log and the Hermosa OS sales numbers win.",
   "untapped": [
@@ -1040,7 +1045,39 @@
     "verdict": "LATER: test after Botox family proves out"
    }
   ],
-  "service_gaps_note": "Sales from the Nov 1-24 service log (₱1.58M, all branches). Break-even close rate = share of chats that must buy for 5x ROAS = 5 x cost per chat / ticket."
+  "service_gaps_note": "Sales from the Nov 1-24 service log (₱1.58M, all branches). Break-even close rate = share of chats that must buy for 5x ROAS = 5 x cost per chat / ticket.",
+  "growth_signals": {
+   "updated": "2026-11-27",
+   "source": "Windsor spend by Facebook page (x1.12) + declared daily sales per branch, Jan 5 - Nov 15 2026 (45 weeks). Monthly table: playbook/branch-month-2026.csv",
+   "findings": [
+    "Week to week, more spend did not bring more sales in any branch (correlation -0.2 to 0.2). Extra money in the same ads returned about 0.5x-1.8x, far below the 4-6x average ROAS.",
+    "More chats did not bring more sales either. QC Main got its most chats in Aug (5,605) while sales fell to ₱868k; sales per chat dropped from ₱370 (Apr) to ₱155 (Aug-Sep). Fairview did the same (₱143 per chat in Sep). The limit is chat quality and closing, not chat volume.",
+    "Biggest natural test: QC Main spent ₱74k* Nov 1-21 (about half its usual pace) and still sold ₱734k, on pace for its best month since May.",
+    "Marikina has the best return per peso in 2026 (6.8x, up to ₱462 per chat) and is the only branch with a hint that spend pays back 2 weeks later (r 0.22).",
+    "The Sta. Maria ad set 'SMB+4 - Women only' is pinned 6 mi around QC Main, so part of Sta. Maria's spend serves QC. Sta. Maria's ROAS fell to 3.6x in Oct-Nov."
+   ],
+   "actions": [
+    {
+     "what": "Do not raise budgets on existing Hiko ad sets for growth; put extra money only into new offers/services (Ultra Max, Botox family, NovoForm).",
+     "budget_day_pre_vat": 0
+    },
+    {
+     "what": "Marikina controlled raise: MK_HIKO +20% (₱1,645 -> ₱1,975/day) for 3 weeks, other branches unchanged; keep it if Marikina sales beat its own 8-week average by more than 5x the extra spend.",
+     "budget_day_pre_vat": 330,
+     "status": "proposed"
+    },
+    {
+     "what": "Move 'SMB+4 - Women only' onto the Sta. Maria pin (or count it as QC Main).",
+     "budget_day_pre_vat": 0,
+     "status": "proposed"
+    },
+    {
+     "what": "Funnel fix before any scale: CSR reply speed, price-first script, follow-ups, ad-source tagging in the service log. This is where the Aug-Sep drop in sales per chat came from.",
+     "budget_day_pre_vat": 0
+    }
+   ],
+   "emerging_service_rule": "Monthly from the Hermosa OS service log: flag a branch x service when sales grow 30%+ month on month for 2 months with 5+ new clients, or when a service sells at 1-2 branches and ₱0 at the others (e.g. Jawtox ₱0 at Fairview/Marikina in Nov). Only November service data exists so far, so trends start from December."
+  }
  },
  "videos": {
   "V001": {

@@ -110,7 +110,7 @@ export type AdSetView = {
   id: string; name: string; campaign: string; status: string; t7: Totals; targeting: Targeting | null; text: string | null;
   mismatch: string | null; learnShort: boolean;
 };
-export type Action = "RAISE" | "CUT" | "KEEP" | "WAIT" | "OFF" | "START" | "NONE";
+export type Action = "RAISE" | "TEST" | "CUT" | "KEEP" | "WAIT" | "OFF" | "START" | "NONE";
 export type LineView = {
   branch: string; service: AdService; key: string;
   budget: number; budgetSource: "adset" | "campaign" | "none"; lastChange: string | null; lockedUntil: string | null;
@@ -144,6 +144,12 @@ function budgets(rows: FeedRow[], idOf: (r: FeedRow) => string | null, valOf: (r
   return out;
 }
 
+/**
+ * A branch line in the playbook. proposedChange = a controlled budget test the ads work proposes (e.g. Marikina Hiko +20%
+ * for 3 weeks), shown as the move while it waits for CHRIS's OK.
+ */
+export type PlanEntry = { budget: number; status: string; reviewDays: number; proposedChange?: { budget: number; why: string; status?: string } | null };
+
 export type AdvisorInput = {
   feed: Feed;
   today: string;
@@ -152,7 +158,7 @@ export type AdvisorInput = {
   /** Share of each branch's sales per ad line. */
   shares: Map<string, Record<AdService, number>>;
   /** Playbook daily budgets (pre-VAT pesos) per "BRANCH|SERVICE", and status. */
-  plan: Map<string, { budget: number; status: string; reviewDays: number }>;
+  plan: Map<string, PlanEntry>;
 };
 
 const sumSales = (m: Map<string, number> | undefined, from: string, to: string) => {
@@ -258,8 +264,18 @@ export function advise(inp: AdvisorInput) {
       action = "OFF"; newBudget = 0; why = "The plan keeps this line off; its return is too low.";
     } else if (lockedUntil) {
       action = "WAIT"; why = `Budget changed on ${fmtDay(lb!.changed!)}. Leave it until ${fmtDay(lockedUntil)} so Meta's learning isn't reset.`;
+    } else if (plan?.proposedChange && plan.proposedChange.budget > 0 && !(roas7 !== null && roasP7 !== null && roas7 < CUT_BELOW && roasP7 < CUT_BELOW)) {
+      // A controlled test from the playbook wins over the plain rules (one branch at a time, so its effect can be measured).
+      action = "TEST"; newBudget = r50(plan.proposedChange.budget);
+      why = `${plan.proposedChange.why}${plan.proposedChange.status === "proposed" ? " Waiting for your OK." : ""}`;
     } else if (roas7 !== null && roasP7 !== null && roas7 >= RAISE_AT && roasP7 >= RAISE_AT) {
-      action = "RAISE"; newBudget = r50(budget * (1 + STEP)); why = `ROAS ${roas7.toFixed(1)}x this week and ${roasP7.toFixed(1)}x last week, both ${RAISE_AT}x or more.`;
+      if (plan) {
+        // Nov 27 growth check (45 weeks, every branch): extra spend on the same ads returned only about 0.5–1.8x.
+        action = "KEEP";
+        why = `ROAS ${roas7.toFixed(1)}x this week and ${roasP7.toFixed(1)}x last week, but in 2026 more spend on the same ads didn't bring more sales. Put extra money into a new offer instead (see New ad sets).`;
+      } else {
+        action = "RAISE"; newBudget = r50(budget * (1 + STEP)); why = `ROAS ${roas7.toFixed(1)}x this week and ${roasP7.toFixed(1)}x last week, both ${RAISE_AT}x or more.`;
+      }
     } else if (roas7 !== null && roasP7 !== null && roas7 < CUT_BELOW && roasP7 < CUT_BELOW) {
       action = "CUT"; newBudget = r50(budget * (1 - STEP)); why = `ROAS under ${CUT_BELOW}x two weeks running (${roas7.toFixed(1)}x, ${roasP7.toFixed(1)}x).`;
     } else if (target !== null && budget > target * 1.2 && !(roas7 !== null && roas7 >= RAISE_AT)) {
@@ -320,6 +336,7 @@ const peso = (p: number) => `₱${Math.round(p).toLocaleString("en-US")}`;
 export function headlineOf(a: Action, budget: number, next: number) {
   switch (a) {
     case "RAISE": return `Raise to ${peso(next)}/day (from ${peso(budget)})`;
+    case "TEST": return `Test ${peso(next)}/day for 3 weeks (from ${peso(budget)})`;
     case "CUT": return `Cut to ${peso(next)}/day (from ${peso(budget)})`;
     case "WAIT": return `Keep ${peso(budget)}/day for now`;
     case "OFF": return `Turn off (${peso(budget)}/day now)`;

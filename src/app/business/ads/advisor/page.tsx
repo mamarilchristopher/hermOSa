@@ -16,7 +16,7 @@ const MGMT = ["OWNER", "FINANCE", "AUDITOR", "MANAGER"];
 const peso = (p: number) => `₱${Math.round(p).toLocaleString("en-US")}`;
 const vat = (p: number) => `₱${Math.round(p * 1.12).toLocaleString("en-US")}*`;
 const xr = (v: number | null) => (v === null ? "–" : `${v.toFixed(1)}x`);
-const ACTION_CLASS: Record<string, string> = { RAISE: "up", START: "up", CUT: "down", OFF: "down", KEEP: "keep", WAIT: "keep", NONE: "none" };
+const ACTION_CLASS: Record<string, string> = { RAISE: "up", TEST: "up", START: "up", CUT: "down", OFF: "down", KEEP: "keep", WAIT: "keep", NONE: "none" };
 
 /** Business › Ad advisor (update-0099, CHRIS Nov 27): this week's budget moves, ads to turn off or copy, ad set set-up and videos, and the market radar. */
 export default async function AdAdvisor() {
@@ -71,7 +71,7 @@ export default async function AdAdvisor() {
   const lines = res.lines;
   const nowPerDay = lines.reduce((s, l) => s + l.budget, 0);
   const nextPerDay = lines.reduce((s, l) => s + (l.action === "NONE" ? 0 : l.newBudget), 0);
-  const moves = lines.filter((l) => ["RAISE", "CUT", "OFF", "START"].includes(l.action));
+  const moves = lines.filter((l) => ["RAISE", "TEST", "CUT", "OFF", "START"].includes(l.action));
   const offAds = lines.flatMap((l) => l.ads.filter((a) => a.flag === "OFF"));
   const winners = lines.flatMap((l) => l.ads.filter((a) => a.flag === "WINNER"));
   const tiring = lines.flatMap((l) => l.ads.filter((a) => a.flag === "TIRING"));
@@ -127,6 +127,23 @@ export default async function AdAdvisor() {
               {winners.map((a) => <li key={a.id} className="good"><b>Winner &quot;{a.name}&quot;</b>{a.status !== "ACTIVE" ? " (paused: consider turning it back on)" : ""}: {a.why}</li>)}
             </ul>
           </div>
+        )}
+
+        {pb.radar.growth_signals && (
+          <section className="card adv-growth">
+            <h2>Does more spend bring more sales? <small>45 weeks of 2026</small></h2>
+            <ul className="adv-list">{pb.radar.growth_signals.findings.map((f) => <li key={f}>{f}</li>)}</ul>
+            <h3>So</h3>
+            <ul className="adv-acts">
+              {pb.radar.growth_signals.actions.map((a) => (
+                <li key={a.what}>
+                  <span>{a.what}</span>
+                  {a.status && <span className={`pill adv-st ${a.status}`}>{statusLabel(a.status)}</span>}
+                </li>
+              ))}
+            </ul>
+            <p className="small muted">{pb.radar.growth_signals.source.replace(/\.?\s*Monthly table:.*$/, ".")}</p>
+          </section>
         )}
 
         {byBranch.map((b) => (
