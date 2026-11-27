@@ -1,9 +1,11 @@
 -- update-0095 (v0.95.0, CHRIS Nov 27, from Geraldine's Nov 25-26 commission log list):
 --   1. Fix a client's name on past Service log entries (a misspelled name), on one entry or on all of that client's entries.
 --   2. Owners and the GM move an entry to the right branch (e.g. the wrong branch was picked).
+--   3. Double dose on a package (e.g. VContour, Lemon Bottle): CHRIS chose "uses 2 package sessions". The visit's
+--      session N is logged as usual and session N+1 is added as its own line (₱0, same people, usual session commission).
 --
 -- Already run? This read-only check tells you (it changes nothing):
---   select case when exists (select 1 from pg_proc where proname = 'rename_service_client')
+--   select case when exists (select 1 from pg_proc where proname = 'log_double_dose')
 --     then 'ALREADY RUN: tick the box on your To-Do' else 'NOT RUN YET: run the rest of this file' end as result;
 
 -- The guard of update-0091, plus the branch move.
@@ -102,5 +104,36 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.change_service_branch(uuid, uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.change_service_branch(uuid, uuid) TO authenticated;
+
+-- 3. Double dose. p_log = the session just saved; adds the next session of the same package to the same visit.
+CREATE OR REPLACE FUNCTION public.log_double_dose(p_log uuid) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_user uuid := private.current_user_id(); l record; v_n integer; r jsonb; v_id uuid; v_type text;
+  v_mgmt boolean := private.is_management(private.current_user_id());
+BEGIN
+  IF v_user IS NULL THEN RETURN jsonb_build_object('ok', false, 'error', 'NOT_AUTHENTICATED'); END IF;
+  SELECT * INTO l FROM public.service_logs WHERE id = p_log AND organization_id = private.current_org_id();
+  IF NOT FOUND OR l.state = 'REJECTED' THEN RETURN jsonb_build_object('ok', false, 'error', 'NOT_FOUND'); END IF;
+  IF l.created_by <> v_user AND NOT v_mgmt THEN RETURN jsonb_build_object('ok', false, 'error', 'NOT_ALLOWED'); END IF;
+  IF coalesce(l.visit_kind, 'PAID') <> 'PAID' THEN RETURN jsonb_build_object('ok', false, 'error', 'BAD_REQUEST'); END IF;
+  SELECT jsonb_array_length(to_jsonb(s) -> 'session_prices') INTO v_n FROM public.services s
+   WHERE s.id = l.service_id AND jsonb_typeof(to_jsonb(s) -> 'session_prices') = 'array';
+  IF v_n IS NULL OR v_n = 0 THEN RETURN jsonb_build_object('ok', false, 'error', 'NOT_A_PACKAGE'); END IF;
+  IF coalesce(l.session_no, 1) + 1 > v_n THEN RETURN jsonb_build_object('ok', false, 'error', 'SESSION_LIMIT', 'of', v_n); END IF;
+  v_type := CASE WHEN l.commission_type = 'NONCOMMI' THEN 'NONCOMMI' WHEN l.assistant_id IS NOT NULL THEN 'LEAD' ELSE 'SOLO' END;
+  r := public.log_visit(l.branch_id, l.service_date, l.service_id, 0, v_type, l.performer_id, l.assistant_id, NULL, 'Double dose', 'PAID', true);
+  IF NOT coalesce((r ->> 'ok')::boolean, false) THEN RETURN r; END IF;
+  v_id := (r ->> 'id')::uuid;
+  UPDATE public.service_logs SET client_name = l.client_name, photo_folder = l.photo_folder, photos_due = false,
+    session_no = coalesce(l.session_no, 1) + 1, booking_id = l.booking_id, list_price_cents = l.list_price_cents WHERE id = v_id;
+  IF v_mgmt AND r ->> 'state' = 'PENDING' THEN
+    UPDATE public.service_logs SET state = 'APPROVED', decided_by = v_user, decided_at = now() WHERE id = v_id AND state = 'PENDING';
+    r := r || jsonb_build_object('state', 'APPROVED');
+  END IF;
+  RETURN r || jsonb_build_object('session', coalesce(l.session_no, 1) + 1);
+END $$;
+REVOKE ALL ON FUNCTION public.log_double_dose(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.log_double_dose(uuid) TO authenticated;
 
 SELECT 'update-0095 is installed' AS result;

@@ -59,3 +59,24 @@ describe("branch fix", () => {
     expect(lines).toBe(1); // commission unchanged
   });
 });
+
+describe("double dose", () => {
+  it("adds the next session of the package to the visit, with its usual commission", async () => {
+    const vc = (await db.sql(`INSERT INTO public.services (organization_id, name, price_cents, commission_cents, session_prices, active, created_by)
+      SELECT organization_id, 'DEMO VContour 10+3', 0, 5769, array_fill(0::bigint, ARRAY[13]), true, $1 FROM public.branches LIMIT 1 RETURNING id`, [owner.appUserId])).rows[0].id as string;
+    const folder = randomUUID();
+    const pic = (k: string) => { const id = randomUUID(); return { kind: k, path: `${db.branches.FAIRVIEW}/${folder}/${k.toLowerCase()}-${id}.jpg`, thumb: null }; };
+    const main = await db.rpc(staff, "aal1", "log_client_visit", [db.branches.FAIRVIEW, today(), vc, 150000, "SOLO", ana, null, null,
+      "PAID", true, "DEMO Double Client", null, folder, JSON.stringify(["WAIVER", "WAIVER", "BEFORE", "AFTER"].map(pic)), false, 12, true]);
+    expect(main.ok).toBe(true);
+    expect((await db.rpc(other, "aal1", "log_double_dose", [main.id])).ok).toBe(false);
+    const r = await db.rpc(staff, "aal1", "log_double_dose", [main.id]);
+    expect(r).toMatchObject({ ok: true, session: 13 });
+    const row = (await db.sql(`SELECT l.session_no, l.amount_paid_cents::int amt, l.client_name, l.photos_due, l.note,
+      (SELECT sum(amount_cents)::int FROM public.commission_lines c WHERE c.service_log_id = l.id) com FROM public.service_logs l WHERE id = $1`, [r.id])).rows[0];
+    expect(row).toEqual({ session_no: 13, amt: 0, client_name: "DEMO Double Client", photos_due: false, note: "Double dose", com: 5769 });
+    expect(await db.rpc(staff, "aal1", "log_double_dose", [r.id])).toMatchObject({ ok: false, error: "SESSION_LIMIT" }); // no session 14
+    const plain = await visit("DEMO Not Package");
+    expect(await db.rpc(staff, "aal1", "log_double_dose", [plain])).toMatchObject({ ok: false, error: "NOT_A_PACKAGE" });
+  });
+});

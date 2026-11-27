@@ -133,6 +133,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const [extras, setExtras] = useState<AddonRow[]>([]);
   const [more, setMore] = useState<MoreRow[]>([]);
   const [afterDp, setAfterDp] = useState(false); // update-0085: balance paid after a down payment
+  const [double, setDouble] = useState(false); // update-0095: a double dose uses 2 sessions of the package
   // update-0087: the client's promo for a promo item ("" = not picked, "new" = starts the promo with this visit).
   const [promoClient, setPromoClient] = useState("");
   // update-0091: on an installment promo, the new client's plan (1 = full payment).
@@ -150,7 +151,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       setAmount("");
       setKind("PAID");
       setWho("");
-      setService(""); setPartner(""); setClient(booking ? (sameName ? booking.fbName : client) : ""); setPriceNote(""); setShare(false); setNote(""); setSession("1"); setMed(""); setExtras([]); setMore([]); setAfterDp(false); setPromoClient(""); setContact(""); setPayPlan("1"); setHasBa(true);
+      setService(""); setPartner(""); setClient(booking ? (sameName ? booking.fbName : client) : ""); setPriceNote(""); setShare(false); setNote(""); setSession("1"); setMed(""); setExtras([]); setMore([]); setAfterDp(false); setDouble(false); setPromoClient(""); setContact(""); setPayPlan("1"); setHasBa(true);
       photos.reset();
       proofs.reset();
     }
@@ -217,6 +218,12 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   for (const x of moreRows) {
     const s = moreChoices.find((o) => o.id === x.service);
     const c = previewCommission(toCents(x.amount), effType, s?.commission ?? null, s?.price ?? null);
+    extra.lead += leadEmp?.eligible === false ? 0 : c.lead; extra.assist += assistEmp?.eligible === false ? 0 : c.assist; extra.solo += person?.eligible === false ? 0 : c.solo;
+  }
+  // update-0095: a double dose adds the next session's set commission (split like the main one).
+  const canDouble = paid && !pm && !!svc?.sessions?.length && Number(session) < svc.sessions.length && svc.commission != null;
+  if (canDouble && double) {
+    const c = previewCommission(0, effType, svc!.commission, svc!.price);
     extra.lead += leadEmp?.eligible === false ? 0 : c.lead; extra.assist += assistEmp?.eligible === false ? 0 : c.assist; extra.solo += person?.eligible === false ? 0 : c.solo;
   }
   const moreJson = JSON.stringify(moreRows.map((x) => ({ service: x.service, amount: x.amount.trim(), note: x.note.trim() })));
@@ -376,6 +383,12 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
           </label>
         )}
         </div>
+        {canDouble && (
+          <label className="span2 double-dose">
+            <input type="checkbox" name="double" value="1" checked={double} onChange={(e) => setDouble(e.target.checked)} />
+            <span><strong>Double dose</strong> · uses 2 sessions of the package: session {session} and session {Number(session) + 1}, each with its commission</span>
+          </label>
+        )}
         {svc?.sessions?.length && !pm ? (
           <div className="span2 pkg-record small">
             {pkg ? (

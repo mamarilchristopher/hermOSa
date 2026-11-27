@@ -31,6 +31,7 @@ const Log = z.object({
   meds: z.union([z.uuid(), z.string().regex(/^free:[0-9a-f-]{36}$/), z.literal("")]).optional(),
   addons: z.string().max(2000).optional(),
   more: z.string().max(4000).optional(),
+  double: z.literal("1").optional(),
   promo_client: z.union([z.uuid(), z.literal("new"), z.literal("")]).optional(),
   promo_contact: z.string().trim().max(40).optional(),
   promo_payments: z.coerce.number().int().min(1).max(6).optional(),
@@ -40,7 +41,7 @@ const Log = z.object({
 const Photos = z.array(z.object({ kind: z.enum(["WAIVER", "BEFORE", "AFTER"]), path: z.string().max(300), thumb: z.string().max(300).nullable() })).max(20);
 
 export async function logService(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session", "meds", "proofs", "addons", "more", "promo_client", "promo_contact", "promo_payments", "no_ba", "booking"].map((k) => [k, fd.get(k) ?? undefined])));
+  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session", "meds", "proofs", "addons", "more", "promo_client", "promo_contact", "promo_payments", "no_ba", "booking", "double"].map((k) => [k, fd.get(k) ?? undefined])));
   if (!p.success) return { error: "Fill in the client's name, the service, the amount paid and who did it." };
   let photos;
   try { photos = Photos.parse(JSON.parse(p.data.photos || "[]")); } catch { return { error: "The photos didn't attach. Remove them and add them again." }; }
@@ -151,6 +152,14 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
       : ` A service didn't save${ex?.error ? ` (${errorText(ex.error)})` : ""}: log it again as its own entry.`;
   }
   if (moreOk) medsNote += moreOk === 1 ? " 1 more service added." : ` ${moreOk} more services added.`;
+  // update-0095 (CHRIS Nov 27): a double dose uses 2 sessions of the package: the next session is added to this visit.
+  if (paid && p.data.double && sessions) {
+    const { data: dd, error: ddErr } = await supabase.rpc("log_double_dose", { p_log: data.id });
+    medsNote += !ddErr && dd?.ok ? ` Double dose: session ${dd.session} added too.`
+      : ddErr?.code === "PGRST202" ? " Double dose needs database update-0095: ask the owner to run it, then log the next session as its own entry (₱0)."
+      : dd?.error === "SESSION_LIMIT" ? ` Double dose: this package has only ${dd.of} sessions, so no extra session was added.`
+      : ` The double dose's second session didn't save${dd?.error ? ` (${errorText(dd.error)})` : ""}: log it as its own entry (₱0).`;
+  }
   // update-0088 (CHRIS Nov 27): tag the backjob (what needed fixing, first treatment and who did it) for tracking.
   if (p.data.kind === "BACKJOB") {
     const staff = String(fd.get("bj_staff") ?? "");
