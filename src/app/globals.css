@@ -2971,3 +2971,13 @@ fieldset.paid-to legend { padding: 0; margin-bottom: 6px; }
 
 /* v0.103.2 (CHRIS Nov 28): Fully paid package shows ₱0 as a fixed value, not a field to type in. */
 .fully-paid-tag { display: flex; align-items: center; min-height: 44px; padding: 8px 12px; border-radius: 10px; border: 1px dashed var(--gold); background: var(--gold-soft); color: var(--brown-dark); font-weight: 800; }
+
+/* update-0105: People › person commission lines. Phones show the commission under the service (no off-screen column). */
+.commission-lines .cl-phone { display: none; }
+.commission-lines .cl-date { white-space: nowrap; }
+@media (max-width: 700px) {
+  .commission-lines .cl-wide { display: none; }
+  .commission-lines .cl-phone { display: block; margin-top: 2px; }
+  .commission-lines th, .commission-lines td { padding-left: 8px; padding-right: 8px; }
+  .commission-lines .cl-date { white-space: normal; font-size: 13px; width: 58px; }
+}

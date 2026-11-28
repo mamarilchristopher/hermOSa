@@ -6,7 +6,7 @@ import { TopBar } from "@/components/TopBar";
 import { centsToPhp } from "@/lib/csv";
 import { manilaToday } from "@/lib/dates";
 import { addMonths, monthEnd, monthLabel } from "@/lib/insights";
-import { ROLE_TEXT } from "@/lib/commission";
+import { CommissionLines, type Line } from "../CommissionLines";
 import { EmployeeForm } from "../EmployeeForm";
 import { StartDateForm } from "../StartDateForm";
 import { NicknameForm } from "../NicknameForm";
@@ -15,7 +15,6 @@ import { DetailsView } from "@/components/DetailsView";
 import type { Details } from "@/lib/employeeDetails";
 import { Uid } from "@/components/Uid";
 
-type Line = { id: string; role: string; amount_cents: number; service_logs: { id: string; service_date: string; state: string; photos_due?: boolean; amount_paid_cents: number; branch_id: string; services: { name: string } | null } };
 
 export default async function Employee({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ month?: string }> }) {
   const { id } = await params;
@@ -85,23 +84,7 @@ export default async function Employee({ params, searchParams }: { params: Promi
         </div>
 
         <h2>Commission lines</h2>
-        <div className="table-wrap">
-          <table>
-            <thead><tr><th>Date</th><th>Service</th><th className="num">Commission</th><th>Type</th><th>Status</th></tr></thead>
-            <tbody>
-              {lines.map((l) => (
-                <tr key={l.id} className={l.service_logs.state === "REJECTED" ? "rejected" : undefined}>
-                  <td>{l.service_logs.service_date}</td>
-                  <td>{l.service_logs.services?.name}<div className="small muted">{branchName[l.service_logs.branch_id]} · paid {centsToPhp(l.service_logs.amount_paid_cents)}</div></td>
-                  <td className="num"><strong>{centsToPhp(l.amount_cents)}</strong></td>
-                  <td><span className={`tag ${l.role}`}>{ROLE_TEXT[l.role]}</span></td>
-                  <td><span className={`pill ${l.service_logs.state === "APPROVED" ? "PUBLISHED" : l.service_logs.state === "REJECTED" ? "REVERSED" : "STAGED"}`}>{l.service_logs.state === "APPROVED" ? "Approved" : l.service_logs.state === "REJECTED" ? "Rejected" : "Waiting"}</span></td>
-                </tr>
-              ))}
-              {lines.length === 0 && <tr><td colSpan={5} className="muted">No commission in {monthLabel(ym)}.</td></tr>}
-            </tbody>
-          </table>
-        </div>
+        <CommissionLines lines={lines} branchName={branchName} empty={`No commission in ${monthLabel(ym)}.`} />
 
         {isOwner && (
           <details className="card">
