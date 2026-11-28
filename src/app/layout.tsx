@@ -7,6 +7,8 @@ import { VERSION } from "@/lib/version";
 import { cookies } from "next/headers";
 import { RegisterSW } from "@/components/Hermosapp";
 import { VersionGuard } from "@/components/VersionGuard";
+import { NavProgress } from "@/components/NavProgress";
+import { Suspense } from "react";
 
 const sans = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
@@ -29,6 +31,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" className={sans.variable} data-theme="ivory" data-mode={mode}>
       <body>
         <VersionGuard />
+        {/* v0.106.8: app-style page changes. The current page stays visible under a see-through veil while the next loads. */}
+        <Suspense fallback={null}><NavProgress /></Suspense>
         {children}
         <RegisterSW />
         <footer className="build-note" title="The code version this page is running">
