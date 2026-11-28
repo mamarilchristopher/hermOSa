@@ -2,7 +2,7 @@
 import { pick } from "@/lib/decision";
 import { BACKJOB_REASONS } from "@/lib/backjobs";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { addService, approveMany, changeBranch, changeDate, fixPackageSession, renameClient, voidEntry, renumberMonth, decideLog, logService, toggleAfterDp, type ActionState } from "./actions";
+import { addService, approveMany, changeBranch, changeDate, fixPackageSession, renameClient, voidEntry, renumberMonth, decideLog, logService, toggleAfterDp, mergeEntry, separateEntry, type ActionState } from "./actions";
 import { previewCommission, type CommissionType } from "@/lib/commission";
 import { centsToPhp } from "@/lib/csv";
 import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
@@ -776,6 +776,33 @@ export function RenumberForm({ month, label }: { month: string; label: string })
       <span className="small muted">Entry numbers (SL-) run in the order entries were made. Once {label} sales are final, put them in order of service date, then branch:</span>
       <button className="secondary small" disabled={pending}>{pending ? "Re-numbering…" : `Re-number ${label}`}</button>
       {s?.ok && <span className="small ok-text">{s.ok}</span>}
+      {s?.error && <span className="field-error">{s.error}</span>}
+    </form>
+  );
+}
+
+/** update-0101 (CHRIS Nov 28): put a meds / add-on line under the client's main sale; the main sale's SL number stays. */
+export function MergeForm({ main, line, label }: { main: string; line: string; label: string }) {
+  const [s, action, pending] = useActionState(mergeEntry, undefined);
+  if (s?.ok) return <span className="small ok-text">{s.ok}</span>;
+  return (
+    <form action={action} className="merge-form">
+      <input type="hidden" name="main" value={main} />
+      <input type="hidden" name="line" value={line} />
+      <button className="small" disabled={pending}>{pending ? "Merging…" : label}</button>
+      {s?.error && <span className="field-error">{s.error}</span>}
+    </form>
+  );
+}
+
+/** Undo a merge: the line gets its own SL number again. */
+export function SeparateForm({ line }: { line: string }) {
+  const [s, action, pending] = useActionState(separateEntry, undefined);
+  if (s?.ok) return <span className="small ok-text">{s.ok}</span>;
+  return (
+    <form action={action} className="inline-form">
+      <input type="hidden" name="line" value={line} />
+      <button className="link-like small" disabled={pending}>{pending ? "…" : "Separate"}</button>
       {s?.error && <span className="field-error">{s.error}</span>}
     </form>
   );

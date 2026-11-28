@@ -9,7 +9,7 @@ import { isIsoDate, manilaToday } from "@/lib/dates";
 import { addDays, sortBranches, WEEKDAYS, weekday } from "@/lib/insights";
 import { ROLE_TEXT, TYPE_TEXT } from "@/lib/commission";
 import { AddPanel } from "@/components/Controls";
-import { AfterDpForm, BatchApprove, BranchEntryForm, ChangeBranchForm, ChangeDateForm, DecideButtons, FixPackageForm, RenameClientForm, RenumberForm, VoidEntryForm } from "./Forms";
+import { AfterDpForm, BatchApprove, BranchEntryForm, ChangeBranchForm, ChangeDateForm, DecideButtons, FixPackageForm, MergeForm, RenameClientForm, RenumberForm, SeparateForm, VoidEntryForm } from "./Forms";
 import type { PackageLine } from "@/lib/packages";
 import { Uid } from "@/components/Uid";
 import { StaffFilter } from "./StaffFilter";
@@ -24,7 +24,7 @@ import type { PromoOptions } from "@/lib/promoTrack";
 
 type Log = {
   id: string; service_date: string; amount_paid_cents: number; commission_type: string; performer_id: string; assistant_id: string | null;
-  receipt_no: string | null; note: string | null; service_id?: string; branch_id?: string; client_name?: string | null; price_note?: string | null; after_dp?: boolean; list_price_cents?: number | null; photo_folder?: string | null; share_ok?: boolean; photos_due?: boolean; session_no?: number; log_no?: string | null; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
+  receipt_no: string | null; note: string | null; service_id?: string; branch_id?: string; client_name?: string | null; price_note?: string | null; after_dp?: boolean; list_price_cents?: number | null; photo_folder?: string | null; share_ok?: boolean; photos_due?: boolean; session_no?: number; merged_into?: string | null; log_no?: string | null; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
   services: { name: string } | null;
 };
 const VISIT_TEXT: Record<string, string> = { BACKJOB: "Backjob (unpaid)", CHECKUP: "Check-up (unpaid)", NO_CHARGE: "No charge" };
@@ -83,6 +83,14 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
     supabase.rpc("chat_people"), // names of everyone in the company, for "Entered by"
   ]);
   const allRaw = (logs ?? []) as unknown as Log[];
+  // update-0101 (CHRIS Nov 28): meds / add-on lines merged into a main sale show inside it, under its SL number.
+  const byId = new Map(allRaw.map((l) => [l.id, l]));
+  const isKid = (l: Log) => !!l.merged_into && byId.has(l.merged_into);
+  const kids = new Map<string, Log[]>();
+  for (const l of allRaw) if (isKid(l)) kids.set(l.merged_into!, [...(kids.get(l.merged_into!) ?? []), l]);
+  const svcKind = new Map(((services ?? []) as { id: string; is_meds?: boolean; is_addon?: boolean }[]).map((x) => [x.id, { meds: !!x.is_meds, addon: !!x.is_addon }]));
+  const extra = (l: Log) => !!l.service_id && (svcKind.get(l.service_id)?.meds || svcKind.get(l.service_id)?.addon);
+  const normName = (n?: string | null) => (n ?? "").trim().replace(/\s+/g, " ").toLowerCase();
   // CHRIS Nov 26: filter by one staff member (Done by or Assisted by). Default: everyone.
   const staffPick = (emps ?? []).find((e) => e.id === sp.staff)?.id ?? null;
   const all = staffPick ? allRaw.filter((l) => l.performer_id === staffPick || l.assistant_id === staffPick) : allRaw;
@@ -149,12 +157,12 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   // entry wasn't on the chosen day used to count too, so the card showed the whole week's commission.
   const dayIds = new Set(list.filter((l) => l.state !== "REJECTED").map((l) => l.id));
   const commission = lines.filter((x) => dayIds.has(x.service_log_id)).reduce((s, x) => s + Number(x.amount_cents), 0);
-  const pendingCount = list.filter((l) => l.state === "PENDING").length;
-  const pendingMine = all.filter((l) => l.state === "PENDING" && approverFor(l.branch_id));
+  const pendingCount = list.filter((l) => l.state === "PENDING" && !isKid(l)).length;
+  const pendingMine = all.filter((l) => l.state === "PENDING" && approverFor(l.branch_id) && !isKid(l));
   const pendingAll = pendingMine.length;
   // v0.100.6 (CHRIS Nov 28): entries that look logged twice (same client, service, session and day), from every entry
   // of these days (not only the staff filter), so the second copy isn't approved by mistake.
-  const doubles = doubleEntries(allRaw);
+  const doubles = doubleEntries(allRaw.filter((l) => !isKid(l)));
   const doubleList = all.filter((l) => doubles.has(l.id));
   const heldBack = pendingMine.filter((l) => doubles.has(l.id));
   const logNo = (x: { log_no: string | null }) => x.log_no ?? "another entry";
@@ -242,20 +250,33 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
         {approver && pendingAll > 1 && <BatchApprove ids={pendingMine.filter((l) => !doubles.has(l.id)).map((l) => l.id)} held={heldBack.length} />}
         {groups.length === 0 && <p className="muted">Nothing logged in these {days} days.</p>}
         {groups.map(([d, dayList]) => {
-          const ok = dayList.filter((l) => l.state !== "REJECTED");
-          const waiting = dayList.filter((l) => l.state === "PENDING").length;
+          const cards = dayList.filter((l) => !isKid(l));
+          const ok = cards.filter((l) => l.state !== "REJECTED");
+          const waiting = cards.filter((l) => l.state === "PENDING").length;
+          const dayCents = dayList.filter((l) => l.state !== "REJECTED").reduce((x, l) => x + Number(l.amount_paid_cents), 0);
           return (
             <section key={d} className="log-day">
               <h3 className="log-day-head">
                 <span>{d === today ? "Today" : d === addDays(today, -1) ? "Yesterday" : WEEKDAYS[weekday(d)]}, {new Date(`${d}T00:00:00Z`).toLocaleDateString("en-PH", { month: "short", day: "numeric", timeZone: "UTC" })}</span>
-                <span className="small muted">{ok.length} entr{ok.length === 1 ? "y" : "ies"} · {centsToPhp(ok.reduce((x, l) => x + Number(l.amount_paid_cents), 0))}{waiting ? ` · ${waiting} waiting` : ""}
+                <span className="small muted">{ok.length} entr{ok.length === 1 ? "y" : "ies"} · {centsToPhp(dayCents)}{waiting ? ` · ${waiting} waiting` : ""}
                   {dayCheck.has(d) && <span className={`check-note ${dayCheck.get(d)!.status}`}> · {diffText(dayCheck.get(d)!)}</span>}</span>
               </h3>
         {/* v0.99.1 (CHRIS Nov 27): one tidy card per entry. Who / what on the left, staff with their commission in the middle,
             amount and status on the right, every action as one row of buttons; the fix tools sit behind "Fix entry". */}
         <div className="card entry-list">
-              {(branch ? dayList : dayList.slice().sort((a, b) => (order.get(a.branch_id ?? "") ?? 9) - (order.get(b.branch_id ?? "") ?? 9))).map((l) => {
-                const ls = lines.filter((x) => x.service_log_id === l.id);
+              {(branch ? cards : cards.slice().sort((a, b) => (order.get(a.branch_id ?? "") ?? 9) - (order.get(b.branch_id ?? "") ?? 9))).map((l) => {
+                const sub = (kids.get(l.id) ?? []).filter((k) => k.state !== "REJECTED");
+                const ls = lines.filter((x) => x.service_log_id === l.id || sub.some((k) => k.id === x.service_log_id));
+                const total = Number(l.amount_paid_cents) + sub.reduce((x, k) => x + Number(k.amount_paid_cents), 0);
+                // A meds / add-on line of a client who has a main sale that day: offer to merge it there.
+                // CHRIS Nov 28: also several services of one client on one waiver. The main sale = a service (not meds or an
+                // add-on), the biggest amount, then the first entered; it keeps its SL number.
+                const visitMates = l.state !== "REJECTED" && !l.merged_into && approverFor(l.branch_id) && l.client_name && !doubles.has(l.id)
+                  ? cards.filter((m) => m.state !== "REJECTED" && !m.merged_into && m.branch_id === l.branch_id && normName(m.client_name) === normName(l.client_name))
+                  : [];
+                const visitMain = visitMates.length > 1 ? visitMates.slice().sort((a, b) => Number(!!extra(a)) - Number(!!extra(b))
+                  || Number(b.amount_paid_cents) - Number(a.amount_paid_cents) || a.created_at.localeCompare(b.created_at))[0] : null;
+                const mainFor = visitMain && visitMain.id !== l.id && !extra(visitMain) ? visitMain : null;
                 const staff = [l.performer_id, l.assistant_id].filter(Boolean) as string[];
                 const canEdit = topMgmt || l.created_by === access.user_id || staff.some((x) => mine.has(x));
                 const fixName = !!l.client_name && l.state !== "REJECTED" && canEdit;
@@ -265,9 +286,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 const awaitingMe = l.state === "PENDING" && approverFor(l.branch_id);
                 // Waiver photos are seen by owners, the GM and the branch's clinic staff (the client archive rule).
                 const seesFiles = can(access, ["OWNER", "MANAGER", "CLINICIAN", "CASHIER"], l.branch_id ?? null);
-                const needsWaiver = (l.visit_kind ?? "PAID") === "PAID" || l.visit_kind === "BACKJOB";
+                const needsWaiver = !extra(l) && ((l.visit_kind ?? "PAID") === "PAID" || l.visit_kind === "BACKJOB");
                 return (
-                  <article key={l.id} id={`entry-${l.id}`} className={["entry", l.state === "REJECTED" ? "rejected" : "", sp.entry === l.id ? "entry-focus" : "", twins ? "entry-double" : ""].join(" ").trim()}>
+                  <article key={l.id} id={`entry-${l.id}`} className={["entry", `entry-${l.state.toLowerCase()}`, l.state === "REJECTED" ? "rejected" : "", sp.entry === l.id ? "entry-focus" : "", twins ? "entry-double" : ""].join(" ").trim()}>
                     <div className="entry-main">
                       <div className="entry-top">
                         {l.state === "PENDING" && approverFor(l.branch_id) && pendingAll > 1 && (
@@ -284,6 +305,19 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                           ? <span className="tag">{VISIT_TEXT[l.visit_kind] ?? l.visit_kind}</span>
                           : <span className={`tag ${l.commission_type}`}>{TYPE_TEXT[l.commission_type]}</span>}
                       </div>
+                      {sub.length > 0 && (
+                        <ul className="entry-sub">
+                          {sub.map((k) => (
+                            <li key={k.id}>
+                              <span className="entry-sub-name">＋ {k.services?.name ?? "Item"}{k.visit_kind === "NO_CHARGE" ? " (free)" : ""}</span>
+                              <span className="entry-sub-amt">{centsToPhp(k.amount_paid_cents)}</span>
+                              {k.commission_type === "NONCOMMI" && <span className="muted small">no commission</span>}
+                              {k.state === "PENDING" && <span className="muted small">· signed off with the sale</span>}
+                              {approverFor(k.branch_id) && <SeparateForm line={k.id} />}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                       {l.receipt_no && <div className="small muted">Waiver / OR {l.receipt_no}</div>}
                       {l.after_dp && <div className="small"><span className="tag">Balance after DP</span> <span className="muted">commission on the full price</span></div>}
                       {l.price_note && <div className="small muted">Price: {l.price_note}</div>}
@@ -293,13 +327,15 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                     <div className="entry-staff">
                       {staff.length === 0 && <span className="small muted">No staff</span>}
                       {staff.map((id, i) => {
-                        const line = ls.find((x) => x.employee_id === id);
+                        const mineLines = ls.filter((x) => x.employee_id === id);
+                        const line = mineLines.find((x) => x.service_log_id === l.id) ?? mineLines[0];
+                        const amt = mineLines.reduce((x, y) => x + Number(y.amount_cents), 0);
                         const role = l.commission_type === "LEAD" ? (i === 0 ? "lead" : "assist") : l.commission_type === "SOLO" ? "solo" : "";
                         return (
                           <div key={id} className="entry-person">
                             <span className="who">{name[id] ?? "Former staff"}{mine.has(id) && <span className="muted"> (you)</span>}</span>
                             <span className="comm">
-                              {noCommission ? <span className="muted small">{role || "-"}</span> : line ? <><strong>{centsToPhp(line.amount_cents)}</strong> <span className="muted small">{ROLE_TEXT[line.role]}</span></>
+                              {noCommission ? <span className="muted small">{role || "-"}</span> : line ? <><strong>{centsToPhp(amt)}</strong> <span className="muted small">{ROLE_TEXT[line.role]}</span></>
                                 : <span className="muted small">{l.commission_type === "NONCOMMI" ? "no commission" : approver || mine.has(id) ? `no commission · ${role}` : role}</span>}
                             </span>
                           </div>
@@ -307,7 +343,8 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                       })}
                     </div>
                     <div className="entry-side">
-                      <div className="entry-paid">{centsToPhp(l.amount_paid_cents)}</div>
+                      <div className="entry-paid">{centsToPhp(total)}</div>
+                      {sub.length > 0 && <div className="small muted entry-paid-split">{centsToPhp(l.amount_paid_cents)} + {centsToPhp(total - Number(l.amount_paid_cents))}</div>}
                       {l.state === "PENDING" && approverFor(l.branch_id) ? <DecideButtons id={l.id} /> : (
                         <span className={`pill ${l.state === "APPROVED" ? "PUBLISHED" : l.state === "REJECTED" ? "REVERSED" : "STAGED"}`}>
                           {l.state === "APPROVED" ? "Approved" : l.state === "REJECTED" ? "Rejected" : "Waiting"}
@@ -315,8 +352,14 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                       )}
                       {l.state === "REJECTED" && l.decision_note && <div className="small muted">{l.decision_note}</div>}
                     </div>
-                    {((l.photos_due && l.state !== "REJECTED") || twins || (awaitingMe && seesFiles)) && (
+                    {((l.photos_due && l.state !== "REJECTED") || twins || (awaitingMe && seesFiles) || mainFor) && (
                       <div className="entry-wide entry-extra">
+                        {mainFor && (
+                          <div className="merge-hint">
+                            <span className="small">Same client as <a href={`#entry-${mainFor.id}`}>{mainFor.log_no ?? "another entry"}</a> ({mainFor.services?.name ?? "service"}). {extra(l) ? "Put it under that sale" : "Same visit, one waiver? Put it under that sale"} so the visit has one SL number.</span>
+                            <MergeForm main={mainFor.id} line={l.id} label={`Merge into ${mainFor.log_no ?? "that sale"}`} />
+                          </div>
+                        )}
                         {twins && (
                           <div className="double-warn">
                             <span className="pill REVERSED">Looks logged twice</span>
@@ -325,7 +368,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                             {topMgmt && l.state !== "REJECTED" && <VoidEntryForm id={l.id} label="Remove this copy" cls="danger small" reason={`Logged twice, same as ${twins.map(logNo).join(", ")}`} />}
                           </div>
                         )}
-                        {awaitingMe && seesFiles && <EntryFiles log={l.id} auto needsWaiver={needsWaiver && !l.photos_due} />}
+                        {awaitingMe && seesFiles && <EntryFiles log={l.id} more={sub.map((k) => k.id)} auto needsWaiver={needsWaiver && !l.photos_due} />}
                         {l.photos_due && l.state !== "REJECTED" && (
                           <div className="photos-due">
                             <span className="pill REVERSED">Photos missing</span>
@@ -346,7 +389,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                           .slice().reverse().map((x) => ({ service: x.services?.name ?? "Service", session: x.session_no ?? 1, amount: Number(x.amount_paid_cents), kind: x.visit_kind ?? "PAID" })),
                       }} />
                       {/* v0.100.6: waiver, proof and photos open right here (not the Client archive page). */}
-                      {!awaitingMe && seesFiles && (l.photo_folder || proofCount.get(l.id)) && <EntryFiles log={l.id} auto={false} needsWaiver={needsWaiver && !l.photos_due} />}
+                      {!awaitingMe && seesFiles && (l.photo_folder || proofCount.get(l.id)) && <EntryFiles log={l.id} more={sub.map((k) => k.id)} auto={false} needsWaiver={needsWaiver && !l.photos_due} />}
                       {l.share_ok && l.photo_folder && <span className="tag">Photo sharing OK</span>}
                       {/* update-0093 (CHRIS Nov 27): add, remove or replace photos on a past entry; saved after an owner's or the GM's approval. */}
                       {l.state !== "REJECTED" && !l.photos_due && canEdit && (

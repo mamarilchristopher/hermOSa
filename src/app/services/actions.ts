@@ -237,6 +237,9 @@ export async function decideLog(_prev: ActionState, fd: FormData): Promise<Actio
   const { data, error } = await supabase.rpc("decide_service_log", { p_log: id.data, p_approve: approve, p_note: String(fd.get("note") ?? "") || null });
   if (error) return { error: "Could not save. Try again." };
   if (!data.ok) return { error: errorText(data.error) };
+  // update-0101: meds / add-ons merged into this sale follow its decision.
+  for (const c of await mergedLines(supabase, [id.data], "PENDING"))
+    await supabase.rpc("decide_service_log", { p_log: c, p_approve: approve, p_note: approve ? null : `With the main sale: ${String(fd.get("note") ?? "").trim()}`.slice(0, 300) });
   revalidatePath("/services");
   revalidatePath("/people");
   return { ok: approve ? "Approved" : "Rejected" };
@@ -249,7 +252,9 @@ export async function approveMany(_prev: ActionState, fd: FormData): Promise<Act
   if (!ids.success) return { error: "Try again." };
   if (!ids.data.length) return { error: "Tick at least one entry first." };
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("approve_service_logs", { p_logs: ids.data });
+  // update-0101: meds / add-ons merged into a ticked sale are approved with it.
+  const withLines = [...new Set([...ids.data, ...(await mergedLines(supabase, ids.data, "PENDING"))])].slice(0, 300);
+  const { data, error } = await supabase.rpc("approve_service_logs", { p_logs: withLines });
   if (error) return { error: error.code === "PGRST202" ? "The owner needs to run update-0060 in Supabase first." : "Could not save. Try again." };
   if (!data.ok) return { error: errorText(data.error) };
   revalidatePath("/services");
@@ -350,9 +355,51 @@ export async function voidEntry(_prev: ActionState, fd: FormData): Promise<Actio
   const reason = String(fd.get("reason") ?? "").trim();
   if (!id.success) return { error: "Refresh the page and try again." };
   if (reason.length < 3) return { error: "Say why, e.g. logged twice, same as SL-271126-004." };
-  const { data, error } = await (await createClient()).rpc("void_service_entry", { p_log: id.data, p_reason: reason });
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("void_service_entry", { p_log: id.data, p_reason: reason });
   if (error) return { error: error.code === "PGRST202" ? "This needs database update-0095. Ask the owner to run it." : "Could not save. Try again." };
   if (!data?.ok) return { error: data?.error === "ALREADY_PAID" ? "Its commission is already on a final payslip, so it can't be removed." : errorText(data?.error) };
+  // update-0101: removing a sale removes the meds / add-ons merged into it too.
+  for (const c of await mergedLines(supabase, [id.data])) await supabase.rpc("void_service_entry", { p_log: c, p_reason: `With the main sale: ${reason}`.slice(0, 300) });
   revalidatePath("/services"); revalidatePath("/me");
   return { ok: "Removed. It stays on record as Rejected and no longer counts in sales or commission.", at: Date.now() };
+}
+
+type Sb = Awaited<ReturnType<typeof createClient>>;
+/** update-0101: the meds / add-on lines merged into these sales (none before update-0101). */
+async function mergedLines(supabase: Sb, mains: string[], state?: string): Promise<string[]> {
+  if (!mains.length) return [];
+  let q = supabase.from("service_logs").select("id").in("merged_into", mains);
+  if (state) q = q.eq("state", state); else q = q.neq("state", "REJECTED");
+  const { data, error } = await q;
+  return error ? [] : ((data ?? []) as { id: string }[]).map((r) => r.id);
+}
+
+const MERGE_ERR: Record<string, string> = {
+  NOT_SAME_VISIT: "Only entries of the same client, day and branch can be merged.",
+  MAIN_IS_MEDS: "Merge the meds into the service, not the other way round.",
+  MAIN_IS_MERGED: "That sale is already part of another entry.",
+  REJECTED: "A removed or rejected entry can't be merged.",
+};
+
+/** update-0101 (CHRIS Nov 28): a meds / add-on line goes under the main sale; the main sale's SL number stays. */
+export async function mergeEntry(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const main = z.uuid().safeParse(fd.get("main"));
+  const line = z.uuid().safeParse(fd.get("line"));
+  if (!main.success || !line.success) return { error: "Refresh the page and try again." };
+  const { data, error } = await (await createClient()).rpc("merge_service_entry", { p_main: main.data, p_line: line.data });
+  if (error) return { error: error.code === "PGRST202" ? "Merging needs database update-0101. Ask the owner to run it." : "Could not merge. Try again." };
+  if (!data?.ok) return { error: MERGE_ERR[data?.error] ?? errorText(data?.error) };
+  revalidatePath("/services");
+  return { ok: `Merged into ${data.log_no ?? "the main sale"}.`, at: Date.now() };
+}
+
+export async function separateEntry(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const line = z.uuid().safeParse(fd.get("line"));
+  if (!line.success) return { error: "Refresh the page and try again." };
+  const { data, error } = await (await createClient()).rpc("separate_service_entry", { p_line: line.data });
+  if (error) return { error: error.code === "PGRST202" ? "This needs database update-0101. Ask the owner to run it." : "Could not save. Try again." };
+  if (!data?.ok) return { error: errorText(data?.error) };
+  revalidatePath("/services");
+  return { ok: `Separated as ${data.log_no}.`, at: Date.now() };
 }

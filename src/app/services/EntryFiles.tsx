@@ -13,13 +13,17 @@ const ORDER: Kind[] = ["WAIVER", "PROOF", "BEFORE", "AFTER"];
 // Browsers other than Safari can't show HEIC originals: the viewer uses the saved preview for those.
 const shows = (path: string) => !/\.(heic|heif)$/i.test(path);
 
-async function load(log: string): Promise<File[] | null> {
+async function load(log: string, more: string[]): Promise<File[] | null> {
   const sb = createClient();
-  const [{ data: ph, error: e1 }, { data: pr }] = await Promise.all([
+  // update-0101: lines merged into this sale (another service on the same waiver, meds) bring their files too.
+  const [{ data: ph, error: e1 }, { data: pr }, ...others] = await Promise.all([
     sb.rpc("entry_photos", { p_log: log }),
-    sb.from("payment_proofs").select("path, thumb_path").eq("service_log_id", log).order("created_at"),
+    sb.from("payment_proofs").select("path, thumb_path").in("service_log_id", [log, ...more]).order("created_at"),
+    ...more.map((m) => sb.rpc("entry_photos", { p_log: m })),
   ]);
-  const photos = (!e1 && ph?.ok ? ph.photos ?? [] : []) as { kind: Kind; path: string; thumb: string | null }[];
+  const seen = new Set<string>();
+  const photos = [ph, ...others.map((o) => o.data)].flatMap((d, i) => ((i === 0 ? !e1 : true) && d?.ok ? d.photos ?? [] : []) as { kind: Kind; path: string; thumb: string | null }[])
+    .filter((p) => !seen.has(p.path) && !!seen.add(p.path));
   const proofs = ((pr ?? []) as { path: string; thumb_path: string | null }[]).map((p) => ({ kind: "PROOF" as Kind, path: p.path, thumb: p.thumb_path }));
   if (e1 && !proofs.length) return null;
   const sign = async (bucket: string, list: { path: string; thumb: string | null }[]) => {
@@ -41,19 +45,20 @@ async function load(log: string): Promise<File[] | null> {
 }
 
 /** auto: load as soon as the card scrolls into view (entries waiting for sign-off). needsWaiver: paid visits and backjobs. */
-export function EntryFiles({ log, auto, needsWaiver }: { log: string; auto: boolean; needsWaiver: boolean }) {
+export function EntryFiles({ log, more = [], auto, needsWaiver }: { log: string; more?: string[]; auto: boolean; needsWaiver: boolean }) {
   const [open, setOpen] = useState(auto);
   const [files, setFiles] = useState<File[] | null | "loading">("loading");
   const box = useRef<HTMLDivElement>(null);
   const started = useRef(false);
   useEffect(() => {
     if (!open || started.current) return;
-    const start = () => { if (started.current) return; started.current = true; void load(log).then(setFiles).catch(() => setFiles(null)); };
+    const start = () => { if (started.current) return; started.current = true; void load(log, more).then(setFiles).catch(() => setFiles(null)); };
     const el = box.current;
     if (!auto || !el || typeof IntersectionObserver === "undefined") { start(); return; }
     const io = new IntersectionObserver((es) => { if (es.some((x) => x.isIntersecting)) { io.disconnect(); start(); } }, { rootMargin: "300px" });
     io.observe(el);
     return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, auto, log]);
 
   if (!open) return <button type="button" className="secondary small" onClick={() => setOpen(true)}>📄 Waiver &amp; proof</button>;

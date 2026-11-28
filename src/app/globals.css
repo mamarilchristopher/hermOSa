@@ -2738,3 +2738,28 @@ details.exp-edit[open] { flex-basis: 100%; }
 @media (max-width: 560px) { .photo-viewer img { max-width: calc(100vw - 16px); } .photo-viewer-nav { width: 40px; height: 40px; font-size: 1.7rem; } .photo-viewer-nav.prev { left: 6px; } .photo-viewer-nav.next { right: 6px; } }
 .double-warn form.change-date { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .double-warn form.change-date input[name="reason"] { flex: 1 1 320px; min-width: 0; }
+
+/* v0.101.0 (CHRIS Nov 28): "a clearer distinction for each entry": every entry is its own card with space between,
+   a stronger border and a status stripe on the left (gold waiting, green approved, red rejected). Light and dark. */
+.card.entry-list { display: grid; gap: 14px; padding: 0; margin: 10px 0 18px; background: transparent; border: 0; box-shadow: none; }
+.entry-list > .entry { background: var(--surface); border: 1px solid var(--line-strong); border-left-width: 5px; border-radius: var(--radius); box-shadow: var(--shadow); }
+.entry-list > .entry:last-child { border-bottom: 1px solid var(--line-strong); }
+.entry-list > .entry.entry-pending { border-left-color: var(--gold); }
+.entry-list > .entry.entry-approved { border-left-color: var(--good); }
+.entry-list > .entry.entry-rejected { border-left-color: var(--bad); }
+.entry-list > .entry.entry-focus { background: var(--gold-soft); }
+.entry-list > .entry.entry-double { box-shadow: var(--shadow), inset 4px 0 0 var(--warn); }
+.log-day + .log-day { margin-top: 22px; }
+.log-day-head { padding: 0 4px; }
+/* update-0101: lines merged into the main sale, and the merge offer. */
+.entry-sub { list-style: none; margin: 2px 0 0; padding: 6px 10px; display: grid; gap: 4px; border-radius: var(--radius-sm); background: var(--pearl); border: 1px dashed var(--line-strong); }
+.entry-sub li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 0.86rem; }
+.entry-sub-name { font-weight: 600; color: var(--ink-2); min-width: 0; overflow-wrap: anywhere; }
+.entry-sub-amt { font-weight: 700; font-variant-numeric: tabular-nums; }
+.entry-sub .inline-form { display: inline-flex; margin: 0 0 0 auto; }
+.entry-sub .inline-form button { min-height: 0; padding: 0 4px; }
+.entry-paid-split { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.merge-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--gold-soft); border: 1px solid var(--gold-line); }
+.merge-hint > .small { color: var(--ink-2); }
+.merge-form { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 860px) { .card.entry-list { gap: 12px; } .entry-list > .entry { border-left-width: 5px; } }
