@@ -2763,3 +2763,13 @@ details.exp-edit[open] { flex-basis: 100%; }
 .merge-hint > .small { color: var(--ink-2); }
 .merge-form { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 860px) { .card.entry-list { gap: 12px; } .entry-list > .entry { border-left-width: 5px; } }
+
+/* v0.101.1 (CHRIS Nov 28): All branches view: each branch's entries in their own section under a clear heading. */
+.log-branch { margin-top: 16px; padding: 12px 12px 2px; border-radius: calc(var(--radius) + 4px); background: var(--cream); border: 1px solid var(--line); }
+.log-branch + .log-branch { margin-top: 18px; }
+.log-branch .card.entry-list { margin: 10px 0 10px; }
+.log-branch-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px 12px; flex-wrap: wrap; margin: 0; padding: 2px 6px; font-size: 1rem; }
+.log-branch-name { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; }
+.log-branch-name::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--gold); }
+.log-branch-head b { color: var(--ink); font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .log-branch { padding: 10px 8px 0; margin-left: -4px; margin-right: -4px; } }

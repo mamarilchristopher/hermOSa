@@ -254,6 +254,10 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
           const ok = cards.filter((l) => l.state !== "REJECTED");
           const waiting = cards.filter((l) => l.state === "PENDING").length;
           const dayCents = dayList.filter((l) => l.state !== "REJECTED").reduce((x, l) => x + Number(l.amount_paid_cents), 0);
+          // v0.101.1 (CHRIS Nov 28): All branches = one section per branch (in branch order), each with its count and total.
+          const sections: { id: string; name: string | null; list: Log[] }[] = branch ? [{ id: branch.id, name: null, list: cards }]
+            : [...scope.map((b) => ({ id: b.id, name: b.name as string | null, list: cards.filter((l) => l.branch_id === b.id) })),
+               { id: "other", name: "Other", list: cards.filter((l) => !order.has(l.branch_id ?? "")) }].filter((x) => x.list.length);
           return (
             <section key={d} className="log-day">
               <h3 className="log-day-head">
@@ -263,8 +267,20 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
               </h3>
         {/* v0.99.1 (CHRIS Nov 27): one tidy card per entry. Who / what on the left, staff with their commission in the middle,
             amount and status on the right, every action as one row of buttons; the fix tools sit behind "Fix entry". */}
+        {sections.map((sec) => {
+          const secAll = dayList.filter((l) => sec.list.some((c) => c.id === l.id || c.id === l.merged_into) && l.state !== "REJECTED");
+          const secOk = sec.list.filter((l) => l.state !== "REJECTED").length;
+          const secWait = sec.list.filter((l) => l.state === "PENDING").length;
+          return (
+          <div key={sec.id} className={sec.name ? `log-branch b-${(branches.find((b) => b.id === sec.id)?.code ?? "x").toLowerCase()}` : undefined}>
+            {sec.name && (
+              <h4 className="log-branch-head">
+                <span className="log-branch-name">{sec.name}</span>
+                <span className="small muted">{secOk} entr{secOk === 1 ? "y" : "ies"} · <b>{centsToPhp(secAll.reduce((x, l) => x + Number(l.amount_paid_cents), 0))}</b>{secWait ? ` · ${secWait} waiting` : ""}</span>
+              </h4>
+            )}
         <div className="card entry-list">
-              {(branch ? cards : cards.slice().sort((a, b) => (order.get(a.branch_id ?? "") ?? 9) - (order.get(b.branch_id ?? "") ?? 9))).map((l) => {
+              {sec.list.map((l) => {
                 const sub = (kids.get(l.id) ?? []).filter((k) => k.state !== "REJECTED");
                 const ls = lines.filter((x) => x.service_log_id === l.id || sub.some((k) => k.id === x.service_log_id));
                 const total = Number(l.amount_paid_cents) + sub.reduce((x, k) => x + Number(k.amount_paid_cents), 0);
@@ -294,7 +310,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                         {l.state === "PENDING" && approverFor(l.branch_id) && pendingAll > 1 && (
                           <input type="checkbox" className="batch-tick" name="pick" value={l.id} form="batch-approve" aria-label={`Tick ${l.client_name ?? "entry"} to approve`} />
                         )}
-                        {!branch && l.branch_id && <span className="tag branch-tag">{(bName[l.branch_id] ?? "").replace(/ \(.*\)$/, "")}</span>}
+                        {!branch && l.branch_id && !order.has(l.branch_id) && <span className="tag branch-tag">{(bName[l.branch_id] ?? "").replace(/ \(.*\)$/, "")}</span>}
                         <span className="entry-client">{l.client_name ?? "No client name"}</span>
                         <Uid v={l.log_no} />
                       </div>
@@ -417,6 +433,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 );
               })}
         </div>
+          </div>
+          );
+        })}
             </section>
           );
         })}
