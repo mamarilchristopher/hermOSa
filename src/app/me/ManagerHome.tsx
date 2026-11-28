@@ -5,19 +5,29 @@ import { addDays, monthLabel } from "@/lib/insights";
 import { dayLabel, type DayCell, type DayView, type Glance } from "@/lib/homeGlance";
 import type { DutyRow } from "@/components/OnDuty";
 import { OnDutyFaces, type DutyFace } from "@/components/OnDutyFaces";
+import type { BranchCount } from "@/lib/arrivals";
 
 export type Todo = { text: string; href: string; urgent?: boolean };
-export type BranchCount = { clients: number; services: number; arrived: number; notLogged: number };
-
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-/** CHRIS Nov 28 (v0.106.2): "5 clients / 6 services availed · 7 bookings arrived · 2 not logged", per branch. */
-function Counts({ c }: { c?: BranchCount }) {
-  const x = c ?? { clients: 0, services: 0, arrived: 0, notLogged: 0 };
+const NONE: BranchCount = { clients: 0, services: 0, arrived: 0, notLogged: 0, unlogged: [] };
+/** CHRIS Nov 28 (v0.106.3): clients, services availed, bookings arrived and arrived-but-not-logged as a stat grid,
+ *  with the names of the arrived clients still missing from the Service log and a link to that day's Bookings. */
+function Counts({ c = NONE, bookingsHref }: { c?: BranchCount; bookingsHref?: string }) {
+  const more = c.unlogged.length - 3;
   return (
-    <span className="glance-counts small">
-      <span>{plural(x.clients, "client")} / {plural(x.services, "service")} availed</span>
-      <span>{plural(x.arrived, "booking")} arrived{x.notLogged > 0 && <> · <span className="glance-unlogged">{x.notLogged} not logged</span></>}</span>
-    </span>
+    <div className="arr">
+      <div className="arr-stats">
+        <span><b>{c.clients}</b>{c.clients === 1 ? "Client" : "Clients"}</span>
+        <span><b>{c.services}</b>{c.services === 1 ? "Service" : "Services"}</span>
+        <span><b>{c.arrived}</b>Arrived</span>
+        <span className={c.notLogged > 0 ? "bad" : c.arrived > 0 ? "good" : ""}><b>{c.notLogged > 0 ? c.notLogged : c.arrived > 0 ? "✓" : 0}</b>{c.notLogged > 0 || !c.arrived ? "Not logged" : "All logged"}</span>
+      </div>
+      {c.unlogged.length > 0 && (
+        <p className="arr-names">
+          <span>Not in the Service log: {c.unlogged.slice(0, 3).join(", ")}{more > 0 ? `, +${more} more` : ""}</span>
+          {bookingsHref && <Link href={bookingsHref}>Open Bookings ›</Link>}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -96,24 +106,27 @@ export function ManagerHome({ g, view, duty, faces = {}, branches, me, bookings,
           {canLogSale && <Link className="button glance-log-btn" href={`/services?date=${view.date}&add=1#add`}><span aria-hidden>+</span> Log a sale</Link>}
         </div>
         {counts && (() => {
-          const all = Object.values(counts).reduce((a, c) => ({ clients: a.clients + c.clients, services: a.services + c.services, arrived: a.arrived + c.arrived, notLogged: a.notLogged + c.notLogged }), { clients: 0, services: 0, arrived: 0, notLogged: 0 });
-          return <p className="small muted glance-all-counts">All branches: {plural(all.clients, "client")} / {plural(all.services, "service")} availed · {plural(all.arrived, "booking")} arrived{all.notLogged > 0 && <> · <span className="glance-unlogged">{all.notLogged} not logged</span></>}</p>;
+          const all = Object.values(counts).reduce((a, c) => ({ clients: a.clients + c.clients, services: a.services + c.services, arrived: a.arrived + c.arrived, notLogged: a.notLogged + c.notLogged, unlogged: [] }), NONE);
+          return <div className="arr-all"><span className="small muted">All branches</span><Counts c={all} /></div>;
         })()}
-                {view.pending > 0 && <p className="small muted glance-pending"><span className="chg warn">+{php(view.pending)} waiting sign-off</span></p>}
+        {view.pending > 0 && <p className="small muted glance-pending"><span className="chg warn">+{php(view.pending)} waiting sign-off</span></p>}
         {shown.length > 0 && <div className="glance-branches">
           {shown.map((b) => {
-            const inner = (<>
+            // CHRIS Nov 26: a branch with sales opens that branch's Service log for the day.
+            const code = branches.find((x) => x.id === b.id)?.code;
+            const linkable = (b.cell.kind !== "empty" || b.pending > 0) && !!code;
+            const main = (<>
               <span className="small muted">{b.name}</span>
               <strong>{b.cell.kind === "empty" ? <span className="muted">{b.pending > 0 ? "Waiting for sign-off" : view.isToday ? "Nothing logged yet" : "Not entered"}</span> : <Cell c={b.cell} />}</strong>
               {!view.isToday && <Delta v={b.vsAvg} title="vs this branch's daily average this month" />}
               {b.pending > 0 && <span className="small muted">+{php(b.pending)} waiting sign-off</span>}
-              {counts && <Counts c={counts[b.id]} />}
             </>);
-            // CHRIS Nov 26: a branch with sales opens that branch's Service log for the day.
-            const code = branches.find((x) => x.id === b.id)?.code;
-            return (b.cell.kind !== "empty" || b.pending > 0) && code
-              ? <Link key={b.id} href={`/services?date=${view.date}&branch=${code}`} className="glance-branch glance-link">{inner}</Link>
-              : <div key={b.id} className={`glance-branch ${b.cell.kind === "empty" && !b.pending ? "missing" : ""}`}>{inner}</div>;
+            return (
+              <div key={b.id} className={`glance-branch${linkable ? " glance-linkable" : ""}${b.cell.kind === "empty" && !b.pending ? " missing" : ""}`}>
+                {linkable ? <Link href={`/services?date=${view.date}&branch=${code}`} className="glance-tile-main">{main}</Link> : <div className="glance-tile-main">{main}</div>}
+                {counts && <Counts c={counts[b.id]} bookingsHref={code ? `/bookings?d=${view.date}&b=${code}` : undefined} />}
+              </div>
+            );
           })}
         </div>}
       </div>
