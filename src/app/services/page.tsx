@@ -26,6 +26,7 @@ type Log = {
   id: string; service_date: string; amount_paid_cents: number; commission_type: string; performer_id: string; assistant_id: string | null;
   receipt_no: string | null; note: string | null; service_id?: string; branch_id?: string; client_name?: string | null; price_note?: string | null; after_dp?: boolean; list_price_cents?: number | null; photo_folder?: string | null; share_ok?: boolean; photos_due?: boolean; session_no?: number; merged_into?: string | null; log_no?: string | null; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
   services: { name: string } | null;
+  decided_by?: string | null; decided_at?: string | null;
 };
 const VISIT_TEXT: Record<string, string> = { BACKJOB: "Backjob (unpaid)", CHECKUP: "Check-up (unpaid)", NO_CHARGE: "No charge" };
 type Line = { service_log_id: string; employee_id: string; role: string; amount_cents: number };
@@ -140,11 +141,16 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
     ...((Array.isArray(ppl) ? ppl : []) as { id: string; name: string }[]).map((x) => [x.id, x.name] as [string, string]),
     [access.user_id, access.display_name],
   ]);
-  // Time it was entered; the date too when it was entered on a later day than the service.
-  const enteredAt = (ts: string, day: string) => {
-    const d = new Date(ts), t = d.toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" });
-    return manilaToday(d) === day ? t : `${d.toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric" })}, ${t}`;
+  // v0.102.2 (CHRIS Nov 28): entered and approved times always as "Nov 26, 2026 · 3:01 PM" (Manila), from the saved timestamps.
+  const stamp = (ts: string) => {
+    const d = new Date(ts);
+    return `${d.toLocaleDateString("en-US", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" })} · ${d.toLocaleTimeString("en-US", { timeZone: "Asia/Manila", hour: "numeric", minute: "2-digit" })}`;
   };
+  const who = (id: string | null | undefined) => (!id ? null : id === access.user_id ? "you" : userName.get(id) ?? "a former user");
+  const decidedLine = (l: Log) => l.state === "PENDING" ? "Pending approval"
+    // Entries saved by owners / the GM are approved as they're saved (update-0060), sometimes without a sign-off stamp.
+    : l.state === "APPROVED" && !l.decided_by && !l.decided_at ? `Approved on entry · ${stamp(l.created_at)}`
+    : `${l.state === "REJECTED" ? "Rejected" : "Approved"}${who(l.decided_by) ? ` by ${who(l.decided_by)}` : ""}${l.decided_at ? ` · ${stamp(l.decided_at)}` : ""}`;
   const mine = new Set((emps ?? []).filter((e) => e.app_user_id === access.user_id).map((e) => e.id));
   // CHRIS Nov 26: the General Manager doesn't perform services, so she isn't in the Lead / Assisted by lists.
   const clinicIds = new Set(branches.filter((b) => b.kind === "CLINIC").map((b) => b.id));
@@ -381,7 +387,8 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                       {l.after_dp && <div className="small"><span className="tag">Balance after DP</span> <span className="muted">commission on the full price</span></div>}
                       {l.price_note && <div className="small muted">Price: {l.price_note}</div>}
                       {l.note && <div className="small muted">{l.note}</div>}
-                      <div className="entry-by small muted">Entered by {l.created_by === access.user_id ? "you" : userName.get(l.created_by) ?? "a former user"} · {enteredAt(l.created_at, l.service_date)}</div>
+                      <div className="entry-by small muted">Entered by {who(l.created_by)} · {stamp(l.created_at)}</div>
+                      <div className={`entry-by small ${l.state === "PENDING" ? "entry-pending" : "muted"}`}>{decidedLine(l)}</div>
                     </div>
                     <div className="entry-staff">
                       {staff.length === 0 && <span className="small muted">No staff</span>}
@@ -443,7 +450,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                         service: l.services?.name ?? "Service", session: l.session_no ?? 1, amount: Number(l.amount_paid_cents), kind: l.visit_kind ?? "PAID",
                         priceNote: l.price_note ?? null, doneBy: name[l.performer_id] ?? null, assistedBy: l.assistant_id ? name[l.assistant_id] ?? null : null,
                         status: l.state === "APPROVED" ? "Approved" : l.state === "REJECTED" ? "Rejected" : "Waiting for sign-off",
-                        enteredBy: userName.get(l.created_by) ?? "Staff", enteredAt: enteredAt(l.created_at, l.service_date),
+                        enteredBy: userName.get(l.created_by) ?? "Staff", enteredAt: stamp(l.created_at), decided: decidedLine(l),
                         visit: (l.client_name ? dayList.filter((x) => x.state !== "REJECTED" && (x.client_name ?? "").trim().toLowerCase() === l.client_name!.trim().toLowerCase()) : [l])
                           .slice().reverse().map((x) => ({ service: x.services?.name ?? "Service", session: x.session_no ?? 1, amount: Number(x.amount_paid_cents), kind: x.visit_kind ?? "PAID" })),
                       }} />

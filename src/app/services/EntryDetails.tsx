@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { KIND_TEXT, lineName, php, recordDate, recordRef, visitTotal, type ServiceRecord } from "@/lib/serviceRecord";
+import { KIND_TEXT, decidedRow, lineName, php, recordDate, recordRef, visitTotal, type ServiceRecord } from "@/lib/serviceRecord";
 import { drawServiceRecord } from "@/lib/serviceRecordImage";
 
 /** CHRIS Nov 26: Details of one service log entry, savable as a photo for the client or management. Open to all staff. */
@@ -37,7 +37,7 @@ export function EntryDetails({ r }: { r: ServiceRecord }) {
     ...(r.priceNote ? [["Price note", r.priceNote] as [string, string]] : []),
     ...(r.doneBy ? [["Done by", r.doneBy] as [string, string]] : []),
     ...(r.assistedBy ? [["Assisted by", r.assistedBy] as [string, string]] : []),
-    ["Status", r.status], ["Entered by", `${r.enteredBy} · ${r.enteredAt}`],
+    ["Status", r.status], ["Entered by", `${r.enteredBy} · ${r.enteredAt}`], ...decidedRow(r),
   ];
   return (
     <>

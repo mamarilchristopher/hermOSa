@@ -2842,3 +2842,4 @@ a.branch-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg, 
   .grid.log-stats > .stat:not(.hero) .value { font-size: 1.2rem; }
   .grid.log-stats > .stat:not(.hero) .note { font-size: 0.76rem; }
 }
+.entry-pending { color: var(--warn); font-weight: 600; }

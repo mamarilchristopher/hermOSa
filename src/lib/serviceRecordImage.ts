@@ -1,4 +1,4 @@
-import { KIND_TEXT, lineName, php, recordDate, recordRef, visitTotal, type ServiceRecord } from "./serviceRecord";
+import { KIND_TEXT, decidedRow, lineName, php, recordDate, recordRef, visitTotal, type ServiceRecord } from "./serviceRecord";
 
 /** Draws a service record on a 1080-wide canvas in the Ivory Soft theme (browser only). */
 export async function drawServiceRecord(r: ServiceRecord, logoSrc: string, font: string): Promise<HTMLCanvasElement> {
@@ -9,7 +9,7 @@ export async function drawServiceRecord(r: ServiceRecord, logoSrc: string, font:
     ...(r.priceNote ? [["Price note", r.priceNote] as [string, string]] : []),
     ...(r.doneBy ? [["Done by", r.doneBy] as [string, string]] : []),
     ...(r.assistedBy ? [["Assisted by", r.assistedBy] as [string, string]] : []),
-    ["Status", r.status], ["Entered by", `${r.enteredBy} · ${r.enteredAt}`],
+    ["Status", r.status], ["Entered by", `${r.enteredBy} · ${r.enteredAt}`], ...decidedRow(r),
   ];
   const showVisit = r.visit.length > 1;
   const rowH = 92, visitH = showVisit ? 120 + r.visit.length * 64 + 80 : 0;
