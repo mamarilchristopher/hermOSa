@@ -3004,3 +3004,20 @@ fieldset.paid-to legend { padding: 0; margin-bottom: 6px; }
 /* v0.106.1: Forgot password links on the sign-in pages. */
 .center-link { display: block; text-align: center; }
 button.center-link { margin: 0 auto; }
+
+/* v0.106.4 (CHRIS Nov 28): overdue commission sign-off, only the overdue entries with Approve / Reject */
+.overdue-page { max-width: 760px; }
+.overdue-group h2 { margin: 18px 0 8px; font-size: 1.05rem; }
+.overdue-entry { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.overdue-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.overdue-head > div strong { font-size: 1.1rem; }
+.overdue-amt { font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.overdue-items li { display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: baseline; gap: 10px; padding: 4px 0; border-bottom: 1px dashed var(--line); font-variant-numeric: tabular-nums; }
+.overdue-items li:last-child { border-bottom: 0; }
+.overdue-staff { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 6px; }
+.overdue-person { display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--cream); font-variant-numeric: tabular-nums; }
+.overdue-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; }
+.overdue-decide { padding-top: 10px; border-top: 1px solid var(--line); }
+.overdue-decide .fill-row button { min-width: 110px; }
+.overdue-done { display: flex; gap: 10px; flex-wrap: wrap; }
+.overdue-items li > span:last-child { white-space: nowrap; flex-shrink: 0; }

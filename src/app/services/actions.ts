@@ -258,6 +258,7 @@ export async function decideLog(_prev: ActionState, fd: FormData): Promise<Actio
   for (const c of await mergedLines(supabase, [id.data], "PENDING"))
     await supabase.rpc("decide_service_log", { p_log: c, p_approve: approve, p_note: approve ? null : `With the main sale: ${String(fd.get("note") ?? "").trim()}`.slice(0, 300) });
   revalidatePath("/services");
+  revalidatePath("/services/overdue");
   revalidatePath("/people");
   return { ok: approve ? "Approved" : "Rejected" };
 }

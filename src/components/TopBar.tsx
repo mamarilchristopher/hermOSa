@@ -108,11 +108,11 @@ export async function TopBar({ access, viewing }: { access: Access; viewing?: { 
         <div className="alert-strip" role="status">
           <strong>Commission sign-off overdue:</strong>
           {overdue.slice(0, 6).map((o) => (
-            <Link key={`${o.code}-${o.date}`} href={`/services?date=${o.date}&branch=${o.code}`}>
+            <Link key={`${o.code}-${o.date}`} href={`/services/overdue?date=${o.date}&branch=${o.code}`}>
               {o.name.replace(/ \(.*\)$/, "")}, {o.date.slice(5).replace("-", "/")} ({o.pending})
             </Link>
           ))}
-          {overdue.length > 6 && <span>+{overdue.length - 6} more days</span>}
+          {overdue.length > 6 && <Link href="/services/overdue">+{overdue.length - 6} more days</Link>}
         </div>
       )}
       <HubTabs hubs={hubs} />

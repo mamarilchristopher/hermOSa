@@ -151,7 +151,7 @@ export async function loadTodos(supabase: SupabaseClient, access: Access, today:
       if (changes) todos.push({ text: `${plural(changes, "sales change needs", "sales changes need")} a second person to confirm`, href: "/sales/daily", urgent: true });
     }
     const overdue = (Array.isArray(overdueData) ? overdueData : []) as { name: string; date: string; code?: string }[];
-    if (overdue.length) todos.push({ text: `Commission sign-off overdue: ${overdue.slice(0, 4).map((o) => `${o.name.replace(/ \(.*\)$/, "")} ${dayLabel(o.date).slice(5)}`).join(", ")}${overdue.length > 4 ? ", and more" : ""}`, href: `/services?date=${overdue[0].date}${overdue[0].code ? `&branch=${overdue[0].code}` : ""}`, urgent: true });
+    if (overdue.length) todos.push({ text: `Commission sign-off overdue: ${overdue.slice(0, 4).map((o) => `${o.name.replace(/ \(.*\)$/, "")} ${dayLabel(o.date).slice(5)}`).join(", ")}${overdue.length > 4 ? ", and more" : ""}`, href: overdue.length === 1 && overdue[0].code ? `/services/overdue?date=${overdue[0].date}&branch=${overdue[0].code}` : "/services/overdue", urgent: true });
     const toSign = (signData as Signoffs | null)?.to_sign;
     // Open the oldest waiting entry in its own branch (without a branch the page showed the first branch, often empty).
     let signHref = `/services?date=${toSign?.oldest}`;
