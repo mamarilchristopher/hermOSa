@@ -9,24 +9,37 @@ import type { BranchCount } from "@/lib/arrivals";
 
 export type Todo = { text: string; href: string; urgent?: boolean };
 const NONE: BranchCount = { clients: 0, services: 0, arrived: 0, notLogged: 0, unlogged: [] };
-/** CHRIS Nov 28 (v0.106.3): clients, services availed, bookings arrived and arrived-but-not-logged as a stat grid,
- *  with the names of the arrived clients still missing from the Service log and a link to that day's Bookings. */
-function Counts({ c = NONE, bookingsHref }: { c?: BranchCount; bookingsHref?: string }) {
-  const more = c.unlogged.length - 3;
+const shortName = (n: string) => n.replace(/ \(.*\)$/, "");
+/** CHRIS Nov 28 (v0.106.5): under the sales figures, a quiet check of clients served vs bookings marked Arrived.
+ *  All branches first, then each branch, with the arrived clients still missing from the Service log. */
+function ArrivalCheck({ rows, date }: { rows: { id: string; name: string; code?: string; c: BranchCount }[]; date: string }) {
+  const all = rows.reduce((a, r) => ({ ...a, clients: a.clients + r.c.clients, services: a.services + r.c.services, arrived: a.arrived + r.c.arrived, notLogged: a.notLogged + r.c.notLogged }), NONE);
+  const gap = (c: BranchCount) => c.notLogged > 0 ? <span className="arr-bad">{c.notLogged} not logged</span> : c.arrived > 0 ? <span className="arr-ok">✓ all logged</span> : <span className="muted">–</span>;
   return (
-    <div className="arr">
-      <div className="arr-stats">
-        <span><b>{c.clients}</b>{c.clients === 1 ? "Client" : "Clients"}</span>
-        <span><b>{c.services}</b>{c.services === 1 ? "Service" : "Services"}</span>
-        <span><b>{c.arrived}</b>Arrived</span>
-        <span className={c.notLogged > 0 ? "bad" : c.arrived > 0 ? "good" : ""}><b>{c.notLogged > 0 ? c.notLogged : c.arrived > 0 ? "✓" : 0}</b>{c.notLogged > 0 || !c.arrived ? "Not logged" : "All logged"}</span>
+    <div className="arr-check">
+      <div className="arr-check-head">
+        <span className="small"><strong>Clients served vs bookings arrived</strong></span>
+        <span className="small muted">All branches: {all.clients} served · {all.arrived} arrived · {gap(all)}</span>
       </div>
-      {c.unlogged.length > 0 && (
-        <p className="arr-names">
-          <span>Not in the Service log: {c.unlogged.slice(0, 3).join(", ")}{more > 0 ? `, +${more} more` : ""}</span>
-          {bookingsHref && <Link href={bookingsHref}>Open Bookings ›</Link>}
-        </p>
-      )}
+      <table className="arr-table">
+        <thead><tr><th>Branch</th><th className="num">Served</th><th className="num">Services</th><th className="num">Arrived</th><th className="num">Mismatch</th></tr></thead>
+        <tbody>
+          {rows.map(({ id, name, code, c }) => {
+            const more = c.unlogged.length - 3;
+            return [
+              <tr key={id} className={c.unlogged.length ? "has-names" : ""}>
+                <td>{shortName(name)}</td><td className="num">{c.clients}</td><td className="num">{c.services}</td><td className="num">{c.arrived}</td><td className="num">{gap(c)}</td>
+              </tr>,
+              c.unlogged.length > 0 && (
+                <tr key={`${id}-n`} className="arr-names-row"><td colSpan={5}>
+                  <span>Arrived, not in the Service log: {c.unlogged.slice(0, 3).join(", ")}{more > 0 ? `, +${more} more` : ""}</span>
+                  {code && <Link href={`/bookings?d=${date}&b=${code}`}>Open Bookings ›</Link>}
+                </td></tr>
+              ),
+            ];
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -105,30 +118,23 @@ export function ManagerHome({ g, view, duty, faces = {}, branches, me, bookings,
           {/* CHRIS Nov 28 (v0.103.1): Owners and the GM log a sale straight from Home (opens the Service log's Add a service form for this day). */}
           {canLogSale && <Link className="button glance-log-btn" href={`/services?date=${view.date}&add=1#add`}><span aria-hidden>+</span> Log a sale</Link>}
         </div>
-        {counts && (() => {
-          const all = Object.values(counts).reduce((a, c) => ({ clients: a.clients + c.clients, services: a.services + c.services, arrived: a.arrived + c.arrived, notLogged: a.notLogged + c.notLogged, unlogged: [] }), NONE);
-          return <div className="arr-all"><span className="small muted">All branches</span><Counts c={all} /></div>;
-        })()}
         {view.pending > 0 && <p className="small muted glance-pending"><span className="chg warn">+{php(view.pending)} waiting sign-off</span></p>}
         {shown.length > 0 && <div className="glance-branches">
           {shown.map((b) => {
-            // CHRIS Nov 26: a branch with sales opens that branch's Service log for the day.
-            const code = branches.find((x) => x.id === b.id)?.code;
-            const linkable = (b.cell.kind !== "empty" || b.pending > 0) && !!code;
-            const main = (<>
+            const inner = (<>
               <span className="small muted">{b.name}</span>
               <strong>{b.cell.kind === "empty" ? <span className="muted">{b.pending > 0 ? "Waiting for sign-off" : view.isToday ? "Nothing logged yet" : "Not entered"}</span> : <Cell c={b.cell} />}</strong>
               {!view.isToday && <Delta v={b.vsAvg} title="vs this branch's daily average this month" />}
               {b.pending > 0 && <span className="small muted">+{php(b.pending)} waiting sign-off</span>}
             </>);
-            return (
-              <div key={b.id} className={`glance-branch${linkable ? " glance-linkable" : ""}${b.cell.kind === "empty" && !b.pending ? " missing" : ""}`}>
-                {linkable ? <Link href={`/services?date=${view.date}&branch=${code}`} className="glance-tile-main">{main}</Link> : <div className="glance-tile-main">{main}</div>}
-                {counts && <Counts c={counts[b.id]} bookingsHref={code ? `/bookings?d=${view.date}&b=${code}` : undefined} />}
-              </div>
-            );
+            // CHRIS Nov 26: a branch with sales opens that branch's Service log for the day.
+            const code = branches.find((x) => x.id === b.id)?.code;
+            return (b.cell.kind !== "empty" || b.pending > 0) && code
+              ? <Link key={b.id} href={`/services?date=${view.date}&branch=${code}`} className="glance-branch glance-link">{inner}</Link>
+              : <div key={b.id} className={`glance-branch ${b.cell.kind === "empty" && !b.pending ? "missing" : ""}`}>{inner}</div>;
           })}
         </div>}
+        {counts && <ArrivalCheck date={view.date} rows={view.branches.map((b) => ({ id: b.id, name: b.name, code: branches.find((x) => x.id === b.id)?.code, c: counts[b.id] ?? NONE }))} />}
       </div>
 
       {/* CHRIS Nov 26: Today so far > live Bookings > On duty today > Yesterday > month so far > Tardiness tracker. */}

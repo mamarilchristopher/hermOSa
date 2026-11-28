@@ -490,25 +490,19 @@ input.pin-input { font-size: 1.6rem; letter-spacing: 0.6em; text-align: center; 
 .glance-branch { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--cream); }
 .glance-branch strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 .glance-branch.missing { border-color: var(--bad); background: var(--bad-bg); }
-/* v0.106.3: Home branch tiles, clients / services / arrived / not logged (CHRIS Nov 28) */
-.glance-today .glance-branch { container-type: inline-size; }
-.glance-tile-main { display: flex; flex-direction: column; gap: 3px; color: inherit; text-decoration: none; }
-a.glance-tile-main strong::after { content: " →"; font-size: .9rem; color: var(--muted); }
-.glance-linkable { transition: transform .15s ease, box-shadow .15s ease; }
-.glance-linkable:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
-.arr { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
-.arr-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-@container (min-width: 290px) { .arr-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.arr-stats > span { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 8px; border-radius: 9px; background: var(--surface); border: 1px solid var(--line); font-size: .7rem; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); line-height: 1.2; min-width: 0; }
-.arr-stats > span b { font-size: 1.15rem; letter-spacing: 0; text-transform: none; color: var(--ink, inherit); font-variant-numeric: tabular-nums; line-height: 1.15; }
-.arr-stats > span.bad { background: var(--bad-bg); border-color: var(--bad); color: var(--bad); }
-.arr-stats > span.bad b { color: var(--bad); }
-.arr-stats > span.good { color: var(--good); }
-.arr-stats > span.good b { color: var(--good); }
-.arr-names { margin: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; justify-content: space-between; font-size: .8rem; color: var(--bad); }
-.arr-names a { font-weight: 600; white-space: nowrap; }
-.arr-all { display: flex; flex-direction: column; gap: 4px; margin: -4px 0 12px; container-type: inline-size; max-width: 620px; }
-.arr-all .arr { margin-top: 0; }
+/* v0.106.5 (CHRIS Nov 28): clients served vs bookings arrived, a quiet table under the sales figures */
+.arr-check { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.arr-check-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; align-items: baseline; }
+.arr-table { width: 100%; border-collapse: collapse; font-size: .85rem; font-variant-numeric: tabular-nums; }
+.arr-table th { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.arr-table td { padding: 6px; border-bottom: 1px dashed var(--line); }
+.arr-table .num { text-align: right; white-space: nowrap; }
+.arr-table tr.has-names td { border-bottom: 0; padding-bottom: 2px; }
+.arr-names-row td { padding-top: 0; font-size: .78rem; color: var(--muted); }
+.arr-names-row a { margin-left: 8px; white-space: nowrap; font-weight: 600; }
+.arr-bad { color: var(--bad); font-weight: 600; }
+.arr-ok { color: var(--good); }
+@media (max-width: 520px) { .arr-table th:nth-child(3), .arr-table td:nth-child(3):not([colspan]) { display: none; } .arr-table th, .arr-table td { padding-left: 4px; padding-right: 4px; } }
 .glance-stats { margin: 4px 0 12px; }
 .glance-stats .stat { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; }
 .glance-table td, .glance-table th { white-space: nowrap; }
