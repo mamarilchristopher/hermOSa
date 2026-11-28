@@ -3074,3 +3074,26 @@ a.button:active, .button:active { transform: translateY(1px); }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
   .nav-progress.on .nav-progress-bar { width: 70%; }
 }
+
+/* v0.106.10 (CHRIS Nov 28: "These branch buttons are not really looking like buttons"): branch tabs on every page are
+   separate raised buttons (PC: a row; phones: 2 columns, "All branches" full width). The picked one is gold with a check. */
+.segmented.tab-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; background: none; border: 0; border-radius: 0; overflow: visible; }
+.segmented.tab-chips a {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 8px 16px; line-height: 1.25; text-align: center;
+  background: var(--surface); color: var(--ink); font-size: 0.88rem; font-weight: 700;
+  border: 1.5px solid var(--line-strong); border-radius: 12px; box-shadow: var(--shadow-sm), 0 2px 0 var(--line);
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+.segmented.tab-chips a:hover { background: var(--surface); color: var(--ink); }
+@media (hover: hover) { .segmented.tab-chips a:hover { border-color: var(--gold); background: var(--pearl); } }
+.segmented.tab-chips a:active { transform: translateY(1px); box-shadow: var(--shadow-sm); }
+.segmented.tab-chips a.on { border: 2px solid var(--gold); background: var(--gold-soft); color: var(--brown-dark); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 22%, transparent); }
+.segmented.tab-chips a.on .ic { color: var(--gold); }
+.segmented.tab-chips a.on .ic-duo { fill: var(--gold); opacity: 0.35; }
+@media (max-width: 700px) {
+  .segmented.tab-chips { display: grid; grid-template-columns: 1fr 1fr; width: 100%; border-radius: 0; }
+  .segmented.tab-chips a { min-height: 46px; padding: 8px 10px; white-space: normal; }
+  /* Date row: arrows and Go stay next to the date instead of spreading to the edges. */
+  .control-bar .day-nav, .periods .day-nav { justify-content: flex-start; flex-wrap: nowrap; }
+  .control-bar .day-nav input[type="date"], .periods .day-nav input[type="date"] { flex: 1; min-width: 0; }
+}

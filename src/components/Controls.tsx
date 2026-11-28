@@ -4,7 +4,7 @@
 // Server-safe (no "use client"): plain links, GET forms and <details>.
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { IconPlus } from "./Icons";
+import { IconCheck, IconPlus } from "./Icons";
 
 /** The card that holds the branch tabs and the period nav, side by side on PC, stacked on phones. */
 export function ControlBar({ children }: { children: ReactNode }) {
@@ -12,12 +12,13 @@ export function ControlBar({ children }: { children: ReactNode }) {
 }
 
 export type Tab = { href: string; label: string; on: boolean };
-/** Branch (or any) choice as segmented tabs, the Service log way. */
+/** Branch (or any) choice. v0.106.10 (CHRIS Nov 28: "These branch buttons are not really looking like buttons"): each one is a
+ *  separate raised button; the picked one turns gold with a check. "(Sikatuna)"-style suffixes are dropped to keep them short. */
 export function Tabs({ tabs, label = "Branch" }: { tabs: Tab[]; label?: string }) {
   if (tabs.length < 2) return null;
   return (
-    <div className="segmented" role="tablist" aria-label={label}>
-      {tabs.map((t) => <Link key={t.href} href={t.href} role="tab" aria-selected={t.on} className={t.on ? "on" : ""}>{t.label}</Link>)}
+    <div className="segmented tab-chips" role="tablist" aria-label={label}>
+      {tabs.map((t) => <Link key={t.href} href={t.href} role="tab" aria-selected={t.on} className={t.on ? "on" : ""}>{t.on && <IconCheck size={16} />}<span>{t.label.replace(/ \(.*\)$/, "")}</span></Link>)}
     </div>
   );
 }

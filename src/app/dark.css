@@ -111,3 +111,5 @@
 /* v0.106.9: lighter magnifier in search boxes. */
 [data-mode="dark"] input.search-field.search-field { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256' fill='%239a968f'%3E%3Cpath opacity='.2' d='M192,112a80,80,0,1,1-80-80A80,80,0,0,1,192,112Z'/%3E%3Cpath d='M229.66,218.34,179.6,168.28a88.21,88.21,0,1,0-11.32,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z'/%3E%3C/svg%3E"); }
 [data-mode="dark"] .vn-icon, [data-mode="dark"] .myday-ico { color: var(--gold); }
+[data-mode="dark"] .segmented.tab-chips a { background: var(--surface); color: var(--ink-2); border-color: var(--line-strong); box-shadow: none; }
+[data-mode="dark"] .segmented.tab-chips a.on { background: var(--gold-soft); color: var(--ink); border-color: var(--gold); }
