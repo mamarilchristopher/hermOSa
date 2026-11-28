@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/browser";
 import { viewPhotos } from "@/components/PhotoViewer";
 
 type Kind = "WAIVER" | "PROOF" | "BEFORE" | "AFTER";
-type File = { kind: Kind; full: string; thumb: string };
+// update-0104: a fully paid package's session card is saved as a WAIVER page named sessioncard-….
+type File = { kind: Kind; full: string; thumb: string; card?: boolean };
 const LABEL: Record<Kind, string> = { WAIVER: "Waiver", PROOF: "Proof of payment", BEFORE: "Before", AFTER: "After" };
 const ORDER: Kind[] = ["WAIVER", "PROOF", "BEFORE", "AFTER"];
 // Browsers other than Safari can't show HEIC originals: the viewer uses the saved preview for those.
@@ -38,7 +39,7 @@ async function load(log: string, more: string[]): Promise<File[] | null> {
     for (const x of list) {
       const full = urls.get(x.path), thumb = x.thumb ? urls.get(x.thumb) : undefined;
       const view = full && shows(x.path) ? full : thumb ?? full;
-      if (view) out.push({ kind: x.kind, full: view, thumb: thumb ?? view });
+      if (view) out.push({ kind: x.kind, full: view, thumb: thumb ?? view, card: /\/sessioncard-/.test(x.path) });
     }
   }
   return out.sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind));
@@ -65,7 +66,8 @@ export function EntryFiles({ log, more = [], auto, needsWaiver }: { log: string;
   const list = Array.isArray(files) ? files : [];
   const waivers = list.filter((f) => f.kind === "WAIVER").length;
   const proofs = list.filter((f) => f.kind === "PROOF").length;
-  const all = list.map((f, i) => ({ src: f.full, alt: `${LABEL[f.kind]}${list.filter((x) => x.kind === f.kind).length > 1 ? ` ${list.slice(0, i + 1).filter((x) => x.kind === f.kind).length}` : ""}` }));
+  const cards = list.filter((f) => f.card).length;
+  const all = list.map((f, i) => ({ src: f.full, alt: f.card ? "Session card" : `${LABEL[f.kind]}${list.filter((x) => x.kind === f.kind && !x.card).length > 1 ? ` ${list.slice(0, i + 1).filter((x) => x.kind === f.kind && !x.card).length}` : ""}` }));
   return (
     <div ref={box} className="entry-files">
       {files === "loading" ? <span className="small muted">Loading waiver and proof…</span>
@@ -83,7 +85,8 @@ export function EntryFiles({ log, more = [], auto, needsWaiver }: { log: string;
             </div>
             <div className="entry-files-note small">
               {needsWaiver && waivers === 0 && <span className="pill REVERSED">No waiver attached</span>}
-              {waivers > 0 && <span className="muted">{waivers} waiver page{waivers === 1 ? "" : "s"}</span>}
+              {cards > 0 && <span className="muted">Session card</span>}
+              {waivers - cards > 0 && <span className="muted">{waivers - cards} waiver page{waivers - cards === 1 ? "" : "s"}</span>}
               <span className="muted">{proofs ? `${proofs} proof${proofs === 1 ? "" : "s"} of payment` : "No proof of payment"}</span>
               {!auto && <button type="button" className="link-like small" onClick={() => setOpen(false)}>Hide</button>}
             </div>

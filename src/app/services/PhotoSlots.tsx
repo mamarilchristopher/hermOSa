@@ -5,7 +5,8 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 
 export type PhotoKind = "BEFORE" | "AFTER" | "WAIVER";
-export type Slot = { key: string; kind: PhotoKind; preview: string; path?: string; thumb?: string | null; status: "uploading" | "done" | "error" };
+/** card (update-0104, CHRIS Nov 28): the client's session card for a fully paid package, saved as a WAIVER page named sessioncard-…. */
+export type Slot = { key: string; kind: PhotoKind; card?: boolean; preview: string; path?: string; thumb?: string | null; status: "uploading" | "done" | "error" };
 
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic", "image/heif": "heif" };
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
@@ -34,19 +35,20 @@ export function usePhotoSlots(branch: string, fixedFolder?: string | null) {
    * taken; the earlier half become Before, the later half After. One photo alone fills whichever is still missing.
    * Staff tap a photo's label to switch it.
    */
-  const add = async (pick: PhotoKind | "AUTO", files: FileList | null) => {
+  const add = async (pick: PhotoKind | "AUTO" | "CARD", files: FileList | null) => {
     const list = Array.from(files ?? []).sort((a, b) => a.lastModified - b.lastModified);
     const haveBefore = slots.some((x) => x.kind === "BEFORE");
-    const kindAt = (i: number): PhotoKind => pick !== "AUTO" ? pick
+    const kindAt = (i: number): PhotoKind => pick === "CARD" ? "WAIVER" : pick !== "AUTO" ? pick
       : list.length === 1 ? (haveBefore ? "AFTER" : "BEFORE") : i < Math.ceil(list.length / 2) ? "BEFORE" : "AFTER";
     for (const [i, file] of list.entries()) {
       const kind = kindAt(i);
       const key = uuid();
       const ext = EXT[file.type] ?? (/\.(heic|heif)$/i.test(file.name) ? file.name.split(".").pop()!.toLowerCase() : null);
       if (!ext) { alert("Only photos (JPG, PNG, WEBP or HEIC) can be added."); continue; }
-      setSlots((l) => [...l, { key, kind, preview: URL.createObjectURL(file), status: "uploading" }]);
+      const card = pick === "CARD";
+      setSlots((l) => [...l, { key, kind, card, preview: URL.createObjectURL(file), status: "uploading" }]);
       const sb = createClient();
-      const path = `${branch}/${folder}/${kind.toLowerCase()}-${key}.${ext}`;
+      const path = `${branch}/${folder}/${card ? "sessioncard" : kind.toLowerCase()}-${key}.${ext}`;
       const { error } = await sb.storage.from("client-photos").upload(path, file, { contentType: file.type || `image/${ext}`, cacheControl: "31536000" });
       if (error) { patch(key, { status: "error" }); continue; }
       let thumb: string | null = null;
@@ -58,19 +60,22 @@ export function usePhotoSlots(branch: string, fixedFolder?: string | null) {
       patch(key, { status: "done", path, thumb });
     }
   };
-  const flip = (key: string) => setSlots((l) => l.map((x) => (x.key === key && x.kind !== "WAIVER" ? { ...x, kind: x.kind === "BEFORE" ? "AFTER" : "BEFORE" } : x)));
+  const flip = (key: string) => setSlots((l) => l.map((x) => (x.key === key && x.kind !== "WAIVER" && !x.card ? { ...x, kind: x.kind === "BEFORE" ? "AFTER" : "BEFORE" } : x)));
   const remove = (key: string) => setSlots((l) => { const s = l.find((x) => x.key === key); if (s) URL.revokeObjectURL(s.preview); return l.filter((x) => x.key !== key); });
   const reset = () => { slots.forEach((s) => URL.revokeObjectURL(s.preview)); setSlots([]); setFolder(uuid()); };
-  const json = JSON.stringify(slots.filter((s) => s.status === "done").map((s) => ({ kind: s.kind, path: s.path, thumb: s.thumb ?? null })));
-  const count = (k: PhotoKind) => slots.filter((s) => s.kind === k && s.status === "done").length;
-  return { folder, slots, add, flip, remove, reset, json, count, uploading: slots.some((s) => s.status === "uploading") };
+  const jsonOf = (only?: (s: Slot) => boolean) => JSON.stringify(slots.filter((s) => s.status === "done" && (!only || only(s))).map((s) => ({ kind: s.kind, path: s.path, thumb: s.thumb ?? null })));
+  const json = jsonOf();
+  const cards = slots.filter((s) => s.card && s.status === "done").length;
+  const count = (k: PhotoKind) => slots.filter((s) => s.kind === k && !s.card && s.status === "done").length;
+  return { folder, slots, add, flip, remove, reset, json, jsonOf, cards, count, uploading: slots.some((s) => s.status === "uploading") };
 }
 
 type Api = ReturnType<typeof usePhotoSlots>;
 
-export function PhotoGroup({ api, kinds, title, hint }: { api: Api; kinds: { kind: PhotoKind | "AUTO"; label: string }[]; title: string; hint?: string }) {
+export function PhotoGroup({ api, kinds, title, hint, max }: { api: Api; kinds: { kind: PhotoKind | "AUTO" | "CARD"; label: string }[]; title: string; hint?: string; max?: number }) {
   const auto = kinds.some((k) => k.kind === "AUTO");
-  const mine = api.slots.filter((s) => (auto ? s.kind !== "WAIVER" : kinds.some((k) => k.kind === s.kind)));
+  const cardGroup = kinds.some((k) => k.kind === "CARD");
+  const mine = api.slots.filter((s) => (cardGroup ? !!s.card : s.card ? false : auto ? s.kind !== "WAIVER" : kinds.some((k) => k.kind === s.kind)));
   return (
     <div className="field photo-group">
       <span className="field-label">{title}</span>
@@ -80,7 +85,7 @@ export function PhotoGroup({ api, kinds, title, hint }: { api: Api; kinds: { kin
           <figure key={s.key} className={`photo-slot ${s.status}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={s.preview} alt={`${s.kind.toLowerCase()} photo`} />
-            {s.status === "done" && s.kind !== "WAIVER" ? (
+            {s.status === "done" && s.card ? <figcaption>Session card</figcaption> : s.status === "done" && s.kind !== "WAIVER" ? (
               <figcaption><button type="button" className={`ba-toggle ${s.kind === "BEFORE" ? "before" : "after"}`} onClick={() => api.flip(s.key)} title="Tap to switch">
                 {s.kind === "BEFORE" ? "Before" : "After"} ⇄</button></figcaption>
             ) : (
@@ -89,9 +94,9 @@ export function PhotoGroup({ api, kinds, title, hint }: { api: Api; kinds: { kin
             <button type="button" className="photo-x" aria-label="Remove photo" onClick={() => api.remove(s.key)}>×</button>
           </figure>
         ))}
-        {kinds.map((k) => (
+        {(max === undefined || mine.length < max) && kinds.map((k) => (
           <label key={k.kind} className="photo-add">
-            <input type="file" accept="image/*,.heic,.heif" multiple hidden
+            <input type="file" accept="image/*,.heic,.heif" multiple={max !== 1} hidden
               onChange={(e) => { void api.add(k.kind, e.target.files); e.target.value = ""; }} />
             <span aria-hidden>＋</span>{k.label}
           </label>

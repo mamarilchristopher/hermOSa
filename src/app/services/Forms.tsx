@@ -249,7 +249,9 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const listPrice = scheduled ?? svc?.price ?? null;
   const priceDiffers = paid && listPrice != null && (scheduled != null ? amount.trim() !== "" && cents !== scheduled : listPrice > 0 && cents > 0 && cents !== listPrice);
   const needsPhotos = kind === "PAID" || kind === "BACKJOB";
-  const missingPhotos = !needsPhotos ? null
+  // CHRIS Nov 28 (update-0104): a fully paid package needs ONE photo only: the client's session card.
+  const missingPhotos = fullyPaid ? (photos.cards < 1 ? "Add a photo of the client's session card." : null)
+    : !needsPhotos ? null
     : hasBa && (photos.count("BEFORE") < 1 || photos.count("AFTER") < 1) ? "Add at least one before and one after photo."
     : photos.count("WAIVER") < 2 ? "Add both pages of the signed waiver." : null;
   // update-0054: owners and the GM may save without photos; the lead and assist are then asked to add them.
@@ -294,7 +296,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       <input type="hidden" name="type" value={effType} />
       <input type="hidden" name="kind" value={fullyPaid ? "PAID" : kind} />
       <input type="hidden" name="folder" value={photos.folder} />
-      <input type="hidden" name="photos" value={photos.json} />
+      <input type="hidden" name="photos" value={fullyPaid ? photos.jsonOf((s) => !!s.card || s.kind === "WAIVER") : photos.jsonOf((s) => !s.card)} />
       <input type="hidden" name="proofs" value={fullyPaid ? "[]" : proofs.json} />
       <input type="hidden" name="addons" value={addonsJson} />
       <input type="hidden" name="more" value={moreJson} />
@@ -584,6 +586,16 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
           </label>
         )}
       </div>
+      {fullyPaid ? (
+        <>
+          {/* CHRIS Nov 28: "Upload session card (add waivers if available)": the card is required, waiver pages optional. */}
+          <PhotoGroup api={photos} title="Upload session card (add waivers if available)" max={1}
+            hint={photosOptional ? "One clear photo of the client's Hermosa session card (optional for owners and the GM)." : "Required: one clear photo of the client's Hermosa session card. No before and after photos needed."}
+            kinds={[{ kind: "CARD", label: "Add session card photo" }]} />
+          <PhotoGroup api={photos} title="Waiver pages (optional)" hint="If the client signed a waiver this visit, add its pages too."
+            kinds={[{ kind: "WAIVER", label: "Add waiver page" }]} />
+        </>
+      ) : (<>
       {needsPhotos && (
         <label className="check-row">
           <input type="checkbox" checked={hasBa} onChange={(e) => setHasBa(e.target.checked)} />
@@ -598,6 +610,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       </label>
       <PhotoGroup api={photos} title="Waiver (2 pages)" hint={needsPhotos ? "A clear photo of each page of the signed waiver." : "Optional for this visit."}
         kinds={[{ kind: "WAIVER", label: "Add waiver page" }]} />
+      </>)}
       {!fullyPaid && <ProofGroup api={proofs} />}
       <div className="entry-grid">
         <label className={needsPartner ? "" : "span2"}>{!paid ? "Handled by" : "Done by"}
