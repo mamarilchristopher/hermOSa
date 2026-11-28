@@ -50,6 +50,11 @@ export default async function DailySales({ searchParams }: { searchParams: Promi
     const k = `${c.branch_id}|${c.date}`;
     if (cells[k]) cells[k][4] = true;
   }
+  // v0.101.2: days where a typed figure differs from the approved entries (the entries are what counts).
+  const names = Object.fromEntries(branches.map((b) => [b.id, b.name.replace(/ \(.*\)$/, "")]));
+  const typedOff = Object.entries(cells).filter(([, c]) => c[6] && c[0] !== null && (c[3] ?? 0) > 0 && c[0] !== c[3])
+    .map(([k, c]) => { const [b, d] = k.split("|"); return { k, b, d, typed: c[0]!, entries: c[3]! }; })
+    .filter((x) => names[x.b]).sort((a, b) => a.d.localeCompare(b.d) || branches.findIndex((x) => x.id === a.b) - branches.findIndex((x) => x.id === b.b));
   const prev = addMonths(start, -1).slice(0, 7), next = addMonths(start, 1).slice(0, 7);
   const anyEnter = branches.some((b) => b.can_enter);
   const gaps = dates.filter((d) => d < today).reduce((n, d) => n + branches.filter((b) => {
@@ -62,7 +67,7 @@ export default async function DailySales({ searchParams }: { searchParams: Promi
       <TopBar access={access} />
       <main className="wide">
         <h1>Daily sales</h1>
-        <p className="muted small">From Nov 25 each day fills itself from the branch&apos;s approved Service log entries (sales signed off later still land on their service date). Type a total only to override a day. Amounts are declared sales (cash and online).</p>
+        <p className="muted small">From Nov 25 each day is the total of the branch&apos;s approved Service log entries, so every figure has entries behind it (sales signed off later still land on their service date). A typed total only counts on a day with no approved entries. Amounts are declared sales (cash and online).</p>
 
         <div className="periods card">
           <div className="segmented">
@@ -76,6 +81,17 @@ export default async function DailySales({ searchParams }: { searchParams: Promi
         {!st.ok && <div className="notice error">Daily sales isn&apos;t set up yet. The owner needs to run update-0013 in Supabase.</div>}
         {st.ok && (
           <>
+            {typedOff.length > 0 && (
+              <div className="notice info typed-off">
+                <strong>{typedOff.length} day{typedOff.length === 1 ? "" : "s"} where a typed figure differs from the approved entries.</strong> The entries&apos; total is used. Open the day&apos;s Service log to check for missing or wrongly dated entries.
+                <ul className="plain-list small">
+                  {typedOff.map((x) => (
+                    <li key={x.k}><span><strong>{names[x.b]}</strong>, {new Date(`${x.d}T00:00:00Z`).toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}: entries <strong>{centsToPhp(x.entries).replace(/\.00$/, "")}</strong>, typed {centsToPhp(x.typed).replace(/\.00$/, "")}</span>
+                      <Link className="button secondary small" href={`/services?date=${x.d}&branch=${branches.find((b) => b.id === x.b)?.code ?? ""}`}>Open entries</Link></li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {gaps > 0 && <p className="small">{gaps} branch-day{gaps === 1 ? "" : "s"} this month with nothing entered (highlighted). Use the ▾ in a cell to mark it Zero sales or Closed.</p>}
             <MonthGrid dates={dates} branches={branches.map((b) => ({ id: b.id, name: b.name, can_enter: b.can_enter }))} cells={cells} today={today} changed={changed} highlight={highlightKeys(sp.hl, branches, ym)} />
             <p className="small muted">▾ in an empty cell: Zero sales, Closed or Enter sales (typing 0 also means zero sales). Gold amounts come from approved Service log entries; +₱ = logged but still waiting for sign-off. • a typed total differs from that day&apos;s approved service log (hover to see it). ✎ a change is waiting for sign-off. ↺ changed before. Every save notifies the other management members, and changing a saved day needs a second person to confirm.

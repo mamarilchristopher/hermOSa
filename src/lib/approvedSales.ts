@@ -1,6 +1,6 @@
 // v0.99.3 (CHRIS Nov 28): from Nov 25 each day's sales come from the APPROVED Service log entries of that service date.
 // Entries signed off later (e.g. a branch that couldn't log during an internet outage and declares the next day) fill the
-// right day automatically, and a typed figure still wins where someone typed one. Pending entries are counted separately.
+// right day automatically. v0.101.2: those totals win over a typed figure (cellOf). Pending entries are counted separately.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { SERVICE_LOG_FROM, type StatusDay } from "./homeGlance";
 

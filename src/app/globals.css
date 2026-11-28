@@ -2773,3 +2773,26 @@ details.exp-edit[open] { flex-basis: 100%; }
 .log-branch-name::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--gold); }
 .log-branch-head b { color: var(--ink); font-variant-numeric: tabular-nums; }
 @media (max-width: 560px) { .log-branch { padding: 10px 8px 0; margin-left: -4px; margin-right: -4px; } }
+
+/* v0.101.2: entries first. A typed Daily Sales figure that differs from the approved entries is shown, not counted. */
+.cell-typed { display: block; font-size: 0.68rem; font-weight: 600; color: var(--bad); white-space: nowrap; text-decoration: line-through; text-decoration-thickness: 1px; }
+.glance-typed { margin-left: 6px; font-weight: 600; color: var(--bad); text-decoration: line-through; text-decoration-thickness: 1px; white-space: nowrap; }
+.typed-off .plain-list { margin: 8px 0 0; }
+.typed-off .plain-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 0; }
+
+/* v0.101.2 (CHRIS Nov 28: the entry buttons were confusing): one row of the same pill buttons, "Fix entry" always at the
+   right end in the same spot. Anything a button opens (fix tools, attach proof, edit photos, waiver previews) opens UNDER
+   the row instead of pushing the other buttons around. */
+.entry-actions > button, .entry-actions > .details-btn, .entry-actions .proof-link, .entry-fix-toggle {
+  min-height: 32px; padding: 5px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; }
+.entry-fix-toggle { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--brown-dark); }
+.entry-fix-toggle::after { content: "▾"; font-size: 0.75rem; }
+.entry-fix-toggle.on { background: var(--pearl); border-color: var(--brown); }
+.entry-fix-toggle.on::after { content: "▴"; }
+.entry-fix-toggle:hover { border-color: var(--brown); }
+.entry-actions > .entry-more-body { flex-basis: 100%; order: 95; margin-top: 2px; }
+.entry-actions .add-later { order: 90; }
+.entry-more-body form.change-date { order: 9; }
+.entry-more-body .link-button.remove { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--line-strong)); }
+@media (max-width: 700px) { .entry-fix-toggle { margin-left: auto; } }

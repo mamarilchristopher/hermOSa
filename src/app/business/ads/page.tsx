@@ -62,7 +62,7 @@ export default async function Ads({ searchParams }: { searchParams: Promise<{ p?
     return (<><TopBar access={access} /><main className="business"><div className="biz-head"><h1>Ads</h1></div><div className="notice info">No ad spend saved yet.</div></main></>);
   }
 
-  // Declared sales per branch per month (the Daily Sales figure, the service log only where nothing was typed).
+  // Sales per branch per month: from Nov 25 the approved Service log total (v0.101.2), typed figures only on days without entries.
   const sales = new Map<string, Map<string, number>>();
   for (const r of await withApprovedSales(supabase, (st as { days?: StatusDay[] } | null)?.days ?? [], today)) {
     const v = centsOfCell(r);

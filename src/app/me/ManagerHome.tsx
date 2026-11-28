@@ -16,7 +16,9 @@ function Delta({ v, title }: { v: number | null; title?: string }) {
 }
 function Cell({ c }: { c: DayCell }) {
   switch (c.kind) {
-    case "sales": return <>{php(c.cents)}{c.log && <span className="muted small glance-log"> Sales Logged</span>}</>;
+    // v0.101.2: from Nov 25 the figure is the approved entries; a different typed Daily Sales figure is shown, not counted.
+    case "sales": return <>{php(c.cents)}{c.log && <span className="muted small glance-log"> Sales Logged</span>}
+      {c.typed !== undefined && <span className="glance-typed small" title={`Typed in Daily Sales: ${php(c.typed)}. The approved entries' total is used.`}>typed {php(c.typed)}</span>}</>;
     case "zero": return <span className="muted">Zero sales</span>;
     case "closed": return <span className="muted">Closed</span>;
     case "waiting": return <span className="pill STAGED">Waiting sign-off</span>;

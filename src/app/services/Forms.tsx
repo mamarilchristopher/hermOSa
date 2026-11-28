@@ -807,3 +807,17 @@ export function SeparateForm({ line }: { line: string }) {
     </form>
   );
 }
+
+/** v0.101.2 (CHRIS Nov 28: the Fix entry button jumped when opened): the button stays put at the right end of the
+ *  action row (it turns into "Close fix tools"), and the tools open in their own panel under the whole row. */
+export function FixEntry({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" className={`entry-fix-toggle${open ? " on" : ""}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        {open ? "Close fix tools" : "Fix entry"}
+      </button>
+      {open && <div className="entry-more-body" role="group" aria-label="Fix this entry">{children}</div>}
+    </>
+  );
+}

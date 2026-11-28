@@ -9,7 +9,8 @@ export type StatusDay = [string, string, number | null, string | null, boolean, 
 export type GlanceBranch = { id: string; name: string };
 
 export type DayCell =
-  | { kind: "sales"; cents: number; log?: true } // log: total of the day's service log (no declared sales typed)
+  /** log: the day's approved Service log total. typed: a typed Daily Sales figure that differs from it (not counted). */
+  | { kind: "sales"; cents: number; log?: true; typed?: number }
   | { kind: "zero" }
   | { kind: "closed" }
   | { kind: "waiting" } // uploaded, waiting for sign-off
@@ -58,12 +59,13 @@ export const SERVICE_LOG_FROM = "2026-11-25";
 export function cellOf(rec: StatusDay | undefined): DayCell {
   if (!rec) return { kind: "empty" };
   const [, date, cents, mark, staged, service] = rec;
-  // CHRIS Nov 26 (v0.81.2): the Daily Sales tab is the correct figure, so Home shows exactly what it shows.
-  // The service log only fills a day nobody has typed or marked yet (shown as "Sales Logged").
-  // CHRIS Nov 28 (v0.99.3): an untyped day takes its approved Service log total, even if it was marked Zero sales or Closed
-  // (sales declared late after an outage); a typed figure still wins.
+  // v0.101.2 (CHRIS Nov 28: "granular data should always build up into totals so it has supporting data"): from Nov 25 a
+  // day with approved Service log entries shows their total, even over a typed figure or a Zero sales / Closed mark.
+  // A typed figure only counts on a day with no approved entries (and before Nov 25). A different typed figure is kept
+  // as `typed` so the Daily Sales grid can flag it.
+  const log = service !== null && service !== undefined && Number(service) > 0 && date >= SERVICE_LOG_FROM ? Number(service) : null;
+  if (log !== null) return cents !== null && Number(cents) !== log ? { kind: "sales", cents: log, log: true, typed: Number(cents) } : { kind: "sales", cents: log, log: true };
   if (cents !== null) return { kind: "sales", cents: Number(cents) };
-  if (service !== null && service !== undefined && Number(service) > 0 && date >= SERVICE_LOG_FROM) return { kind: "sales", cents: Number(service), log: true };
   if (mark === "NO_SALES") return { kind: "zero" };
   if (mark === "CLOSED") return { kind: "closed" };
   if (staged) return { kind: "waiting" };

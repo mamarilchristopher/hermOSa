@@ -65,21 +65,21 @@ describe("service log as the source from Nov 25", () => {
   const g = computeGlance("2026-11-26", [A, B], [
     s("a", "2026-11-24", null, 500_00), // before the switch: service log alone doesn't count
     s("a", "2026-11-25", null, 300_00), s("a", "2026-11-26", null, 120_00),
-    s("b", "2026-11-26", 90_00, 40_00), // declared sales typed in still win
+    s("b", "2026-11-26", 90_00, 40_00), // v0.101.2: approved entries win over a typed figure (kept to flag)
   ]);
   it("uses the day's service log total when no sales were typed", () => {
     expect(g.branches[0].todayCell).toEqual({ kind: "sales", cents: 120_00, log: true });
     expect(g.branches[0].yesterday).toEqual({ kind: "sales", cents: 300_00, log: true });
     expect(g.branches[0].mtd).toBe(300_00);
-    expect(g.branches[1].todayCell).toEqual({ kind: "sales", cents: 90_00 });
-    expect(g.todaySoFar).toBe(210_00);
+    expect(g.branches[1].todayCell).toEqual({ kind: "sales", cents: 40_00, log: true, typed: 90_00 });
+    expect(g.todaySoFar).toBe(160_00);
   });
 });
 
 describe("v0.99.3: approved Service log fills days, ‹ › day view (CHRIS Nov 28)", () => {
-  it("an untyped day takes the approved log total, even over a Zero sales mark; typed still wins", () => {
+  it("an untyped day takes the approved log total, even over a Zero sales mark", () => {
     expect(cellOf(["b", "2026-11-28", null, "NO_SALES", false, 950000])).toEqual({ kind: "sales", cents: 950000, log: true });
-    expect(cellOf(["b", "2026-11-28", 500000, null, false, 950000])).toEqual({ kind: "sales", cents: 500000 });
+    expect(cellOf(["b", "2026-11-28", 500000, null, false, 950000])).toEqual({ kind: "sales", cents: 950000, log: true, typed: 500000 });
     expect(cellOf(["b", "2026-11-28", null, "CLOSED", false, null])).toEqual({ kind: "closed" });
     expect(cellOf(["b", "2026-11-20", null, null, false, 950000])).toEqual({ kind: "empty" });
   });
@@ -100,5 +100,19 @@ describe("v0.99.3: approved Service log fills days, ‹ › day view (CHRIS Nov 
     const t = computeDay("2026-12-05", today, br, days);
     expect(t.date).toBe(today);
     expect(t.next).toBeNull();
+  });
+});
+
+describe("v0.101.2: entries first from Nov 25 (CHRIS Nov 28)", () => {
+  it("approved entries are the figure; a typed figure counts only on a day with no approved entries", () => {
+    // SMB Nov 26: typed 37,200, entries 1,000 -> 1,000 (typed kept to flag)
+    expect(cellOf(["smb", "2026-11-26", 3720000, null, false, 100000])).toEqual({ kind: "sales", cents: 100000, log: true, typed: 3720000 });
+    // same figure typed: no flag
+    expect(cellOf(["smb", "2026-11-26", 100000, null, false, 100000])).toEqual({ kind: "sales", cents: 100000, log: true });
+    // no approved entries: the typed figure counts
+    expect(cellOf(["smb", "2026-11-26", 3720000, null, false, null])).toEqual({ kind: "sales", cents: 3720000 });
+    expect(cellOf(["smb", "2026-11-26", 3720000, null, false, 0])).toEqual({ kind: "sales", cents: 3720000 });
+    // before Nov 25 typed figures stay the source
+    expect(cellOf(["smb", "2026-11-24", 3720000, null, false, 100000])).toEqual({ kind: "sales", cents: 3720000 });
   });
 });

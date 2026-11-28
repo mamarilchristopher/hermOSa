@@ -9,7 +9,7 @@ import { isIsoDate, manilaToday } from "@/lib/dates";
 import { addDays, sortBranches, WEEKDAYS, weekday } from "@/lib/insights";
 import { ROLE_TEXT, TYPE_TEXT } from "@/lib/commission";
 import { AddPanel } from "@/components/Controls";
-import { AfterDpForm, BatchApprove, BranchEntryForm, ChangeBranchForm, ChangeDateForm, DecideButtons, FixPackageForm, MergeForm, RenameClientForm, RenumberForm, SeparateForm, VoidEntryForm } from "./Forms";
+import { AfterDpForm, BatchApprove, BranchEntryForm, ChangeBranchForm, ChangeDateForm, DecideButtons, FixPackageForm, MergeForm, RenameClientForm, RenumberForm, SeparateForm, VoidEntryForm, FixEntry } from "./Forms";
 import type { PackageLine } from "@/lib/packages";
 import { Uid } from "@/components/Uid";
 import { StaffFilter } from "./StaffFilter";
@@ -312,7 +312,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                         )}
                         {!branch && l.branch_id && !order.has(l.branch_id) && <span className="tag branch-tag">{(bName[l.branch_id] ?? "").replace(/ \(.*\)$/, "")}</span>}
                         <span className="entry-client">{l.client_name ?? "No client name"}</span>
-                        <Uid v={l.log_no} />
+                        {l.log_no !== l.client_name && <Uid v={l.log_no} />}
                       </div>
                       <div className="entry-service">
                         {(l.session_no ?? 1) > 1 && <span className="session-tag">Session {l.session_no}</span>}
@@ -416,17 +416,14 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                           {payCheck.get(l.id) === "RECEIVED" ? "Payment received" : payCheck.get(l.id) === "NOT_RECEIVED" ? "Not received" : "To confirm"}</span>}</span> : null}
                       {l.state !== "REJECTED" && <AttachProof log={l.id} branch={l.branch_id ?? branch?.id ?? ""} have={proofCount.get(l.id) ?? 0} />}
                       {(topMgmt || fixName) && (
-                        <details className="entry-more">
-                          <summary>Fix entry</summary>
-                          <div className="entry-more-body">
-                            {fixName && <RenameClientForm id={l.id} name={l.client_name!} all={topMgmt} />}
-                            {topMgmt && <ChangeDateForm id={l.id} date={l.service_date} max={today} />}
-                            {topMgmt && <ChangeBranchForm id={l.id} branch={l.branch_id ?? ""} branches={viewable.map((b) => ({ id: b.id, name: b.name }))} />}
-                            {afterDp && <AfterDpForm id={l.id} on={!!l.after_dp} />}
-                            {fixPkg && <FixPackageForm id={l.id} />}
-                            {topMgmt && l.state === "APPROVED" && <VoidEntryForm id={l.id} />}
-                          </div>
-                        </details>
+                        <FixEntry>
+                          {fixName && <RenameClientForm id={l.id} name={l.client_name!} all={topMgmt} />}
+                          {topMgmt && <ChangeDateForm id={l.id} date={l.service_date} max={today} />}
+                          {topMgmt && <ChangeBranchForm id={l.id} branch={l.branch_id ?? ""} branches={viewable.map((b) => ({ id: b.id, name: b.name }))} />}
+                          {afterDp && <AfterDpForm id={l.id} on={!!l.after_dp} />}
+                          {fixPkg && <FixPackageForm id={l.id} />}
+                          {topMgmt && l.state === "APPROVED" && <VoidEntryForm id={l.id} cls="link-button small remove" />}
+                        </FixEntry>
                       )}
                     </div>
                   </article>
