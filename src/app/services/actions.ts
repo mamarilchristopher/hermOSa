@@ -284,7 +284,9 @@ export async function changeDate(_prev: ActionState, fd: FormData): Promise<Acti
   if (!data.ok) return { error: data.error === "ALREADY_PAID" ? "This entry's commission is already on a final payslip, so its date can't change." : data.error === "INVALID_DATE" ? "Pick today or an earlier day." : errorText(data.error) };
   revalidatePath("/services");
   revalidatePath("/me");
-  return { ok: `Moved to ${new Date(`${date.data}T00:00:00Z`).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}.`, at: Date.now() };
+  // update-0102: the whole visit (every merged line) moves with the main sale.
+  const more = Number(data.moved ?? 1) > 1 ? ` with its ${Number(data.moved) - 1} merged line${Number(data.moved) === 2 ? "" : "s"}` : "";
+  return { ok: `Moved to ${new Date(`${date.data}T00:00:00Z`).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}${more}.`, at: Date.now() };
 }
 
 /** CHRIS Nov 27 (update-0085): mark or unmark an entry as the balance paid after a DP (commission on the full price). */
@@ -335,7 +337,8 @@ export async function changeBranch(_prev: ActionState, fd: FormData): Promise<Ac
   if (error) return { error: error.code === "PGRST202" ? "Changing branches needs database update-0095. Ask the owner to run it." : "Could not save. Try again." };
   if (!data?.ok) return { error: data?.error === "ALREADY_PAID" ? "This entry's commission is already on a final payslip, so its branch can't change." : errorText(data?.error) };
   revalidatePath("/services"); revalidatePath("/me");
-  return { ok: "Branch changed.", at: Date.now() };
+  const more = Number(data.moved ?? 1) > 1 ? ` The ${Number(data.moved) - 1} merged line${Number(data.moved) === 2 ? "" : "s"} moved with it.` : "";
+  return { ok: `Branch changed.${more}`, at: Date.now() };
 }
 
 /** update-0095: owners and the GM turn a package session saved as "No charge" into Paid ₱0 with its session commission. */

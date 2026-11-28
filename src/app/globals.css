@@ -2796,3 +2796,29 @@ details.exp-edit[open] { flex-basis: 100%; }
 .entry-more-body form.change-date { order: 9; }
 .entry-more-body .link-button.remove { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--line-strong)); }
 @media (max-width: 700px) { .entry-fix-toggle { margin-left: auto; } }
+
+/* v0.101.2: one visit, one waiver: the highest value service on top, "+" rows under it, amounts in one column. */
+.entry-sub { grid-template-columns: minmax(0, 1fr) auto auto; column-gap: 12px; row-gap: 0; padding: 4px 12px; }
+.entry-sub li { display: contents; }
+.entry-sub li > * { display: flex; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+.entry-sub li:first-child > * { border-top: 0; }
+.entry-sub-name { flex-wrap: wrap; gap: 2px 6px; }
+.entry-sub-name .session-tag { font-size: 0.7rem; }
+.entry-sub-amt { justify-content: flex-end; white-space: nowrap; }
+.entry-sub-do { justify-content: flex-end; min-width: 0; }
+.entry-sub-do .inline-form { margin: 0; }
+.entry-sub.visit { margin-top: 0; }
+.entry-sub .visit-top > * { padding: 8px 0; }
+.entry-sub .visit-top .entry-service { margin: 0; font-size: 1rem; color: var(--ink); }
+.entry-sub .visit-top .entry-sub-amt { font-size: 0.95rem; }
+/* A visit with several services takes the full card width on phones: the total and status sit on one row above it. */
+@media (max-width: 700px) {
+  .entry.entry-visit { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "side" "staff" "wide" "actions"; }
+  .entry.entry-visit .entry-side { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; text-align: left; }
+  .entry.entry-visit .entry-side .entry-paid-split { margin-right: auto; }
+  .entry-sub { padding: 2px 10px; column-gap: 10px; grid-template-columns: minmax(0, 1fr) auto; }
+  .entry-sub .entry-sub-name { grid-row: span 2; }
+  .entry-sub .entry-sub-amt { padding-bottom: 0; }
+  .entry-sub .entry-sub-do { grid-column: 2; border-top: 0; padding-top: 0; }
+  .entry.entry-visit .entry-side { gap: 4px 10px; }
+}

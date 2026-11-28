@@ -304,7 +304,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 const seesFiles = can(access, ["OWNER", "MANAGER", "CLINICIAN", "CASHIER"], l.branch_id ?? null);
                 const needsWaiver = !extra(l) && ((l.visit_kind ?? "PAID") === "PAID" || l.visit_kind === "BACKJOB");
                 return (
-                  <article key={l.id} id={`entry-${l.id}`} className={["entry", `entry-${l.state.toLowerCase()}`, l.state === "REJECTED" ? "rejected" : "", sp.entry === l.id ? "entry-focus" : "", twins ? "entry-double" : ""].join(" ").trim()}>
+                  <article key={l.id} id={`entry-${l.id}`} className={["entry", sub.length ? "entry-visit" : "", `entry-${l.state.toLowerCase()}`, l.state === "REJECTED" ? "rejected" : "", sp.entry === l.id ? "entry-focus" : "", twins ? "entry-double" : ""].join(" ").trim()}>
                     <div className="entry-main">
                       <div className="entry-top">
                         {l.state === "PENDING" && approverFor(l.branch_id) && pendingAll > 1 && (
@@ -314,26 +314,50 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                         <span className="entry-client">{l.client_name ?? "No client name"}</span>
                         {l.log_no !== l.client_name && <Uid v={l.log_no} />}
                       </div>
-                      <div className="entry-service">
-                        {(l.session_no ?? 1) > 1 && <span className="session-tag">Session {l.session_no}</span>}
-                        <strong>{l.services?.name}</strong>
-                        {l.visit_kind && l.visit_kind !== "PAID"
-                          ? <span className="tag">{VISIT_TEXT[l.visit_kind] ?? l.visit_kind}</span>
-                          : <span className={`tag ${l.commission_type}`}>{TYPE_TEXT[l.commission_type]}</span>}
-                      </div>
-                      {sub.length > 0 && (
-                        <ul className="entry-sub">
-                          {sub.map((k) => (
-                            <li key={k.id}>
-                              <span className="entry-sub-name">＋ {k.services?.name ?? "Item"}{k.visit_kind === "NO_CHARGE" ? " (free)" : ""}</span>
-                              <span className="entry-sub-amt">{centsToPhp(k.amount_paid_cents)}</span>
-                              {k.commission_type === "NONCOMMI" && <span className="muted small">no commission</span>}
-                              {k.state === "PENDING" && <span className="muted small">· signed off with the sale</span>}
-                              {approverFor(k.branch_id) && <SeparateForm line={k.id} />}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                      {/* v0.101.2 (CHRIS Nov 28: "multiple services availed in single waiver ... should always appear" this way):
+                          the highest value service is the headline with its amount, every other line of the visit is a "+" row
+                          under it, highest first, amounts lined up. The SL number stays with the entry that holds it. */}
+                      {(() => {
+                        const visit = [l, ...sub].sort((a, b) => Number(b.amount_paid_cents) - Number(a.amount_paid_cents) || Number(a.id !== l.id) - Number(b.id !== l.id));
+                        const top = sub.length ? visit[0] : l;
+                        const rest = sub.length ? visit.slice(1) : [];
+                        const free = (k: Log) => (k.visit_kind === "NO_CHARGE" ? " (free)" : "");
+                        return (<>
+                          {!sub.length && (
+                            <div className="entry-service">
+                              {(l.session_no ?? 1) > 1 && <span className="session-tag">Session {l.session_no}</span>}
+                              <strong>{l.services?.name}</strong>
+                              {l.visit_kind && l.visit_kind !== "PAID"
+                                ? <span className="tag">{VISIT_TEXT[l.visit_kind] ?? l.visit_kind}</span>
+                                : <span className={`tag ${l.commission_type}`}>{TYPE_TEXT[l.commission_type]}</span>}
+                            </div>
+                          )}
+                          {rest.length > 0 && (
+                            <ul className="entry-sub visit">
+                              <li className="visit-top">
+                                <span className="entry-sub-name entry-service">
+                                  {(top.session_no ?? 1) > 1 && <span className="session-tag">Session {top.session_no}</span>}
+                                  <strong>{top.services?.name}{free(top)}</strong>
+                                  {l.visit_kind && l.visit_kind !== "PAID"
+                                    ? <span className="tag">{VISIT_TEXT[l.visit_kind] ?? l.visit_kind}</span>
+                                    : <span className={`tag ${l.commission_type}`}>{TYPE_TEXT[l.commission_type]}</span>}
+                                </span>
+                                <span className="entry-sub-amt">{centsToPhp(top.amount_paid_cents)}</span>
+                                <span className="entry-sub-do" />
+                              </li>
+                              {rest.map((k) => (
+                                <li key={k.id}>
+                                  <span className="entry-sub-name">＋ {(k.session_no ?? 1) > 1 && <span className="session-tag">Session {k.session_no}</span>} {k.services?.name ?? "Item"}{free(k)}
+                                    {k.commission_type === "NONCOMMI" && k.id !== l.id && <span className="muted small"> · no commission</span>}
+                                    {k.state === "PENDING" && k.id !== l.id && <span className="muted small"> · signed off with the sale</span>}</span>
+                                  <span className="entry-sub-amt">{centsToPhp(k.amount_paid_cents)}</span>
+                                  <span className="entry-sub-do">{k.id !== l.id && approverFor(k.branch_id) && <SeparateForm line={k.id} />}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </>);
+                      })()}
                       {l.receipt_no && <div className="small muted">Waiver / OR {l.receipt_no}</div>}
                       {l.after_dp && <div className="small"><span className="tag">Balance after DP</span> <span className="muted">commission on the full price</span></div>}
                       {l.price_note && <div className="small muted">Price: {l.price_note}</div>}
@@ -360,7 +384,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                     </div>
                     <div className="entry-side">
                       <div className="entry-paid">{centsToPhp(total)}</div>
-                      {sub.length > 0 && <div className="small muted entry-paid-split">{centsToPhp(l.amount_paid_cents)} + {centsToPhp(total - Number(l.amount_paid_cents))}</div>}
+                      {sub.length > 0 && <div className="small muted entry-paid-split">{sub.length + 1} services · one waiver</div>}
                       {l.state === "PENDING" && approverFor(l.branch_id) ? <DecideButtons id={l.id} /> : (
                         <span className={`pill ${l.state === "APPROVED" ? "PUBLISHED" : l.state === "REJECTED" ? "REVERSED" : "STAGED"}`}>
                           {l.state === "APPROVED" ? "Approved" : l.state === "REJECTED" ? "Rejected" : "Waiting"}
