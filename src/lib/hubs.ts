@@ -25,7 +25,8 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
   // update-0091 (CHRIS Nov 27): CSRs and marketing post the promos; owners and the GM too.
   const poster = owner || gm || has(["CSR", "MARKETING"]);
   // CHRIS Nov 27: for everyone but management, Bookings is its own button and takes Chat's place on the phone bar.
-  const ownBookings = !management && (booker || archiver);
+  // CHRIS Nov 28 (v0.106.7): client receiving runs from Bookings, so it is everyone's 2nd button, management included.
+  const ownBookings = booker || archiver;
   return ([
     // CHRIS Nov 27 (v0.89.1): My day sits on Home for the GM and the owners.
     { key: "home", label: "Home", short: "Home", icon: "home", tabs: [{ href: "/me", label: "Home" }, ...(owner || gm ? [{ href: "/focus", label: "My day" }] : [])] },
@@ -42,7 +43,7 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
     ] },
     { key: "bookings", label: "Bookings", short: "Bookings", icon: "calendar", tabs: ownBookings ? [
       { href: "/bookings", label: "Bookings" },
-      ...(poster ? [{ href: "/promos/post", label: "Promo posts" }] : []),
+      ...(poster && !management ? [{ href: "/promos/post", label: "Promo posts" }] : []),
     ] : [] },
     { key: "sales", label: "Sales", short: "Sales", icon: "chart", tabs: [
       ...(filler ? [{ href: "/sales/daily", label: "Daily sales" }] : []),
@@ -86,11 +87,11 @@ export function menuFor(grants: MenuGrant[], c: MenuCounts = {}): Hub[] {
   ] as Hub[]).filter((h) => h.tabs.length > 0).sort((a, b) => hubRank(a.key, management) - hubRank(b.key, management));
 }
 
-/** Menu order (CHRIS Nov 27, v0.89.1). Management: Home, Business, Clinic, Sales, then the rest, Time clock last (they
- *  don't clock in). Everyone else: Home, Clinic, Bookings (CHRIS Nov 27: in Chat's place), Time clock (4th on the phone bar),
- *  then Chat and the rest. */
-const MGMT_ORDER = ["home", "business", "clinic", "sales", "chat", "team", "pay", "people", "settings", "time"];
-const STAFF_ORDER = ["home", "clinic", "bookings", "time", "chat", "team", "sales", "pay", "people", "settings", "business"];
+/** Menu order (CHRIS Nov 28, v0.106.7): Bookings is everyone's 2nd button. Management: Home, Bookings, Business, Sales,
+ *  then Clinic and the rest, Time clock last (they don't clock in). CSRs and CMAs: Home, Bookings, Clinic, Time clock
+ *  (the 4 phone-bar buttons), then Chat and the rest. */
+const MGMT_ORDER = ["home", "bookings", "business", "sales", "clinic", "chat", "team", "pay", "people", "settings", "time"];
+const STAFF_ORDER = ["home", "bookings", "clinic", "time", "chat", "team", "sales", "pay", "people", "settings", "business"];
 export function hubRank(key: string, management: boolean): number {
   const i = (management ? MGMT_ORDER : STAFF_ORDER).indexOf(key);
   return i < 0 ? 99 : i;
