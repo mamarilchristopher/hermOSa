@@ -1,7 +1,12 @@
 // Service order in every service list (CHRIS, Nov 26): his price-list order, best sellers first.
 // Services not on this list (added later) come after, A to Z.
+// CHRIS Nov 28 (v0.103.3): his top 10 most used services come first, in this exact order (a second name on a row is
+// another spelling of the same service).
+const TOP = [
+  ["Hiko Deluxe"], ["Ultra Max Hiko"], ["Ultra VLift"], ["Lux Queen 10+3"], ["Lux Queen 5+1"], ["Brilliant 10+3"], ["Brilliant 5+1"],
+  ["Barbie Arms Trio"], ["Face Botox (per area)", "Face Botox Package", "Face Botox"], ["Lemon Bottle Face", "Lemon Bottle Face Single Session"],
+];
 const ORDER = [
-  "TEST Service", // staff phone test, Nov 26 (CHRIS will delete it later)
   "Hiko Deluxe", "Hiko Pro", "Ultra Max Hiko", "Diamond Tip (No Alartox)", "Diamond Tip (with Alartox)", "Additional per Thread",
   "Alar Botox", "Fox Eye", "Hexalift", "Ultra VLift", "Barbie Arms Trio",
   "Additional Mono Thread (20pcs)", "Additional Mono Thread (30pcs)", "Additional Mono Thread (50pcs)", "Fillers", "Signature facial",
@@ -18,7 +23,9 @@ const ORDER = [
   "Diode Underarms", "Diode Arms", "Diode Half Leg", "Diode Full Legs", "Diode Bikini Line", "Diode Beard (Male)", "Diode Upper Neck (Male)",
 ];
 const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
-const RANK = new Map(ORDER.map((n, i) => [key(n), i]));
+const RANK = new Map<string, number>();
+TOP.forEach((names, i) => names.forEach((n) => RANK.set(key(n), i)));
+ORDER.forEach((n, i) => { if (!RANK.has(key(n))) RANK.set(key(n), TOP.length + i); });
 
 export function sortServices<T extends { name: string }>(list: T[]): T[] {
   return [...list].sort((a, b) => {
