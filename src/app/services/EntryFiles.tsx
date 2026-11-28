@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { viewPhotos } from "@/components/PhotoViewer";
+import { IconFile } from "@/components/Icons";
 
 type Kind = "WAIVER" | "PROOF" | "BEFORE" | "AFTER";
 // update-0104: a fully paid package's session card is saved as a WAIVER page named sessioncard-….
@@ -62,7 +63,7 @@ export function EntryFiles({ log, more = [], auto, needsWaiver }: { log: string;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, auto, log]);
 
-  if (!open) return <button type="button" className="secondary small" onClick={() => setOpen(true)}>📄 Waiver &amp; proof</button>;
+  if (!open) return <button type="button" className="secondary small" onClick={() => setOpen(true)}><IconFile />Waiver &amp; proof</button>;
   const list = Array.isArray(files) ? files : [];
   const waivers = list.filter((f) => f.kind === "WAIVER").length;
   const proofs = list.filter((f) => f.kind === "PROOF").length;

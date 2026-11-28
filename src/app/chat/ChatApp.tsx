@@ -4,7 +4,7 @@ import { shrinkPhoto as shrink } from "@/lib/chatPhoto";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { Avatar } from "@/components/Avatar";
-import { IconBack, IconImage, IconInfo, IconPlus, IconSend } from "@/components/Icons";
+import { IconBack, IconBell, IconBellSlash, IconImage, IconInfo, IconMegaphone, IconPlus, IconSearch, IconSend, IconX } from "@/components/Icons";
 import { CHAT_READ_EVENT, CHAT_SOUNDS_EVENT, firstName, playChatSound, setSoundsOn, soundsOn } from "@/lib/chatSounds";
 
 /** Team chat client (v0.49, update-0049). Messages arrive live through Supabase Realtime; reading is limited to members by the database. */
@@ -364,7 +364,7 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
         <div className="chat-list-head">
           <h1>Chat</h1>
           <button type="button" className="icon-btn chat-sound" aria-pressed={sounds} title={sounds ? "Chat sounds are on. Tap to mute." : "Chat sounds are off. Tap to turn on."}
-            aria-label={sounds ? "Mute chat sounds" : "Turn on chat sounds"} onClick={() => setSoundsOn(!sounds)}>{sounds ? "🔔" : "🔕"}</button>
+            aria-label={sounds ? "Mute chat sounds" : "Turn on chat sounds"} onClick={() => setSoundsOn(!sounds)}>{sounds ? <IconBell /> : <IconBellSlash />}</button>
           <button type="button" className="secondary chat-new" onClick={() => setPanel(panel === "new" ? null : "new")}><IconPlus /> New</button>
         </div>
         {panel === "new" && <NewChat people={people} supabase={supabase} onDone={async (id) => { await refreshList(); open(id); }} onClose={() => setPanel(null)} />}
@@ -422,7 +422,7 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
                       {!mine && group && (first ? <Avatar name={who?.name ?? "?"} url={faces.get(m.sender_id) ?? null} size={30} /> : <span className="chat-face-gap" />)}
                       <div className="chat-bubble-wrap">
                         {!mine && group && first && <span className="chat-name">{who?.name ?? "Former member"}</span>}
-                        {!mine && m.from_management && !m.deleted_at && <span className="mgmt-chip">📣 Message from {firstName(who?.name ?? "management")}</span>}
+                        {!mine && m.from_management && !m.deleted_at && <span className="mgmt-chip"><IconMegaphone className="ic-lead" />Message from {firstName(who?.name ?? "management")}</span>}
                         <div className={`chat-bubble ${m.deleted_at ? "deleted" : ""} ${m.photo_path && !m.body ? "photo-only" : ""}`}
                           onClick={(e) => {
                             if (m.deleted_at) return;
@@ -486,7 +486,7 @@ export function ChatApp({ me, initialRooms, people, initialRoom, management = fa
               <div className="chat-replying">
                 <span><span className="muted small">Replying to {replyTo.sender_id === me.id ? "yourself" : names.get(replyTo.sender_id)?.name ?? "Former member"}</span>
                   <span className="chat-replying-text">{replyTo.body ? replyTo.body.slice(0, 120) : replyTo.gif_url ? "GIF" : "Photo"}</span></span>
-                <button type="button" className="icon-btn" aria-label="Cancel reply" onClick={() => setReplyTo(null)}>✕</button>
+                <button type="button" className="icon-btn" aria-label="Cancel reply" onClick={() => setReplyTo(null)}><IconX size={18} /></button>
               </div>
             )}
             <form className="chat-compose" onSubmit={(e) => { e.preventDefault(); void send(); }}>
@@ -612,7 +612,7 @@ export function GifPicker({ onPick, onClose }: { onPick: (url: string) => void; 
         <div className="chat-gif-handle" aria-hidden />
         <div className="chat-gif-head">
           <label className="chat-gif-search">
-            <span aria-hidden>🔍</span>
+            <IconSearch />
             <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search GIPHY" aria-label="Search GIFs" autoFocus={typeof window !== "undefined" && window.innerWidth > 900} />
           </label>
           <button type="button" className="chat-gif-done" onClick={onClose}>Done</button>

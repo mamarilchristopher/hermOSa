@@ -3,6 +3,7 @@
 // the ORIGINAL file, untouched (no compression), plus a small preview for the archive grid.
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
+import { IconCamera } from "@/components/Icons";
 
 export type PhotoKind = "BEFORE" | "AFTER" | "WAIVER";
 /** card (update-0104, CHRIS Nov 28): the client's session card for a fully paid package, saved as a WAIVER page named sessioncard-…. */
@@ -113,7 +114,7 @@ export function AddPhotosLater({ log, branch, folder, needs }: { log: string; br
   const [msg, setMsg] = useState<{ ok?: string; error?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   if (msg?.ok === "done") return <span className="pill PUBLISHED">Photos complete</span>;
-  if (!open) return <button type="button" className="small" onClick={() => setOpen(true)}>Add photos</button>;
+  if (!open) return <button type="button" className="small" onClick={() => setOpen(true)}><IconCamera />Add photos</button>;
   const save = async () => {
     setBusy(true); setMsg(null);
     const { data, error } = await createClient().rpc("add_visit_photos", { p_log: log, p_folder: api.folder, p_photos: JSON.parse(api.json) });

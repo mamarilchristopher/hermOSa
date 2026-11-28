@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { Avatar } from "./Avatar";
-import { IconChat, IconImage, IconSend } from "./Icons";
+import { IconChat, IconImage, IconSend, IconX } from "./Icons";
 import { shrinkPhoto } from "@/lib/chatPhoto";
 import { CHAT_READ_EVENT } from "@/lib/chatSounds";
 
@@ -295,7 +295,7 @@ function MiniChat({ room, me, face, online, incoming, sign, photos, onClose, onE
         <span className="dock-face">{face}{online && <span className="dock-dot" aria-hidden />}</span>
         <span className="mini-title"><strong>{room.name ?? "Chat"}</strong>{online ? <span className="mini-on">Active now</span> : group ? <span className="small muted">{room.members} people</span> : null}</span>
         <button type="button" className="icon-btn" title="Open in Chat" aria-label="Open in Chat" onClick={onExpand}>⤢</button>
-        <button type="button" className="icon-btn" title="Close" aria-label="Close chat" onClick={onClose}>✕</button>
+        <button type="button" className="icon-btn" title="Close" aria-label="Close chat" onClick={onClose}><IconX size={18} /></button>
       </header>
       <div className="mini-scroll" ref={scroller}>
         {msgs === null && <p className="small muted mini-note">Loading…</p>}

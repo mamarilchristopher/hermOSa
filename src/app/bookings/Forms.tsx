@@ -2,7 +2,13 @@
 import { useActionState, useEffect, useState } from "react";
 import { pick } from "@/lib/decision";
 import { addBooking, logFollowUp, setStatus } from "./actions";
+import { IconArrowRight, IconCheck, IconCheckCircle, IconPhoneSlash, IconWeek, IconX, IconXCircle } from "@/components/Icons";
+import type { ReactNode } from "react";
 
+/** v0.106.9: soft duotone icon on each status button. */
+const STATUS_ICON: Record<string, ReactNode> = {
+  CONFIRMED: <IconCheck />, ARRIVING: <IconArrowRight />, ARRIVED: <IconCheckCircle />, NO_SHOW: <IconXCircle />, UNRESPONSIVE: <IconPhoneSlash />,
+};
 
 export function AddBookingForm({ branches, today, min, max, services }: { branches: { id: string; name: string }[]; today: string; min: string; max: string; services: { name: string; price: number | null }[] }) {
   const [s, action, pending] = useActionState(addBooking, undefined);
@@ -51,7 +57,7 @@ export function StatusForm({ id, status, booker, today }: { id: string; status: 
   const [resched, setResched] = useState(false);
   const [cancel, setCancel] = useState(false);
   const btn = (v: string, label: string) => (
-    <button key={v} className={status === v ? "on" : ""} onClick={pick(v)} disabled={pending}>{label}</button>
+    <button key={v} className={status === v ? "on" : ""} onClick={pick(v)} disabled={pending}>{STATUS_ICON[v]}{label}</button>
   );
   return (
     <form action={action} className="booking-actions">
@@ -63,10 +69,10 @@ export function StatusForm({ id, status, booker, today }: { id: string; status: 
         {/* v0.106.6 (CHRIS Nov 28): Done comes only from logging (or linking) the sale, never a tap. */}
         {btn("NO_SHOW", "Did not arrive")}
         {btn("UNRESPONSIVE", "Unresponsive")}
-        <button type="button" className={resched ? "on" : ""} onClick={() => { setResched(!resched); setCancel(false); }}>Re-sched…</button>
+        <button type="button" className={resched ? "on" : ""} onClick={() => { setResched(!resched); setCancel(false); }}><IconWeek />Re-sched…</button>
         {/* CHRIS Nov 27 (update-0094): Cancelled always asks for the client's reason. */}
         {booker && <button type="button" className={status === "CANCELLED" || cancel ? "on" : ""} disabled={pending || status === "CANCELLED"}
-          onClick={() => { setCancel(!cancel); setResched(false); }}>Cancelled…</button>}
+          onClick={() => { setCancel(!cancel); setResched(false); }}><IconX />Cancelled…</button>}
       </div>
       {cancel && (
         <div className="booking-resched">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { VAPID_PUBLIC_KEY } from "@/lib/pushConfig";
+import { IconBell } from "./Icons";
 
 type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 let deferred: InstallEvent | null = null;
@@ -149,7 +150,7 @@ export function NotifyRequired() {
   return (
     <div className="notify-required" role="status">
       <span className="nr-text">
-        <span aria-hidden>🔔</span> <b>Notifications are required while timed in.</b>{" "}
+        <IconBell className="ic-lead" /><b>Notifications are required while timed in.</b>{" "}
         {s === "denied" && "They're blocked: allow them in your phone's Settings › Notifications."}
         {s === "install" && <>Add Hermosapp to your Home Screen first (Safari › Share › Add to Home Screen).</>}
         {s === "unsupported" && "This phone can't get them. Update it or use Chrome."}

@@ -72,12 +72,23 @@ code { font-size: 0.85em; background: var(--cream); padding: 1px 6px; border-rad
   transition: background 0.15s, color 0.15s;
 }
 .side-nav a svg { color: var(--muted); transition: color 0.15s; }
-.nav-emoji { display: inline-grid; place-items: center; width: 22px; height: 22px; font-size: 19px; line-height: 1; flex: none; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
-.tab-nav .nav-emoji { font-size: 21px; width: 24px; height: 24px; }
-.static-hub-row .nav-emoji { font-size: 16px; width: 18px; height: 18px; }
+/* v0.106.9 (CHRIS Nov 28, option B): soft duotone icons. The tint is the icon's own color at 20%; on the page you're on it turns gold. */
+.ic { flex: none; display: inline-block; vertical-align: -0.2em; }
+.ic-duo { opacity: 0.2; transition: fill 0.15s, opacity 0.15s; }
+.side-nav a.active .ic-duo, .tab-nav a.active .ic-duo, .tab-nav .tab-more.active .ic-duo, .more-sheet a.active .ic-duo, .segmented .on .ic-duo { fill: var(--gold); opacity: 0.5; }
+.tab-nav .ic { width: 24px; height: 24px; }
+.ic-lead { width: 1.15em; height: 1.15em; margin-right: 0.3em; }
+.icon-btn > .ic, .chat-sound > .ic { width: 20px; height: 20px; }
+.vn-icon { color: var(--brown); }
+.chat-gif-search > .ic { color: var(--muted); }
+/* Search boxes: a soft magnifier inside the field instead of the old 🔍 in the placeholder. */
+input.search-field.search-field { padding-left: 38px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256' fill='%238a776b'%3E%3Cpath opacity='.2' d='M192,112a80,80,0,1,1-80-80A80,80,0,0,1,192,112Z'/%3E%3Cpath d='M229.66,218.34,179.6,168.28a88.21,88.21,0,1,0-11.32,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: 12px 50%; background-size: 18px 18px; }
+/* Icons inside buttons and button-like links sit 1.15em tall with a small gap before the label. */
+button > .ic, .button > .ic { width: 1.15em; height: 1.15em; }
+.link-like > .ic, .with-ic > .ic { width: 1.15em; height: 1.15em; margin-right: 0.35em; }
 .side-nav a:hover { background: var(--pearl); color: var(--ink); }
 .side-nav a.active { background: var(--gold-soft); color: var(--brown-dark); }
-.side-nav a.active svg { color: var(--gold); }
+.side-nav a.active svg { color: var(--brown-dark); }
 .side-nav a.active::before { content: ""; position: absolute; left: -14px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--gold); }
 /* v0.48.1: Light | Dark pill at the foot of the side menu. */
 .side-mode { padding: 12px 8px 0; border-top: 1px solid var(--line); }
@@ -132,7 +143,7 @@ main > h1 + p.muted { margin-top: 0; margin-bottom: 20px; }
     font-size: 0.7rem; font-weight: 700; color: var(--muted); text-decoration: none;
   }
   .tab-nav a.active { color: var(--brown-dark); background: var(--gold-soft); }
-  .tab-nav a.active svg { color: var(--gold); }
+  .tab-nav a.active svg { color: var(--brown-dark); }
   h1 { font-size: 1.4rem; }
 }
 
@@ -1248,7 +1259,7 @@ main.chat-main { --page: 1280px; padding-top: 20px; padding-bottom: 20px; }
 .client-folder > summary { display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; list-style: none; }
 .client-folder > summary::-webkit-details-marker { display: none; }
 .client-folder[open] > summary { border-bottom: 1px solid var(--line); }
-.folder-icon { font-size: 24px; }
+.folder-icon { color: var(--gold); }
 .folder-main { display: grid; gap: 1px; flex: 1; min-width: 0; }
 .folder-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; white-space: nowrap; }
 .folder-group { padding: 10px 14px 4px; display: grid; gap: 6px; }
@@ -1283,7 +1294,9 @@ body:has(.notify-required) main { padding-bottom: 80px; }
 .test-popup h2 { margin: 0; font-size: 1.2rem; }
 .test-popup.pass h2 { color: var(--good); }
 .test-popup p { margin: 0; }
-.test-popup-icon { font-size: 2.6rem; line-height: 1; }
+.test-popup-icon { line-height: 1; }
+.test-popup-icon.ok { color: var(--good); }
+.test-popup-icon.warn { color: var(--warn); }
 .test-popup button { min-width: 140px; }
 /* One button for before & after (v0.55.7): tap the label to switch */
 .ba-toggle { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; }
@@ -1367,6 +1380,7 @@ input.batch-tick { width: 20px; height: 20px; margin: 0 8px 0 0; float: left; cu
 .nte-proof-status { position: absolute; left: 4px; bottom: 4px; font-size: 0.68rem; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.9); color: #2f241d; }
 .nte-proof-thumb.error .nte-proof-status { color: var(--bad); }
 .nte-proof-x { position: absolute; top: 3px; right: 3px; min-height: 0; margin: 0; padding: 0; width: 22px; height: 22px; border-radius: 999px; border: 0; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.7rem; line-height: 22px; box-shadow: none; }
+.nte-proof-x > .ic { width: 14px; height: 14px; }
 .nte-proof-add { width: 88px; height: 88px; min-height: 0; margin: 0; padding: 6px; border-radius: 12px; border: 1px dashed var(--gold-line); background: var(--gold-soft); color: var(--brown-dark); font-size: 0.78rem; font-weight: 700; display: grid; place-content: center; gap: 2px; box-shadow: none; }
 .nte-proof-add span { font-size: 1.2rem; color: var(--gold); }
 .nte-proof-row button.nte-proof-add { border-radius: 14px; }
@@ -1596,6 +1610,8 @@ a.hb-row-main:hover strong { text-decoration: underline; }
 .rcv-log-btn { font-weight: 700; }
 .rcv-link select { flex: 1 1 200px; min-width: 0; max-width: 100%; }
 .rcv-done { color: var(--good); font-weight: 600; }
+.rcv-done.with-ic, .mgmt-alert-tag.with-ic { display: inline-flex; align-items: center; gap: 0.35em; }
+.rcv-done.with-ic > .ic, .mgmt-alert-tag.with-ic > .ic { margin-right: 0; }
 .rcv-wait { color: var(--warn, #b7791f); font-weight: 600; }
 .booking-row { scroll-margin-top: 90px; }
 .booking-row.focused, .booking-row:target { outline: 2px solid var(--gold); outline-offset: 4px; border-radius: 10px; background: rgba(201, 162, 74, 0.12); }
@@ -1834,7 +1850,7 @@ a.hb-row-main:hover strong { text-decoration: underline; }
 .promo-lightbox-tabs { display: inline-flex; background: var(--viz-track, #f4ece0); border-radius: 999px; padding: 3px; }
 .promo-lightbox-tabs button { border: 0; background: transparent; color: inherit; font: inherit; font-size: 0.85rem; font-weight: 700; padding: 8px 16px; min-height: 38px; border-radius: 999px; cursor: pointer; }
 .promo-lightbox-tabs button.on { background: var(--surface, #fff); color: var(--viz-deep, #8c6a2f); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12); }
-.promo-lightbox-x { border: 0; background: var(--viz-track, #f4ece0); color: inherit; width: 40px; height: 40px; border-radius: 50%; font-size: 18px; cursor: pointer; }
+.promo-lightbox-x { border: 0; background: var(--viz-track, #f4ece0); color: inherit; width: 40px; height: 40px; border-radius: 50%; font-size: 18px; cursor: pointer; display: inline-grid; place-items: center; padding: 0; }
 .promo-lightbox-img { flex: 1; min-height: 0; display: grid; place-items: center; padding: 0 12px 12px; overflow: auto; }
 .promo-lightbox-img img { display: block; max-width: 100%; max-height: calc(94dvh - 76px); width: auto; height: auto; border-radius: 10px; }
 .promo-lightbox-img .promo-mock-wait { width: 100%; aspect-ratio: 4 / 5; border-radius: 10px; }
@@ -1852,7 +1868,7 @@ a.hb-row-main:hover strong { text-decoration: underline; }
 /* My day (v0.88, CHRIS Nov 27): the GM's daily reminders. PC: two columns; phone: one. */
 .myday-heads { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; margin-bottom: 14px; }
 .myday-head { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 16px; text-decoration: none; color: inherit; background: var(--surface); border: 1px solid var(--line); }
-.myday-head .e { font-size: 1.6rem; line-height: 1; }
+.myday-head .e { color: var(--gold); }
 .myday-head b { display: block; margin-bottom: 2px; }
 .myday-head span { font-size: 0.86rem; color: var(--ink-2); }
 .myday-head b { color: var(--ink); font-size: 0.98rem; }
@@ -1873,7 +1889,7 @@ a.hb-row-main:hover strong { text-decoration: underline; }
 .myday-tick { flex: none; width: 30px; height: 30px; min-height: 30px; padding: 0; border-radius: 9px; border: 2px solid var(--viz-gold); background: transparent; color: #fff; font-weight: 800; font-size: 16px; cursor: pointer; }
 .myday-item.done .myday-tick { background: var(--viz-gold); }
 .myday-item.done .myday-text b { text-decoration: line-through; color: var(--muted); }
-.myday-ico { flex: none; font-size: 1.2rem; width: 26px; text-align: center; }
+.myday-ico { flex: none; width: 26px; display: grid; place-items: center; color: var(--brown); }
 .myday-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .myday-text b { font-size: 0.95rem; }
 .myday-text span { font-size: 0.8rem; color: var(--ink-2); line-height: 1.35; }
@@ -1948,7 +1964,7 @@ a.hb-row-main:hover strong { text-decoration: underline; }
 .myday-addon.slow { background: linear-gradient(160deg, #fbf7f1, #efe6da); }
 [data-mode="dark"] .myday-addon { background: linear-gradient(160deg, #2a2924, #222220); border-color: #3a3730; }
 .myday-addon-head { display: flex; gap: 12px; align-items: flex-start; }
-.myday-addon-head .e { font-size: 1.8rem; line-height: 1; }
+.myday-addon-head .e { color: var(--gold); }
 .myday-addon-head .label { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--viz-deep); }
 [data-mode="dark"] .myday-addon-head .label { color: var(--viz-gold-hi); }
 .myday-addon-head h2 { margin: 2px 0 0; font-size: 1.2rem; }
@@ -2107,7 +2123,7 @@ details.add-panel .add-btn {
   display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.92rem; padding: 10px 18px; min-height: 42px;
   border-radius: var(--radius-sm); background: var(--btn-bg); border: 1px solid var(--btn-bg); color: var(--btn-fg); box-shadow: 0 1px 2px rgba(47, 36, 29, 0.12);
 }
-details.add-panel .add-btn > span { font-size: 1.15rem; line-height: 1; }
+details.add-panel .add-btn > .ic { width: 1.15em; height: 1.15em; }
 details.add-panel > summary:hover .add-btn { background: var(--btn-hover); border-color: var(--btn-hover); }
 details.add-panel[open] .add-btn { background: var(--surface); color: var(--brown-dark); border-color: var(--line-strong); box-shadow: none; }
 details.add-panel[open] .add-btn > span { transform: rotate(45deg); }

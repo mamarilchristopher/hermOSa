@@ -12,6 +12,7 @@ import { paidToLabel } from "@/lib/paidTo";
 import { centsToPhp } from "@/lib/csv";
 import { RemoveProof } from "./RemoveProof";
 import { ConfirmPayment, FocusFolder } from "./ConfirmPayment";
+import { IconCard, IconSearch } from "@/components/Icons";
 
 type Proof = { id: string; path: string; thumb: string | null; by: string | null; by_short?: string | null; at: string };
 type Check = { state: "PENDING" | "RECEIVED" | "NOT_RECEIVED"; note: string | null; by: string | null; at: string | null };
@@ -74,8 +75,8 @@ export default async function PaymentProofs({ searchParams }: { searchParams: Pr
         <form className="row-buttons log-search" method="get">
           <input type="hidden" name="month" value={month} />
           {branch && <input type="hidden" name="branch" value={branch} />}
-          <input name="q" defaultValue={sp.q ?? ""} placeholder="🔍 Search a client or service" aria-label="Client or service" maxLength={60} />
-          <button className="secondary small" type="submit">Search</button>
+          <input name="q" defaultValue={sp.q ?? ""} className="search-field" placeholder="Search a client or service" aria-label="Client or service" maxLength={60} />
+          <button className="secondary small" type="submit"><IconSearch />Search</button>
         </form>
 
         {error ? <div className="notice error">{error.code === "PGRST202" ? "The owner needs to run update-0075 in Supabase first." : "Could not load the proofs. Try again."}</div>
@@ -91,7 +92,7 @@ export default async function PaymentProofs({ searchParams }: { searchParams: Pr
                   {folders.filter((f) => f.date === d).map((f) => (
                     <details key={f.id} className="client-folder" id={f.id} open={f.id === sp.entry || undefined}>
                       <summary>
-                        <span className="folder-icon" aria-hidden>💳</span>
+                        <IconCard size={26} className="folder-icon" />
                         <span className="folder-main">
                           <strong>{f.client ?? "No client name"}{f.staff && <span className="folder-staff"> – {f.staff}</span>}</strong>{f.log_no && <span className="small muted">{f.log_no}</span>}
                           <span className="small muted">{[f.service, branchShort(f.branch ?? ""), centsToPhp(f.amount_cents), paidTo.has(f.id) ? `to ${paidTo.get(f.id)}` : null].filter(Boolean).join(" · ")}</span>

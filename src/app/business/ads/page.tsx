@@ -23,6 +23,7 @@ import { RunningNow } from "./RunningNow";
 import ACC from "@/data/adAccounts.json";
 import { chunks, every } from "../load";
 import { saveSources, saveSpend } from "./actions";
+import { IconTrophy } from "@/components/Icons";
 
 type LogRow = LogForSource & { log_no: string | null; branch_id: string; service_date: string; service_id: string; client_name: string | null };
 const MGMT = ["OWNER", "FINANCE", "AUDITOR", "MANAGER"];
@@ -191,7 +192,7 @@ export default async function Ads({ searchParams }: { searchParams: Promise<{ p?
           <SpendSalesChart months={chartMonths} title="Monthly ad spend with VAT against declared sales, last 13 months" />
           <div className="biz-signals ads-findings">
             <span className="good" title="QC Main spent about half in November 2026 and its sales held.">✓ QC Main: half the spend in Nov, sales held</span>
-            {best && <span className="good" title={best.tip}>🏆 Best: {best.group} {best.label} {x(best.value)}</span>}
+            {best && <span className="good" title={best.tip}><IconTrophy className="ic-lead" />Best: {best.group} {best.label} {x(best.value)}</span>}
             {flags.slice(0, 3).map((f) => <span key={f.key} className="bad" title={f.tip}>▼ {f.group} {f.label} {x(f.value)}</span>)}
           </div>
         </div>

@@ -4,6 +4,7 @@ import { requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
 import { centsToPhp } from "@/lib/csv";
 import { Uid } from "@/components/Uid";
+import { IconSearch } from "@/components/Icons";
 
 type Row = { id: string; log_no: string | null; old_log_no?: string | null; client_name: string | null; service_date: string; branch_id: string | null; session_no: number | null; visit_kind: string | null;
   amount_paid_cents: number; state: string; performer_id: string | null; assistant_id: string | null; services: { name: string } | null };
@@ -36,7 +37,7 @@ export default async function ClientSearch({ searchParams }: { searchParams: Pro
         <h1>Search clients</h1>
         <form className="card row-buttons" style={{ alignItems: "center" }}>
           <input name="q" defaultValue={q} minLength={2} required placeholder="Client name or SL number" aria-label="Client name or SL number" style={{ flex: "1 1 220px", width: "auto" }} autoFocus={!q} />
-          <button className="small">Search</button>
+          <button className="small"><IconSearch />Search</button>
         </form>
         {q && rows.length === 0 && <div className="card"><p className="muted" style={{ margin: 0 }}>No entries found for &ldquo;{q}&rdquo;. Try part of the name, e.g. the surname.</p></div>}
         {rows.length === 300 && <p className="small muted">Showing the latest 300 entries. Type more of the name to narrow it down.</p>}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { IconBell } from "./Icons";
 import { loadInbox, markRead, type Inbox } from "@/app/inbox/actions";
+import { IconText } from "./IconText";
 
 const when = (iso: string) => new Date(iso).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
@@ -49,7 +50,7 @@ export function NotifBell() {
             <ul className="bell-list">
               {todos.map((t) => (
                 <li key={t.text}><Link href={t.href} className={t.urgent ? "urgent" : ""} onClick={() => setOpen(false)}>
-                  <span className="bell-dot" aria-hidden />{t.text}</Link></li>
+                  <span className="bell-dot" aria-hidden /><span><IconText text={t.text} /></span></Link></li>
               ))}
             </ul>
           )}

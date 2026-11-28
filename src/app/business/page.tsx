@@ -18,6 +18,8 @@ import {
 } from "@/lib/business";
 import { loadIdeas } from "../promos/ideas";
 import { every, promoDue } from "./load";
+import { IconAlarm, IconChat, IconPhoneSlash, IconStar, IconWarning, IconWeek } from "@/components/Icons";
+import { IconText } from "@/components/IconText";
 
 type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: string }[]; days?: StatusDay[] };
 
@@ -127,7 +129,7 @@ export default async function Business() {
             <div className="label">Yesterday</div>
             <div className="value"><CountUp cents={g.yesterdayTotal} /></div>
             <div className="sub">
-              {g.yesterdayMissing.length > 0 ? <span className="chg warn" title={`Not typed yet: ${g.yesterdayMissing.join(", ")}`}>⚠ {g.yesterdayMissing.length} not typed</span>
+              {g.yesterdayMissing.length > 0 ? <span className="chg warn" title={`Not typed yet: ${g.yesterdayMissing.join(", ")}`}><IconWarning className="ic-lead" />{g.yesterdayMissing.length} not typed</span>
                 : yesterdayLastWeek ? <Chg c={change(g.yesterdayTotal, yesterdayLastWeek)} suffix="vs last week" /> : null}
             </div>
             <GoldSpark values={last14} id="sp-yday" label="Daily sales, last 14 days" />
@@ -152,7 +154,7 @@ export default async function Business() {
           <h2>Today&apos;s promo picks</h2>
           {/* loads the serif used on the promo photos */}
           <span className={serif.className} aria-hidden style={{ position: "absolute", opacity: 0, pointerEvents: "none" }}>Aa</span>
-          {signals.length > 0 && <div className="biz-signals">{signals.map((x) => <span key={x.text} className={x.tone ?? ""} title={x.title}>{x.text}</span>)}</div>}
+          {signals.length > 0 && <div className="biz-signals">{signals.map((x) => <span key={x.text} className={x.tone ?? ""} title={x.title}><IconText text={x.text} /></span>)}</div>}
           {ideas.missing && <p className="small muted">Promo ideas start once update-0086 is run.</p>}
           {!ideas.missing && picks.length === 0 && <p className="small muted">No ideas yet: the Service log needs a few more weeks.</p>}
           <div className="biz-pickgrid">
@@ -163,7 +165,7 @@ export default async function Business() {
                 <b>{idea.title}</b>
                 <span className="m">{idea.items.length === 1 ? `${adName(idea.items[0].name)} ${idea.items[0].paid}${idea.items[0].free ? ` + ${idea.items[0].free}` : ""}` : idea.items.map((i) => `${i.paid + i.free} ${adName(i.name)}`).join(" + ")}</span>
                 <span className="p">{peso(idea.price)} <small>· {sessionsOf(idea.items)} sessions</small></span>
-                <span className="why" title={why}>{badge}</span>
+                <span className="why" title={why}><IconText text={badge} /></span>
                 {ownerGm && <Link className="button small biz-open" href={`/promos?idea=${encodeURIComponent(idea.id)}`}>Open in builder</Link>}
               </div>
             ))}
@@ -175,7 +177,7 @@ export default async function Business() {
               ))}
               {promo.due.slice(0, 8).map(({ c, next, promo: t }) => (
                 <Link key={c.id} className="biz-due" href={`/promos/client/${c.id}`} title={`${t}: ${promo.names[next.s] ?? "session"} ${next.n}${bName[c.branch_id] ? ` · ${bName[c.branch_id]}` : ""}`}>
-                  💬 {c.client_name} <span className={`chg ${next.late > 0 ? "down" : "neu"}`}>{next.late > 0 ? `${next.late}d late` : "today"}</span>
+                  <IconChat className="ic-lead" />{c.client_name} <span className={`chg ${next.late > 0 ? "down" : "neu"}`}>{next.late > 0 ? `${next.late}d late` : "today"}</span>
                 </Link>
               ))}
               {promo.due.length > 8 && <span className="biz-promo">+{promo.due.length - 8}</span>}
@@ -222,9 +224,9 @@ export default async function Business() {
               <div className="biz-book">
                 <Ring frac={bk.showRate ?? 0} label={bk.showRate === null ? "–" : `${Math.round(bk.showRate * 100)}%`} sub="showed up" size={124} color="var(--good)" />
                 <ul>
-                  <li>📅 <b>{bk.past}</b> appointments</li>
-                  <li>📵 <b>{bk.unresponsive}</b> {bk.unresponsive > 0 ? <Link href="/bookings/followups">unresponsive</Link> : "unresponsive"}</li>
-                  {bk.busiest && <li>⭐ <b>{bk.busiest}</b> most booked</li>}
+                  <li><IconWeek className="ic-lead" /><b>{bk.past}</b> appointments</li>
+                  <li><IconPhoneSlash className="ic-lead" /><b>{bk.unresponsive}</b> {bk.unresponsive > 0 ? <Link href="/bookings/followups">unresponsive</Link> : "unresponsive"}</li>
+                  {bk.busiest && <li><IconStar className="ic-lead" /><b>{bk.busiest}</b> most booked</li>}
                 </ul>
               </div>
             )}
@@ -246,7 +248,7 @@ export default async function Business() {
           {topStaff.length === 0 ? <p className="small muted">No services logged in the last 28 days.</p> : (
             <BarRows rows={topStaff.map((x) => ({
               key: x.id, name: x.name, avatar: initial(x.name), cents: x.sales,
-              pill: x.lateMin > 0 ? <span className="chg down" title={`${x.lates} late${x.lates === 1 ? "" : "s"}, ${x.lateMin} minutes`}>⏰ {x.lateMin}m</span> : null,
+              pill: x.lateMin > 0 ? <span className="chg down" title={`${x.lates} late${x.lates === 1 ? "" : "s"}, ${x.lateMin} minutes`}><IconAlarm className="ic-lead" />{x.lateMin}m</span> : null,
             }))} />
           )}
           {staff.length > 0 && (

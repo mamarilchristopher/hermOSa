@@ -6,13 +6,14 @@ import { IconCalendar, IconChart, IconClipboard, IconCoins, IconHome, IconIdCard
 
 const ICONS = { chart: IconChart, calendar: IconCalendar, upload: IconUpload, users: IconUsers, clipboard: IconClipboard, people: IconPeople, coins: IconCoins, home: IconHome, idcard: IconIdCard, pen: IconPen, week: IconWeek, clock: IconClock, settings: IconSettings, chat: IconChat, briefcase: IconBriefcase };
 
-/** Colored menu icons (CHRIS Nov 27, v0.90.1): emoji per hub, same on the side menu and the phone bar. */
-const EMOJI: Record<string, string> = { home: "🏠", business: "💼", clinic: "📋", sales: "📈", chat: "💬", bookings: "📆", time: "⏰", team: "📅", pay: "💰", people: "👥", settings: "⚙️" };
-const HubIcon = ({ hub }: { hub: Hub }) => {
-  const e = EMOJI[hub.key];
-  if (e) return <span className="nav-emoji" aria-hidden>{e}</span>;
-  const Icon = ICONS[hub.icon];
-  return <Icon />;
+/** Menu icons (CHRIS Nov 28, v0.106.9: soft duotone, replacing the v0.90.1 emoji): one per hub, same on the side menu and the phone bar. */
+const HUB_ICON: Record<string, (typeof ICONS)[keyof typeof ICONS]> = {
+  home: IconHome, business: IconBriefcase, clinic: IconClipboard, sales: IconChart, chat: IconChat, bookings: IconCalendar,
+  time: IconClock, team: IconWeek, pay: IconCoins, people: IconPeople, settings: IconSettings,
+};
+const HubIcon = ({ hub, size }: { hub: Hub; size?: number }) => {
+  const Icon = HUB_ICON[hub.key] ?? ICONS[hub.icon];
+  return <Icon size={size} />;
 };
 
 /** One page inside a hub (shown as a tab across the top of the page). */
@@ -111,7 +112,7 @@ export function StaticMenu({ hubs, title }: { hubs: Hub[]; title: string }) {
       {hubs.map((h) => {
         return (
           <div key={h.key} className="static-hub">
-            <span className="static-hub-row"><HubIcon hub={h} /><span>{h.label}</span></span>
+            <span className="static-hub-row"><HubIcon hub={h} size={18} /><span>{h.label}</span></span>
             {h.tabs.length > 1 && <ul>{h.tabs.map((t) => <li key={t.href}>{t.label}</li>)}</ul>}
           </div>
         );

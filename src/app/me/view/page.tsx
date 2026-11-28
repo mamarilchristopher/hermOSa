@@ -12,6 +12,7 @@ import { HomeBookings, loadHomeBookings } from "../HomeBookings";
 import { sortBranches } from "@/lib/insights";
 import { branchShort } from "@/lib/schedule";
 import { menuFor } from "@/lib/hubs";
+import { IconAlarm, IconBell, IconCamera, IconChat } from "@/components/Icons";
 
 type ViewAs = {
   ok: boolean; error?: string; name: string; email: string; joined_at: string | null;
@@ -89,7 +90,7 @@ export default async function ViewAsPage({ searchParams }: { searchParams: Promi
               <ul className="view-notices">
                 {notices.latest.map((n, i) => (
                   <li key={i} className={n.read ? "" : "unread"}>
-                    <span className="vn-icon" aria-hidden>{(n.kind ?? "").startsWith("CHAT") ? "💬" : n.kind === "PHOTOS_DUE" ? "📷" : (n.kind ?? "").includes("NTE") || (n.kind ?? "").includes("IR") ? "⏰" : "🔔"}</span>
+                    <span className="vn-icon" aria-hidden>{(n.kind ?? "").startsWith("CHAT") ? <IconChat size={18} /> : n.kind === "PHOTOS_DUE" ? <IconCamera size={18} /> : (n.kind ?? "").includes("NTE") || (n.kind ?? "").includes("IR") ? <IconAlarm size={18} /> : <IconBell size={18} />}</span>
                     <strong>{!n.read && <span className="vn-dot" title="Unread" />}{n.title}</strong>
                     <span className="vn-time">{new Date(n.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
                     {n.body && <span className="small" style={{ gridColumn: "2 / -1" }}>{n.body}</span>}

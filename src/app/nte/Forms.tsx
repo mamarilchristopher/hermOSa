@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { nteDeadline } from "@/lib/nte";
 import { explainNte, issueLateIr, pingNte, reviewNte, voidNte, type ActionState } from "./actions";
 import { pick } from "@/lib/decision";
+import { IconBell, IconX } from "@/components/Icons";
 
 function Msg({ s }: { s: ActionState }) {
   if (s?.error) return <div className="notice error">{s.error}</div>;
@@ -69,7 +70,7 @@ export function NteExplainForm({ id, prompt }: { id: string; prompt: string }) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={p.preview} alt="Proof photo" />
               <span className="nte-proof-status">{p.status === "uploading" ? "Uploading…" : p.status === "error" ? "Didn't upload" : "✓"}</span>
-              <button type="button" className="nte-proof-x" aria-label="Remove photo" onClick={() => remove(p.key)}>✕</button>
+              <button type="button" className="nte-proof-x" aria-label="Remove photo" onClick={() => remove(p.key)}><IconX size={14} /></button>
             </span>
           ))}
           {proofs.length < 3 && (
@@ -135,7 +136,7 @@ export function PingNteButton({ id, name, count, last }: { id: string; name: str
   return (
     <form action={action} className="nte-ping">
       <input type="hidden" name="id" value={id} />
-      <button className="small" disabled={pending} title={`Send ${name} a reminder to explain`}>🔔 {pending ? "Sending…" : `Ping ${name}`}</button>
+      <button className="small" disabled={pending} title={`Send ${name} a reminder to explain`}><IconBell />{pending ? "Sending…" : `Ping ${name}`}</button>
       {s?.ok ? <span className="small ok-text">{s.ok}</span>
         : s?.error ? <span className="field-error">{s.error}</span>
         : count ? <span className="small muted">Reminded {count === 1 ? "once" : `${count} times`}{when ? `, last ${when}` : ""}</span> : null}

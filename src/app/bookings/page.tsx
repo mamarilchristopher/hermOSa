@@ -8,6 +8,7 @@ import { LiveBookings } from "./LiveBookings";
 import { LogSale, type LinkChoice } from "./Receive";
 import { nameScore } from "@/lib/arrivals";
 import { AddPanel, ControlBar, DayPicker, Stat, Stats, Tabs } from "@/components/Controls";
+import { IconWarning } from "@/components/Icons";
 
 type Booking = {
   id: string; booked_on: string; csr_employee_id: string | null; client_name: string; contact: string | null; platform: string; services: string;
@@ -150,7 +151,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
         {toClose.length > 0 && day <= today && (
           <div className={`notice ${closingTime ? "error" : "info"}`}>
             {closingTime
-              ? <>⚠ {toClose.length} client{toClose.length === 1 ? "" : "s"} still not closed out. Set each one to <strong>Arrived</strong> or <strong>Did not arrive</strong>.</>
+              ? <><IconWarning className="ic-lead" />{toClose.length} client{toClose.length === 1 ? "" : "s"} still not closed out. Set each one to <strong>Arrived</strong> or <strong>Did not arrive</strong>.</>
               : <>{toClose.length} still to come today. Before 7 PM, set each one to <strong>Arrived</strong> or <strong>Did not arrive</strong>.</>}
           </div>
         )}

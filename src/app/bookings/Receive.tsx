@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { pick } from "@/lib/decision";
 import { linkEntry, setStatus } from "./actions";
+import { IconArrowRight, IconCheckCircle, IconPlus, IconXCircle } from "@/components/Icons";
 
 // v0.106.6 (CHRIS Nov 28): client receiving runs from the booking. Each booking shows only its next step:
 // Arriving / Arrived / Did not arrive, then "Log the sale" (the entry is linked to the booking, which becomes Done).
@@ -15,7 +16,7 @@ export function QuickStatus({ id, status }: { id: string; status: string }) {
     <form action={action} className="rcv-status">
       <input type="hidden" name="id" value={id} />
       {next.map(([v, label]) => (
-        <button key={v} className={`small ${v === "ARRIVED" ? "" : "secondary"}`} onClick={pick(v)} disabled={pending}>{label}</button>
+        <button key={v} className={`small ${v === "ARRIVED" ? "" : "secondary"}`} onClick={pick(v)} disabled={pending}>{v === "ARRIVED" ? <IconCheckCircle /> : v === "NO_SHOW" ? <IconXCircle /> : <IconArrowRight />}{label}</button>
       ))}
       {s?.error && <span className="small" style={{ color: "var(--bad)" }}>{s.error}</span>}
     </form>
@@ -29,11 +30,11 @@ export function LogSale({ booking, href, entries = [], linkHref }: { booking: st
   const [s, action, pending] = useActionState(linkEntry, undefined);
   const best = [...entries].sort((a, b) => b.score - a.score)[0];
   const [open, setOpen] = useState(false);
-  if (s?.ok) return <span className="rcv-done">✓ {s.ok}</span>;
+  if (s?.ok) return <span className="rcv-done with-ic"><IconCheckCircle />{s.ok}</span>;
   return (
     <div className="rcv-log">
       <div className="rcv-log-row">
-        <Link className="button small rcv-log-btn" href={href}>Log the sale ›</Link>
+        <Link className="button small rcv-log-btn" href={href}><IconPlus />Log the sale</Link>
         {entries.length > 0 && !open && <button type="button" className="secondary small" onClick={() => setOpen(true)}>Already logged? Link it</button>}
         {entries.length === 0 && linkHref && <Link className="small" href={linkHref}>Already logged? Link it</Link>}
       </div>

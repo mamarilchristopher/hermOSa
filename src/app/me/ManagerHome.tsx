@@ -6,6 +6,7 @@ import { dayLabel, type DayCell, type DayView, type Glance } from "@/lib/homeGla
 import type { DutyRow } from "@/components/OnDuty";
 import { OnDutyFaces, type DutyFace } from "@/components/OnDutyFaces";
 import type { BranchCount } from "@/lib/arrivals";
+import { IconText } from "@/components/IconText";
 
 export type Todo = { text: string; href: string; urgent?: boolean };
 const NONE: BranchCount = { clients: 0, services: 0, arrived: 0, notLogged: 0, unlogged: [] };
@@ -77,7 +78,7 @@ export function TodoCard({ todos }: { todos: Todo[] }) {
           <ul className="plain-list todo-list">
             {todos.map((t) => (
               <li key={t.text} className={t.urgent ? "urgent" : ""}>
-                <span>{t.text}</span><Link className="button secondary small" href={t.href}>Open</Link>
+                <span><IconText text={t.text} /></span><Link className="button secondary small" href={t.href}>Open</Link>
               </li>
             ))}
           </ul>

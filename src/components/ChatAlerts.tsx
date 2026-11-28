@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { CHAT_READ_EVENT, firstName, playChatSound } from "@/lib/chatSounds";
+import { IconMegaphone } from "./Icons";
 
 type Notice = { id: string; room_id: string; created_at: string; sender: string; sender_first?: string | null; room_name: string | null; text: string };
 
@@ -53,14 +54,14 @@ export function ChatAlerts({ me, management }: { me: string; management: boolean
   if (later === top.id) {
     return (
       <Link href={`/chat/${top.room_id}`} className="mgmt-pill" role="status">
-        <span aria-hidden>📣</span> {from}{list.length > 1 ? ` (${list.length})` : ""}
+        <IconMegaphone className="ic-lead" />{from}{list.length > 1 ? ` (${list.length})` : ""}
       </Link>
     );
   }
   return (
     <div className="mgmt-alert" role="alertdialog" aria-live="assertive" aria-label={from}>
       <div className="mgmt-alert-card">
-        <span className="mgmt-alert-tag"><span aria-hidden>📣</span> {from}</span>
+        <span className="mgmt-alert-tag with-ic"><IconMegaphone />{from}</span>
         <strong className="mgmt-alert-from">{top.sender}{top.room_name ? ` in ${top.room_name}` : ""}</strong>
         <p className="mgmt-alert-text">{top.text}</p>
         {rest > 0 && <p className="small mgmt-alert-more">+ {rest} more from management</p>}

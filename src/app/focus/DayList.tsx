@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { DaySection } from "@/lib/gmDay";
+import { EmojiIcon } from "@/components/IconText";
 
 /** My day checklist: tick items as you go. Ticks stay on this device for today only (a reminder, not a record). */
 export function DayList({ sections, today }: { sections: DaySection[]; today: string }) {
@@ -27,14 +28,14 @@ export function DayList({ sections, today }: { sections: DaySection[]; today: st
       <div className="myday-grid">
         {sections.map((s) => (
           <section key={s.key} className="card myday-sec">
-            <h2><span aria-hidden>{s.icon}</span> {s.title} <small>{s.when}</small></h2>
+            <h2><EmojiIcon e={s.icon} size={22} className="ic-lead" />{s.title} <small>{s.when}</small></h2>
             <ul>
               {s.items.map((i) => {
                 const on = ticked.has(i.key);
                 return (
                   <li key={i.key} className={`myday-item ${i.tone}${on ? " done" : ""}`}>
                     <button type="button" className="myday-tick" aria-pressed={on} aria-label={`${on ? "Untick" : "Tick"}: ${i.title}`} onClick={() => toggle(i.key)}>{on ? "✓" : ""}</button>
-                    <span className="myday-ico" aria-hidden>{i.icon}</span>
+                    <span className="myday-ico" aria-hidden><EmojiIcon e={i.icon} size={20} /></span>
                     <span className="myday-text">
                       <b>{i.title}</b>
                       <span>{i.note}</span>

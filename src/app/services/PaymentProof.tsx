@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 import { thumbOf } from "./PhotoSlots";
+import { IconCard } from "@/components/Icons";
 
 type Slot = { key: string; preview: string; path?: string; thumb?: string | null; status: "uploading" | "done" | "error" };
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic", "image/heif": "heif" };
@@ -60,7 +61,7 @@ export function ProofGroup({ api, room = MAX_PROOFS, hint = true }: { api: Api; 
         {api.slots.length < room && (
           <label className="photo-add proof-add">
             <input type="file" accept="image/*,.heic,.heif" multiple hidden onChange={(e) => { void api.add(e.target.files, room); e.target.value = ""; }} />
-            <span aria-hidden>💳</span>Attach proof of payment
+            <IconCard />Attach proof of payment
           </label>
         )}
       </div>
@@ -76,7 +77,7 @@ export function AttachProof({ log, branch, have }: { log: string; branch: string
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (have >= MAX_PROOFS) return null;
-  if (!open) return <button type="button" className="link-like small proof-link" onClick={() => setOpen(true)}>💳 Attach proof of payment</button>;
+  if (!open) return <button type="button" className="link-like small proof-link" onClick={() => setOpen(true)}><IconCard />Attach proof of payment</button>;
   const save = async () => {
     setBusy(true); setError(null);
     const { data, error: e } = await createClient().rpc("add_payment_proof", { p_log: log, p_photos: JSON.parse(api.json) });

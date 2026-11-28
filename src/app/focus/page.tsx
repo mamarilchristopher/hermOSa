@@ -14,6 +14,7 @@ import { AddonCard } from "./AddonCard";
 import { loadIdeas } from "../promos/ideas";
 import { promoDue } from "../business/load";
 import { DayList } from "./DayList";
+import { IconBag, IconHandCoins, IconHandshake } from "@/components/Icons";
 
 type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: string }[]; days?: StatusDay[] };
 const count = (r: { count: number | null }) => r.count ?? 0;
@@ -114,17 +115,17 @@ export default async function MyDay() {
           <div className="myday-heads">
             {near && (
               <Link href="/services" className={`myday-head ${unsettled ? "warn" : "ok"}`}>
-                <span className="e" aria-hidden>💸</span>
+                <IconHandCoins size={30} className="e" />
                 <span><b>Payday {cut.daysLeft === 0 ? "is today" : `in ${cut.daysLeft} day${cut.daysLeft === 1 ? "" : "s"}`}</b>
                   {unsettled ? `Settle pending commissions: ${signoff.count ?? 0} entries to sign off, ${payments.count ?? 0} payments to confirm` : "All commissions are settled for this cutoff"}</span>
               </Link>
             )}
             {ctx.payday && !near && (
-              <Link href="/business" className="myday-head ok"><span className="e" aria-hidden>🛍️</span><span><b>Clients&apos; payday</b>Push year programs and prepaid packages today</span></Link>
+              <Link href="/business" className="myday-head ok"><IconBag size={30} className="e" /><span><b>Clients&apos; payday</b>Push year programs and prepaid packages today</span></Link>
             )}
             {checkins.slice(0, 4).map((c) => (
               <Link key={c.id} href={`/people/${c.id}`} className="myday-head soft">
-                <span className="e" aria-hidden>🤝</span>
+                <IconHandshake size={30} className="e" />
                 <span><b>Check in with {c.name.split(" ")[0]}</b>{c.why} in 4 weeks: invite a short talk or a staff checkup</span>
               </Link>
             ))}

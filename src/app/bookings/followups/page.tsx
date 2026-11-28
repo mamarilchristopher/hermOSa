@@ -5,6 +5,7 @@ import { TopBar } from "@/components/TopBar";
 import { manilaToday } from "@/lib/dates";
 import { FollowUpForm } from "../Forms";
 import { LiveBookings } from "../LiveBookings";
+import { IconConfetti } from "@/components/Icons";
 
 type Booking = {
   id: string; client_name: string; contact: string | null; platform: string; services: string; appointment_date: string;
@@ -71,7 +72,7 @@ export default async function FollowUpsPage() {
 
         <div className="card">
           <h2>To follow up ({list.length})</h2>
-          {list.length === 0 && <p className="muted small" style={{ margin: 0 }}>Nobody to follow up. 🎉</p>}
+          {list.length === 0 && <p className="muted small" style={{ margin: 0 }}>Nobody to follow up. <IconConfetti className="ic-lead" /></p>}
           {list.map((r) => {
             const h = forBooking(r.id);
             return (

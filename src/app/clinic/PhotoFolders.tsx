@@ -11,6 +11,7 @@ import { BRANCH_ORDER } from "@/lib/insights";
 import { ShareToggle } from "./ShareToggle";
 import { TaggedDownload } from "./TaggedDownload";
 import { DeleteFolder } from "./DeleteFolder";
+import { IconFolder, IconSearch } from "@/components/Icons";
 
 type Photo = { id: string; kind: "WAIVER" | "BEFORE" | "AFTER"; path: string; thumb: string | null };
 type Visit = { id: string; date: string; client: string; service: string | null; branch_id: string; branch: string | null; lead: string | null;
@@ -83,8 +84,8 @@ export async function PhotoFolders({ social, searchParams }: { social: boolean; 
         <form className="row-buttons log-search" method="get">
           <input type="hidden" name="month" value={month} />
           {branch && <input type="hidden" name="branch" value={branch} />}
-          <input name="q" defaultValue={sp.q ?? ""} placeholder="🔍 Search a client or service" aria-label="Client or service" maxLength={60} />
-          <button className="secondary small" type="submit">Search</button>
+          <input name="q" defaultValue={sp.q ?? ""} className="search-field" placeholder="Search a client or service" aria-label="Client or service" maxLength={60} />
+          <button className="secondary small" type="submit"><IconSearch />Search</button>
         </form>
 
         {error ? <div className="notice error">{error.code === "PGRST202" ? "The owner needs to run update-0053 in Supabase first." : "Could not load the photos. Try again."}</div>
@@ -107,7 +108,7 @@ export async function PhotoFolders({ social, searchParams }: { social: boolean; 
                     return (
                       <details key={v.id} className="client-folder" id={v.id}>
                         <summary>
-                          <span className="folder-icon" aria-hidden>📁</span>
+                          <IconFolder size={26} className="folder-icon" />
                           <span className="folder-main">
                             <strong>{v.client}</strong>
                             <span className="small muted">{[v.service, branchShort(v.branch ?? "")].filter(Boolean).join(" · ")}</span>
@@ -142,7 +143,7 @@ export async function PhotoFolders({ social, searchParams }: { social: boolean; 
                         {/* update-0093 (CHRIS Nov 27): photos replaced or removed by an approved edit stay here, in "Old". */}
                         {!social && (v.old?.length ?? 0) > 0 && (
                           <details className="folder-group folder-old">
-                            <summary><span className="field-label">📁 Old ({v.old!.length})</span></summary>
+                            <summary><span className="field-label"><IconFolder className="ic-lead" />Old ({v.old!.length})</span></summary>
                             <ul className="plain-list folder-photos">
                               {v.old!.map((p) => {
                                 const src = p.thumb ? view[p.thumb] : /\.hei[cf]$/i.test(p.path) ? undefined : view[p.path];

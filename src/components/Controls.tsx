@@ -4,6 +4,7 @@
 // Server-safe (no "use client"): plain links, GET forms and <details>.
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { IconPlus } from "./Icons";
 
 /** The card that holds the branch tabs and the period nav, side by side on PC, stacked on phones. */
 export function ControlBar({ children }: { children: ReactNode }) {
@@ -71,7 +72,7 @@ export function AddPanel({ title, hint, open = false, id, children }: { title: s
   return (
     <details className="card add-panel" id={id} open={open || undefined}>
       <summary>
-        <span className="add-btn"><span aria-hidden>+</span> {title}</span>
+        <span className="add-btn"><IconPlus />{title}</span>
         {hint && <span className="small muted add-hint">{hint}</span>}
       </summary>
       <div className="add-body">{children}</div>

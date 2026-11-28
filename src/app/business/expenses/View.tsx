@@ -8,6 +8,7 @@ import { dayLabel } from "@/lib/homeGlance";
 import { shiftMonth, type Category, type Dashboard, type Line } from "@/lib/expenses";
 import { ExpenseForm, RemoveExpense, type BranchOpt, type CatOpt, type Prefill } from "./Forms";
 import { saveCategory } from "./actions";
+import { IconReceipt } from "@/components/Icons";
 
 const LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 /** On All branches, one line per automatic item (a payroll cutoff, the month's ads) with the branches in its note. */
@@ -167,7 +168,7 @@ export function ExpensesView(p: ViewProps) {
                   {l.auto ? <Link className="small" href={autoHref(l)}>{l.auto === "PAYROLL" ? "Payroll →" : "Ads →"}</Link> : (
                     <>
                       {(p.receipts[l.id!] ?? []).filter((r) => r.url).map((r, i) => (
-                        <a key={r.path} className="small exp-receipt" href={r.url} {...(r.path.endsWith(".pdf") ? { target: "_blank", rel: "noreferrer", "data-newtab": "" } : {})}>🧾 {i === 0 ? "Receipt" : i + 1}</a>
+                        <a key={r.path} className="small exp-receipt" href={r.url} {...(r.path.endsWith(".pdf") ? { target: "_blank", rel: "noreferrer", "data-newtab": "" } : {})}><IconReceipt className="ic-lead" />{i === 0 ? "Receipt" : i + 1}</a>
                       ))}
                       {p.canManage && p.prefills[l.id!] && (
                         <details className="exp-edit">

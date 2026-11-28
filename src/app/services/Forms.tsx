@@ -12,6 +12,7 @@ import { PAID_TO, PAID_TO_WARNING } from "@/lib/paidTo";
 import { promoItemLabel, promoOf, promoServiceIds, type PromoOptions } from "@/lib/promoTrack";
 import { payStatus, planDues, sessionsUnlocked } from "@/lib/promoPay";
 import { packageRecord, type PackageLine } from "@/lib/packages";
+import { IconCheck, IconCheckCircle, IconPlus, IconWarning, IconX } from "@/components/Icons";
 
 type Opt = { id: string; name: string; eligible?: boolean; here?: boolean; at?: string[]; atHere?: boolean; price?: number | null; commission?: number | null; sessions?: number[] | null };
 
@@ -47,7 +48,7 @@ function TestPopup({ s }: { s: ActionState }) {
   return (
     <div className="modal-back" role="dialog" aria-modal="true" onClick={() => setClosedAt(s?.at)}>
       <div className={`card modal test-popup ${pass ? "pass" : "fail"}`} onClick={(e) => e.stopPropagation()}>
-        <div className="test-popup-icon" aria-hidden>{pass ? "✅" : "⚠️"}</div>
+        <div className={`test-popup-icon ${pass ? "ok" : "warn"}`} aria-hidden>{pass ? <IconCheckCircle size={46} /> : <IconWarning size={46} />}</div>
         <h2>{pass ? "Your service logging feature is working correctly." : "Almost there"}</h2>
         {!pass && <p>{s!.ok!.replace("Test saved, but it isn't complete yet: ", "Your test was saved, but: ")}</p>}
         <button type="button" onClick={() => setClosedAt(s?.at)}>OK</button>
@@ -441,7 +442,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
         {(paid || backjob) && !fullyPaid && !/^\s*0*(\.0*)?\s*$/.test(amount || "x") && (
           <fieldset className="span2 paid-to">
             <legend className="field-label">Payment sent to</legend>
-            <p className="paid-to-warn" role="note">⚠️ <strong>{PAID_TO_WARNING}</strong> <span>Example: the client paid with their GCash app into our BPI account → choose BPI.</span></p>
+            <p className="paid-to-warn" role="note"><IconWarning className="ic-lead" /><strong>{PAID_TO_WARNING}</strong> <span>Example: the client paid with their GCash app into our BPI account → choose BPI.</span></p>
             <div className="chip-pick paid-to-pick">
               {PAID_TO.map((o) => (
                 <label key={o.v} className={paidTo === o.v ? "on" : ""}>
@@ -544,10 +545,10 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
                 <label>Add-on paid (₱)
                   <input inputMode="decimal" placeholder="e.g. 500" value={x.amount} required={!!x.service} onChange={(e) => setExtras(extras.map((y, j) => j === i ? { ...y, amount: e.target.value } : y))} />
                 </label>
-                <button type="button" className="secondary small addon-remove" aria-label="Remove add-on" onClick={() => setExtras(extras.filter((_, j) => j !== i))}>✕</button>
+                <button type="button" className="secondary small addon-remove" aria-label="Remove add-on" onClick={() => setExtras(extras.filter((_, j) => j !== i))}><IconX /></button>
               </div>
             ))}
-            <button type="button" className="secondary small" onClick={() => setExtras([...extras, { service: addons.length === 1 ? addons[0].id : "", amount: addons.length === 1 && addons[0].price ? String(addons[0].price / 100) : "" }])}>+ Add-on{extras.length ? " (another)" : ""}</button>
+            <button type="button" className="secondary small" onClick={() => setExtras([...extras, { service: addons.length === 1 ? addons[0].id : "", amount: addons.length === 1 && addons[0].price ? String(addons[0].price / 100) : "" }])}><IconPlus />Add-on{extras.length ? " (another)" : ""}</button>
           </div>
         )}
         {paid && !fullyPaid && (
@@ -570,7 +571,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
                   <label>Amount paid (₱)
                     <input inputMode="decimal" placeholder="e.g. 1500" value={x.amount} required={!!x.service} onChange={(e) => set({ amount: e.target.value })} />
                   </label>
-                  <button type="button" className="secondary small addon-remove" aria-label="Remove service" onClick={() => setMore(more.filter((_, j) => j !== i))}>✕</button>
+                  <button type="button" className="secondary small addon-remove" aria-label="Remove service" onClick={() => setMore(more.filter((_, j) => j !== i))}><IconX /></button>
                   {differs && (
                     <label className="addon-note"><span>Reason for the different price <span className="muted">(list price {centsToPhp(s!.price ?? 0)})</span></span>
                       <input required minLength={3} maxLength={300} placeholder="e.g. 10% promo, loyalty discount" value={x.note} onChange={(e) => set({ note: e.target.value })} />
@@ -579,7 +580,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
                 </div>
               );
             })}
-            <button type="button" className="secondary small" onClick={() => setMore([...more, { service: "", amount: "", note: "" }])}>+ Another service{more.length ? " (one more)" : ""}</button>
+            <button type="button" className="secondary small" onClick={() => setMore([...more, { service: "", amount: "", note: "" }])}><IconPlus />Another service{more.length ? " (one more)" : ""}</button>
             {more.length === 0 && <span className="small muted">Same client, more than one service? Add each one here: one entry, same photos, each with its own commission.</span>}
           </div>
         )}
@@ -687,13 +688,13 @@ export function DecideButtons({ id }: { id: string }) {
       {rejecting ? (
         <>
           <input name="note" placeholder="Reason" required minLength={3} maxLength={300} autoFocus />
-          <button type="submit" onClick={pick("reject")} className="danger small" disabled={pending}>Reject</button>
+          <button type="submit" onClick={pick("reject")} className="danger small" disabled={pending}><IconX />Reject</button>
           <button type="button" className="secondary small" onClick={() => setRejecting(false)}>Cancel</button>
         </>
       ) : (
         <>
-          <button type="submit" onClick={pick("approve")} className="small" disabled={pending}>Approve</button>
-          <button type="button" className="secondary small" onClick={() => setRejecting(true)}>Reject</button>
+          <button type="submit" onClick={pick("approve")} className="small" disabled={pending}><IconCheck />Approve</button>
+          <button type="button" className="secondary small" onClick={() => setRejecting(true)}><IconX />Reject</button>
         </>
       )}
       {state?.error && <span className="small" style={{ color: "var(--bad)" }}>{state.error}</span>}
@@ -709,8 +710,8 @@ export function BatchApprove({ ids, held = 0 }: { ids: string[]; held?: number }
     <form id="batch-approve" action={action} className="batch-approve">
       {ids.map((id) => <input key={id} type="hidden" name="all" value={id} />)}
       <span className="small muted">{ids.length + held} waiting. Tick entries below, or approve them all.{held > 0 && <> <b className="warn-text">{held} look{held === 1 ? "s" : ""} logged twice</b> and {held === 1 ? "is" : "are"} left out of Approve all.</>}</span>
-      <button type="submit" className="secondary small" disabled={pending} onClick={pick("selected")}>Approve ticked</button>
-      {ids.length > 0 && <button type="submit" className="small" disabled={pending} onClick={(e) => { if (!confirm(`Approve all ${ids.length} waiting entries${held ? ` (not the ${held} that look logged twice)` : ""}?`)) { e.preventDefault(); return; } pick("all")(e); }}>Approve all {ids.length}</button>}
+      <button type="submit" className="secondary small" disabled={pending} onClick={pick("selected")}><IconCheck />Approve ticked</button>
+      {ids.length > 0 && <button type="submit" className="small" disabled={pending} onClick={(e) => { if (!confirm(`Approve all ${ids.length} waiting entries${held ? ` (not the ${held} that look logged twice)` : ""}?`)) { e.preventDefault(); return; } pick("all")(e); }}><IconCheck />Approve all {ids.length}</button>}
       {state?.ok && <span className="small" style={{ color: "var(--good)" }}>{state.ok}</span>}
       {state?.error && <span className="small" style={{ color: "var(--bad)" }}>{state.error}</span>}
     </form>
@@ -822,7 +823,7 @@ export function PaidToForm({ id, value }: { id: string; value: string | null }) 
   return (
     <form action={action} className="change-date paid-to-fix">
       <input type="hidden" name="id" value={id} />
-      <span className="paid-to-warn small" role="note">⚠️ <strong>{PAID_TO_WARNING}</strong></span>
+      <span className="paid-to-warn small" role="note"><IconWarning className="ic-lead" /><strong>{PAID_TO_WARNING}</strong></span>
       <select name="paid_to" defaultValue={value ?? ""} required aria-label="Payment sent to">
         <option value="" disabled>Payment sent to…</option>
         {PAID_TO.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}

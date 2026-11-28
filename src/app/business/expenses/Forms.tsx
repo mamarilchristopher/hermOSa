@@ -6,6 +6,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import type { Scan, ScanItem } from "@/lib/receiptScan";
 import { saveExpense, saveExpenses, voidExpense } from "./actions";
+import { IconCamera, IconReceipt } from "@/components/Icons";
 
 export type CatOpt = { id: string; name: string; grp: string };
 export type BranchOpt = { id: string; name: string; code?: string };
@@ -157,7 +158,7 @@ export function ExpenseForm({ org, cats, branches, prefill = {}, month, scope, t
           <label className={`button exp-scan-btn${reading.status === "reading" ? " busy" : ""}`}>
             <input type="file" accept="image/*,.heic,.heif,application/pdf" hidden disabled={reading.status === "reading"}
               onChange={(e) => { void scanFile(e.target.files?.[0]); e.target.value = ""; }} />
-            <span aria-hidden>📷</span> {reading.status === "reading" ? "Reading the receipt…" : reading.status === "idle" ? "Scan receipt or screenshot" : "Scan another"}
+            <IconCamera />{reading.status === "reading" ? "Reading the receipt…" : reading.status === "idle" ? "Scan receipt or screenshot" : "Scan another"}
           </label>
           <span className="small muted">Bills, store receipts, GCash or app screenshots, vouchers, handwritten lists. It fills the details; you check and save.</span>
         </div>
@@ -234,7 +235,7 @@ export function ExpenseForm({ org, cats, branches, prefill = {}, month, scope, t
           {slots.length < 5 && (
             <label className="photo-add">
               <input type="file" accept="image/*,.heic,.heif,application/pdf" multiple hidden onChange={(e) => { void add(e.target.files); e.target.value = ""; }} />
-              <span aria-hidden>🧾</span>Add receipt
+              <IconReceipt />Add receipt
             </label>
           )}
         </div>

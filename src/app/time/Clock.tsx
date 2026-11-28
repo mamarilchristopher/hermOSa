@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/browser";
 import { clockPunch, setBranchLocation, type PunchState } from "./actions";
 import { parseCoords } from "@/lib/schedule";
 import { photoTakenAt } from "@/lib/exif";
+import { IconCamera, IconImage, IconLogout } from "@/components/Icons";
 
 type B = { id: string; name: string; wfh?: boolean };
 const PENDING = "hermosa-pending-punch";
@@ -151,13 +152,13 @@ export function TimeClock({ userId, isIn, branches, defaultBranch, status, manag
       )}
       <input ref={file} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onPhoto(e.target.files?.[0])} />
       <button className={`clock-btn ${isIn ? "out" : ""}`} disabled={!!busy || !branch} onClick={() => file.current?.click()}>
-        {busy ?? (isIn ? "Time out" : "Time in")}
+        {!busy && (isIn ? <IconLogout /> : <IconCamera />)}{busy ?? (isIn ? "Time out" : "Time in")}
       </button>
       {/* Screenshots: WFH staff for in and out; management (owners and the GM) for time out too (CHRIS Nov 25). */}
       {(online || (managerShot && isIn)) && <>
         <input ref={shot} type="file" accept="image/*" hidden onChange={(e) => onPhoto(e.target.files?.[0], true)} />
         <button type="button" className="secondary" disabled={!!busy || !branch} onClick={() => shot.current?.click()}>
-          {isIn ? "Time out" : "Time in"} with a screenshot
+          <IconImage />{isIn ? "Time out" : "Time in"} with a screenshot
         </button>
       </>}
       {/* Example photo (CHRIS, Nov 25): one for CSRs working from home, one for everyone at a clinic. */}

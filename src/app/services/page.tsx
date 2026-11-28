@@ -24,6 +24,7 @@ import { EntryFiles } from "./EntryFiles";
 import { branchShort } from "@/lib/schedule";
 import { doubleEntries } from "@/lib/doubleEntries";
 import type { PromoOptions } from "@/lib/promoTrack";
+import { IconCard, IconPackage, IconSearch } from "@/components/Icons";
 
 type Log = {
   id: string; service_date: string; amount_paid_cents: number; commission_type: string; performer_id: string; assistant_id: string | null;
@@ -215,9 +216,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
         <h1>Service Log</h1>
         <p className="muted small">{noCommission ? "Every service done today and who did it. A manager signs off each entry." : "Every service done today, who did it and the commission. A manager signs off each entry."}</p>
         <form action="/services/clients" className="row-buttons log-search" style={{ marginTop: -4 }}>
-          <input name="q" minLength={2} required placeholder="🔍 Search a client (all dates)" aria-label="Search a client" />
-          <button className="secondary small">Search</button>
-          {bundleIds.length > 0 && <Link className="small" href="/services/packages">📦 Package clients</Link>}
+          <input name="q" minLength={2} required className="search-field" placeholder="Search a client (all dates)" aria-label="Search a client" />
+          <button className="secondary small"><IconSearch />Search</button>
+          {bundleIds.length > 0 && <Link className="small" href="/services/packages"><IconPackage className="ic-lead" />Package clients</Link>}
         </form>
 
         <div className="periods card">
@@ -494,7 +495,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                       {l.state !== "REJECTED" && !l.photos_due && canEdit && (
                         <EditPhotos log={l.id} branch={l.branch_id ?? branch?.id ?? ""} approver={can(access, ["OWNER"], null) || can(access, ["MANAGER"], null)} />
                       )}
-                      {proofCount.get(l.id) ? <span className="entry-proof">{!seesFiles && <Link className="button secondary small" href={`/clinic/payments?month=${l.service_date.slice(0, 7)}#${l.id}`}>💳 Proof ({proofCount.get(l.id)})</Link>}
+                      {proofCount.get(l.id) ? <span className="entry-proof">{!seesFiles && <Link className="button secondary small" href={`/clinic/payments?month=${l.service_date.slice(0, 7)}#${l.id}`}><IconCard />Proof ({proofCount.get(l.id)})</Link>}
                         {payCheck.get(l.id) && <span className={`pill ${payCheck.get(l.id) === "RECEIVED" ? "PUBLISHED" : payCheck.get(l.id) === "NOT_RECEIVED" ? "REVERSED" : "STAGED"}`}>
                           {payCheck.get(l.id) === "RECEIVED" ? "Payment received" : payCheck.get(l.id) === "NOT_RECEIVED" ? "Not received" : "To confirm"}</span>}</span> : null}
                       {l.state !== "REJECTED" && <AttachProof log={l.id} branch={l.branch_id ?? branch?.id ?? ""} have={proofCount.get(l.id) ?? 0} />}

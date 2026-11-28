@@ -1,6 +1,7 @@
 "use client";
 import { useActionState, useState } from "react";
 import { SECTIONS, visible, type Details, type Field } from "@/lib/employeeDetails";
+import { IconLock } from "./Icons";
 
 export type DetailsState = { ok?: string; error?: string; errors?: Record<string, string>; values?: Details; n?: number } | undefined;
 type Action = (prev: DetailsState, fd: FormData) => Promise<DetailsState>;
@@ -37,7 +38,7 @@ function Input({ f, value, error }: { f: Field; value: string; error?: string })
   }
   return (
     <label className={`field ${f.half ? "half" : ""} ${error ? "has-error" : ""}`}>
-      <span>{f.label}{f.required && " *"}{f.sensitive && <span className="lock" title="Only you and the owners see this"> 🔒</span>}</span>
+      <span>{f.label}{f.required && " *"}{f.sensitive && <span className="lock" title="Only you and the owners see this"> <IconLock size={13} /></span>}</span>
       {control}
       {f.hint && f.type === "date" && <span className="small muted">{f.hint}</span>}
       {error && <span className="field-error" id={`${id}-err`}>{error}</span>}

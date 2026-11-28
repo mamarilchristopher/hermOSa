@@ -4,6 +4,7 @@ import { drawPromo, type PromoArt } from "@/lib/promoImage";
 import { modelSrc, modelsFor } from "@/lib/promoModels";
 import { fontsOf } from "@/lib/canvasShare";
 import type { PromoItem } from "@/lib/promoRules";
+import { IconX } from "./Icons";
 
 /** The post photo a promo idea would make, shown on its card (CHRIS Nov 27): drawn once the card scrolls into view.
  *  Tap or click it to see it large, with the Story version beside it. Works the same on PC and phones. */
@@ -71,7 +72,7 @@ export function PromoMockup({ idea, endsOn, serif }: { idea: MockupIdea; endsOn:
             <button type="button" className={kind === "feed" ? "on" : ""} aria-pressed={kind === "feed"} onClick={() => show("feed")}>FB post</button>
             <button type="button" className={kind === "story" ? "on" : ""} aria-pressed={kind === "story"} onClick={() => show("story")}>Story</button>
           </span>
-          <button type="button" className="promo-lightbox-x" onClick={() => dlg.current?.close()} aria-label="Close">✕</button>
+          <button type="button" className="promo-lightbox-x" onClick={() => dlg.current?.close()} aria-label="Close"><IconX size={18} /></button>
         </div>
         <div className="promo-lightbox-img" onClick={() => dlg.current?.close()}>
           {big[kind] ? <img src={big[kind]} alt={`${idea.title}: ${kind === "feed" ? "FB post" : "Story"} photo`} onClick={(e) => e.stopPropagation()} /> : <span className="promo-mock-wait" />}

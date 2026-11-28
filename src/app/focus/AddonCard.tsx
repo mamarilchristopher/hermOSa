@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import type { AddonIdea } from "@/lib/gmDay";
+import { IconBulb } from "@/components/Icons";
+import { IconText } from "@/components/IconText";
 
 /** Today's add-on idea: the offer, why, and a ready message to ask the owners (CHRIS Nov 27). */
 export function AddonCard({ idea }: { idea: AddonIdea }) {
@@ -12,13 +14,13 @@ export function AddonCard({ idea }: { idea: AddonIdea }) {
   return (
     <section className={`card myday-addon ${idea.day}`}>
       <div className="myday-addon-head">
-        <span className="e" aria-hidden>💡</span>
+        <IconBulb size={34} className="e" />
         <div>
           <span className="label">Today&apos;s add-on idea · ask the owners first</span>
           <h2>{idea.title}</h2>
         </div>
       </div>
-      <div className="myday-addon-chips">{idea.chips.map((c) => <span key={c}>{c}</span>)}</div>
+      <div className="myday-addon-chips">{idea.chips.map((c) => <span key={c}><IconText text={c} /></span>)}</div>
       <p className="myday-addon-offer">{idea.offer}</p>
       <details className="myday-addon-why">
         <summary>Why this works today</summary>

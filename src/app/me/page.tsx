@@ -23,6 +23,7 @@ import { tracker, type NteList, nteId } from "@/lib/nte";
 import { NteDeadline, NteExplainForm } from "../nte/Forms";
 import { HomeBookings, loadHomeBookings } from "./HomeBookings";
 import { HomeTardiness } from "./HomeTardiness";
+import { IconCamera, IconMegaphone } from "@/components/Icons";
 
 type Signoffs = { to_sign: { count: number; oldest: string | null }; mine: { count: number; oldest: string | null } };
 type DailyStatus = { ok: boolean; branches?: { id: string; code: string; name: string }[]; days?: StatusDay[];
@@ -154,7 +155,7 @@ export default async function Me({ searchParams }: { searchParams: Promise<{ day
             {photosDue.map((d) => (
               <div key={d.id} className="nte-box">
                 <p className="small" style={{ margin: 0 }}><strong>{d.client ?? "Client"} · {d.service ?? "Service"}</strong> · {dayLabel(d.date)}</p>
-                <Link className="button small" href={`/services?date=${d.date}&branch=${d.branch}&entry=${d.id}#entry-${d.id}`}>Add photos</Link>
+                <Link className="button small" href={`/services?date=${d.date}&branch=${d.branch}&entry=${d.id}#entry-${d.id}`}><IconCamera />Add photos</Link>
               </div>
             ))}
           </div>
@@ -174,7 +175,7 @@ export default async function Me({ searchParams }: { searchParams: Promise<{ day
         )}
         {fromMgmt.length > 0 && (
           <div className="card chat-home-mgmt">
-            <span className="mgmt-alert-tag"><span aria-hidden>📣</span> Message from management</span>
+            <span className="mgmt-alert-tag with-ic"><IconMegaphone />Message from management</span>
             {fromMgmt.slice(0, 3).map((m) => (
               <Link key={m.id} href={`/chat/${m.room_id}`} className="chat-home-line">
                 <strong>{m.sender}{m.room_name ? ` in ${m.room_name}` : ""}</strong>
