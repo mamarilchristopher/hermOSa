@@ -71,7 +71,10 @@ export function ExpensesView(p: ViewProps) {
     <main>
       <div className="title-row tdy-title">
         <h1>Expenses</h1>
-        {p.canCategories && <Link className="button secondary small" href={q({ cats: !p.showCats })}>{p.showCats ? "Close categories" : "Categories & budgets"}</Link>}
+        <div className="xr-actions">
+          <Link className="button small" href={`/business/expenses/report${[ym !== thisMonth ? `at=${ym}` : "", scope ? `branch=${scope}` : ""].filter(Boolean).join("&").replace(/^(?=.)/, "?")}`}>Expense report</Link>
+          {p.canCategories && <Link className="button secondary small" href={q({ cats: !p.showCats })}>{p.showCats ? "Close categories" : "Categories & budgets"}</Link>}
+        </div>
       </div>
       <p className="muted small">Money out next to sales. Salaries come from final payroll cutoffs and Meta ad spend from Windsor by themselves; type the rest, with a receipt photo.</p>
       {p.ok && <div className="notice ok">{p.ok}</div>}

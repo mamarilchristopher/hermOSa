@@ -99,3 +99,7 @@
 [data-mode="dark"] .nav-badge, [data-mode="dark"] .tab-badge, [data-mode="dark"] .dock-count { color: #16171a; }
 [data-mode="dark"] .chat-msg.mine .chat-tag { color: var(--on-accent); background: rgba(0, 0, 0, 0.1); }
 [data-mode="dark"] table.tracker td.cell-input input { background: #16171a; color: var(--ink); }
+
+/* v0.102.4 Expense report sheet stays paper white */
+[data-mode="dark"] .xr-doc th, [data-mode="dark"] .xr-doc td { background: transparent; }
+[data-mode="dark"] .xr-doc tr.sub td { background: #f4f4f4; }
