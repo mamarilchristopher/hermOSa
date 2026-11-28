@@ -490,6 +490,9 @@ input.pin-input { font-size: 1.6rem; letter-spacing: 0.6em; text-align: center; 
 .glance-branch { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--cream); }
 .glance-branch strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 .glance-branch.missing { border-color: var(--bad); background: var(--bad-bg); }
+.glance-counts { display: flex; flex-direction: column; gap: 1px; margin-top: 4px; padding-top: 6px; border-top: 1px dashed var(--line); color: var(--muted); font-variant-numeric: tabular-nums; }
+.glance-unlogged { color: var(--bad); font-weight: 600; }
+.glance-all-counts { margin: -6px 0 12px; }
 .glance-stats { margin: 4px 0 12px; }
 .glance-stats .stat { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; }
 .glance-table td, .glance-table th { white-space: nowrap; }

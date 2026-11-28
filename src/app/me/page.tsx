@@ -8,7 +8,7 @@ import { manilaToday } from "@/lib/dates";
 import { monthEnd, monthLabel, monthStart } from "@/lib/insights";
 import { ROLE_TEXT } from "@/lib/commission";
 import { markNoticesRead } from "./actions";
-import { ManagerHome, TodoCard, type Todo } from "./ManagerHome";
+import { ManagerHome, TodoCard, type BranchCount, type Todo } from "./ManagerHome";
 import type { DutyRow } from "@/components/OnDuty";
 import type { Ir } from "@/lib/incidents";
 import { branchShort, timeLabel } from "@/lib/schedule";
@@ -42,7 +42,42 @@ async function managementHome(supabase: Awaited<ReturnType<typeof requireAccess>
   const view = computeDay(/^\d{4}-\d{2}-\d{2}$/.test(viewDay) ? viewDay : today, today, sb, days);
   const duty = Array.isArray(dutyData) ? (dutyData as DutyRow[]) : null;
   const faces = duty?.length ? await loadFaces(supabase, duty) : {};
-  return { g, view, duty, faces, bookings };
+  const counts = await branchCounts(supabase, view.date);
+  return { g, view, duty, faces, bookings, counts };
+}
+
+/** CHRIS Nov 28 (v0.106.2): per branch, clients and services logged that day, bookings marked Arrived, and arrived
+ *  bookings with no Service log entry yet (matched by the booking link, else by client or waiver name). */
+async function branchCounts(supabase: Awaited<ReturnType<typeof requireAccess>>["supabase"], day: string): Promise<Record<string, BranchCount>> {
+  const [{ data: logs }, { data: bks }] = await Promise.all([
+    supabase.from("service_logs").select("id, branch_id, client_name, booking_id, services(is_meds)").eq("service_date", day).neq("state", "REJECTED").limit(2000),
+    supabase.from("bookings").select("id, branch_id, client_name, waiver_name").eq("appointment_date", day).in("status", ["ARRIVED", "DONE"]).limit(2000),
+  ]);
+  const norm = (v: string | null | undefined) => (v ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  const out: Record<string, BranchCount> = {};
+  const at = (b: string) => (out[b] ??= { clients: 0, services: 0, arrived: 0, notLogged: 0 });
+  type L = { id: string; branch_id: string; client_name: string | null; booking_id: string | null; services: { is_meds: boolean } | { is_meds: boolean }[] | null };
+  const rows = (logs ?? []) as L[];
+  const names = new Map<string, Set<string>>();
+  const linked = new Set<string>();
+  for (const l of rows) {
+    const c = at(l.branch_id);
+    const svc = Array.isArray(l.services) ? l.services[0] : l.services;
+    if (!svc?.is_meds) c.services += 1;
+    const n = norm(l.client_name) || `#${l.id}`;
+    if (!names.has(l.branch_id)) names.set(l.branch_id, new Set());
+    names.get(l.branch_id)!.add(n);
+    if (l.booking_id) linked.add(l.booking_id);
+  }
+  for (const [b, set] of names) at(b).clients = set.size;
+  for (const k of (bks ?? []) as { id: string; branch_id: string; client_name: string | null; waiver_name: string | null }[]) {
+    const c = at(k.branch_id);
+    c.arrived += 1;
+    const here = names.get(k.branch_id);
+    const logged = linked.has(k.id) || (!!here && ((!!norm(k.client_name) && here.has(norm(k.client_name))) || (!!norm(k.waiver_name) && here.has(norm(k.waiver_name)))));
+    if (!logged) c.notLogged += 1;
+  }
+  return out;
 }
 
 type Notice = { id: string; kind?: string; title: string; body: string | null; link: string | null; created_at: string; read_at: string | null };
@@ -174,7 +209,7 @@ export default async function Me({ searchParams }: { searchParams: Promise<{ day
         )}
         {staffBookings && <HomeBookings rows={staffBookings.rows} who={staffBookings.who} toFollow={staffBookings.toFollow}
           branches={sortBranches(branches.filter((b) => b.kind === "CLINIC")).map((b) => ({ id: b.id, name: branchShort(b.name), code: b.code }))} />}
-        {home && <ManagerHome me={access.user_id} canLogSale={ownerLevel} g={home.g} view={home.view} duty={home.duty} faces={home.faces} branches={homeBranches}
+        {home && <ManagerHome me={access.user_id} canLogSale={ownerLevel} counts={home.counts} g={home.g} view={home.view} duty={home.duty} faces={home.faces} branches={homeBranches}
           bookings={home.bookings && <HomeBookings rows={home.bookings.rows} who={home.bookings.who} toFollow={home.bookings.toFollow} branches={home.g.branches.map((x) => homeBranches.find((b) => b.id === x.id) ?? { id: x.id, name: x.name })} />}
           tardiness={ownerLevel && trackData != null && <HomeTardiness month={monthLabel(today.slice(0, 7))} ntes={(trackData as NteList).ntes} people={tardy} />} />}
         {emp?.commission_eligible && (

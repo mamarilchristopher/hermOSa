@@ -7,6 +7,19 @@ import type { DutyRow } from "@/components/OnDuty";
 import { OnDutyFaces, type DutyFace } from "@/components/OnDutyFaces";
 
 export type Todo = { text: string; href: string; urgent?: boolean };
+export type BranchCount = { clients: number; services: number; arrived: number; notLogged: number };
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+/** CHRIS Nov 28 (v0.106.2): "5 clients / 6 services availed · 7 bookings arrived · 2 not logged", per branch. */
+function Counts({ c }: { c?: BranchCount }) {
+  const x = c ?? { clients: 0, services: 0, arrived: 0, notLogged: 0 };
+  return (
+    <span className="glance-counts small">
+      <span>{plural(x.clients, "client")} / {plural(x.services, "service")} availed</span>
+      <span>{plural(x.arrived, "booking")} arrived{x.notLogged > 0 && <> · <span className="glance-unlogged">{x.notLogged} not logged</span></>}</span>
+    </span>
+  );
+}
 
 const php = (c: number) => centsToPhp(Math.round(c / 100) * 100).replace(/\.00$/, "");
 function Delta({ v, title }: { v: number | null; title?: string }) {
@@ -51,7 +64,7 @@ export function TodoCard({ todos }: { todos: Todo[] }) {
 }
 
 /** Home for owners, finance and managers: what needs doing, yesterday per branch, and how the month is going. */
-export function ManagerHome({ g, view, duty, faces = {}, branches, me, bookings, tardiness, canLogSale = false }: { canLogSale?: boolean; me?: string; bookings?: ReactNode; tardiness?: ReactNode; g: Glance; view: DayView; duty: DutyRow[] | null; faces?: Record<string, DutyFace>; branches: { id: string; name: string; code?: string }[] }) {
+export function ManagerHome({ g, view, duty, faces = {}, branches, me, bookings, tardiness, canLogSale = false, counts }: { counts?: Record<string, BranchCount>; canLogSale?: boolean; me?: string; bookings?: ReactNode; tardiness?: ReactNode; g: Glance; view: DayView; duty: DutyRow[] | null; faces?: Record<string, DutyFace>; branches: { id: string; name: string; code?: string }[] }) {
   const ym = g.today.slice(0, 7);
   const hm = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" });
   // CHRIS (Nov 26): "Not entered yet" boxes show only during clinic hours to 11:59 PM, never 12:00 AM to 9:59 AM.
@@ -82,7 +95,11 @@ export function ManagerHome({ g, view, duty, faces = {}, branches, me, bookings,
           {/* CHRIS Nov 28 (v0.103.1): Owners and the GM log a sale straight from Home (opens the Service log's Add a service form for this day). */}
           {canLogSale && <Link className="button glance-log-btn" href={`/services?date=${view.date}&add=1#add`}><span aria-hidden>+</span> Log a sale</Link>}
         </div>
-        {view.pending > 0 && <p className="small muted glance-pending"><span className="chg warn">+{php(view.pending)} waiting sign-off</span></p>}
+        {counts && (() => {
+          const all = Object.values(counts).reduce((a, c) => ({ clients: a.clients + c.clients, services: a.services + c.services, arrived: a.arrived + c.arrived, notLogged: a.notLogged + c.notLogged }), { clients: 0, services: 0, arrived: 0, notLogged: 0 });
+          return <p className="small muted glance-all-counts">All branches: {plural(all.clients, "client")} / {plural(all.services, "service")} availed · {plural(all.arrived, "booking")} arrived{all.notLogged > 0 && <> · <span className="glance-unlogged">{all.notLogged} not logged</span></>}</p>;
+        })()}
+                {view.pending > 0 && <p className="small muted glance-pending"><span className="chg warn">+{php(view.pending)} waiting sign-off</span></p>}
         {shown.length > 0 && <div className="glance-branches">
           {shown.map((b) => {
             const inner = (<>
@@ -90,6 +107,7 @@ export function ManagerHome({ g, view, duty, faces = {}, branches, me, bookings,
               <strong>{b.cell.kind === "empty" ? <span className="muted">{b.pending > 0 ? "Waiting for sign-off" : view.isToday ? "Nothing logged yet" : "Not entered"}</span> : <Cell c={b.cell} />}</strong>
               {!view.isToday && <Delta v={b.vsAvg} title="vs this branch's daily average this month" />}
               {b.pending > 0 && <span className="small muted">+{php(b.pending)} waiting sign-off</span>}
+              {counts && <Counts c={counts[b.id]} />}
             </>);
             // CHRIS Nov 26: a branch with sales opens that branch's Service log for the day.
             const code = branches.find((x) => x.id === b.id)?.code;

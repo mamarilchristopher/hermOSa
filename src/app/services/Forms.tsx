@@ -170,6 +170,8 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   // update-0106 (CHRIS Nov 28): a backjob shows the service price, editable down to ₱0 (often free). No commission.
   const backjob = kind === "BACKJOB";
   const amountTyped = amount.trim() !== "";
+  // Staff may date a backjob up to 60 days back.
+  const backjobMin = (() => { const d = new Date(`${today ?? date}T00:00:00Z`); d.setUTCDate(d.getUTCDate() - 60); return d.toISOString().slice(0, 10); })();
   const svc = services.find((x) => x.id === service);
   // update-0087: a promo item (a session or the payment line) and the clients on that promo.
   const pm = svc ? promoOf(svc.id, promos) : null;
@@ -296,7 +298,8 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       <Msg s={state} />
       {state?.link && <p className="small"><a className="button secondary small" href={state.link}>Open the client&apos;s schedule to send them</a></p>}
       <input type="hidden" name="branch" value={branch} />
-      {!photosOptional && <input type="hidden" name="date" value={date} />}
+      {/* v0.106.2 (CHRIS Nov 28): anyone may log a backjob for an earlier day (owners and the GM: any entry). */}
+      {!photosOptional && !backjob && <input type="hidden" name="date" value={date} />}
       <input type="hidden" name="type" value={effType} />
       <input type="hidden" name="kind" value={fullyPaid ? "PAID" : kind} />
       <input type="hidden" name="folder" value={photos.folder} />
@@ -342,9 +345,9 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
         </div>
       )}
       <div className="entry-grid">
-        {photosOptional && (
-          <label className="span2">Date of service
-            <input type="date" name="date" required value={day} max={today ?? date} onChange={(e) => setDay(e.target.value)} />
+        {(photosOptional || backjob) && (
+          <label className="span2">Date of service{!photosOptional && <span className="muted"> (the day the backjob was done)</span>}
+            <input type="date" name="date" required value={day} max={today ?? date} min={photosOptional ? undefined : backjobMin} onChange={(e) => setDay(e.target.value)} />
             {today && day !== today && <span className="small" style={{ color: "var(--bad)" }}>Logging for an earlier day ({new Date(`${day}T00:00:00Z`).toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}).</span>}
           </label>
         )}
@@ -654,7 +657,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
           )}
         </div>
         <button type="submit" disabled={pending || photos.uploading || proofs.uploading || !!missing} title={missing ?? undefined}>
-          {pending ? "Saving…" : photos.uploading || proofs.uploading ? "Uploading photos…" : "Add to today's log"}
+          {pending ? "Saving…" : photos.uploading || proofs.uploading ? "Uploading photos…" : today && day !== today ? `Add to the ${new Date(`${day}T00:00:00Z`).toLocaleDateString("en-PH", { month: "short", day: "numeric", timeZone: "UTC" })} log` : "Add to today's log"}
         </button>
       </div>
       {missing && !photos.uploading && (!!service || !!client || photos.slots.length > 0) && <p className="small muted entry-missing">{missing}</p>}
