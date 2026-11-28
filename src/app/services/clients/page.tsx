@@ -1,3 +1,4 @@
+import { serviceLabel } from "@/lib/visit";
 import Link from "next/link";
 import { requireAccess } from "@/lib/access";
 import { TopBar } from "@/components/TopBar";
@@ -49,7 +50,7 @@ export default async function ClientSearch({ searchParams }: { searchParams: Pro
                   const b = r.branch_id ? bName.get(r.branch_id) : null;
                   return (
                     <li key={r.id}>
-                      <span><strong>{(r.session_no ?? 1) > 1 && <span className="session-tag">Session {r.session_no}</span>}{r.services?.name ?? "Service"}</strong> <Uid v={r.log_no} />{r.old_log_no && <span className="small muted" style={{ whiteSpace: "nowrap" }}> (old code {r.old_log_no})</span>}
+                      <span><strong>{(r.session_no ?? 1) > 1 && <span className="session-tag">Session {r.session_no}</span>}{serviceLabel(r.services?.name, r.visit_kind, r.amount_paid_cents)}</strong> <Uid v={r.log_no} />{r.old_log_no && <span className="small muted" style={{ whiteSpace: "nowrap" }}> (old code {r.old_log_no})</span>}
                         <br /><span className="small muted">{day(r.service_date)}{b ? ` · ${b.name}` : ""}{r.performer_id ? ` · by ${who.get(r.performer_id) ?? "staff"}` : ""}{r.assistant_id ? ` + ${who.get(r.assistant_id) ?? "staff"}` : ""}</span></span>
                       <span className="client-hit-end">
                         <span className="num">{(r.visit_kind ?? "PAID") === "PAID" ? centsToPhp(Number(r.amount_paid_cents)) : (r.visit_kind ?? "").replace("_", " ").toLowerCase()}</span>

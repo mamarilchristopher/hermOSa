@@ -4,6 +4,7 @@ import { BACKJOB_REASONS } from "@/lib/backjobs";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { changePaidTo, addService, approveMany, changeBranch, changeDate, fixPackageSession, renameClient, voidEntry, renumberMonth, decideLog, logService, toggleAfterDp, mergeEntry, separateEntry, type ActionState } from "./actions";
 import { previewCommission, type CommissionType } from "@/lib/commission";
+import { serviceLabel } from "@/lib/visit";
 import { centsToPhp } from "@/lib/csv";
 import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
 import { ProofGroup, useProofSlots } from "./PaymentProof";
@@ -166,6 +167,9 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const person = employees.find((e) => e.id === who);
   const partnerEmp = employees.find((e) => e.id === partner);
   const cents = fullyPaid ? 0 : Math.round(Number(amount.replace(/[,₱\s]/g, "")) * 100) || 0;
+  // update-0106 (CHRIS Nov 28): a backjob shows the service price, editable down to ₱0 (often free). No commission.
+  const backjob = kind === "BACKJOB";
+  const amountTyped = amount.trim() !== "";
   const svc = services.find((x) => x.id === service);
   // update-0087: a promo item (a session or the payment line) and the clients on that promo.
   const pm = svc ? promoOf(svc.id, promos) : null;
@@ -313,7 +317,8 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
           ))}
         </div>
         {fullyPaid && <span className="small muted">For a client who already paid for their whole package. Logged at ₱0 with no payment questions{noCommission ? "" : "; the session commission is still paid as usual"}.</span>}
-        {!paid && <span className="small muted">{noCommission ? "Logged at ₱0, so you can see every client handled." : "Logged at ₱0 with no commission, so you can see every client handled."}</span>}
+        {backjob && <span className="small muted">Type what the client paid for the backjob, or 0 if it&apos;s free.{noCommission ? "" : " No commission."} A free backjob is saved as &ldquo;Service (retouch/backjob)&rdquo;.</span>}
+        {!paid && !backjob && <span className="small muted">{noCommission ? "Logged at ₱0, so you can see every client handled." : "Logged at ₱0 with no commission, so you can see every client handled."}</span>}
       </div>
       {/* update-0088 (CHRIS Nov 27): what the backjob fixes and who did the first treatment, for backjob tracking. */}
       {kind === "BACKJOB" && (
@@ -418,6 +423,11 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
             <input type="hidden" name="amount" value="0" />
             <span className="fully-paid-tag">₱0 · fully paid</span>
           </label>
+        ) : backjob ? (
+          <label>Amount paid (₱)
+            <input name="amount" inputMode="decimal" placeholder="0 if free" required value={amount} onChange={(e) => setAmount(e.target.value)} />
+            {svc && amountTyped && cents === 0 && <span className="small backjob-name">Saved as <strong>{serviceLabel(svc.name, "BACKJOB", 0)}</strong></span>}
+          </label>
         ) : paid && (
           <label>Amount paid (₱)
             <input name="amount" inputMode="decimal" placeholder={svc?.sessions?.length && !pm ? "What the client paid (0 if none)" : "e.g. 2500"} required value={amount} readOnly={!!pm?.part && !!pm.promo.pay_service_id} onChange={(e) => setAmount(e.target.value)} />
@@ -425,7 +435,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
         )}
         </div>
         {/* update-0103 (CHRIS Nov 28): the account the money went TO. Not asked when nothing was paid now (₱0). */}
-        {paid && !fullyPaid && !/^\s*0*(\.0*)?\s*$/.test(amount || "x") && (
+        {(paid || backjob) && !fullyPaid && !/^\s*0*(\.0*)?\s*$/.test(amount || "x") && (
           <fieldset className="span2 paid-to">
             <legend className="field-label">Payment sent to</legend>
             <p className="paid-to-warn" role="note">⚠️ <strong>{PAID_TO_WARNING}</strong> <span>Example: the client paid with their GCash app into our BPI account → choose BPI.</span></p>
@@ -640,7 +650,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
               {needsPartner && effType !== "SOLO" && shown.lead > 0 && shown.assist > 0 && <span className="muted">lead {centsToPhp(p.lead)} · assist {centsToPhp(p.assist)}</span>}
             </>
           ) : (
-            <span className="muted">{!paid ? "Unpaid visit: no commission" : effType === "NONCOMMI" ? "" : cents > 0 ? "" : "Enter the amount paid to see the commission"}</span>
+            <span className="muted">{backjob ? (cents > 0 ? `Backjob ${centsToPhp(cents)}: no commission` : "Backjob: no commission") : !paid ? "Unpaid visit: no commission" : effType === "NONCOMMI" ? "" : cents > 0 ? "" : "Enter the amount paid to see the commission"}</span>
           )}
         </div>
         <button type="submit" disabled={pending || photos.uploading || proofs.uploading || !!missing} title={missing ?? undefined}>

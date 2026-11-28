@@ -33,8 +33,8 @@ export function EntryDetails({ r }: { r: ServiceRecord }) {
 
   const rows: [string, string][] = [
     ["Client", r.client], ["Date of service", recordDate(r.date)], ["Branch", r.branch], ["Service", lineName(r)],
-    ["Payment", r.kind === "PAID" ? php(r.amount) : KIND_TEXT[r.kind] ?? r.kind],
-    ...(r.kind === "PAID" && r.paidTo ? [["Paid to", r.paidTo] as [string, string]] : []),
+    ["Payment", r.kind === "PAID" || (r.kind === "BACKJOB" && r.amount > 0) ? php(r.amount) + (r.kind === "BACKJOB" ? " (backjob)" : "") : KIND_TEXT[r.kind] ?? r.kind],
+    ...((r.kind === "PAID" || r.kind === "BACKJOB") && r.paidTo ? [["Paid to", r.paidTo] as [string, string]] : []),
     ...(r.priceNote ? [["Price note", r.priceNote] as [string, string]] : []),
     ...(r.doneBy ? [["Done by", r.doneBy] as [string, string]] : []),
     ...(r.assistedBy ? [["Assisted by", r.assistedBy] as [string, string]] : []),
@@ -51,7 +51,7 @@ export function EntryDetails({ r }: { r: ServiceRecord }) {
         {r.visit.length > 1 && (
           <div className="record-visit">
             <span className="small muted">This visit</span>
-            {r.visit.map((l, i) => <div key={i}><span>{lineName(l)}</span><span>{l.kind === "PAID" ? php(l.amount) : KIND_TEXT[l.kind] ?? l.kind}</span></div>)}
+            {r.visit.map((l, i) => <div key={i}><span>{lineName(l)}</span><span>{l.kind === "PAID" || (l.kind === "BACKJOB" && l.amount > 0) ? php(l.amount) : KIND_TEXT[l.kind] ?? l.kind}</span></div>)}
             <div className="record-total"><span>Total paid</span><span>{php(visitTotal(r))}</span></div>
           </div>
         )}

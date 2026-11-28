@@ -69,6 +69,16 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     if (sessions && p.data.session > sessions.length) return { error: `This bundle has ${sessions.length} sessions. Pick a session from 1 to ${sessions.length}.` };
     if (sessions && (p.data.amount ?? "").trim() === "") return { error: "Type what the client paid for this session (0 if nothing)." };
   }
+  // update-0106 (CHRIS Nov 28): a backjob may be paid (any amount) or free (₱0, shown as "Service (retouch/backjob)"). No commission.
+  if (p.data.kind === "BACKJOB") {
+    if ((p.data.amount ?? "").trim() === "") return { error: "Type what the client paid for the backjob, or 0 if it's free." };
+    try {
+      cents = phpToCents((p.data.amount ?? "").replace(/[,₱\s]/g, ""));
+    } catch {
+      return { error: "Enter the amount paid, e.g. 2500, or 0 if the backjob is free." };
+    }
+    if (cents < 0) return { error: "Enter the amount paid, or 0 if the backjob is free." };
+  }
   // CHRIS Nov 26 (update-0080): add-ons, each its own line of this visit at 5% commission. Checked before anything is saved.
   let addons: { service: string; cents: number }[] = [];
   if (paid && p.data.addons) {
@@ -180,7 +190,7 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
     medsNote += dpErr || !dp?.ok ? " The DP balance mark didn't save: ask the owner or GM to tap \"Balance after DP\" on the entry." : " Marked as the balance after a DP (commission on the full price).";
   }
   // update-0103 (CHRIS Nov 28): the account the payment went to, for the whole visit (after its meds/add-ons/extra lines exist).
-  if (paid && p.data.paid_to) {
+  if ((paid || (p.data.kind === "BACKJOB" && cents > 0)) && p.data.paid_to) {
     const { data: pt, error: ptErr } = await supabase.rpc("set_service_paid_to", { p_log: data.id, p_paid_to: p.data.paid_to });
     if (ptErr?.code !== "PGRST202" && (ptErr || !pt?.ok)) medsNote += " The payment account didn't save: the owner or GM can set it with Fix entry.";
   }

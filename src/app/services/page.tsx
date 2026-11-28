@@ -1,3 +1,4 @@
+import { serviceLabel } from "@/lib/visit";
 import { isTestService, sortServices } from "@/lib/serviceOrder";
 import Link from "next/link";
 import { EntryDetails } from "./EntryDetails";
@@ -30,6 +31,9 @@ type Log = {
   decided_by?: string | null; decided_at?: string | null;
 };
 const VISIT_TEXT: Record<string, string> = { BACKJOB: "Backjob (unpaid)", CHECKUP: "Check-up (unpaid)", NO_CHARGE: "No charge" };
+// update-0106: a backjob can be paid now.
+const visitText = (l: { visit_kind?: string | null; amount_paid_cents: number | string }) =>
+  l.visit_kind === "BACKJOB" && Number(l.amount_paid_cents) > 0 ? "Backjob (paid)" : VISIT_TEXT[l.visit_kind ?? ""] ?? l.visit_kind ?? "";
 type Line = { service_log_id: string; employee_id: string; role: string; amount_cents: number };
 
 const topMgmtFor = (access: Parameters<typeof can>[0]) => can(access, ["OWNER"], null) || can(access, ["MANAGER"], null);
@@ -352,9 +356,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                           {!sub.length && (
                             <div className="entry-service">
                               {(l.session_no ?? 1) > 1 && <span className="session-tag">Session {l.session_no}</span>}
-                              <strong>{l.services?.name}</strong>
+                              <strong>{serviceLabel(l.services?.name, l.visit_kind, l.amount_paid_cents)}</strong>
                               {l.visit_kind && l.visit_kind !== "PAID"
-                                ? <span className="tag">{VISIT_TEXT[l.visit_kind] ?? l.visit_kind}</span>
+                                ? <span className="tag">{visitText(l)}</span>
                                 : <span className={`tag ${l.commission_type}`}>{TYPE_TEXT[l.commission_type]}</span>}
                             </div>
                           )}
@@ -363,9 +367,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                               <li className="visit-top">
                                 <span className="entry-sub-name entry-service">
                                   {(top.session_no ?? 1) > 1 && <span className="session-tag">Session {top.session_no}</span>}
-                                  <strong>{top.services?.name}{free(top)}</strong>
+                                  <strong>{serviceLabel(top.services?.name, top.visit_kind, top.amount_paid_cents)}{free(top)}</strong>
                                   {l.visit_kind && l.visit_kind !== "PAID"
-                                    ? <span className="tag">{VISIT_TEXT[l.visit_kind] ?? l.visit_kind}</span>
+                                    ? <span className="tag">{visitText(l)}</span>
                                     : <span className={`tag ${l.commission_type}`}>{TYPE_TEXT[l.commission_type]}</span>}
                                 </span>
                                 <span className="entry-sub-amt">{centsToPhp(top.amount_paid_cents)}</span>
@@ -373,7 +377,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                               </li>
                               {rest.map((k) => (
                                 <li key={k.id}>
-                                  <span className="entry-sub-name">＋ {(k.session_no ?? 1) > 1 && <span className="session-tag">Session {k.session_no}</span>} {k.services?.name ?? "Item"}{free(k)}
+                                  <span className="entry-sub-name">＋ {(k.session_no ?? 1) > 1 && <span className="session-tag">Session {k.session_no}</span>} {k.visit_kind === "BACKJOB" ? serviceLabel(k.services?.name, k.visit_kind, k.amount_paid_cents) : k.services?.name ?? "Item"}{free(k)}
                                     {k.commission_type === "NONCOMMI" && k.id !== l.id && <span className="muted small"> · no commission</span>}
                                     {k.state === "PENDING" && k.id !== l.id && <span className="muted small"> · signed off with the sale</span>}</span>
                                   <span className="entry-sub-amt">{centsToPhp(k.amount_paid_cents)}</span>
@@ -412,7 +416,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                     <div className="entry-side">
                       <div className="entry-paid">{centsToPhp(total)}</div>
                       {sub.length > 0 && <div className="small muted entry-paid-split">{sub.length + 1} services · one waiver</div>}
-                      {(l.visit_kind ?? "PAID") === "PAID" && paidToLabel(l.paid_to) && <div className="small entry-paid-to">Paid to <strong>{paidToLabel(l.paid_to)}</strong></div>}
+                      {((l.visit_kind ?? "PAID") === "PAID" || l.visit_kind === "BACKJOB") && paidToLabel(l.paid_to) && <div className="small entry-paid-to">Paid to <strong>{paidToLabel(l.paid_to)}</strong></div>}
                       {l.state === "PENDING" && approverFor(l.branch_id) ? <DecideButtons id={l.id} /> : (
                         <span className={`pill ${l.state === "APPROVED" ? "PUBLISHED" : l.state === "REJECTED" ? "REVERSED" : "STAGED"}`}>
                           {l.state === "APPROVED" ? "Approved" : l.state === "REJECTED" ? "Rejected" : "Waiting"}
@@ -449,12 +453,12 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                     <div className="entry-actions">
                       <EntryDetails r={{
                         id: l.id, branch: bName[l.branch_id ?? ""] ?? branch?.name ?? "", date: l.service_date, client: l.client_name ?? "No client name",
-                        service: l.services?.name ?? "Service", session: l.session_no ?? 1, amount: Number(l.amount_paid_cents), kind: l.visit_kind ?? "PAID",
+                        service: serviceLabel(l.services?.name, l.visit_kind, l.amount_paid_cents), session: l.session_no ?? 1, amount: Number(l.amount_paid_cents), kind: l.visit_kind ?? "PAID",
                         priceNote: l.price_note ?? null, paidTo: paidToLabel(l.paid_to), doneBy: name[l.performer_id] ?? null, assistedBy: l.assistant_id ? name[l.assistant_id] ?? null : null,
                         status: l.state === "APPROVED" ? "Approved" : l.state === "REJECTED" ? "Rejected" : "Waiting for sign-off",
                         enteredBy: userName.get(l.created_by) ?? "Staff", enteredAt: stamp(l.created_at), decided: decidedLine(l),
                         visit: (l.client_name ? dayList.filter((x) => x.state !== "REJECTED" && (x.client_name ?? "").trim().toLowerCase() === l.client_name!.trim().toLowerCase()) : [l])
-                          .slice().reverse().map((x) => ({ service: x.services?.name ?? "Service", session: x.session_no ?? 1, amount: Number(x.amount_paid_cents), kind: x.visit_kind ?? "PAID" })),
+                          .slice().reverse().map((x) => ({ service: serviceLabel(x.services?.name, x.visit_kind, x.amount_paid_cents), session: x.session_no ?? 1, amount: Number(x.amount_paid_cents), kind: x.visit_kind ?? "PAID" })),
                       }} />
                       {/* v0.100.6: waiver, proof and photos open right here (not the Client archive page). */}
                       {!awaitingMe && seesFiles && (l.photo_folder || proofCount.get(l.id)) && <EntryFiles log={l.id} more={sub.map((k) => k.id)} auto={false} needsWaiver={needsWaiver && !l.photos_due} />}
@@ -471,7 +475,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                         <FixEntry>
                           {fixName && <RenameClientForm id={l.id} name={l.client_name!} all={topMgmt} />}
                           {topMgmt && <ChangeDateForm id={l.id} date={l.service_date} max={today} />}
-                          {(l.visit_kind ?? "PAID") === "PAID" && total > 0 && (topMgmt || l.state === "PENDING") && <PaidToForm id={l.id} value={l.paid_to ?? null} />}
+                          {((l.visit_kind ?? "PAID") === "PAID" || l.visit_kind === "BACKJOB") && total > 0 && (topMgmt || l.state === "PENDING") && <PaidToForm id={l.id} value={l.paid_to ?? null} />}
                           {topMgmt && <ChangeBranchForm id={l.id} branch={l.branch_id ?? ""} branches={viewable.map((b) => ({ id: b.id, name: b.name }))} />}
                           {afterDp && <AfterDpForm id={l.id} on={!!l.after_dp} />}
                           {fixPkg && <FixPackageForm id={l.id} />}
