@@ -39,7 +39,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   if (viewable.length === 0) redirect("/");
   // update-0092 (CHRIS Nov 27): staff work at any branch. Where they are today = the branch they timed in at,
   // else today's schedule, else their home branch (records only). Staff open on that branch; management on All branches.
-  const staffOnly = !can(access, ["OWNER", "FINANCE", "MANAGER", "AUDITOR", "HR"], null) && !access.grants.some((g) => g.role === "MANAGER");
+  // (v0.102.1: staff no longer open on one branch; everyone sees the branch tiles.)
   const { data: meRow } = await supabase.from("employees").select("id, branch_id").eq("app_user_id", access.user_id).eq("active", true).order("created_at").limit(1).maybeSingle();
   // update-0097: everyone's time-in branches today (before update-0097 the function is missing: no limits).
   const { data: atToday } = await supabase.rpc("staff_branches_today");
@@ -50,7 +50,9 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   ]) : [{ data: null }, { data: null }];
   const workingAt = [inAt?.branch_id, shiftAt?.branch_id, meRow?.branch_id].find((id) => id && viewable.some((b) => b.id === id)) as string | undefined;
   // CHRIS Nov 26 (v0.80.1): "All branches" is the default for anyone who sees more than one branch.
-  const picked = viewable.find((b) => b.code === sp.branch) ?? (sp.branch === undefined && staffOnly ? viewable.find((b) => b.id === workingAt) : undefined);
+  // v0.102.1 (CHRIS Nov 28): no branch switcher; the page shows every branch, with one tile per branch under the day's
+  // totals. A link that names a branch (e.g. from Home) still opens that branch alone, with "Show all branches".
+  const picked = viewable.find((b) => b.code === sp.branch);
   const branch = picked ?? (viewable.length > 1 ? null : viewable[0]);
   const scope = branch ? [branch] : viewable;
   const scopeIds = scope.map((b) => b.id);
@@ -176,7 +178,13 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   } : null;
   const link = (d: string, b = here) => `/services?date=${d}&branch=${b}${staffPick && b === here ? `&staff=${staffPick}` : ""}`;
   // All branches: each branch's total for the chosen day, in branch order.
-  const perBranch = branch ? [] : scope.map((b) => ({ name: b.name, cents: list.filter((l) => l.branch_id === b.id && l.state !== "REJECTED").reduce((x, l) => x + Number(l.amount_paid_cents), 0) }));
+  const perBranch = branch ? [] : scope.map((b) => {
+    const ok = list.filter((l) => l.branch_id === b.id && l.state !== "REJECTED");
+    const ids = new Set(ok.map((l) => l.id));
+    return { id: b.id, name: b.name, cents: ok.reduce((x, l) => x + Number(l.amount_paid_cents), 0), count: ok.filter((l) => !isKid(l)).length,
+      waiting: ok.filter((l) => l.state === "PENDING" && !isKid(l)).length,
+      commission: lines.filter((x) => ids.has(x.service_log_id)).reduce((x, y) => x + Number(y.amount_cents), 0) };
+  });
   const order = new Map(scope.map((b, i) => [b.id, i]));
   const dayLabel = `${WEEKDAYS[weekday(date)]}, ${new Date(`${date}T00:00:00Z`).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}`;
 
@@ -193,10 +201,10 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
         </form>
 
         <div className="periods card">
-          <div className="segmented" role="tablist" aria-label="Branch">
-            {viewable.length > 1 && <Link href={link(date, "ALL")} className={branch ? "" : "on"}>All branches</Link>}
-            {viewable.map((b) => <Link key={b.id} href={link(date, b.code)} className={b.id === branch?.id ? "on" : ""}>{b.name}</Link>)}
-          </div>
+          {branch && viewable.length > 1 ? (
+            <div className="branch-only"><span><span className="small muted">Showing</span> <strong>{branch.name}</strong> <span className="small muted">only</span></span>
+              <Link className="button secondary small" href={link(date, "ALL")}>Show all branches</Link></div>
+          ) : <div className="small muted">{dayLabel}</div>}
           <form className="day-nav">
             <input type="hidden" name="branch" value={here} />
             <Link className="button secondary small" href={link(addDays(date, -1))} aria-label="Previous day">←</Link>
@@ -207,9 +215,8 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
           </form>
         </div>
 
-        <div className="grid">
-          <div className="card stat hero"><div className="label">{branch?.name ?? "All branches"} · {dayLabel}</div><div className="value">{centsToPhp(paid)}</div><div className="note">{(() => { const ok = list.filter((l) => l.state !== "REJECTED"); const unpaid = ok.filter((l) => l.visit_kind && l.visit_kind !== "PAID").length; return `${ok.length - unpaid} paid services${unpaid ? `, ${unpaid} unpaid visit${unpaid === 1 ? "" : "s"}` : ""}`; })()}</div>
-            {perBranch.length > 0 && <div className="branch-split">{perBranch.map((b) => <span key={b.name}><span className="muted">{b.name.replace(/ \(.*\)$/, "")}</span> {centsToPhp(b.cents)}</span>)}</div>}</div>
+        <div className="grid log-stats">
+          <div className="card stat hero"><div className="label">{branch?.name ?? "All branches"} · {dayLabel}</div><div className="value">{centsToPhp(paid)}</div><div className="note">{(() => { const ok = list.filter((l) => l.state !== "REJECTED"); const unpaid = ok.filter((l) => l.visit_kind && l.visit_kind !== "PAID").length; return `${ok.length - unpaid} paid services${unpaid ? `, ${unpaid} unpaid visit${unpaid === 1 ? "" : "s"}` : ""}`; })()}</div></div>
           {approver && <div className="card stat"><div className="label">Commission</div><div className="value">{centsToPhp(commission)}</div><div className="note">5% of amount paid, lead 60 / assist 40</div></div>}
           <div className="card stat"><div className="label">Sign-off</div><div className="value">{pendingCount === 0 ? (list.length ? "All signed" : "–") : `${pendingCount} waiting`}</div><div className="note">{approver ? "Approve entries below, one by one or together" : "Your manager signs these off"}</div></div>
         </div>
@@ -222,7 +229,19 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
             {topMgmt ? " Check the waiver and proof on each, then remove the extra copy." : approver ? " Check the waiver and proof on each, then reject the extra copy." : " Tell an owner or the GM which one to remove."}{" "}
             <a href={`#entry-${doubleList[0].id}`}>Go to the first one</a></div>
         )}
-        {checks.length > 0 && <DeclaredCheck checks={checks} names={checkNames} current={branch?.id ?? ""} open={inCheckWindow(date)} day={inCheckWindow(date) ? date : CHECK_TO} link={link} />}
+        {perBranch.length > 1 && (
+          <div className="branch-tiles">
+            {perBranch.map((b) => {
+              const body = (<>
+                <span className="branch-tile-name">{b.name.replace(/ \(.*\)$/, "")}</span>
+                <span className="branch-tile-total">{centsToPhp(b.cents)}</span>
+                <span className="small muted">{b.count ? `${b.count} entr${b.count === 1 ? "y" : "ies"}` : "No entries"}{approver && b.count ? ` · ${centsToPhp(b.commission)} commission` : ""}</span>
+                {b.count > 0 && (b.waiting ? <span className="chg warn">{b.waiting} waiting</span> : <span className="chg up">All signed</span>)}
+              </>);
+              return b.count ? <a key={b.id} className="card branch-tile" href={`#sec-${date}-${b.id}`}>{body}</a> : <div key={b.id} className="card branch-tile empty">{body}</div>;
+            })}
+          </div>
+        )}
 
         {canLog && (onDuty === false ? (
           <div className="notice info">Time in first to add services. Only staff who are timed in today can add to the Service log. <Link href="/time">Go to Time clock</Link></div>
@@ -272,7 +291,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
           const secOk = sec.list.filter((l) => l.state !== "REJECTED").length;
           const secWait = sec.list.filter((l) => l.state === "PENDING").length;
           return (
-          <div key={sec.id} className={sec.name ? `log-branch b-${(branches.find((b) => b.id === sec.id)?.code ?? "x").toLowerCase()}` : undefined}>
+          <div key={sec.id} id={`sec-${d}-${sec.id}`} className={sec.name ? `log-branch b-${(branches.find((b) => b.id === sec.id)?.code ?? "x").toLowerCase()}` : undefined}>
             {sec.name && (
               <h4 className="log-branch-head">
                 <span className="log-branch-name">{sec.name}</span>
@@ -462,6 +481,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
         })}
         <p className="log-more">{days < 91 && <Link className="button secondary" href={`${link(date)}&days=${days + 7}`} scroll={false}>Show 7 more days</Link>}
           <span className="small muted"> Showing the {days} days up to {date === today ? "today" : dayLabel}.</span></p>
+        {checks.length > 0 && <DeclaredCheck checks={checks} names={checkNames} current={branch?.id ?? ""} open={inCheckWindow(date)} day={inCheckWindow(date) ? date : CHECK_TO} link={link} />}
         {can(access, ["OWNER"], null) && (
           <RenumberForm month={date.slice(0, 7)} label={new Date(`${date.slice(0, 7)}-01T00:00:00Z`).toLocaleDateString("en-PH", { month: "long", year: "numeric", timeZone: "UTC" })} />
         )}

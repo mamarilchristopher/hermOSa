@@ -2822,3 +2822,23 @@ details.exp-edit[open] { flex-basis: 100%; }
   .entry-sub .entry-sub-do { grid-column: 2; border-top: 0; padding-top: 0; }
   .entry.entry-visit .entry-side { gap: 4px 10px; }
 }
+
+/* v0.102.1 (CHRIS Nov 28): Service log, one tile per branch under the day's totals (replaces the branch switcher).
+   Tapping a tile jumps to that branch's entries for the day. */
+.branch-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 16px; }
+.branch-tile { margin: 0; display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; text-decoration: none; color: inherit;
+  border-top: 3px solid var(--gold); transition: transform 0.15s, box-shadow 0.15s; }
+a.branch-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,0.08)); }
+.branch-tile.empty { border-top-color: var(--line-strong); opacity: 0.75; }
+.branch-tile-name { font-size: 0.74rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+.branch-tile-total { font-size: 1.3rem; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.branch-tile .chg { align-self: flex-start; margin-top: 2px; }
+.branch-only { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.log-branch { scroll-margin-top: 80px; }
+@media (max-width: 900px) { .branch-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .branch-tile { padding: 12px; } .branch-tile-total { font-size: 1.1rem; } }
+@media (max-width: 700px) {
+  .grid.log-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
+  .grid.log-stats > .hero { grid-column: 1 / -1; }
+  .grid.log-stats > .stat:not(.hero) .value { font-size: 1.2rem; }
+  .grid.log-stats > .stat:not(.hero) .note { font-size: 0.76rem; }
+}
