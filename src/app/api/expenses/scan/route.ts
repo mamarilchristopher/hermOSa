@@ -67,10 +67,10 @@ export async function POST(req: Request) {
   let raw: RawScan | null = null;
   try {
     const res = await client.beta.messages.parse({
-      model: "claude-opus-5-5",
+      // v0.102.3 (CHRIS Nov 28: Opus "a bit costly for scan feature"): the small model, about ₱0.10 a scan; every scan is
+      // checked by a person before it's saved.
+      model: "claude-haiku-5-5",
       max_tokens: 16000,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
       output_config: { effort: "medium", format: betaZodOutputFormat(Schema) },
       system: scanSystem(cats, branches),
       messages: [{ role: "user", content: [source, { type: "text", text: scanUser(today, name) }] }],
