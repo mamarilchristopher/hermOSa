@@ -21,6 +21,7 @@ import { EditPhotos } from "./EditPhotos";
 import { AttachProof } from "./PaymentProof";
 import { paidToLabel } from "@/lib/paidTo";
 import { EntryFiles } from "./EntryFiles";
+import { branchShort } from "@/lib/schedule";
 import { doubleEntries } from "@/lib/doubleEntries";
 import type { PromoOptions } from "@/lib/promoTrack";
 
@@ -120,6 +121,14 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const checkNames = Object.fromEntries(checkList.map((b) => [b.id, b.name]));
   const dayCheck = new Map((branch ? checks.find((c) => c.branch === branch.id)?.days ?? [] : []).map((d) => [d.date, d]));
   const list = all.filter((l) => l.service_date === date); // the chosen day, for the cards on top
+  // v0.106.6: that day's arrived bookings at the branches this person logs for, whose sale isn't linked yet.
+  const { data: arrivedRows } = canLog && !sp.booking
+    ? await supabase.from("bookings").select("id, branch_id, client_name, waiver_name, services, status").eq("appointment_date", date)
+      .in("branch_id", logBranches.map((b) => b.id)).in("status", ["ARRIVING", "ARRIVED", "DONE"]).order("appointment_time", { ascending: true, nullsFirst: false }).limit(200)
+    : { data: [] };
+  const linkedBookings = new Set(allRaw.filter((l) => l.state !== "REJECTED" && (l as { booking_id?: string | null }).booking_id).map((l) => (l as { booking_id?: string | null }).booking_id as string));
+  const waitingBookings = ((arrivedRows ?? []) as { id: string; branch_id: string; client_name: string; waiver_name: string | null; services: string; status: string }[])
+    .filter((w) => !linkedBookings.has(w.id));
   // update-0054 (CHRIS Nov 26): only staff timed in today add entries; owners and the GM always can.
   const { data: onDuty } = canLog && !topMgmt ? await supabase.rpc("can_log_services_now") : { data: true };
   // update-0093: photo changes waiting for the owners / the GM (errors before the update = none).
@@ -262,7 +271,24 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
             {(services ?? []).length === 0 ? <>Add your services first on <Link href="/services/prices">Price list</Link>.</> : null}
           </div>
         ) : (
-          <AddPanel title="Add a service" hint="Log a client's visit: service, paid, staff and photos" open={!!fromBooking || sp.add === "1"} id="add">
+          <>
+          {/* v0.106.6 (CHRIS Nov 28): arrived clients are logged FROM their booking, so the sale and the booking stay tied. */}
+          {!fromBooking && waitingBookings.length > 0 && (
+            <div className="card rcv-pick">
+              <div><strong>Arrived, sale not logged yet ({waitingBookings.length})</strong>
+                <span className="small muted"> Tap the client to log their sale from the booking. Walk-in with no booking? Use Add a service below.</span></div>
+              <div className="rcv-pick-list">
+                {waitingBookings.map((w) => (
+                  <Link key={w.id} className="rcv-pick-item" href={`/services?branch=${branches.find((b) => b.id === w.branch_id)?.code ?? ""}&booking=${w.id}#add`}>
+                    <strong>{w.waiver_name ?? w.client_name}</strong>
+                    <span className="small muted">{w.services}{scope.length > 1 ? ` · ${branchShort(bName[w.branch_id] ?? "")}` : ""}</span>
+                    <span className="small rcv-pick-go">Log the sale ›</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+          <AddPanel title="Add a service" hint={fromBooking ? "Log this client's sale: service, paid, staff and photos" : "Walk-ins not in Bookings. Booked clients: log from their booking"} open={!!fromBooking || sp.add === "1"} id="add">
             {fromBooking && bk && (
               <div className="notice info booking-from">
                 Logging the sale for <strong>{bk.waiver_name ?? bk.client_name}</strong>{bk.waiver_name ? <span className="muted"> (FB: {bk.client_name})</span> : null}, booked for {bk.services} at {bName[bk.branch_id] ?? "the branch"}. Saving links it to the booking, so it&apos;s not recorded twice. <Link href={`/bookings?d=${bk.appointment_date}&focus=${bk.id}`}>Back to Bookings</Link>
@@ -271,6 +297,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
             <BranchEntryForm key={`${here}-${fromBooking?.id ?? ""}`} booking={fromBooking} branches={(fromBooking ? logBranches.filter((b) => b.id === bk!.branch_id) : logBranches).map((b) => ({ id: b.id, name: b.name }))} start={fromBooking ? bk!.branch_id : logBranches.find((b) => b.id === workingAt)?.id ?? (logBranches.length === 1 ? logBranches[0].id : "")} date={date} today={today} meds={(services ?? []).filter((s) => s.is_meds).map((s) => ({ id: s.id, name: s.name, price: Number(s.price_cents ?? 0) }))} services={sortServices((services ?? []).filter((s) => !s.is_meds && !isTestService(s.name))).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null, commission: s.commission_cents ?? null, sessions: Array.isArray(s.session_prices) ? (s.session_prices as (number | string)[]).map(Number) : null }))} promos={promoOpts} packages={packages} addons={sortServices((services ?? []).filter((s) => s.is_addon && !s.is_meds)).map((s) => ({ id: s.id, name: s.name, price: s.price_cents ?? null }))} employees={employees} noCommission={noCommission} photosOptional={topMgmt} />
             {isManager && <p className="small" style={{ marginTop: 12 }}><Link href="/services/prices">Price list and commissions</Link> (add a new kind of service, set its price and commission)</p>}
           </AddPanel>
+          </>
         ))}
 
         <div className="entries-head">

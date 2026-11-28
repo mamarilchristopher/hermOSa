@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { manilaToday } from "@/lib/dates";
 import { z } from "zod";
+import { nameScore } from "@/lib/arrivals";
 import { createClient } from "@/lib/supabase/server";
 import { centsToPhp, phpToCents } from "@/lib/csv";
 import { errorText } from "@/lib/access";
@@ -206,8 +207,26 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
   if (p.data.booking) {
     const { data: wv } = await supabase.rpc("set_booking_waiver", { p_id: p.data.booking, p_name: p.data.client });
     const { data: ln, error: lnErr } = await supabase.rpc("link_booking_log", { p_booking: p.data.booking, p_log: data.id });
-    medsNote += lnErr || !ln?.ok || !wv?.ok ? " It didn't link to the booking: tap Done on Bookings." : " Linked to the booking (marked Done).";
+    medsNote += lnErr || !ln?.ok || !wv?.ok ? " It didn't link to the booking: use Already logged? Link it on Bookings." : " Linked to the booking (marked Done).";
     revalidatePath("/bookings");
+  } else if (p.data.client) {
+    // v0.106.6 (CHRIS Nov 28): logged without opening the booking, but the client has an arrived booking that day at this
+    // branch with the same name (Facebook or waiver name): tie them so the booking isn't left without its sale.
+    const { data: me } = await supabase.from("service_logs").select("merged_into").eq("id", data.id).maybeSingle();
+    if (!me?.merged_into) {
+      const { data: bks } = await supabase.from("bookings").select("id, client_name, waiver_name").eq("branch_id", p.data.branch)
+        .eq("appointment_date", p.data.date).in("status", ["ARRIVING", "ARRIVED", "DONE"]).limit(100);
+      const same = ((bks ?? []) as { id: string; client_name: string | null; waiver_name: string | null }[])
+        .filter((b) => nameScore(b.client_name, p.data.client) === 3 || nameScore(b.waiver_name, p.data.client) === 3);
+      if (same.length) {
+        const { data: taken } = await supabase.from("service_logs").select("booking_id").in("booking_id", same.map((b) => b.id)).neq("state", "REJECTED");
+        const free = same.filter((b) => !((taken ?? []) as { booking_id: string }[]).some((t) => t.booking_id === b.id));
+        if (free.length === 1) {
+          const { data: ln } = await supabase.rpc("link_booking_log", { p_booking: free[0].id, p_log: data.id });
+          if (ln?.ok) { medsNote += " Matched to this client's booking (marked Done)."; revalidatePath("/bookings"); }
+        }
+      }
+    }
   }
   revalidatePath("/services");
   revalidatePath("/me");

@@ -5,6 +5,8 @@ import { TopBar } from "@/components/TopBar";
 import { isIsoDate, manilaToday } from "@/lib/dates";
 import { AddBookingForm, CancelReasonForm, CopyForGc, NoteForm, StatusForm } from "./Forms";
 import { LiveBookings } from "./LiveBookings";
+import { LogSale, type LinkChoice } from "./Receive";
+import { nameScore } from "@/lib/arrivals";
 import { AddPanel, ControlBar, DayPicker, Stat, Stats, Tabs } from "@/components/Controls";
 
 type Booking = {
@@ -62,8 +64,19 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
   const { data, error } = first.error?.code === "42703" ? await forDay(false) : first;
   const rows = (data ?? []) as Booking[];
   // update-0091: bookings whose sale is already in the Service log (so nobody logs it twice).
-  const { data: linked } = rows.length ? await supabase.from("service_logs").select("booking_id").in("booking_id", rows.map((r) => r.id)).neq("state", "REJECTED") : { data: [] };
-  const sold = new Set(((linked ?? []) as { booking_id: string }[]).map((x) => x.booking_id));
+  const { data: linked } = rows.length ? await supabase.from("service_logs").select("booking_id, log_no, merged_into").in("booking_id", rows.map((r) => r.id)).neq("state", "REJECTED") : { data: [] };
+  const soldNo = new Map<string, string>();
+  for (const x of (linked ?? []) as { booking_id: string; log_no: string | null; merged_into: string | null }[]) if (!soldNo.has(x.booking_id) || !x.merged_into) soldNo.set(x.booking_id, x.log_no ?? "");
+  const sold = new Set(soldNo.keys());
+  // v0.106.6 (CHRIS Nov 28): the day's entries not tied to a booking, so an arrived booking can be linked to the sale
+  // someone logged on its own ("Already logged? Link it"). Best name match first.
+  const { data: looseRows } = rows.some((r) => (r.status === "ARRIVED" || r.status === "ARRIVING" || r.status === "DONE") && !sold.has(r.id))
+    ? await supabase.from("service_logs").select("id, branch_id, log_no, client_name, booking_id, merged_into, services(name)").eq("service_date", day).neq("state", "REJECTED").is("booking_id", null).is("merged_into", null).limit(500)
+    : { data: [] };
+  const loose = (looseRows ?? []) as unknown as { id: string; branch_id: string; log_no: string | null; client_name: string | null; services: { name: string } | null }[];
+  const linkChoices = (r: Booking): LinkChoice[] => loose.filter((l) => l.branch_id === r.branch_id)
+    .map((l) => ({ id: l.id, label: `${l.client_name ?? "No name"} · ${l.services?.name ?? "Service"}${l.log_no ? ` · ${l.log_no}` : ""}`, score: Math.max(nameScore(r.client_name, l.client_name), nameScore(r.waiver_name, l.client_name)) }))
+    .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label));
   // update-0094: the client's reason on Cancelled bookings (CHRIS Nov 27). Before the update runs this finds nothing.
   const cancelledIds = rows.filter((r) => r.status === "CANCELLED").map((r) => r.id);
   const { data: reasonRows, error: reasonErr } = cancelledIds.length ? await supabase.from("bookings").select("id, cancel_reason").in("id", cancelledIds) : { data: [], error: null };
@@ -112,7 +125,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
       <TopBar access={access} />
       <main>
         <h1 className="title-row">Bookings <LiveBookings /></h1>
-        <p className="muted small">{booker ? "Log each booking here, from Facebook, calls, texts or walk-ins. Tap Arriving when the client says they're on the way; the branch marks Arrived, and every booking is closed out (Arrived or Did not arrive) by 7 PM." : "Who is booked for this day at every branch, and their status. Tap Arriving when the client is on the way, Arrived when they come in, then tap their name to log the sale. Close out everyone (Arrived or Did not arrive) by 7 PM."}</p>
+        <p className="muted small">{booker ? "Log each booking here, from Facebook, calls, texts or walk-ins. Tap Arriving when the client says they're on the way; the branch marks Arrived, and every booking is closed out (Arrived or Did not arrive) by 7 PM." : "Run client receiving from here. Tap Arriving when the client is on the way and Arrived when they come in. After they pay, tap Log the sale on their booking (or their name) so the sale is tied to the booking. Add a new Service log entry only for walk-ins who aren't in Bookings. Close out everyone (Arrived or Did not arrive) by 7 PM."}</p>
         {error && <div className="notice info">{error.code === "42P01" ? "The owner needs to run update-0040 in Supabase first." : "Could not load. Try again."}</div>}
 
         {/* v0.98.1 (CHRIS Nov 27): the Service log pattern. Branch tabs and the day picker in one bar, counts as cards,
@@ -162,9 +175,9 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
             {list.map((r) => (
               <div key={r.id} id={`bk-${r.id}`} className={`booking-row${sp.focus === r.id ? " focused" : ""}${closingTime && !moved(r) && WAITING.includes(r.status) ? " closeout" : ""}`}>
                 <p style={{ margin: "0 0 2px" }}>
-                  {/* update-0091: Arriving / Arrived (or Done without a sale yet): the name opens the Service log, filled in from the booking. */}
-                  {!moved(r) && canLog(r.branch_id) && (r.status === "ARRIVING" || r.status === "ARRIVED" || (r.status === "DONE" && !sold.has(r.id)))
-                    ? <Link className="booking-client" href={`/services?branch=${codeOf.get(r.branch_id) ?? ""}&booking=${r.id}`} title="Log the sale for this client"><strong>{r.waiver_name ?? r.client_name}</strong> ›</Link>
+                  {/* CHRIS Nov 28: an arrived client's name logs their sale, tied to this booking. */}
+                  {!moved(r) && !sold.has(r.id) && canLog(r.branch_id) && (r.status === "ARRIVING" || r.status === "ARRIVED" || r.status === "DONE")
+                    ? <Link className="booking-client" href={`/services?branch=${codeOf.get(r.branch_id) ?? ""}&booking=${r.id}#add`} title="Log the sale for this client"><strong>{r.waiver_name ?? r.client_name}</strong> ›</Link>
                     : <strong>{r.waiver_name ?? r.client_name}</strong>}{" "}
                   {r.waiver_name && <span className="small muted">(FB: {r.client_name}) </span>}
                   {r.contact ? <a className="small" href={`tel:${r.contact.replace(/\s/g, "")}`}>{r.contact}</a> : <span className="small muted">no number</span>}{" "}
@@ -187,7 +200,11 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
                 </p>
                 {r.status === "CANCELLED" && !moved(r) && reasonOf.get(r.id) && <p className="small" style={{ margin: "0 0 6px" }}><strong>Client reason:</strong> {reasonOf.get(r.id)}</p>}
                 {r.status === "CANCELLED" && !moved(r) && reasonsLive && !reasonOf.get(r.id) && booker && <CancelReasonForm id={r.id} />}
-                {sold.has(r.id) && <p className="small" style={{ margin: "0 0 6px", color: "var(--good)" }}>✓ Sale logged in the Service log{canLog(r.branch_id) && <> · <Link href={`/services?branch=${codeOf.get(r.branch_id) ?? ""}&booking=${r.id}`}>Add another service</Link></>}</p>}
+                {sold.has(r.id) && <p className="small" style={{ margin: "0 0 6px", color: "var(--good)" }}>✓ Sale logged in the Service log{soldNo.get(r.id) ? ` · ${soldNo.get(r.id)}` : ""}{canLog(r.branch_id) && <> · <Link href={`/services?branch=${codeOf.get(r.branch_id) ?? ""}&booking=${r.id}#add`}>Add another service</Link></>}</p>}
+                {/* v0.106.6 (CHRIS Nov 28): an arrived client's sale is logged FROM the booking, so the two stay tied. */}
+                {!moved(r) && !sold.has(r.id) && (r.status === "ARRIVING" || r.status === "ARRIVED" || r.status === "DONE") && (canLog(r.branch_id)
+                  ? <div style={{ margin: "0 0 8px" }}><LogSale booking={r.id} href={`/services?branch=${codeOf.get(r.branch_id) ?? ""}&booking=${r.id}#add`} entries={linkChoices(r)} /></div>
+                  : (r.status === "ARRIVED" || r.status === "DONE") && <p className="small rcv-wait" style={{ margin: "0 0 6px" }}>Sale not logged yet</p>)}
                 {!moved(r) && canMark(r.branch_id) && <><StatusForm id={r.id} status={r.status} booker={booker} today={today} /> <NoteForm id={r.id} note={r.status_note} /></>}
               </div>
             ))}

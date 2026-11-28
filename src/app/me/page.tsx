@@ -131,6 +131,11 @@ export default async function Me({ searchParams }: { searchParams: Promise<{ day
   // Client photos and waivers I still owe (update-0054): always urgent on Home.
   const { data: dueData } = emp ? await supabase.rpc("my_photos_due") : { data: null };
   const photosDue = (Array.isArray(dueData) ? dueData : []) as { id: string; date: string; client: string | null; service: string | null; branch: string; amount: number }[];
+  // v0.106.6: who can mark a booking's arrival (bookers, and the branch's staff) and log its sale, per branch.
+  const clinicIds = branches.filter((b) => b.kind === "CLINIC").map((b) => b.id);
+  const bookerAll = can(access, ["CSR", "OWNER"], null) || can(access, ["MANAGER"], null);
+  const markable = clinicIds.filter((id) => bookerAll || can(access, ["MANAGER", "CLINICIAN", "CASHIER"], id));
+  const loggable = clinicIds.filter((id) => can(access, ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN"], id));
   const homeBranches = branches.filter((b) => b.kind === "CLINIC" || b.kind === "WFH").map((b) => ({ id: b.id, name: branchShort(b.name), code: b.code }));
   const tardy = trackData ? tracker((trackData as NteList).ntes, (trackData as NteList).ir_minutes) : [];
 
@@ -185,10 +190,10 @@ export default async function Me({ searchParams }: { searchParams: Promise<{ day
             <a className="button secondary small" href="/chat">Open Chat</a>
           </div>
         )}
-        {staffBookings && <HomeBookings rows={staffBookings.rows} who={staffBookings.who} toFollow={staffBookings.toFollow}
+        {staffBookings && <HomeBookings rows={staffBookings.rows} who={staffBookings.who} toFollow={staffBookings.toFollow} sold={staffBookings.sold} markable={markable} loggable={loggable}
           branches={sortBranches(branches.filter((b) => b.kind === "CLINIC")).map((b) => ({ id: b.id, name: branchShort(b.name), code: b.code }))} />}
         {home && <ManagerHome me={access.user_id} canLogSale={ownerLevel} counts={home.counts} g={home.g} view={home.view} duty={home.duty} faces={home.faces} branches={homeBranches}
-          bookings={home.bookings && <HomeBookings rows={home.bookings.rows} who={home.bookings.who} toFollow={home.bookings.toFollow} branches={home.g.branches.map((x) => homeBranches.find((b) => b.id === x.id) ?? { id: x.id, name: x.name })} />}
+          bookings={home.bookings && <HomeBookings rows={home.bookings.rows} who={home.bookings.who} toFollow={home.bookings.toFollow} sold={home.bookings.sold} markable={markable} loggable={loggable} branches={home.g.branches.map((x) => homeBranches.find((b) => b.id === x.id) ?? { id: x.id, name: x.name })} />}
           tardiness={ownerLevel && trackData != null && <HomeTardiness month={monthLabel(today.slice(0, 7))} ntes={(trackData as NteList).ntes} people={tardy} />} />}
         {emp?.commission_eligible && (
           <>

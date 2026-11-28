@@ -60,7 +60,7 @@ export function StatusForm({ id, status, booker, today }: { id: string; status: 
         {booker && btn("CONFIRMED", "Confirmed")}
         {btn("ARRIVING", "Arriving")}
         {btn("ARRIVED", "Arrived")}
-        {btn("DONE", "Done")}
+        {/* v0.106.6 (CHRIS Nov 28): Done comes only from logging (or linking) the sale, never a tap. */}
         {btn("NO_SHOW", "Did not arrive")}
         {btn("UNRESPONSIVE", "Unresponsive")}
         <button type="button" className={resched ? "on" : ""} onClick={() => { setResched(!resched); setCancel(false); }}>Re-sched…</button>

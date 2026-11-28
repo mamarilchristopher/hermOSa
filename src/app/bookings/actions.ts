@@ -76,3 +76,18 @@ export async function logFollowUp(_prev: BookingState, fd: FormData): Promise<Bo
   revalidatePath("/bookings"); revalidatePath("/bookings/followups"); revalidatePath("/me");
   return { ok: outcome === "REBOOKED" ? "Rebooked." : outcome === "CANCELLED" ? "Cancelled." : "Follow-up logged." };
 }
+
+/** v0.106.6 (CHRIS Nov 28): link an arrived booking to a Service log entry already saved for that client (the sale
+ *  was logged on its own). Same branch; staff link their own entries, owners and the GM any. The booking becomes Done. */
+export async function linkEntry(_prev: BookingState, fd: FormData): Promise<BookingState> {
+  const booking = z.uuid().safeParse(fd.get("booking"));
+  const log = z.uuid().safeParse(fd.get("log"));
+  if (!booking.success) return { error: "Refresh the page and try again." };
+  if (!log.success) return { error: "Pick the entry first." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("link_booking_log", { p_booking: booking.data, p_log: log.data });
+  if (error) return { error: "Could not link. Try again." };
+  if (!data?.ok) return { error: data?.error === "NOT_FOUND" ? "That entry can't be linked here (other branch, or entered by someone else: ask an owner or the GM)." : errorText(data?.error) };
+  revalidatePath("/bookings"); revalidatePath("/me"); revalidatePath("/services");
+  return { ok: "Linked. The booking is Done." };
+}

@@ -1584,9 +1584,19 @@ details.notices-fold > summary h2 { margin: 0; }
 details.notices-fold .nf-latest { flex: 1 1 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 details.notices-fold[open] > summary { margin-bottom: 12px; }
 /* Home board: each client opens their booking (CHRIS Nov 26) */
-a.hb-row { color: inherit; text-decoration: none; border-radius: 8px; margin: 0 -6px; padding-left: 6px; padding-right: 6px; }
-a.hb-row:hover { background: var(--gold-soft); }
-a.hb-row:hover strong { text-decoration: underline; }
+a.hb-row-main { display: flex; flex-direction: column; gap: 2px; color: inherit; text-decoration: none; border-radius: 8px; margin: 0 -6px; padding: 0 6px; }
+a.hb-row-main:hover { background: var(--gold-soft); }
+a.hb-row-main:hover strong { text-decoration: underline; }
+/* v0.106.6 (CHRIS Nov 28): receiving from the booking. Next step on each booking. */
+.hb-row { gap: 6px; padding-bottom: 8px; }
+.hb-row.hb-unlogged { box-shadow: inset 3px 0 0 var(--warn, #c98a1a); padding-left: 8px; margin-left: -8px; }
+.rcv-status, .rcv-log-row, .rcv-link { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rcv-status button, .rcv-log-row .button, .rcv-log-row button, .rcv-link button { min-height: 0; padding: 7px 12px; font-size: .82rem; }
+.rcv-log { display: flex; flex-direction: column; gap: 6px; }
+.rcv-log-btn { font-weight: 700; }
+.rcv-link select { flex: 1 1 200px; min-width: 0; max-width: 100%; }
+.rcv-done { color: var(--good); font-weight: 600; }
+.rcv-wait { color: var(--warn, #b7791f); font-weight: 600; }
 .booking-row { scroll-margin-top: 90px; }
 .booking-row.focused, .booking-row:target { outline: 2px solid var(--gold); outline-offset: 4px; border-radius: 10px; background: rgba(201, 162, 74, 0.12); }
 /* Documents (update-0082, CHRIS Nov 26) */
@@ -3015,3 +3025,8 @@ button.center-link { margin: 0 auto; }
 .overdue-decide .fill-row button { min-width: 110px; }
 .overdue-done { display: flex; gap: 10px; flex-wrap: wrap; }
 .overdue-items li > span:last-child { white-space: nowrap; flex-shrink: 0; }
+.rcv-pick { display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--gold-line, var(--line)); background: var(--gold-soft); }
+.rcv-pick-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 8px; }
+.rcv-pick-item { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); color: inherit; text-decoration: none; transition: transform .15s ease, box-shadow .15s ease; }
+.rcv-pick-item:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+.rcv-pick-go { font-weight: 700; color: var(--brown-dark); }
