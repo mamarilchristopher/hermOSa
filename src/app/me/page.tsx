@@ -174,7 +174,7 @@ export default async function Me({ searchParams }: { searchParams: Promise<{ day
         )}
         {staffBookings && <HomeBookings rows={staffBookings.rows} who={staffBookings.who} toFollow={staffBookings.toFollow}
           branches={sortBranches(branches.filter((b) => b.kind === "CLINIC")).map((b) => ({ id: b.id, name: branchShort(b.name), code: b.code }))} />}
-        {home && <ManagerHome me={access.user_id} g={home.g} view={home.view} duty={home.duty} faces={home.faces} branches={homeBranches}
+        {home && <ManagerHome me={access.user_id} canLogSale={ownerLevel} g={home.g} view={home.view} duty={home.duty} faces={home.faces} branches={homeBranches}
           bookings={home.bookings && <HomeBookings rows={home.bookings.rows} who={home.bookings.who} toFollow={home.bookings.toFollow} branches={home.g.branches.map((x) => homeBranches.find((b) => b.id === x.id) ?? { id: x.id, name: x.name })} />}
           tardiness={ownerLevel && trackData != null && <HomeTardiness month={monthLabel(today.slice(0, 7))} ntes={(trackData as NteList).ntes} people={tardy} />} />}
         {emp?.commission_eligible && (

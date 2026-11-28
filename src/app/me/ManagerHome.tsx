@@ -51,7 +51,7 @@ export function TodoCard({ todos }: { todos: Todo[] }) {
 }
 
 /** Home for owners, finance and managers: what needs doing, yesterday per branch, and how the month is going. */
-export function ManagerHome({ g, view, duty, faces = {}, branches, me, bookings, tardiness }: { me?: string; bookings?: ReactNode; tardiness?: ReactNode; g: Glance; view: DayView; duty: DutyRow[] | null; faces?: Record<string, DutyFace>; branches: { id: string; name: string; code?: string }[] }) {
+export function ManagerHome({ g, view, duty, faces = {}, branches, me, bookings, tardiness, canLogSale = false }: { canLogSale?: boolean; me?: string; bookings?: ReactNode; tardiness?: ReactNode; g: Glance; view: DayView; duty: DutyRow[] | null; faces?: Record<string, DutyFace>; branches: { id: string; name: string; code?: string }[] }) {
   const ym = g.today.slice(0, 7);
   const hm = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" });
   // CHRIS (Nov 26): "Not entered yet" boxes show only during clinic hours to 11:59 PM, never 12:00 AM to 9:59 AM.
@@ -79,6 +79,8 @@ export function ManagerHome({ g, view, duty, faces = {}, branches, me, bookings,
             : <span className="glance-verdict">{verdict(view) && <span className={`chg ${verdict(view)!.tone}`}>{verdict(view)!.text}</span>}
                 <Delta v={view.vsAvg} title="vs this month's daily average" />{view.vsAvg !== null && <span className="muted small">vs month avg</span>}
                 {view.branches.filter((b) => b.cell.kind === "empty").length > 0 && <span className="chg warn">{view.branches.filter((b) => b.cell.kind === "empty").length} not entered</span>}</span>}
+          {/* CHRIS Nov 28 (v0.103.1): Owners and the GM log a sale straight from Home (opens the Service log's Add a service form for this day). */}
+          {canLogSale && <Link className="button glance-log-btn" href={`/services?date=${view.date}&add=1#add`}><span aria-hidden>+</span> Log a sale</Link>}
         </div>
         {view.pending > 0 && <p className="small muted glance-pending"><span className="chg warn">+{php(view.pending)} waiting sign-off</span></p>}
         {shown.length > 0 && <div className="glance-branches">

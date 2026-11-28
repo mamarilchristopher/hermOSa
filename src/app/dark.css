@@ -103,3 +103,7 @@
 /* v0.102.4 Expense report sheet stays paper white */
 [data-mode="dark"] .xr-doc th, [data-mode="dark"] .xr-doc td { background: transparent; }
 [data-mode="dark"] .xr-doc tr.sub td { background: #f4f4f4; }
+/* v0.103.1: branch buttons on Add a service keep their own look (no generic segmented hover). */
+[data-mode="dark"] .segmented.branch-choice button:hover { background: var(--surface); }
+[data-mode="dark"] .segmented.branch-choice button.on, [data-mode="dark"] .segmented.branch-choice button.on:hover { background: var(--gold-soft); }
+@media (hover: hover) { [data-mode="dark"] .segmented.branch-choice button:not(.on):hover { background: var(--cream); } }

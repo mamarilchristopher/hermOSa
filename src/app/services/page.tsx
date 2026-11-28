@@ -34,7 +34,7 @@ type Line = { service_log_id: string; employee_id: string; role: string; amount_
 
 const topMgmtFor = (access: Parameters<typeof can>[0]) => can(access, ["OWNER"], null) || can(access, ["MANAGER"], null);
 
-export default async function ServiceLog({ searchParams }: { searchParams: Promise<{ date?: string; branch?: string; entry?: string; days?: string; staff?: string; booking?: string }> }) {
+export default async function ServiceLog({ searchParams }: { searchParams: Promise<{ date?: string; branch?: string; entry?: string; days?: string; staff?: string; booking?: string; add?: string }> }) {
   const { supabase, access, branches } = await requireAccess();
   const sp = await searchParams;
   const viewable = branchesFor(access, branches, ["OWNER", "FINANCE", "MANAGER", "CASHIER", "CLINICIAN", "HR", "AUDITOR"]);
@@ -258,7 +258,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
             {(services ?? []).length === 0 ? <>Add your services first on <Link href="/services/prices">Price list</Link>.</> : null}
           </div>
         ) : (
-          <AddPanel title="Add a service" hint="Log a client's visit: service, paid, staff and photos" open={!!fromBooking} id="add">
+          <AddPanel title="Add a service" hint="Log a client's visit: service, paid, staff and photos" open={!!fromBooking || sp.add === "1"} id="add">
             {fromBooking && bk && (
               <div className="notice info booking-from">
                 Logging the sale for <strong>{bk.waiver_name ?? bk.client_name}</strong>{bk.waiver_name ? <span className="muted"> (FB: {bk.client_name})</span> : null}, booked for {bk.services} at {bName[bk.branch_id] ?? "the branch"}. Saving links it to the booking, so it&apos;s not recorded twice. <Link href={`/bookings?d=${bk.appointment_date}&focus=${bk.id}`}>Back to Bookings</Link>
