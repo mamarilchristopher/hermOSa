@@ -2,11 +2,12 @@
 import { pick } from "@/lib/decision";
 import { BACKJOB_REASONS } from "@/lib/backjobs";
 import { useActionState, useEffect, useRef, useState } from "react";
-import { addService, approveMany, changeBranch, changeDate, fixPackageSession, renameClient, voidEntry, renumberMonth, decideLog, logService, toggleAfterDp, mergeEntry, separateEntry, type ActionState } from "./actions";
+import { changePaidTo, addService, approveMany, changeBranch, changeDate, fixPackageSession, renameClient, voidEntry, renumberMonth, decideLog, logService, toggleAfterDp, mergeEntry, separateEntry, type ActionState } from "./actions";
 import { previewCommission, type CommissionType } from "@/lib/commission";
 import { centsToPhp } from "@/lib/csv";
 import { PhotoGroup, usePhotoSlots } from "./PhotoSlots";
 import { ProofGroup, useProofSlots } from "./PaymentProof";
+import { PAID_TO, PAID_TO_WARNING } from "@/lib/paidTo";
 import { promoItemLabel, promoOf, promoServiceIds, type PromoOptions } from "@/lib/promoTrack";
 import { payStatus, planDues, sessionsUnlocked } from "@/lib/promoPay";
 import { packageRecord, type PackageLine } from "@/lib/packages";
@@ -119,6 +120,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const [bjReason, setBjReason] = useState("");
   const [bjStaff, setBjStaff] = useState("");
   const [amount, setAmount] = useState("");
+  const [paidTo, setPaidTo] = useState("");
   const [who, setWho] = useState("");
   // Controlled so the fields survive a "log it anyway?" round trip (React resets uncontrolled fields after an action).
   const [service, setService] = useState(booking?.serviceId ?? "");
@@ -149,7 +151,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
     if (state?.ok) {
       form.current?.reset();
       form.current?.querySelector('input[name="confirm"]')?.remove();
-      setAmount("");
+      setAmount(""); setPaidTo("");
       setKind("PAID");
       setWho("");
       setService(""); setPartner(""); setClient(booking ? (sameName ? booking.fbName : client) : ""); setPriceNote(""); setShare(false); setNote(""); setSession("1"); setMed(""); setExtras([]); setMore([]); setAfterDp(false); setDouble(false); setPromoClient(""); setContact(""); setPayPlan("1"); setHasBa(true);
@@ -403,6 +405,21 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
           </label>
         )}
         </div>
+        {/* update-0103 (CHRIS Nov 28): the account the money went TO. Not asked when nothing was paid now (₱0). */}
+        {paid && !/^\s*0*(\.0*)?\s*$/.test(amount || "x") && (
+          <fieldset className="span2 paid-to">
+            <legend className="field-label">Payment sent to</legend>
+            <p className="paid-to-warn" role="note">⚠️ <strong>{PAID_TO_WARNING}</strong> <span>Example: the client paid with their GCash app into our BPI account → choose BPI.</span></p>
+            <div className="chip-pick paid-to-pick">
+              {PAID_TO.map((o) => (
+                <label key={o.v} className={paidTo === o.v ? "on" : ""}>
+                  <input type="radio" name="paid_to" value={o.v} required checked={paidTo === o.v} onChange={() => setPaidTo(o.v)} />
+                  {o.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
         {kind === "NO_CHARGE" && svc?.sessions?.length ? (
           <div className="span2 notice error small">A package session already paid for (or a free one) is <strong>Paid with ₱0</strong>, so the session commission is still paid. Choose <strong>Paid</strong> above and type 0.</div>
         ) : null}
@@ -746,6 +763,27 @@ export function ChangeBranchForm({ id, branch, branches }: { id: string; branch:
     <form action={action} className="change-date">
       <input type="hidden" name="id" value={id} />
       <select name="branch" defaultValue={branch} aria-label="Correct branch">{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
+      <button className="small" disabled={pending}>Save</button>
+      <button type="button" className="secondary small" onClick={() => setOpen(false)}>Cancel</button>
+      {s?.error && <span className="field-error">{s.error}</span>}
+    </form>
+  );
+}
+
+/** update-0103 (CHRIS Nov 28): set or change the account the visit's payment went to. */
+export function PaidToForm({ id, value }: { id: string; value: string | null }) {
+  const [s, action, pending] = useActionState(changePaidTo, undefined);
+  const [open, setOpen] = useState(false);
+  if (s?.ok) return <div className="small ok-text">{s.ok}</div>;
+  if (!open) return <button type="button" className="link-button small" onClick={() => setOpen(true)}>{value ? "Change payment account" : "Set payment account"}</button>;
+  return (
+    <form action={action} className="change-date paid-to-fix">
+      <input type="hidden" name="id" value={id} />
+      <span className="paid-to-warn small" role="note">⚠️ <strong>{PAID_TO_WARNING}</strong></span>
+      <select name="paid_to" defaultValue={value ?? ""} required aria-label="Payment sent to">
+        <option value="" disabled>Payment sent to…</option>
+        {PAID_TO.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
+      </select>
       <button className="small" disabled={pending}>Save</button>
       <button type="button" className="secondary small" onClick={() => setOpen(false)}>Cancel</button>
       {s?.error && <span className="field-error">{s.error}</span>}

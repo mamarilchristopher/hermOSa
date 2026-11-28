@@ -34,6 +34,7 @@ export function EntryDetails({ r }: { r: ServiceRecord }) {
   const rows: [string, string][] = [
     ["Client", r.client], ["Date of service", recordDate(r.date)], ["Branch", r.branch], ["Service", lineName(r)],
     ["Payment", r.kind === "PAID" ? php(r.amount) : KIND_TEXT[r.kind] ?? r.kind],
+    ...(r.kind === "PAID" && r.paidTo ? [["Paid to", r.paidTo] as [string, string]] : []),
     ...(r.priceNote ? [["Price note", r.priceNote] as [string, string]] : []),
     ...(r.doneBy ? [["Done by", r.doneBy] as [string, string]] : []),
     ...(r.assistedBy ? [["Assisted by", r.assistedBy] as [string, string]] : []),

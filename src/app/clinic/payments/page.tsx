@@ -8,6 +8,7 @@ import { TopBar } from "@/components/TopBar";
 import { manilaToday } from "@/lib/dates";
 import { dayLabel } from "@/lib/homeGlance";
 import { branchShort } from "@/lib/schedule";
+import { paidToLabel } from "@/lib/paidTo";
 import { centsToPhp } from "@/lib/csv";
 import { RemoveProof } from "./RemoveProof";
 import { ConfirmPayment, FocusFolder } from "./ConfirmPayment";
@@ -43,6 +44,12 @@ export default async function PaymentProofs({ searchParams }: { searchParams: Pr
   for (let i = 0; i < files.length; i += 200) {
     const { data: s } = await supabase.storage.from("payment-proofs").createSignedUrls(files.slice(i, i + 200), 3600);
     for (const x of s ?? []) if (x.path && x.signedUrl) view[x.path] = x.signedUrl;
+  }
+  // update-0103: the account each payment went to, so management checks the right account.
+  const paidTo = new Map<string, string>();
+  for (let i = 0; i < folders.length; i += 150) {
+    const { data: pt } = await supabase.from("service_logs").select("id, paid_to").in("id", folders.slice(i, i + 150).map((f) => f.id));
+    for (const r of (pt ?? []) as { id: string; paid_to?: string | null }[]) { const l = paidToLabel(r.paid_to); if (l) paidTo.set(r.id, l); }
   }
   const days = [...new Set(folders.map((f) => f.date))];
   const link = (m: string) => `/clinic/payments?month=${m}${branch ? `&branch=${branch}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
@@ -87,7 +94,7 @@ export default async function PaymentProofs({ searchParams }: { searchParams: Pr
                         <span className="folder-icon" aria-hidden>💳</span>
                         <span className="folder-main">
                           <strong>{f.client ?? "No client name"}{f.staff && <span className="folder-staff"> – {f.staff}</span>}</strong>{f.log_no && <span className="small muted">{f.log_no}</span>}
-                          <span className="small muted">{[f.service, branchShort(f.branch ?? ""), centsToPhp(f.amount_cents)].filter(Boolean).join(" · ")}</span>
+                          <span className="small muted">{[f.service, branchShort(f.branch ?? ""), centsToPhp(f.amount_cents), paidTo.has(f.id) ? `to ${paidTo.get(f.id)}` : null].filter(Boolean).join(" · ")}</span>
                         </span>
                         <span className="folder-side small muted">{f.proofs.length} proof{f.proofs.length === 1 ? "" : "s"}
                           {f.check && <span className={`pill ${CHECK_PILL[f.check.state]}`}>{CHECK_TEXT[f.check.state]}</span>}

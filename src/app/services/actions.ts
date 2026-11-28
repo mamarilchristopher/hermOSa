@@ -8,6 +8,7 @@ import { errorText } from "@/lib/access";
 import { isTestService } from "@/lib/serviceOrder";
 import { testResult } from "@/lib/serviceTest";
 import { firstPlan, promoOf, type PromoOptions } from "@/lib/promoTrack";
+import { PAID_TO_VALUES, paidToLabel } from "@/lib/paidTo";
 
 export type ActionState = { error?: string; ok?: string; at?: number; duplicate?: string; link?: string } | undefined;
 
@@ -37,11 +38,12 @@ const Log = z.object({
   promo_payments: z.coerce.number().int().min(1).max(6).optional(),
   no_ba: z.literal("1").optional(),
   booking: z.uuid().optional(),
+  paid_to: z.enum(PAID_TO_VALUES).optional(),
 });
 const Photos = z.array(z.object({ kind: z.enum(["WAIVER", "BEFORE", "AFTER"]), path: z.string().max(300), thumb: z.string().max(300).nullable() })).max(20);
 
 export async function logService(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session", "meds", "proofs", "addons", "more", "promo_client", "promo_contact", "promo_payments", "no_ba", "booking", "double"].map((k) => [k, fd.get(k) ?? undefined])));
+  const p = Log.safeParse(Object.fromEntries(["branch", "date", "service", "amount", "kind", "type", "employee", "partner", "note", "client", "price_note", "folder", "photos", "share", "session", "meds", "proofs", "addons", "more", "promo_client", "promo_contact", "promo_payments", "no_ba", "booking", "double", "paid_to"].map((k) => [k, fd.get(k) ?? undefined])));
   if (!p.success) return { error: "Fill in the client's name, the service, the amount paid and who did it." };
   let photos;
   try { photos = Photos.parse(JSON.parse(p.data.photos || "[]")); } catch { return { error: "The photos didn't attach. Remove them and add them again." }; }
@@ -176,6 +178,11 @@ export async function logService(_prev: ActionState, fd: FormData): Promise<Acti
   if (paid && fd.get("after_dp") === "1") {
     const { data: dp, error: dpErr } = await supabase.rpc("set_after_dp", { p_log: data.id, p_on: true });
     medsNote += dpErr || !dp?.ok ? " The DP balance mark didn't save: ask the owner or GM to tap \"Balance after DP\" on the entry." : " Marked as the balance after a DP (commission on the full price).";
+  }
+  // update-0103 (CHRIS Nov 28): the account the payment went to, for the whole visit (after its meds/add-ons/extra lines exist).
+  if (paid && p.data.paid_to) {
+    const { data: pt, error: ptErr } = await supabase.rpc("set_service_paid_to", { p_log: data.id, p_paid_to: p.data.paid_to });
+    if (ptErr?.code !== "PGRST202" && (ptErr || !pt?.ok)) medsNote += " The payment account didn't save: the owner or GM can set it with Fix entry.";
   }
   // CHRIS Nov 26 (update-0075): optional proof of payment, kept in its own folder.
   let proofs: { path: string; thumb: string | null }[] = [];
@@ -339,6 +346,18 @@ export async function changeBranch(_prev: ActionState, fd: FormData): Promise<Ac
   revalidatePath("/services"); revalidatePath("/me");
   const more = Number(data.moved ?? 1) > 1 ? ` The ${Number(data.moved) - 1} merged line${Number(data.moved) === 2 ? "" : "s"} moved with it.` : "";
   return { ok: `Branch changed.${more}`, at: Date.now() };
+}
+
+/** update-0103 (CHRIS Nov 28): change the account a visit's payment went to. */
+export async function changePaidTo(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const id = z.uuid().safeParse(fd.get("id"));
+  const to = z.enum(PAID_TO_VALUES).safeParse(fd.get("paid_to"));
+  if (!id.success || !to.success) return { error: "Pick the account the payment was sent to." };
+  const { data, error } = await (await createClient()).rpc("set_service_paid_to", { p_log: id.data, p_paid_to: to.data });
+  if (error) return { error: error.code === "PGRST202" ? "This needs database update-0103. Ask the owner to run it." : "Could not save. Try again." };
+  if (!data?.ok) return { error: errorText(data?.error) };
+  revalidatePath("/services");
+  return { ok: `Paid to ${paidToLabel(to.data)}.`, at: Date.now() };
 }
 
 /** update-0095: owners and the GM turn a package session saved as "No charge" into Paid ₱0 with its session commission. */

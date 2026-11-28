@@ -8,6 +8,8 @@ export type ServiceRecord = {
   status: string; enteredBy: string; enteredAt: string;
   /** v0.102.2: "Approved by X · Nov 26, 2026 · 4:15 PM", "Rejected by …" or "Pending approval". */
   decided?: string;
+  /** update-0103: the account the payment went to, e.g. "BPI". */
+  paidTo?: string | null;
   /** Every line of this client's visit that day (this entry included), e.g. a service and its meds. */
   visit: RecordLine[];
 };

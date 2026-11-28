@@ -9,7 +9,7 @@ import { isIsoDate, manilaToday } from "@/lib/dates";
 import { addDays, sortBranches, WEEKDAYS, weekday } from "@/lib/insights";
 import { ROLE_TEXT, TYPE_TEXT } from "@/lib/commission";
 import { AddPanel } from "@/components/Controls";
-import { AfterDpForm, BatchApprove, BranchEntryForm, ChangeBranchForm, ChangeDateForm, DecideButtons, FixPackageForm, MergeForm, RenameClientForm, RenumberForm, SeparateForm, VoidEntryForm, FixEntry } from "./Forms";
+import { AfterDpForm, BatchApprove, BranchEntryForm, ChangeBranchForm, PaidToForm, ChangeDateForm, DecideButtons, FixPackageForm, MergeForm, RenameClientForm, RenumberForm, SeparateForm, VoidEntryForm, FixEntry } from "./Forms";
 import type { PackageLine } from "@/lib/packages";
 import { Uid } from "@/components/Uid";
 import { StaffFilter } from "./StaffFilter";
@@ -18,13 +18,14 @@ import { CHECK_FROM, CHECK_TO, checkBranches, inCheckWindow, type StatusDay } fr
 import { AddPhotosLater } from "./PhotoSlots";
 import { EditPhotos } from "./EditPhotos";
 import { AttachProof } from "./PaymentProof";
+import { paidToLabel } from "@/lib/paidTo";
 import { EntryFiles } from "./EntryFiles";
 import { doubleEntries } from "@/lib/doubleEntries";
 import type { PromoOptions } from "@/lib/promoTrack";
 
 type Log = {
   id: string; service_date: string; amount_paid_cents: number; commission_type: string; performer_id: string; assistant_id: string | null;
-  receipt_no: string | null; note: string | null; service_id?: string; branch_id?: string; client_name?: string | null; price_note?: string | null; after_dp?: boolean; list_price_cents?: number | null; photo_folder?: string | null; share_ok?: boolean; photos_due?: boolean; session_no?: number; merged_into?: string | null; log_no?: string | null; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
+  receipt_no: string | null; note: string | null; service_id?: string; branch_id?: string; client_name?: string | null; price_note?: string | null; after_dp?: boolean; list_price_cents?: number | null; photo_folder?: string | null; share_ok?: boolean; photos_due?: boolean; session_no?: number; merged_into?: string | null; log_no?: string | null; paid_to?: string | null; state: string; visit_kind?: string; created_by: string; created_at: string; decision_note: string | null;
   services: { name: string } | null;
   decided_by?: string | null; decided_at?: string | null;
 };
@@ -411,6 +412,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                     <div className="entry-side">
                       <div className="entry-paid">{centsToPhp(total)}</div>
                       {sub.length > 0 && <div className="small muted entry-paid-split">{sub.length + 1} services · one waiver</div>}
+                      {(l.visit_kind ?? "PAID") === "PAID" && paidToLabel(l.paid_to) && <div className="small entry-paid-to">Paid to <strong>{paidToLabel(l.paid_to)}</strong></div>}
                       {l.state === "PENDING" && approverFor(l.branch_id) ? <DecideButtons id={l.id} /> : (
                         <span className={`pill ${l.state === "APPROVED" ? "PUBLISHED" : l.state === "REJECTED" ? "REVERSED" : "STAGED"}`}>
                           {l.state === "APPROVED" ? "Approved" : l.state === "REJECTED" ? "Rejected" : "Waiting"}
@@ -448,7 +450,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                       <EntryDetails r={{
                         id: l.id, branch: bName[l.branch_id ?? ""] ?? branch?.name ?? "", date: l.service_date, client: l.client_name ?? "No client name",
                         service: l.services?.name ?? "Service", session: l.session_no ?? 1, amount: Number(l.amount_paid_cents), kind: l.visit_kind ?? "PAID",
-                        priceNote: l.price_note ?? null, doneBy: name[l.performer_id] ?? null, assistedBy: l.assistant_id ? name[l.assistant_id] ?? null : null,
+                        priceNote: l.price_note ?? null, paidTo: paidToLabel(l.paid_to), doneBy: name[l.performer_id] ?? null, assistedBy: l.assistant_id ? name[l.assistant_id] ?? null : null,
                         status: l.state === "APPROVED" ? "Approved" : l.state === "REJECTED" ? "Rejected" : "Waiting for sign-off",
                         enteredBy: userName.get(l.created_by) ?? "Staff", enteredAt: stamp(l.created_at), decided: decidedLine(l),
                         visit: (l.client_name ? dayList.filter((x) => x.state !== "REJECTED" && (x.client_name ?? "").trim().toLowerCase() === l.client_name!.trim().toLowerCase()) : [l])
@@ -469,6 +471,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                         <FixEntry>
                           {fixName && <RenameClientForm id={l.id} name={l.client_name!} all={topMgmt} />}
                           {topMgmt && <ChangeDateForm id={l.id} date={l.service_date} max={today} />}
+                          {(l.visit_kind ?? "PAID") === "PAID" && total > 0 && (topMgmt || l.state === "PENDING") && <PaidToForm id={l.id} value={l.paid_to ?? null} />}
                           {topMgmt && <ChangeBranchForm id={l.id} branch={l.branch_id ?? ""} branches={viewable.map((b) => ({ id: b.id, name: b.name }))} />}
                           {afterDp && <AfterDpForm id={l.id} on={!!l.after_dp} />}
                           {fixPkg && <FixPackageForm id={l.id} />}

@@ -2920,3 +2920,24 @@ a.branch-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg, 
   .xr-sign, .xr-foot { break-inside: avoid; }
   .bell, .version-guard, .photo-viewer { display: none !important; }
 }
+
+/* update-0103 (CHRIS Nov 28): Payment sent to (the account the money landed in) */
+fieldset.paid-to { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 8px; }
+fieldset.paid-to legend { padding: 0; margin-bottom: 6px; }
+.paid-to-warn { margin: 0; padding: 9px 12px; border-radius: 10px; background: #fff4d6; border: 1px solid #e8c56a; color: #5a4210; font-size: 0.84rem; line-height: 1.4; }
+.paid-to-warn strong { color: #5a4210; }
+.paid-to-warn span { display: block; margin-top: 2px; font-size: 0.8rem; }
+.paid-to-pick label { position: relative; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 999px; font-size: 0.85rem; font-weight: 600; padding: 7px 14px; min-height: 38px; }
+.paid-to-pick label:hover { border-color: var(--gold-line); }
+.paid-to-pick label.on { background: var(--viz-gold); border-color: var(--viz-gold); color: var(--on-accent); }
+.paid-to-pick input { position: absolute; opacity: 0; width: 1px; height: 1px; bottom: 0; left: 50%; margin: 0; }
+.paid-to-pick label:has(input:focus-visible) { outline: 2px solid var(--gold); outline-offset: 2px; }
+.entry-paid-to { color: var(--ink-2); }
+.paid-to-fix { flex-wrap: wrap; }
+.paid-to-fix .paid-to-warn { flex-basis: 100%; }
+[data-mode="dark"] .paid-to-warn { background: #3a3018; border-color: #7a6227; color: #f3e2b5; }
+[data-mode="dark"] .paid-to-warn strong { color: #f3e2b5; }
+@media (max-width: 720px) {
+  .paid-to-pick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .paid-to-pick label { padding: 6px 4px; font-size: 0.8rem; text-align: center; line-height: 1.15; }
+}
