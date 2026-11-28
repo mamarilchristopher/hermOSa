@@ -37,7 +37,8 @@ export function MfaForm() {
     const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: setup.factorId, code: code.trim() });
     setBusy(false);
     if (error) return setError("That code didn't work. Check the time on your phone and try again.");
-    router.replace("/");
+    // v0.106.1: back to "Set a new password" when the owner came from a password reset.
+    router.replace(new URLSearchParams(window.location.search).get("next") === "/login/reset" ? "/login/reset" : "/");
     router.refresh();
   }
 

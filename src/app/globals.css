@@ -2981,3 +2981,7 @@ fieldset.paid-to legend { padding: 0; margin-bottom: 6px; }
   .commission-lines th, .commission-lines td { padding-left: 8px; padding-right: 8px; }
   .commission-lines .cl-date { white-space: normal; font-size: 13px; width: 58px; }
 }
+
+/* v0.106.1: Forgot password links on the sign-in pages. */
+.center-link { display: block; text-align: center; }
+button.center-link { margin: 0 auto; }

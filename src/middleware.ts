@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PUBLIC_PATHS = ["/login", "/join"];
+const PUBLIC_PATHS = ["/login", "/join", "/auth/confirm"];
 
 // Refreshes the Supabase session cookie and sends signed-out visitors to /login.
 // This is convenience only: every page, action and database call re-checks access itself.
