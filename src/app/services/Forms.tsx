@@ -642,14 +642,15 @@ export function DecideButtons({ id }: { id: string }) {
 }
 
 /** Owners and the GM (update-0060): approve the ticked entries, or every waiting entry of the day, in one go. */
-export function BatchApprove({ ids }: { ids: string[] }) {
+// v0.100.6 (CHRIS Nov 28): "Approve all" leaves out entries that look logged twice; check those one by one.
+export function BatchApprove({ ids, held = 0 }: { ids: string[]; held?: number }) {
   const [state, action, pending] = useActionState(approveMany, undefined);
   return (
     <form id="batch-approve" action={action} className="batch-approve">
       {ids.map((id) => <input key={id} type="hidden" name="all" value={id} />)}
-      <span className="small muted">{ids.length} waiting. Tick entries below, or approve them all.</span>
+      <span className="small muted">{ids.length + held} waiting. Tick entries below, or approve them all.{held > 0 && <> <b className="warn-text">{held} look{held === 1 ? "s" : ""} logged twice</b> and {held === 1 ? "is" : "are"} left out of Approve all.</>}</span>
       <button type="submit" className="secondary small" disabled={pending} onClick={pick("selected")}>Approve ticked</button>
-      <button type="submit" className="small" disabled={pending} onClick={(e) => { if (!confirm(`Approve all ${ids.length} waiting entries?`)) { e.preventDefault(); return; } pick("all")(e); }}>Approve all {ids.length}</button>
+      {ids.length > 0 && <button type="submit" className="small" disabled={pending} onClick={(e) => { if (!confirm(`Approve all ${ids.length} waiting entries${held ? ` (not the ${held} that look logged twice)` : ""}?`)) { e.preventDefault(); return; } pick("all")(e); }}>Approve all {ids.length}</button>}
       {state?.ok && <span className="small" style={{ color: "var(--good)" }}>{state.ok}</span>}
       {state?.error && <span className="small" style={{ color: "var(--bad)" }}>{state.error}</span>}
     </form>
@@ -699,16 +700,18 @@ export function FixPackageForm({ id }: { id: string }) {
 }
 
 /** update-0095: void a duplicate or wrong entry, even an approved one (owners / GM). */
-export function VoidEntryForm({ id }: { id: string }) {
+// v0.100.6 (CHRIS Nov 28): "Remove entry" (was "Void entry"), also right on a card that looks logged twice, reason filled in.
+// The entry stays on record as Rejected with the reason; it no longer counts in sales or commission.
+export function VoidEntryForm({ id, reason = "", label = "Remove entry", cls = "link-button small" }: { id: string; reason?: string; label?: string; cls?: string }) {
   const [s, action, pending] = useActionState(voidEntry, undefined);
   const [open, setOpen] = useState(false);
   if (s?.ok) return <div className="small ok-text">{s.ok}</div>;
-  if (!open) return <button type="button" className="link-button small" onClick={() => setOpen(true)}>Void entry</button>;
+  if (!open) return <button type="button" className={cls} onClick={() => setOpen(true)}>{label}</button>;
   return (
     <form action={action} className="change-date">
       <input type="hidden" name="id" value={id} />
-      <input name="reason" required minLength={3} maxLength={300} placeholder="Why, e.g. duplicate of SL-2611-0401" aria-label="Why void this entry" autoFocus />
-      <button className="small danger" disabled={pending}>Void</button>
+      <input name="reason" required minLength={3} maxLength={300} defaultValue={reason} placeholder="Why, e.g. logged twice, same as SL-271126-004" aria-label="Why remove this entry" autoFocus />
+      <button className="small danger" disabled={pending}>{pending ? "Removing…" : "Remove"}</button>
       <button type="button" className="secondary small" onClick={() => setOpen(false)}>Cancel</button>
       {s?.error && <span className="field-error">{s.error}</span>}
     </form>

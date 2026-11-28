@@ -2698,3 +2698,34 @@ details.exp-edit[open] { flex-basis: 100%; }
 .adv-trade li > span { font-weight: 800; }
 .adv-trade li.gain > span { color: var(--good); }
 .adv-trade li.cost > span { color: var(--bad); }
+
+/* v0.100.6 (CHRIS Nov 28): waiver + proof previews on Service log cards, photo viewer gallery, entries that look logged twice. */
+.entry-extra { display: grid; gap: 10px; }
+.entry-files { display: grid; gap: 6px; }
+.entry-files-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.entry-file { display: grid; gap: 3px; justify-items: center; width: 76px; min-height: 0; padding: 4px; border-radius: var(--radius-sm); border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-2); box-shadow: none; cursor: zoom-in; }
+.entry-file:hover { border-color: var(--brown); background: var(--surface); color: var(--ink-2); }
+.entry-file img { width: 66px; height: 66px; object-fit: cover; border-radius: 6px; background: var(--pearl); }
+.entry-file span { font-size: 0.68rem; font-weight: 700; line-height: 1.15; text-align: center; overflow-wrap: anywhere; }
+.entry-file.WAIVER { border-color: var(--gold-line); }
+.entry-file.PROOF span { color: var(--brown-dark); }
+.entry-actions .entry-files { flex-basis: 100%; order: 99; }
+.entry-files-note { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.entry.entry-double { box-shadow: inset 4px 0 0 var(--warn); }
+.double-warn { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--warn-bg); border: 1px solid var(--line); }
+.double-warn > span.small { color: var(--ink-2); }
+.double-warn form.change-date { flex-basis: 100%; }
+.double-notice a { font-weight: 700; }
+.photo-viewer-cap { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 6px 14px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92); color: #2f241d; font-size: 0.85rem; font-weight: 700; white-space: nowrap; cursor: default; }
+.photo-viewer-n { font-variant-numeric: tabular-nums; color: #6b5a4c; font-weight: 600; }
+.photo-viewer-nav { position: fixed; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; min-height: 0; padding: 0; border-radius: 50%; border: 0; background: rgba(255, 255, 255, 0.92); color: #2f241d; font-size: 2rem; line-height: 1; box-shadow: none; }
+.photo-viewer-nav:hover { background: #fff; color: #2f241d; }
+.photo-viewer-nav.prev { left: 12px; }
+.photo-viewer-nav.next { right: 12px; }
+.photo-viewer img { cursor: zoom-in; }
+.photo-viewer.zoomed { display: block; overflow: auto; padding: 0; }
+.photo-viewer.zoomed img { max-width: none; max-height: none; width: min(2400px, 250%); border-radius: 0; cursor: zoom-out; }
+@media (max-width: 560px) { .photo-viewer { padding: 12px 12px 64px; } .photo-viewer-nav { width: 40px; height: 40px; font-size: 1.7rem; } .photo-viewer-nav.prev { left: 6px; } .photo-viewer-nav.next { right: 6px; } }
+.double-warn form.change-date { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.double-warn form.change-date input[name="reason"] { flex: 1 1 320px; min-width: 0; }

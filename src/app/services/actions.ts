@@ -349,10 +349,10 @@ export async function voidEntry(_prev: ActionState, fd: FormData): Promise<Actio
   const id = z.uuid().safeParse(fd.get("id"));
   const reason = String(fd.get("reason") ?? "").trim();
   if (!id.success) return { error: "Refresh the page and try again." };
-  if (reason.length < 3) return { error: "Say why, e.g. duplicate of SL-2611-0401." };
+  if (reason.length < 3) return { error: "Say why, e.g. logged twice, same as SL-271126-004." };
   const { data, error } = await (await createClient()).rpc("void_service_entry", { p_log: id.data, p_reason: reason });
   if (error) return { error: error.code === "PGRST202" ? "This needs database update-0095. Ask the owner to run it." : "Could not save. Try again." };
-  if (!data?.ok) return { error: data?.error === "ALREADY_PAID" ? "Already on a final payslip, so it can't be voided." : errorText(data?.error) };
+  if (!data?.ok) return { error: data?.error === "ALREADY_PAID" ? "Its commission is already on a final payslip, so it can't be removed." : errorText(data?.error) };
   revalidatePath("/services"); revalidatePath("/me");
-  return { ok: "Voided. It no longer counts.", at: Date.now() };
+  return { ok: "Removed. It stays on record as Rejected and no longer counts in sales or commission.", at: Date.now() };
 }

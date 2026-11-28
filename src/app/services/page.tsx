@@ -18,6 +18,8 @@ import { CHECK_FROM, CHECK_TO, checkBranches, inCheckWindow, type StatusDay } fr
 import { AddPhotosLater } from "./PhotoSlots";
 import { EditPhotos } from "./EditPhotos";
 import { AttachProof } from "./PaymentProof";
+import { EntryFiles } from "./EntryFiles";
+import { doubleEntries } from "@/lib/doubleEntries";
 import type { PromoOptions } from "@/lib/promoTrack";
 
 type Log = {
@@ -150,6 +152,12 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
   const pendingCount = list.filter((l) => l.state === "PENDING").length;
   const pendingMine = all.filter((l) => l.state === "PENDING" && approverFor(l.branch_id));
   const pendingAll = pendingMine.length;
+  // v0.100.6 (CHRIS Nov 28): entries that look logged twice (same client, service, session and day), from every entry
+  // of these days (not only the staff filter), so the second copy isn't approved by mistake.
+  const doubles = doubleEntries(allRaw);
+  const doubleList = all.filter((l) => doubles.has(l.id));
+  const heldBack = pendingMine.filter((l) => doubles.has(l.id));
+  const logNo = (x: { log_no: string | null }) => x.log_no ?? "another entry";
   const groups = [...new Set(all.map((l) => l.service_date))].map((d) => [d, all.filter((l) => l.service_date === d)] as const);
   const here = branch?.code ?? "ALL";
   // The booking's sale can be logged only at its own branch, by someone who logs services there.
@@ -201,6 +209,11 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
         {Number(photoWaiting) > 0 && (
           <div className="notice"><strong>{Number(photoWaiting)} photo change{Number(photoWaiting) === 1 ? "" : "s"}</strong> waiting for your approval. <Link href="/services/photo-changes">Review photo changes</Link></div>
         )}
+        {doubleList.length > 0 && (
+          <div className="notice warn double-notice"><strong>{doubleList.length} entries look logged twice</strong> (same client, service and day) in these {days} days.
+            {topMgmt ? " Check the waiver and proof on each, then remove the extra copy." : approver ? " Check the waiver and proof on each, then reject the extra copy." : " Tell an owner or the GM which one to remove."}{" "}
+            <a href={`#entry-${doubleList[0].id}`}>Go to the first one</a></div>
+        )}
         {checks.length > 0 && <DeclaredCheck checks={checks} names={checkNames} current={branch?.id ?? ""} open={inCheckWindow(date)} day={inCheckWindow(date) ? date : CHECK_TO} link={link} />}
 
         {canLog && (onDuty === false ? (
@@ -226,7 +239,7 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
           <h2>Entries</h2>
           {staffChoices.length > 0 && <StaffFilter choices={staffChoices} value={staffPick} />}
         </div>
-        {approver && pendingAll > 1 && <BatchApprove ids={pendingMine.map((l) => l.id)} />}
+        {approver && pendingAll > 1 && <BatchApprove ids={pendingMine.filter((l) => !doubles.has(l.id)).map((l) => l.id)} held={heldBack.length} />}
         {groups.length === 0 && <p className="muted">Nothing logged in these {days} days.</p>}
         {groups.map(([d, dayList]) => {
           const ok = dayList.filter((l) => l.state !== "REJECTED");
@@ -248,8 +261,13 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                 const fixName = !!l.client_name && l.state !== "REJECTED" && canEdit;
                 const afterDp = topMgmt && l.state !== "REJECTED" && (l.after_dp || ((l.visit_kind ?? "PAID") === "PAID" && Number(l.amount_paid_cents) > 0 && Number(l.list_price_cents ?? 0) > Number(l.amount_paid_cents)));
                 const fixPkg = topMgmt && l.state !== "REJECTED" && l.visit_kind === "NO_CHARGE" && !!l.service_id && bundleIds.includes(l.service_id);
+                const twins = doubles.get(l.id);
+                const awaitingMe = l.state === "PENDING" && approverFor(l.branch_id);
+                // Waiver photos are seen by owners, the GM and the branch's clinic staff (the client archive rule).
+                const seesFiles = can(access, ["OWNER", "MANAGER", "CLINICIAN", "CASHIER"], l.branch_id ?? null);
+                const needsWaiver = (l.visit_kind ?? "PAID") === "PAID" || l.visit_kind === "BACKJOB";
                 return (
-                  <article key={l.id} id={`entry-${l.id}`} className={["entry", l.state === "REJECTED" ? "rejected" : "", sp.entry === l.id ? "entry-focus" : ""].join(" ").trim()}>
+                  <article key={l.id} id={`entry-${l.id}`} className={["entry", l.state === "REJECTED" ? "rejected" : "", sp.entry === l.id ? "entry-focus" : "", twins ? "entry-double" : ""].join(" ").trim()}>
                     <div className="entry-main">
                       <div className="entry-top">
                         {l.state === "PENDING" && approverFor(l.branch_id) && pendingAll > 1 && (
@@ -297,11 +315,24 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                       )}
                       {l.state === "REJECTED" && l.decision_note && <div className="small muted">{l.decision_note}</div>}
                     </div>
-                    {l.photos_due && l.state !== "REJECTED" && (
-                      <div className="photos-due entry-wide">
-                        <span className="pill REVERSED">Photos missing</span>
-                        {!noCommission && <span className="small muted"> Commission held until they&apos;re added.</span>}
-                        {canEdit && <AddPhotosLater log={l.id} branch={l.branch_id ?? branch?.id ?? ""} folder={l.photo_folder ?? null} needs="before and after photos and both waiver pages" />}
+                    {((l.photos_due && l.state !== "REJECTED") || twins || (awaitingMe && seesFiles)) && (
+                      <div className="entry-wide entry-extra">
+                        {twins && (
+                          <div className="double-warn">
+                            <span className="pill REVERSED">Looks logged twice</span>
+                            <span className="small">Same client, service and day as {twins.map((t) => <a key={t.id} href={`#entry-${t.id}`}>{logNo(t)} ({t.state === "APPROVED" ? "approved" : "waiting"})</a>).reduce<React.ReactNode[]>((a, x, i) => (i ? [...a, ", ", x] : [x]), [])}.
+                              {" "}{twins.every((t) => !t.first) ? "This is the first one entered." : "This one was entered later."}</span>
+                            {topMgmt && l.state !== "REJECTED" && <VoidEntryForm id={l.id} label="Remove this copy" cls="danger small" reason={`Logged twice, same as ${twins.map(logNo).join(", ")}`} />}
+                          </div>
+                        )}
+                        {awaitingMe && seesFiles && <EntryFiles log={l.id} auto needsWaiver={needsWaiver && !l.photos_due} />}
+                        {l.photos_due && l.state !== "REJECTED" && (
+                          <div className="photos-due">
+                            <span className="pill REVERSED">Photos missing</span>
+                            {!noCommission && <span className="small muted"> Commission held until they&apos;re added.</span>}
+                            {canEdit && <AddPhotosLater log={l.id} branch={l.branch_id ?? branch?.id ?? ""} folder={l.photo_folder ?? null} needs="before and after photos and both waiver pages" />}
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="entry-actions">
@@ -314,12 +345,14 @@ export default async function ServiceLog({ searchParams }: { searchParams: Promi
                         visit: (l.client_name ? dayList.filter((x) => x.state !== "REJECTED" && (x.client_name ?? "").trim().toLowerCase() === l.client_name!.trim().toLowerCase()) : [l])
                           .slice().reverse().map((x) => ({ service: x.services?.name ?? "Service", session: x.session_no ?? 1, amount: Number(x.amount_paid_cents), kind: x.visit_kind ?? "PAID" })),
                       }} />
-                      {l.photo_folder && l.client_name && <Link className="button secondary small" href={`/clinic/archive?month=${l.service_date.slice(0, 7)}#${l.id}`}>Photos{l.share_ok ? " · sharing OK" : ""}</Link>}
+                      {/* v0.100.6: waiver, proof and photos open right here (not the Client archive page). */}
+                      {!awaitingMe && seesFiles && (l.photo_folder || proofCount.get(l.id)) && <EntryFiles log={l.id} auto={false} needsWaiver={needsWaiver && !l.photos_due} />}
+                      {l.share_ok && l.photo_folder && <span className="tag">Photo sharing OK</span>}
                       {/* update-0093 (CHRIS Nov 27): add, remove or replace photos on a past entry; saved after an owner's or the GM's approval. */}
                       {l.state !== "REJECTED" && !l.photos_due && canEdit && (
                         <EditPhotos log={l.id} branch={l.branch_id ?? branch?.id ?? ""} approver={can(access, ["OWNER"], null) || can(access, ["MANAGER"], null)} />
                       )}
-                      {proofCount.get(l.id) ? <span className="entry-proof"><Link className="button secondary small" href={`/clinic/payments?month=${l.service_date.slice(0, 7)}#${l.id}`}>💳 Proof ({proofCount.get(l.id)})</Link>
+                      {proofCount.get(l.id) ? <span className="entry-proof">{!seesFiles && <Link className="button secondary small" href={`/clinic/payments?month=${l.service_date.slice(0, 7)}#${l.id}`}>💳 Proof ({proofCount.get(l.id)})</Link>}
                         {payCheck.get(l.id) && <span className={`pill ${payCheck.get(l.id) === "RECEIVED" ? "PUBLISHED" : payCheck.get(l.id) === "NOT_RECEIVED" ? "REVERSED" : "STAGED"}`}>
                           {payCheck.get(l.id) === "RECEIVED" ? "Payment received" : payCheck.get(l.id) === "NOT_RECEIVED" ? "Not received" : "To confirm"}</span>}</span> : null}
                       {l.state !== "REJECTED" && <AttachProof log={l.id} branch={l.branch_id ?? branch?.id ?? ""} have={proofCount.get(l.id) ?? 0} />}
