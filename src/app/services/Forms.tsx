@@ -28,6 +28,9 @@ function sessionLabel(i: number, list: number[], name: string): string {
 
 const KINDS = [
   { v: "PAID", label: "Paid" },
+  // CHRIS Nov 28 (v0.103.2): a session of a package the client already paid for in full: ₱0, no payment questions,
+  // the usual session commission. Saved as Paid ₱0.
+  { v: "PACKAGE", label: "Fully paid package" },
   { v: "BACKJOB", label: "Backjob" },
   { v: "CHECKUP", label: "Check-up" },
   { v: "NO_CHARGE", label: "No charge" },
@@ -116,7 +119,8 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   const [state, action, pending] = useActionState(logService, undefined);
   // CHRIS Nov 26: no Lead/Assist/Solo choice. "Done by" is the lead; a commission-based lead may add an assistant (default None).
   const [kind, setKind] = useState<Kind>("PAID");
-  const paid = kind === "PAID";
+  const fullyPaid = kind === "PACKAGE";
+  const paid = kind === "PAID" || fullyPaid;
   const [bjReason, setBjReason] = useState("");
   const [bjStaff, setBjStaff] = useState("");
   const [amount, setAmount] = useState("");
@@ -161,11 +165,14 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
   }, [state]);
   const person = employees.find((e) => e.id === who);
   const partnerEmp = employees.find((e) => e.id === partner);
-  const cents = Math.round(Number(amount.replace(/[,₱\s]/g, "")) * 100) || 0;
+  const cents = fullyPaid ? 0 : Math.round(Number(amount.replace(/[,₱\s]/g, "")) * 100) || 0;
   const svc = services.find((x) => x.id === service);
   // update-0087: a promo item (a session or the payment line) and the clients on that promo.
   const pm = svc ? promoOf(svc.id, promos) : null;
   const promoIds = promoServiceIds(promos);
+  // Fully paid package: only package sessions (bundles and promo sessions), never a promo's payment line.
+  const isPackage = (s: Opt) => !!s.sessions?.length || !!promoOf(s.id, promos)?.part;
+  const svcList = fullyPaid ? services.filter(isPackage) : services;
   const pmClients = pm ? (promos?.clients ?? []).filter((c) => c.promo_id === pm.promo.id) : [];
   const pc = pmClients.find((c) => c.id === promoClient) ?? null;
   const pmUsed = pc && svc ? pc.used[svc.id] ?? 0 : 0;
@@ -285,20 +292,25 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       <input type="hidden" name="branch" value={branch} />
       {!photosOptional && <input type="hidden" name="date" value={date} />}
       <input type="hidden" name="type" value={effType} />
-      <input type="hidden" name="kind" value={kind} />
+      <input type="hidden" name="kind" value={fullyPaid ? "PAID" : kind} />
       <input type="hidden" name="folder" value={photos.folder} />
       <input type="hidden" name="photos" value={photos.json} />
-      <input type="hidden" name="proofs" value={proofs.json} />
+      <input type="hidden" name="proofs" value={fullyPaid ? "[]" : proofs.json} />
       <input type="hidden" name="addons" value={addonsJson} />
       <input type="hidden" name="more" value={moreJson} />
       {needsPhotos && !hasBa && <input type="hidden" name="no_ba" value="1" />}
       <div className="field">
         <span className="field-label">Did the client pay?</span>
-        <div className="segmented choice" role="radiogroup" aria-label="Did the client pay?">
+        <div className="segmented choice branch-choice" role="radiogroup" aria-label="Did the client pay?">
           {KINDS.map((k) => (
-            <button type="button" key={k.v} role="radio" aria-checked={kind === k.v} className={kind === k.v ? "on" : ""} onClick={() => setKind(k.v)}>{k.label}</button>
+            <button type="button" key={k.v} role="radio" aria-checked={kind === k.v} className={kind === k.v ? "on" : ""} onClick={() => {
+              setKind(k.v);
+              // Fully paid package: nothing paid today; a service that isn't a package is cleared so a package is picked.
+              if (k.v === "PACKAGE") { setPaidTo(""); setExtras([]); setMore([]); setAfterDp(false); setMed(""); if (svc && !isPackage(svc)) setService(""); }
+            }}>{k.label}</button>
           ))}
         </div>
+        {fullyPaid && <span className="small muted">For a client who already paid for their whole package. Logged at ₱0 with no payment questions{noCommission ? "" : "; the session commission is still paid as usual"}.</span>}
         {!paid && <span className="small muted">{noCommission ? "Logged at ₱0, so you can see every client handled." : "Logged at ₱0 with no commission, so you can see every client handled."}</span>}
       </div>
       {/* update-0088 (CHRIS Nov 27): what the backjob fixes and who did the first treatment, for backjob tracking. */}
@@ -391,22 +403,27 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
             if (pr != null) setAmount(pr > 0 ? String(pr / 100) : "");
           }}>
             <option value="" disabled>Choose a service…</option>
-            {services.filter((s) => !promoIds.has(s.id)).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            {services.some((s) => promoIds.has(s.id)) && (
+            {svcList.filter((s) => !promoIds.has(s.id)).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {svcList.some((s) => promoIds.has(s.id)) && (
               <optgroup label="Promos">
-                {services.filter((s) => promoIds.has(s.id)).map((s) => <option key={s.id} value={s.id}>{promoItemLabel(s.id, promos) ?? s.name}</option>)}
+                {svcList.filter((s) => promoIds.has(s.id)).map((s) => <option key={s.id} value={s.id}>{promoItemLabel(s.id, promos) ?? s.name}</option>)}
               </optgroup>
             )}
           </select>
         </label>
-        {paid && (
+        {fullyPaid ? (
+          <label>Amount paid (₱)
+            <input type="hidden" name="amount" value="0" />
+            <span className="fully-paid-tag">₱0 · fully paid</span>
+          </label>
+        ) : paid && (
           <label>Amount paid (₱)
             <input name="amount" inputMode="decimal" placeholder={svc?.sessions?.length && !pm ? "What the client paid (0 if none)" : "e.g. 2500"} required value={amount} readOnly={!!pm?.part && !!pm.promo.pay_service_id} onChange={(e) => setAmount(e.target.value)} />
           </label>
         )}
         </div>
         {/* update-0103 (CHRIS Nov 28): the account the money went TO. Not asked when nothing was paid now (₱0). */}
-        {paid && !/^\s*0*(\.0*)?\s*$/.test(amount || "x") && (
+        {paid && !fullyPaid && !/^\s*0*(\.0*)?\s*$/.test(amount || "x") && (
           <fieldset className="span2 paid-to">
             <legend className="field-label">Payment sent to</legend>
             <p className="paid-to-warn" role="note">⚠️ <strong>{PAID_TO_WARNING}</strong> <span>Example: the client paid with their GCash app into our BPI account → choose BPI.</span></p>
@@ -421,7 +438,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
           </fieldset>
         )}
         {kind === "NO_CHARGE" && svc?.sessions?.length ? (
-          <div className="span2 notice error small">A package session already paid for (or a free one) is <strong>Paid with ₱0</strong>, so the session commission is still paid. Choose <strong>Paid</strong> above and type 0.</div>
+          <div className="span2 notice error small">A package session already paid for (or a free one) earns its session commission. Choose <strong>Fully paid package</strong> above (or Paid and type 0).</div>
         ) : null}
         {canDouble && (
           <label className="span2 double-dose">
@@ -489,14 +506,14 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
             {pc && pm.part && pmGated && pmUsedAll >= pmUnlocked && pmUnlocked < (pm.promo.sessions ?? 0) && <span className="small" style={{ color: "var(--bad)" }}>Sessions follow payments: {pc.client} has used the {pmUnlocked} session{pmUnlocked === 1 ? "" : "s"} paid so far. Log their next payment first.</span>}
           </div>
         )}
-        {meds.length > 0 && (
+        {meds.length > 0 && !fullyPaid && (
           <label className="span2"><span>Meds{!noCommission && <span className="muted"> (no commission)</span>}</span>
             <select name="meds" value={med} onChange={(e) => setMed(e.target.value)}>
               {medsChoices(meds).map((m) => <option key={m.v} value={m.v}>{m.label}</option>)}
             </select>
           </label>
         )}
-        {paid && addons.length > 0 && (
+        {paid && !fullyPaid && addons.length > 0 && (
           <div className="span2 addons">
             {extras.map((x, i) => (
               <div className="addon-row" key={i}>
@@ -518,7 +535,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
             <button type="button" className="secondary small" onClick={() => setExtras([...extras, { service: addons.length === 1 ? addons[0].id : "", amount: addons.length === 1 && addons[0].price ? String(addons[0].price / 100) : "" }])}>+ Add-on{extras.length ? " (another)" : ""}</button>
           </div>
         )}
-        {paid && (
+        {paid && !fullyPaid && (
           <div className="span2 addons more-services">
             {more.map((x, i) => {
               const s = moreChoices.find((o) => o.id === x.service);
@@ -581,7 +598,7 @@ export function EntryForm({ branch, date, today, services, employees, noCommissi
       </label>
       <PhotoGroup api={photos} title="Waiver (2 pages)" hint={needsPhotos ? "A clear photo of each page of the signed waiver." : "Optional for this visit."}
         kinds={[{ kind: "WAIVER", label: "Add waiver page" }]} />
-      <ProofGroup api={proofs} />
+      {!fullyPaid && <ProofGroup api={proofs} />}
       <div className="entry-grid">
         <label className={needsPartner ? "" : "span2"}>{!paid ? "Handled by" : "Done by"}
           <select name="employee" required value={who} onChange={(e) => { setWho(e.target.value); if (e.target.value === partner || employees.find((x) => x.id === e.target.value)?.eligible === false) setPartner(""); }}>{people}</select>

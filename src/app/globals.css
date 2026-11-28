@@ -2968,3 +2968,6 @@ fieldset.paid-to legend { padding: 0; margin-bottom: 6px; }
   .segmented.branch-choice button { padding: 10px 10px; font-size: 0.88rem; text-align: left; }
   .segmented.branch-choice button:first-child:nth-last-child(odd) { grid-column: 1 / -1; }
 }
+
+/* v0.103.2 (CHRIS Nov 28): Fully paid package shows ₱0 as a fixed value, not a field to type in. */
+.fully-paid-tag { display: flex; align-items: center; min-height: 44px; padding: 8px 12px; border-radius: 10px; border: 1px dashed var(--gold); background: var(--gold-soft); color: var(--brown-dark); font-weight: 800; }
